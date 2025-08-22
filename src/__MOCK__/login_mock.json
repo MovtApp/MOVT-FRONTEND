@@ -1,0 +1,10 @@
+{
+  "user": {
+    "id": "1",
+    "name": "Usuário Teste",
+    "email": "teste@movt.com",
+    "token": "mock-jwt-token-123456"
+  },
+  "success": true,
+  "message": "Login realizado com sucesso"
+}

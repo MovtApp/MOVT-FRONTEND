@@ -1,29 +1,38 @@
 {
   "expo": {
-    "name": "Movt",
-    "slug": "Movt",
+    "name": "MOVT",
+    "slug": "movt",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/icon.png",
-    "userInterfaceStyle": "light",
-    "newArchEnabled": true,
+    "icon": "./src/assets/iconBuild.png",
     "splash": {
-      "image": "./assets/splash-icon.png",
+      "image": "./src/assets/logo.png",
       "resizeMode": "contain",
       "backgroundColor": "#ffffff"
     },
+    "userInterfaceStyle": "light",
+    "newArchEnabled": true,
     "ios": {
-      "supportsTablet": true
+      "bundleIdentifier": "com.dsvmTecnology.movtapp",
+      "supportsTablet": false
     },
     "android": {
-      "adaptiveIcon": {
-        "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#ffffff"
-      },
+      "package": "com.dsvmTecnology.movtapp",
       "edgeToEdgeEnabled": true
     },
+    "extra": {
+      "eas": {
+        "projectId": "06c0d00e-747e-498a-944c-8cafd9e468dc"
+      }
+    },
+    "updates": {
+      "url": "https://u.expo.dev/06c0d00e-747e-498a-944c-8cafd9e468dc"
+    },
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
     "web": {
-      "favicon": "./assets/favicon.png"
+      "favicon": "./assets/icon.png"
     }
   }
 }
