@@ -15,12 +15,6 @@ import { supabase } from "../../services/supabaseClient";
 import BackButton from "../../components/BackButton";
 import CustomInput from "../../components/CustomInput";
 import { Button } from "../../components/Button";
-import { useNavigation } from "@react-navigation/native";
-import {
-  NativeStackNavigationProp,
-  NativeStackScreenProps,
-} from "@react-navigation/native-stack";
-import { AuthStackParamList } from "../../@types/routes";
 import DateTimePickerModal from "react-native-modal-datetime-picker";
 import { Calendar, Eye, EyeOff } from "lucide-react-native";
 import { H4 } from "@components/Typography";
@@ -38,7 +32,11 @@ const registerSchema = z.object({
 
 type RegisterFormData = z.infer<typeof registerSchema>;
 
-type Props = NativeStackScreenProps<any, "SignUpScreen">;
+interface Props {
+  navigation: {
+    navigate: (screen: string) => void;
+  };
+}
 
 export const SignUpScreen = ({ navigation }: Props) => {
   function handleLogin() {

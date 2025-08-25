@@ -1,11 +1,5 @@
 import React, { useState } from "react";
-import {
-  View,
-  Text,
-  TouchableOpacity,
-  StyleSheet,
-  TextInput,
-} from "react-native";
+import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
 import BackButton from "../../components/BackButton";
 import SocialButton from "../../components/SocialButton";
 import { useNavigation } from "@react-navigation/native";

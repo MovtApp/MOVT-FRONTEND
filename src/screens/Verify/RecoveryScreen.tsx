@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { View, StyleSheet, TouchableOpacity, Text } from "react-native";
 import BackButton from "@components/BackButton";
-import RootStackParamList from "@/@types/routes";
+import { RootStackParamList } from "@/@types/routes";
 import { useNavigation } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import CustomInput from "@components/CustomInput";

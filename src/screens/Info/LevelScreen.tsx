@@ -9,8 +9,8 @@ const LevelScreen = () => {
   const navigation =
     useNavigation<NativeStackNavigationProp<RootStackParamList>>();
 
-  const handleHeight = () => {
-    navigation.navigate("Info", { screen: "LevelScreen" });
+  const handleLevel = () => {
+    navigation.navigate("App", { screen: "HomeScreen" });
   };
 
   return (
@@ -29,7 +29,7 @@ const LevelScreen = () => {
         <Input text="Avançado" />
       </View>
 
-      <TouchableOpacity style={styles.advanceButton} onPress={handleHeight}>
+      <TouchableOpacity style={styles.advanceButton} onPress={handleLevel}>
         <Text style={styles.advanceButtonText}>Avançar</Text>
       </TouchableOpacity>
     </View>

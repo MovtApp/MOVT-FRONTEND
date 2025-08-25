@@ -12,6 +12,7 @@
   "dependencies": {
     "@expo-google-fonts/rubik": "^0.4.1",
     "@expo/metro-runtime": "~5.0.4",
+    "@expo/ngrok": "^4.1.3",
     "@gorhom/bottom-sheet": "^5.1.2",
     "@gregfrench/react-native-wheel-picker": "^1.2.16",
     "@hookform/resolvers": "^5.1.1",
@@ -27,7 +28,6 @@
     "@rn-primitives/slot": "^1.1.0",
     "@rn-primitives/types": "^1.1.0",
     "@supabase/supabase-js": "^2.50.3",
-
     "axios": "^1.9.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
@@ -43,7 +43,7 @@
     "expo-status-bar": "~2.2.3",
     "expo-updates": "~0.28.12",
     "fs-extra": "^11.3.0",
-    "lucide-react-native": "^0.486.0",
+    "lucide-react-native": "^0.541.0",
     "nativewind": "^4.1.23",
     "react": "19.0.0",
     "react-dom": "^19.0.0",
@@ -57,7 +57,7 @@
     "react-native-reanimated": "~3.17.4",
     "react-native-safe-area-context": "5.4.0",
     "react-native-screens": "~4.10.0",
-    "react-native-svg": "^15.12.0",
+    "react-native-svg": "^13.14.0",
     "react-native-web": "^0.20.0",
     "tailwind-merge": "^3.1.0",
     "tailwindcss-animate": "^1.0.7",
@@ -74,7 +74,6 @@
     "eslint-plugin-prettier": "^5.4.0",
     "prettier": "^3.5.3",
     "prettier-plugin-tailwindcss": "^0.6.11",
-    "react-native-svg-transformer": "^1.5.0",
     "tailwindcss": "^3.4.17",
     "typescript": "~5.8.3"
   },

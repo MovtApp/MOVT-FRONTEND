@@ -2,9 +2,9 @@ import React, { useState } from "react";
 import { View, StyleSheet, TouchableOpacity, Text } from "react-native";
 import BackButton from "@components/BackButton";
 import CustomInput from "@components/CustomInput";
-import RootStackParamList from "@/@types/routes";
 import { useNavigation } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
+import { RootStackParamList } from "@/@types/routes";
 
 const VerifyPhoneScreen = () => {
   const navigation =

@@ -1,10 +1,10 @@
+import React, { useState } from "react";
 import { View, StyleSheet, TouchableOpacity, Text } from "react-native";
 import BackButton from "@components/BackButton";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import RootStackParamList from "@/@types/routes";
+import { RootStackParamList } from "@/@types/routes";
 import { useNavigation } from "@react-navigation/native";
 import SelectInput from "@components/SelectInput";
-import { useState } from "react";
 
 const GenderScreen = () => {
   const navigation =
