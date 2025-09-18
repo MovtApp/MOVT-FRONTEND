@@ -1,4 +1,4 @@
-import { Image, ScrollView, View, StyleSheet, Text } from "react-native";
+import { Image, ScrollView, View, StyleSheet, Text, TouchableOpacity } from "react-native";
 
 import LogoIcon from "@assets/icon.png";
 import {
@@ -6,6 +6,7 @@ import {
   MapPin,
   QrCode,
   Network,
+  HeartPlus,
 } from "lucide-react-native";
 import { ContainerX } from "@components/ContainerX";
 import { H4, P } from "@components/Typography";
@@ -15,6 +16,7 @@ import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 type Props = NativeStackScreenProps<any, "StartupScreen">;
 
 export const StartupScreen = ({ navigation }: Props) => {
+
   function handleStart() {
     navigation.navigate("SignInScreen");
   }
@@ -29,10 +31,10 @@ export const StartupScreen = ({ navigation }: Props) => {
             paddingBottom: 120,
           }}
         >
-          <View className="">
+          <View>
             <Image
               source={LogoIcon}
-              className="mb-6 h-20 w-20 self-start"
+              style={{ marginBottom: 24, height: 80, width: 80, alignSelf: "flex-start" }}
               resizeMode="contain"
             />
             <Text style={styles.title}>Boas vindas ao Movt</Text>
@@ -40,75 +42,70 @@ export const StartupScreen = ({ navigation }: Props) => {
               Explore o melhor do mundo fitness com profissionais
               especializados.
             </Text>
-            <View className="gap-6">
+            <View>
               <Text style={styles.subtitle}>Veja como funciona:</Text>
-              <View className="flex-row gap-4">
-                <MapPin size={30} color="#111" />
-                <View className="flex-1 gap-1 overflow-hidden">
-                  <H4 className="text-grayscale-600">
+              <View style={{ flexDirection: "row", marginBottom: 24 }}>
+                <View style={{ marginRight: 16 }}>
+                  <MapPin size={30} color="#111" />
+                </View>
+                <View style={{ flex: 1, overflow: "hidden" }}>
+                  <H4 style={{ fontFamily: "Rubik_700Bold" }}>
                     Encontre personal trainers
                   </H4>
-                  <P className="text-sm text-grayscale-500">
+                  <P>
                     Veja treinadores perto de você com base na localização de
                     forma eficiente.
                   </P>
                 </View>
               </View>
-              <View className="flex-row gap-4">
-                <QrCode size={30} color="#111" />
-                <View className="flex-1 gap-1 overflow-hidden">
-                  <H4 className="text-grayscale-600">
+              <View style={{ flexDirection: "row", marginBottom: 24 }}>
+                <View style={{ marginRight: 16 }}>
+                  <QrCode size={30} color="#111" />
+                </View>
+                <View style={{ flex: 1, overflow: "hidden" }}>
+                  <H4 style={{ fontFamily: "Rubik_700Bold" }}>
                     Integração com empresas parceiras
                   </H4>
-                  <P className="text-sm text-grayscale-500">
+                  <P>
                     Encontre academias parceiras nas proximidades que oferecem
                     benefícios.
                   </P>
                 </View>
               </View>
-              <View className="flex-row gap-4">
-                <Network size={30} color="#111" />
-                <View className="flex-1 gap-1 overflow-hidden">
-                  <H4 className="text-grayscale-600">
+              <View style={{ flexDirection: "row", marginBottom: 24 }}>
+                <View style={{ marginRight: 16 }}>
+                  <Network size={30} color="#111" />
+                </View>
+                <View style={{ flex: 1, overflow: "hidden" }}>
+                  <H4 style={{ fontFamily: "Rubik_700Bold" }}>
                     Tecnologia a favor do usuário
                   </H4>
-                  <P className="text-sm text-grayscale-500">
+                  <P>
                     Oferecemos soluções tecnológicas para gerenciamento de
                     métricas e resultados.
                   </P>
                 </View>
               </View>
-              <View className="flex-row gap-4">
-                <Radar size={30} color="#111" />
-                <View className="flex-1 gap-1 overflow-hidden">
-                  <H4 className="text-grayscale-600">
-                    Tecnologia a favor do usuário
+              <View style={{ flexDirection: "row", marginBottom: 24 }}>
+                <View style={{ marginRight: 16 }}>
+                  <HeartPlus size={30} color="#111" />
+                </View>
+                <View style={{ flex: 1, overflow: "hidden" }}>
+                  <H4 style={{ fontFamily: "Rubik_700Bold" }}>
+                    Saúde e bem-estar
                   </H4>
-                  <P className="text-sm text-grayscale-500">
-                    Oferecemos soluções tecnológicas para gerenciamento de
-                    métricas e resultados.
+                  <P>
+                    Facilita o cuidado com a saúde, tornando o acompanhamento de treinos e hábitos mais prático e motivador.
                   </P>
                 </View>
               </View>
             </View>
           </View>
         </ScrollView>
-        <View
-          style={{
-            position: "absolute",
-            left: 30,
-            right: 30,
-            bottom: 30,
-          }}
-        >
-          <Button
-            className="h-14 bg-[#192126]"
-            variant="default"
-            onPress={handleStart}
-          >
-            <H4 className="text-grayscale-1">Começar</H4>
-          </Button>
-        </View>
+       
+      <TouchableOpacity style={styles.advanceButton} onPress={handleStart}>
+        <Text style={styles.advanceButtonText}>Começar</Text>
+      </TouchableOpacity>
       </View>
     </ContainerX>
   );
@@ -185,5 +182,20 @@ const styles = StyleSheet.create({
     fontFamily: "Rubik_500Medium",
     fontSize: 16,
     color: "#1877F3",
+  },
+  advanceButton: {
+    width: 350,
+    alignSelf: "center",
+    backgroundColor: "#192126",
+    borderRadius: 10,
+    paddingVertical: 14,
+    alignItems: "center",
+    marginBottom: 30,
+    marginTop: 30,
+  },
+  advanceButtonText: {
+    color: "#fff",
+    fontFamily: "Rubik_500Medium",
+    fontSize: 16,
   },
 });

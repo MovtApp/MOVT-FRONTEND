@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, ReactNode } from "react";
 import { View, Text, TouchableOpacity, ScrollView } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useNavigation } from "@react-navigation/native";
 import { cn } from "../lib/utils";
 import {
   CalendarDays,
@@ -18,7 +19,6 @@ import {
   Dumbbell,
 } from "lucide-react-native";
 
-// Contexto do Sidebar
 interface SidebarContextType {
   isOpen: boolean;
   toggle: () => void;
@@ -73,6 +73,7 @@ interface SidebarProps {
 export const Sidebar: React.FC<SidebarProps> = ({ className }) => {
   const { isOpen, close } = useSidebar();
   const { top } = useSafeAreaInsets();
+  const navigation = useNavigation();
 
   if (!isOpen) return null;
 
@@ -107,26 +108,66 @@ export const Sidebar: React.FC<SidebarProps> = ({ className }) => {
       >
         <View style={styles.sidebarSection}>
           <Text style={styles.sidebarSectionTitle}>Menu principal</Text>
-          <View style={styles.sidebarItemContent}>
+          
+          {/* INÍCIO */}
+          <TouchableOpacity
+            style={styles.sidebarItemContent}
+            onPress={() => {
+              // @ts-ignore
+              navigation.navigate('HomeScreen');
+            }}
+          >
             <House size={24} color="#fff" />
             <Text style={styles.sidebarItemText}>Início</Text>
-          </View>
-          <View style={styles.sidebarItemContent}>
+          </TouchableOpacity>
+
+          {/* MAPA */}
+          <TouchableOpacity
+            style={styles.sidebarItemContent}
+            onPress={() => {
+              // @ts-ignore
+              navigation.navigate('MapScreen');
+            }}
+          >
             <MapPinned size={24} color="#fff" />
             <Text style={styles.sidebarItemText}>Mapa</Text>
-          </View>
-          <View style={styles.sidebarItemContent}>
+          </TouchableOpacity>
+
+          {/* DIETAS */}
+          <TouchableOpacity
+            style={styles.sidebarItemContent}
+            onPress={() => {
+              // @ts-ignore
+              navigation.navigate('DietScreen');
+            }}
+          >
             <Soup size={24} color="#fff" />
             <Text style={styles.sidebarItemText}>Dietas</Text>
-          </View>
-          <View style={styles.sidebarItemContent}>
+          </TouchableOpacity>
+
+          {/* DADOS */}
+          <TouchableOpacity
+            style={styles.sidebarItemContent}
+            onPress={() => {
+              // @ts-ignore
+              navigation.navigate('DataScreen');
+            }}
+          >
             <ChartColumnBig size={24} color="#fff" />
             <Text style={styles.sidebarItemText}>Dados</Text>
-          </View>
-          <View style={styles.sidebarItemContent}>
+          </TouchableOpacity>
+
+          {/* CHAT */}
+          <TouchableOpacity
+            style={styles.sidebarItemContent}
+            onPress={() => {
+              // @ts-ignore
+              navigation.navigate('ChatScreen');
+            }}
+          >
             <MessageCircle size={24} color="#fff" />
             <Text style={styles.sidebarItemText}>Chat</Text>
-          </View>
+          </TouchableOpacity>
         </View>
 
         {/* Linha divisória */}
@@ -134,18 +175,42 @@ export const Sidebar: React.FC<SidebarProps> = ({ className }) => {
 
         <View style={styles.sidebarSection}>
           <Text style={styles.sidebarSectionTitle}>Painel</Text>
-          <View style={styles.sidebarItemContent}>
+          
+          {/* TREINOS */}
+          <TouchableOpacity
+            style={styles.sidebarItemContent}
+            onPress={() => {
+              // @ts-ignore
+              navigation.navigate('TrainingScreen');
+            }}
+          >
             <Dumbbell size={24} color="#fff" />
             <Text style={styles.sidebarItemText}>Treinos</Text>
-          </View>
-          <View style={styles.sidebarItemContent}>
+          </TouchableOpacity>
+
+          {/* AGENDAMENTOS */}
+          <TouchableOpacity
+            style={styles.sidebarItemContent}
+            onPress={() => {
+              // @ts-ignore
+              navigation.navigate('ScheduleScreen');
+            }}
+          >
             <CalendarDays size={24} color="#fff" />
             <Text style={styles.sidebarItemText}>Agendamentos</Text>
-          </View>
-          <View style={styles.sidebarItemContent}>
+          </TouchableOpacity>
+
+          {/* COMUNIDADES */}
+          <TouchableOpacity
+            style={styles.sidebarItemContent}
+            onPress={() => {
+              // @ts-ignore
+              navigation.navigate('CommunityScreen');
+            }}
+          >
             <Globe size={24} color="#fff" />
             <Text style={styles.sidebarItemText}>Comunidades</Text>
-          </View>
+          </TouchableOpacity>
         </View>
 
         {/* Linha divisória */}
@@ -153,20 +218,44 @@ export const Sidebar: React.FC<SidebarProps> = ({ className }) => {
 
         <View style={styles.sidebarSection}>
           <Text style={styles.sidebarSectionTitle}>Sua conta</Text>
-          <View style={styles.sidebarItemContent}>
+
+          {/* CONFIGURAÇÕES */}
+          <TouchableOpacity
+            style={styles.sidebarItemContent}
+            onPress={() => {
+              // @ts-ignore
+              navigation.navigate('ConfigScreen');
+            }}
+          >
             <Settings size={24} color="#fff" />
             <Text style={styles.sidebarItemText}>
               Configurações e privacidades
             </Text>
-          </View>
-          <View style={styles.sidebarItemContent}>
+          </TouchableOpacity>
+
+          {/* AJUDA E SUPORTE */}
+          <TouchableOpacity
+            style={styles.sidebarItemContent}
+            onPress={() => {
+              // @ts-ignore
+              navigation.navigate('SupportScreen');
+            }}
+          >
             <CircleHelp size={24} color="#fff" />
             <Text style={styles.sidebarItemText}>Ajuda e suporte</Text>
-          </View>
-          <View style={styles.sidebarItemContent}>
+          </TouchableOpacity>
+
+          {/* SOBRE */}
+          <TouchableOpacity
+            style={styles.sidebarItemContent}
+            onPress={() => {
+              // @ts-ignore
+              navigation.navigate('AboutScreen');
+            }}
+          >
             <Info size={24} color="#fff" />
             <Text style={styles.sidebarItemText}>Sobre</Text>
-          </View>
+          </TouchableOpacity>
         </View>
 
         {/* Linha divisória */}

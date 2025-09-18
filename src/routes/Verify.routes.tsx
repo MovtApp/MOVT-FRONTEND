@@ -3,10 +3,10 @@ import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { VerifyStackParamList } from "../@types/routes";
 import VerifyAccountScreen from "../screens/Verify/verifyAccountScreen";
 import VerifyPhoneScreen from "../screens/Verify/verifyPhoneScreen";
-import VerifyCompanyScreen from "@screens/Verify/verifyCompanyScreen";
-import VerifyCNPJScreen from "@screens/Verify/VerifyCNPJScreen";
-import VerifyCrefScreen from "@screens/Verify/VerifyCrefScreen";
-import RecoveryScreen from "@screens/Verify/RecoveryScreen";
+import VerifyCompanyScreen from "../screens/Verify/verifyCompanyScreen";
+import VerifyCNPJScreen from "../screens/Verify/VerifyCNPJScreen";
+import VerifyCrefScreen from "../screens/Verify/VerifyCrefScreen";
+import RecoveryScreen from "../screens/Verify/RecoveryScreen";
 
 const Stack = createNativeStackNavigator<VerifyStackParamList>();
 

@@ -1,5 +1,6 @@
 import { View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { COLORS } from "../styles/colors";
 
 type Props = {
   children: React.ReactNode;
@@ -8,8 +9,9 @@ export function ContainerX({ children }: Props) {
   const insets = useSafeAreaInsets();
   return (
     <View
-      className="flex-1 bg-grayscale-1"
       style={{
+        flex: 1,
+        backgroundColor: COLORS.grayscale[0],
         paddingTop: insets.top,
         paddingBottom: insets.bottom,
         paddingLeft: insets.left,

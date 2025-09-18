@@ -4,7 +4,7 @@ import BackButton from "@components/BackButton";
 import CustomInput from "@components/CustomInput";
 import { useNavigation } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import { RootStackParamList } from "@/@types/routes";
+import RootStackParamList from "@typings/routes";
 
 const VerifyPhoneScreen = () => {
   const navigation =
@@ -61,7 +61,7 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: "#fff",
     paddingHorizontal: 20,
-    paddingTop: 60,
+    paddingTop: 20,
     justifyContent: "space-between",
   },
   topSection: {

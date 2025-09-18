@@ -1,9 +1,9 @@
 import { View, StyleSheet, TouchableOpacity, Text } from "react-native";
 import BackButton from "@components/BackButton";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import { RootStackParamList } from "@/@types/routes";
 import { useNavigation } from "@react-navigation/native";
 import { Input } from "@components/Input";
+import RootStackParamList from "@typings/routes";
 
 const ObjectivesScreen = () => {
   const navigation =
@@ -45,7 +45,7 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: "#fff",
     paddingHorizontal: 20,
-    paddingTop: 60,
+    paddingTop: 20,
     justifyContent: "space-between",
   },
   topSection: {

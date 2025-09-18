@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import {
   View,
   TouchableOpacity,
@@ -8,16 +8,17 @@ import {
   KeyboardAvoidingView,
   Platform,
 } from "react-native";
-import { useForm, Controller } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { supabase } from "../../services/supabaseClient";
-import BackButton from "../../components/BackButton";
-import CustomInput from "../../components/CustomInput";
-import { Button } from "../../components/Button";
+import { supabase } from "@services/supabaseClient";
+import BackButton from "@components/BackButton";
+import CustomInput from "@components/CustomInput";
+import { Button } from "@components/Button";
 import DateTimePickerModal from "react-native-modal-datetime-picker";
 import { Calendar, Eye, EyeOff } from "lucide-react-native";
 import { H4 } from "@components/Typography";
+import { useForm, Controller, ControllerRenderProps } from "react-hook-form";
+
 
 const registerSchema = z.object({
   name: z.string().min(2, { message: "Nome obrigatório" }),
@@ -159,10 +160,10 @@ export const SignUpScreen = ({ navigation }: Props) => {
             <Controller
               control={control}
               name="name"
-              render={({ field: { onChange, value } }) => (
+              render={({ field }: { field: ControllerRenderProps<RegisterFormData, "name"> }) => (
                 <CustomInput
-                  value={value}
-                  onChangeText={onChange}
+                  value={field.value}
+                  onChangeText={field.onChange}
                   placeholder="Nome completo"
                   autoCapitalize="words"
                 />
@@ -176,10 +177,10 @@ export const SignUpScreen = ({ navigation }: Props) => {
             <Controller
               control={control}
               name="email"
-              render={({ field: { onChange, value } }) => (
+              render={({ field }: { field: ControllerRenderProps<RegisterFormData, "email"> }) => (
                 <CustomInput
-                  value={value}
-                  onChangeText={onChange}
+                  value={field.value}
+                  onChangeText={field.onChange}
                   placeholder="Digite seu e-mail"
                   keyboardType="email-address"
                   autoCapitalize="none"
@@ -194,11 +195,11 @@ export const SignUpScreen = ({ navigation }: Props) => {
             <Controller
               control={control}
               name="cpf"
-              render={({ field: { onChange, value } }) => (
+              render={({ field }: { field: ControllerRenderProps<RegisterFormData, "cpf"> }) => (
                 <CustomInput
-                  value={value}
-                  onChangeText={(text) =>
-                    onChange(tab === "CPF" ? formatCPF(text) : formatCNPJ(text))
+                  value={field.value}
+                  onChangeText={(text: string) =>
+                    field.onChange(tab === "CPF" ? formatCPF(text) : formatCNPJ(text))
                   }
                   placeholder={
                     tab === "CPF" ? "000.000.000-00" : "00.000.000/0000-00"
@@ -215,7 +216,7 @@ export const SignUpScreen = ({ navigation }: Props) => {
             <Controller
               control={control}
               name="birth"
-              render={({ field: { onChange, value } }) => {
+              render={({ field }: { field: ControllerRenderProps<RegisterFormData, "birth"> }) => {
                 // Função para formatar a data enquanto digita (DD/MM/AAAA)
                 const handleDateInput = (text: string) => {
                   let cleaned = text.replace(/\D/g, "");
@@ -227,12 +228,12 @@ export const SignUpScreen = ({ navigation }: Props) => {
                       "$1/$2/$3",
                     );
                   }
-                  onChange(cleaned);
+                  field.onChange(cleaned);
                 };
                 return (
                   <>
                     <CustomInput
-                      value={value}
+                      value={field.value}
                       onChangeText={handleDateInput}
                       placeholder="DD/MM/AAAA"
                       keyboardType="numeric"
@@ -249,12 +250,12 @@ export const SignUpScreen = ({ navigation }: Props) => {
                     <DateTimePickerModal
                       isVisible={showDatePicker}
                       mode="date"
-                      date={value ? stringToDate(value) : new Date()}
+                      date={field.value ? stringToDate(field.value) : new Date()}
                       maximumDate={new Date()}
-                      onConfirm={(date) => {
+                      onConfirm={(date: Date) => {
                         setShowDatePicker(false);
                         const formatted = formatDate(date);
-                        onChange(formatted);
+                        field.onChange(formatted);
                       }}
                       onCancel={() => setShowDatePicker(false)}
                       locale="pt-BR"
@@ -273,10 +274,10 @@ export const SignUpScreen = ({ navigation }: Props) => {
             <Controller
               control={control}
               name="phone"
-              render={({ field: { onChange, value } }) => (
+              render={({ field }: { field: ControllerRenderProps<RegisterFormData, "phone"> }) => (
                 <CustomInput
-                  value={value}
-                  onChangeText={(text) => onChange(formatPhone(text))}
+                  value={field.value}
+                  onChangeText={(text: string) => field.onChange(formatPhone(text))}
                   placeholder="(+55) 11 99999-9999"
                   keyboardType="phone-pad"
                 />
@@ -290,10 +291,10 @@ export const SignUpScreen = ({ navigation }: Props) => {
             <Controller
               control={control}
               name="password"
-              render={({ field: { onChange, value } }) => (
+              render={({ field }: { field: ControllerRenderProps<RegisterFormData, "password"> }) => (
                 <CustomInput
-                  value={value}
-                  onChangeText={onChange}
+                  value={field.value}
+                  onChangeText={field.onChange}
                   placeholder="Digite aqui sua senha"
                   secureTextEntry={!showPassword}
                   rightIcon={
@@ -327,11 +328,10 @@ export const SignUpScreen = ({ navigation }: Props) => {
           <View style={styles.footer}>
             <Text style={styles.footerText}>Já tem uma conta?</Text>
             <Button
-              className="h-14 bg-[#192126]"
               variant="default"
               onPress={handleLogin}
             >
-              <H4 className="text-grayscale-1">Log In</H4>
+              <H4>Log In</H4>
             </Button>
           </View>
         </ScrollView>
@@ -345,7 +345,7 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: "#fff",
     paddingHorizontal: 20,
-    paddingTop: 60,
+    paddingTop: 20,
   },
   title: {
     fontFamily: "Rubik_700Bold",

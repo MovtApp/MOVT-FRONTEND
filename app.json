@@ -14,7 +14,10 @@
     "newArchEnabled": true,
     "ios": {
       "bundleIdentifier": "com.dsvmTecnology.movtapp",
-      "supportsTablet": false
+      "supportsTablet": false,
+      "infoPlist": {
+        "UIBackgroundModes": ["background-fetch", "background-processing"]
+      }
     },
     "android": {
       "package": "com.dsvmTecnology.movtapp",

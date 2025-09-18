@@ -1,7 +1,6 @@
 import React from "react";
 import { TextInput, View, StyleSheet, Text } from "react-native";
 import { COLORS } from "../styles/colors";
-import { spacings } from "../styles/spacings";
 
 /**
  * Componente de input customizado e reutilizável.

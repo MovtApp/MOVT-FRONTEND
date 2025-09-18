@@ -9,8 +9,8 @@ import {
 } from "react-native";
 import BackButton from "@components/BackButton";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import { RootStackParamList } from "@/@types/routes";
 import { useNavigation } from "@react-navigation/native";
+import RootStackParamList from "@typings/routes";
 
 const { width: screenWidth } = Dimensions.get("window");
 const ITEM_WIDTH = 80; // Largura de cada item de peso
@@ -107,7 +107,7 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: "#fff",
     paddingHorizontal: 20,
-    paddingTop: 60,
+    paddingTop: 20,
   },
   title: {
     fontFamily: "Rubik_700Bold",

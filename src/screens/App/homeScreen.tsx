@@ -5,6 +5,7 @@ import {
   StyleSheet,
   TouchableOpacity,
   ScrollView,
+  Image,
 } from "react-native";
 import {
   Bell,
@@ -23,7 +24,7 @@ import {
   SidebarOverlay,
   useSidebar,
 } from "../../components/Sidebar";
-import SearchInput from "@components/SearchInput";
+import SearchInput from "../../components/SearchInput";
 
 const MenuButton: React.FC = () => {
   const { toggle } = useSidebar();
@@ -46,7 +47,11 @@ const HomeScreen: React.FC = () => {
           {/* Botão do menu */}
           <MenuButton />
 
-          <Text style={styles.title}>Treinos</Text>
+          <Image
+            source={{ uri: "https://res.cloudinary.com/ditlmzgrh/image/upload/v1758030169/MV_pukwcn.png" }}
+            style={{ width: 80, height: 40 }}
+            resizeMode="cover"
+          />
 
           <TouchableOpacity style={styles.notificationButton}>
             <Bell size={24} color="#000" />
@@ -223,7 +228,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
     paddingHorizontal: 20,
-    paddingTop: 60,
+    paddingTop: 20,
     paddingBottom: 20,
     backgroundColor: "#fff",
     zIndex: 45,

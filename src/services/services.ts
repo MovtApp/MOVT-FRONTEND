@@ -1,5 +1,5 @@
 import { api } from "./api";
-import loginJSON from "@/__MOCK__/login_mock.json";
+import loginJSON from "../__MOCK__/login_mock.json";
 import type { AxiosResponse } from "axios";
 
 const DEV = false;

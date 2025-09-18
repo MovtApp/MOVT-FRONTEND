@@ -1,12 +1,12 @@
 import React from "react";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
-import GenderScreen from "@screens/Info/GenderScreen";
-import AgeScreen from "@screens/Info/AgeScreen";
-import HeightScreen from "@screens/Info/HeightScreen";
-import WeightScreen from "@screens/Info/WeightScreen";
-import LevelScreen from "@screens/Info/LevelScreen";
-import WidthScreen from "@screens/Info/WidthScreen";
-import ObjectivesScreen from "@screens/Info/ObjectivesScreen";
+import GenderScreen from "../screens/Info/GenderScreen";
+import AgeScreen from "../screens/Info/AgeScreen";
+import HeightScreen from "../screens/Info/HeightScreen";
+import WeightScreen from "../screens/Info/WeightScreen";
+import LevelScreen from "../screens/Info/LevelScreen";
+import WidthScreen from "../screens/Info/WidthScreen";
+import ObjectivesScreen from "../screens/Info/ObjectivesScreen";
 
 const Stack = createNativeStackNavigator();
 

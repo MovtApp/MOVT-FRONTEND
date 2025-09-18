@@ -9,8 +9,8 @@ import {
 } from "react-native";
 import BackButton from "@components/BackButton";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import { RootStackParamList } from "@/@types/routes";
 import { useNavigation } from "@react-navigation/native";
+import RootStackParamList from "@typings/routes";
 
 const { height: screenHeight } = Dimensions.get("window");
 const ITEM_HEIGHT = 60; // Altura de cada item de altura
@@ -104,7 +104,7 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: "#fff",
     paddingHorizontal: 20,
-    paddingTop: 60,
+    paddingTop: 20,
   },
   title: {
     fontFamily: "Rubik_700Bold",
@@ -123,14 +123,13 @@ const styles = StyleSheet.create({
   instruction: {
     fontFamily: "Rubik_400Regular",
     fontSize: 16,
-    marginTop: 10,
     color: "#666",
     marginBottom: 8,
   },
   heightDisplay: {
     alignItems: "center",
     marginVertical: 30,
-    marginBottom: 10,
+    marginBottom: -20,
     flexDirection: "column",
     justifyContent: "center",
   },
