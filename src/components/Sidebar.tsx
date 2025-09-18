@@ -1,8 +1,8 @@
 import React, { createContext, useContext, useState, ReactNode } from "react";
-import { View, Text, TouchableOpacity, ScrollView } from "react-native";
+import { View, Text, TouchableOpacity, ScrollView, Dimensions } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useNavigation } from "@react-navigation/native";
-import { cn } from "../lib/utils";
+// import { cn } from "../lib/utils"; // Removendo importação não utilizada
 import {
   CalendarDays,
   ChartColumnBig,
@@ -67,10 +67,10 @@ export const SidebarProvider: React.FC<SidebarProviderProps> = ({
 
 // Componente principal do Sidebar
 interface SidebarProps {
-  className?: string;
+  // className?: string; // Removido, pois não será mais usado
 }
 
-export const Sidebar: React.FC<SidebarProps> = ({ className }) => {
+export const Sidebar: React.FC<SidebarProps> = ({ /* className */ }) => {
   const { isOpen, close } = useSidebar();
   const { top } = useSafeAreaInsets();
   const navigation = useNavigation();
@@ -79,14 +79,20 @@ export const Sidebar: React.FC<SidebarProps> = ({ className }) => {
 
   return (
     <View
-      className={cn(
-        "absolute left-0 top-0 z-50 h-full w-96 border-r",
-        className,
-      )}
-      style={{ paddingTop: top, backgroundColor: "#192126" }}
+      style={{
+        position: "absolute",
+        left: 0,
+        top: 0,
+        bottom: 0,
+        width: 384, // Equivalent to w-96 (96 * 4 = 384px)
+        zIndex: 50,
+        borderRightWidth: 1, // Equivalent to border-r
+        borderColor: "#333", // Ajuste a cor da borda se necessário
+        backgroundColor: "#192126",
+      }}
     >
       {/* Header do Sidebar */}
-      <View style={styles.sidebarHeader}>
+      <View style={[styles.sidebarHeader, { paddingTop: top }]}>
         <View style={styles.headerTop}>
           <Text style={styles.sidebarTitle}>Menu</Text>
           <TouchableOpacity style={styles.sidebarClose} onPress={close}>
@@ -286,9 +292,17 @@ export const SidebarOverlay: React.FC<SidebarOverlayProps> = ({ onPress }) => {
   return (
     <TouchableOpacity
       onPress={onPress || close}
-      className="absolute inset-0 z-40 bg-black/20"
       activeOpacity={1}
-      style={{ pointerEvents: "auto" }}
+      style={{
+        position: "absolute",
+        top: 0,
+        right: 0,
+        bottom: 0,
+        left: 0,
+        zIndex: 40,
+        backgroundColor: "rgba(0, 0, 0, 0.2)",
+        pointerEvents: "auto",
+      }}
     />
   );
 };

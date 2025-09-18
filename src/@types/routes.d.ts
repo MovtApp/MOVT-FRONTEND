@@ -1,5 +1,9 @@
 export type AppStackParamList = {
   HomeScreen: undefined;
+  MapScreen: undefined;
+  DietScreen: undefined;
+  DataScreen: undefined;
+  ChatScreen: undefined;
 };
 
 export type AuthStackParamList = {

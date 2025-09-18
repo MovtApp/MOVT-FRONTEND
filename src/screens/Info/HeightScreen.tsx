@@ -201,7 +201,7 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     alignItems: "center",
     marginBottom: 30,
-    marginTop: 30,
+    marginTop: 32,
   },
   advanceButtonText: {
     color: "#fff",

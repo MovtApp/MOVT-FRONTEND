@@ -25,12 +25,12 @@ import {
   useSidebar,
 } from "../../components/Sidebar";
 import SearchInput from "../../components/SearchInput";
+import BottomNavigationBar from "../../components/BottomNavigationBar";
 
 const MenuButton: React.FC = () => {
-  const { toggle } = useSidebar();
 
   return (
-    <TouchableOpacity style={styles.menuButton} onPress={toggle}>
+    <TouchableOpacity style={styles.menuButton}>
       <Menu size={24} color="#000" />
     </TouchableOpacity>
   );
@@ -209,9 +209,7 @@ const HomeScreen: React.FC = () => {
           </View>
         </ScrollView>
 
-        {/* Sidebar e Overlay */}
-        <Sidebar />
-        <SidebarOverlay />
+        
       </View>
     </SidebarProvider>
   );
@@ -255,6 +253,7 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingHorizontal: 20,
     zIndex: 1,
+    paddingBottom: 80, // Adicionei este padding para evitar que o conteúdo seja coberto pela barra de navegação
   },
   searchContainer: {
     marginBottom: 20,
