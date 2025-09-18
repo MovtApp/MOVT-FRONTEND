@@ -13,19 +13,16 @@ import {
   Play,
   Users,
   Dumbbell,
-  Target,
   Activity,
   Menu,
   BicepsFlexed,
 } from "lucide-react-native";
+import TrainingSelector from "../../components/TrainingSelector";
+import PromotionalBanner from "../../components/PromotionalBanner";
 import {
   SidebarProvider,
-  Sidebar,
-  SidebarOverlay,
-  useSidebar,
 } from "../../components/Sidebar";
 import SearchInput from "../../components/SearchInput";
-import BottomNavigationBar from "../../components/BottomNavigationBar";
 
 const MenuButton: React.FC = () => {
 
@@ -38,6 +35,11 @@ const MenuButton: React.FC = () => {
 
 const HomeScreen: React.FC = () => {
   const [search, setSearch] = useState("");
+  const [selectedGender, setSelectedGender] = useState<'male' | 'female'>('female'); // Estado para controlar o gênero
+
+  const toggleGender = () => {
+    setSelectedGender(prevGender => (prevGender === 'female' ? 'male' : 'female'));
+  };
 
   return (
     <SidebarProvider>
@@ -67,63 +69,12 @@ const HomeScreen: React.FC = () => {
             icon={<Search size={24} color="#888" />}
           />
 
+          
           {/* Promotional Banner */}
-          <View style={styles.banner}>
-            <View style={styles.bannerContent}>
-              <View style={styles.bannerText}>
-                <Text style={styles.bannerTitle}>
-                  Comece forte e defina suas metas!
-                </Text>
-                <TouchableOpacity style={styles.bannerButton}>
-                  <Text style={styles.bannerButtonText}>Let&apos;s go!</Text>
-                </TouchableOpacity>
-              </View>
-              <View style={styles.bannerImage}>
-                <Dumbbell size={60} color="#000" />
-              </View>
-            </View>
-          </View>
+          <PromotionalBanner gender={selectedGender} />
 
           {/* Workout Selection */}
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Selecione seu treino</Text>
-            <View style={styles.workoutTypes}>
-              <TouchableOpacity
-                style={[styles.workoutType, styles.workoutTypeActive]}
-              >
-                <Dumbbell size={20} color="#fff" />
-                <Text style={styles.workoutTypeTextActive}>Musculação</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.workoutType}>
-                <BicepsFlexed size={20} color="#666" />
-                <Text style={styles.workoutTypeText}>Funcional</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.workoutType}>
-                <Activity size={20} color="#666" />
-                <Text style={styles.workoutTypeText}>Reabilitação física</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.workoutType}>
-                <Target size={20} color="#666" />
-                <Text style={styles.workoutTypeText}>Emagrecimento</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.workoutType}>
-                <Target size={20} color="#666" />
-                <Text style={styles.workoutTypeText}>
-                  Condicionamento físico
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.workoutType}>
-                <Activity size={20} color="#666" />
-                <Text style={styles.workoutTypeText}>Gravidez</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.workoutType}>
-                <Activity size={20} color="#666" />
-                <Text style={styles.workoutTypeText}>
-                  Performance esportiva
-                </Text>
-              </TouchableOpacity>
-            </View>
-          </View>
+          <TrainingSelector />
 
           {/* Communities */}
           <View style={styles.section}>
@@ -207,9 +158,7 @@ const HomeScreen: React.FC = () => {
               </View>
             </ScrollView>
           </View>
-        </ScrollView>
-
-        
+        </ScrollView>        
       </View>
     </SidebarProvider>
   );
@@ -271,40 +220,43 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: "#666",
   },
-  banner: {
-    backgroundColor: "#4ade80",
-    borderRadius: 16,
-    marginBottom: 24,
-    overflow: "hidden",
-  },
-  bannerContent: {
-    flexDirection: "row",
-    alignItems: "center",
-    padding: 20,
-  },
-  bannerText: {
-    flex: 1,
-  },
-  bannerTitle: {
-    fontSize: 18,
-    fontWeight: "bold",
-    color: "#fff",
-    marginBottom: 16,
-  },
-  bannerButton: {
-    backgroundColor: "#000",
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    borderRadius: 8,
-    alignSelf: "flex-start",
-  },
-  bannerButtonText: {
-    color: "#fff",
-    fontWeight: "600",
-  },
-  bannerImage: {
-    marginLeft: 20,
-  },
+  // Promotional Banner Styles (removidos, pois estão em PromotionalBanner.tsx)
+  // banner: {
+  //   backgroundColor: "#4ade80",
+  //   borderRadius: 16,
+  //   marginBottom: 24,
+  //   overflow: "hidden",
+  //   zIndex: 1,
+  // },
+  // bannerContent: {
+  //   flexDirection: "row",
+  //   alignItems: "center",
+  //   padding: 20,
+  // },
+  // bannerText: {
+  //   flex: 1,
+  // },
+  // bannerTitle: {
+  //   fontSize: 18,
+  //   fontWeight: "bold",
+  //   color: "#fff",
+  //   marginBottom: 16,
+  // },
+  // bannerButton: {
+  //   backgroundColor: "#000",
+  //   paddingHorizontal: 20,
+  //   paddingVertical: 10,
+  //   borderRadius: 8,
+  //   alignSelf: "flex-start",
+  // },
+  // bannerButtonText: {
+  //   color: "#fff",
+  //   fontWeight: "600",
+  // },
+  // bannerImage: {
+  //   marginLeft: 20,
+  //   zIndex: 2,
+  // },
   section: {
     marginBottom: 24,
   },
@@ -420,6 +372,14 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     alignItems: "center",
     justifyContent: "center",
+  },
+  dumbbellsImage: {
+    position: 'relative',
+    bottom: 10,
+    right: 10,
+    width: 80,
+    height: 80,
+    zIndex: 4,
   },
 });
 
