@@ -21,7 +21,7 @@ module.exports = function (api) {
           },
         },
       ],
-      "react-native-reanimated/plugin", // Manter este plugin
+      "react-native-worklets/plugin", // Manter este plugin
     ],
   };
 };

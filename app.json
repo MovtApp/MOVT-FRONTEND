@@ -11,17 +11,30 @@
       "backgroundColor": "#ffffff"
     },
     "userInterfaceStyle": "light",
-    "newArchEnabled": true,
+    "newArchEnabled": false,
     "ios": {
       "bundleIdentifier": "com.dsvmTecnology.movtapp",
       "supportsTablet": false,
       "infoPlist": {
-        "UIBackgroundModes": ["background-fetch", "background-processing"]
+        "UIBackgroundModes": [
+          "background-fetch",
+          "background-processing"
+        ],
+        "NSLocationWhenInUseUsageDescription": "Este aplicativo precisa de acesso à sua localização para mostrar você no mapa."
       }
     },
     "android": {
+      "config": {
+        "googleMaps": {
+          "apiKey": "AIzaSyCDr92TX5erQLKKXVQQ9aOLER2XTpxD7CY"
+        }
+      },
       "package": "com.dsvmTecnology.movtapp",
-      "edgeToEdgeEnabled": true
+      "edgeToEdgeEnabled": true,
+      "permissions": [
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_FINE_LOCATION"
+      ]
     },
     "extra": {
       "eas": {
@@ -31,9 +44,7 @@
     "updates": {
       "url": "https://u.expo.dev/06c0d00e-747e-498a-944c-8cafd9e468dc"
     },
-    "runtimeVersion": {
-      "policy": "appVersion"
-    },
+    "runtimeVersion": "1.0.0",
     "web": {
       "favicon": "./assets/icon.png"
     }

@@ -3,12 +3,15 @@
   "compilerOptions": {
     "strict": true,
     "baseUrl": "./",
-    "moduleResolution": "bundler",
+    "moduleResolution": "node16",
+    "module": "Node16",
     "jsx": "react-jsx",
     "esModuleInterop": true,
     "allowSyntheticDefaultImports": true,
     "skipLibCheck": true,
+    "allowImportingTsExtensions": true,
     "paths": {
+      "expo-location": ["./node_modules/expo-location"],
       "@styles/*": ["./src/styles/*"],
       "@assets/*": ["./src/assets/*"],
       "@components/*": ["./src/components/*"],

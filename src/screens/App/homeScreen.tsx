@@ -6,6 +6,7 @@ import {
   TouchableOpacity,
   ScrollView,
   Image,
+  ImageBackground,
 } from "react-native";
 import {
   Bell,
@@ -15,14 +16,19 @@ import {
   Dumbbell,
   Activity,
   Menu,
-  BicepsFlexed,
 } from "lucide-react-native";
 import TrainingSelector from "../../components/TrainingSelector";
 import PromotionalBanner from "../../components/PromotionalBanner";
+import PlanCardTraining from "../../components/PlanCardsTraining.tsx";
+import TrainingBanner from "../../components/TrainingBanner";
 import {
   SidebarProvider,
 } from "../../components/Sidebar";
 import SearchInput from "../../components/SearchInput";
+import Communities from "@components/Communities";
+import TheBestForYou from "@components/TheBestForYou";
+import ChallengesSection from "../../components/ChallengesSection";
+import Heating from "@components/Heating";
 
 const MenuButton: React.FC = () => {
 
@@ -35,18 +41,68 @@ const MenuButton: React.FC = () => {
 
 const HomeScreen: React.FC = () => {
   const [search, setSearch] = useState("");
-  const [selectedGender, setSelectedGender] = useState<'male' | 'female'>('female'); // Estado para controlar o gênero
+  const [selectedGender] = useState<'male' | 'female'>('female');
 
-  const toggleGender = () => {
-    setSelectedGender(prevGender => (prevGender === 'female' ? 'male' : 'female'));
-  };
+  const exerciseData = [
+    {
+      title: 'Agachamento',
+      calories: '180 - 250 Kcal',
+      minutes: '15 min',
+      imageUrl: 'https://res.cloudinary.com/ditlmzgrh/image/upload/v1757229915/image_71_jntmsv.jpg', 
+    },
+    {
+      title: 'Supino',
+      calories: '150 - 200 Kcal',
+      minutes: '12 min',
+      imageUrl: 'https://res.cloudinary.com/ditlmzgrh/image/upload/v1757229915/image_txncpp.jpg', 
+    },
+    {
+      title: 'Remada curvada',
+      calories: '160 - 220 Kcal',
+      minutes: '12 min',
+      imageUrl: 'https://res.cloudinary.com/ditlmzgrh/image/upload/v1757229918/image_75_drh4vh.jpg', 
+    },
+    {
+      title: 'Levantamento Terra',
+      calories: '160 - 220 Kcal',
+      minutes: '15 min',
+      imageUrl: 'https://res.cloudinary.com/ditlmzgrh/image/upload/v1757229918/image111_gu6iim.jpg', 
+    },
+    {
+      title: 'Puxada na Barra',
+      calories: '140 - 200 Kcal',
+      minutes: '12 min',
+      imageUrl: 'https://res.cloudinary.com/ditlmzgrh/image/upload/v1757229918/image_73_co9eqf.jpg', 
+    },
+  ];
+
+  const bestForYouData = [
+    {
+      image: { uri: "https://res.cloudinary.com/ditlmzgrh/image/upload/v1757229918/image111_gu6iim.jpg" },
+      title: "Flexão de Braços",
+      minutes: "10 min",
+      level: "Iniciante",
+    },
+    {
+      image: { uri: "https://res.cloudinary.com/ditlmzgrh/image/upload/v1757229915/image_71_jntmsv.jpg" },
+      title: "Prancha com toque no ombro",
+      minutes: "5 min",
+      level: "Intermediário",
+    },
+    {
+      image: { uri: "https://res.cloudinary.com/ditlmzgrh/image/upload/v1757229915/image_txncpp.jpg" },
+      title: "Agachamento",
+      minutes: "15 min",
+      level: "Avançado",
+    },
+  ];
 
   return (
     <SidebarProvider>
       <View style={styles.container}>
+        
         {/* Header */}
         <View style={styles.header}>
-          {/* Botão do menu */}
           <MenuButton />
 
           <Image
@@ -61,14 +117,12 @@ const HomeScreen: React.FC = () => {
         </View>
 
         <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-          {/* Search Bar */}
           <SearchInput
             value={search}
             onChangeText={setSearch}
             placeholder="Pesquisar"
             icon={<Search size={24} color="#888" />}
           />
-
           
           {/* Promotional Banner */}
           <PromotionalBanner gender={selectedGender} />
@@ -77,50 +131,7 @@ const HomeScreen: React.FC = () => {
           <TrainingSelector />
 
           {/* Communities */}
-          <View style={styles.section}>
-            <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>Comunidades</Text>
-              <TouchableOpacity>
-                <Text style={styles.seeAllText}>Ver todas</Text>
-              </TouchableOpacity>
-            </View>
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              style={styles.communitiesList}
-            >
-              <View style={styles.communityItem}>
-                <View style={styles.communityAvatar}>
-                  <Users size={24} color="#666" />
-                </View>
-                <Text style={styles.communityName}>Powerlifters</Text>
-              </View>
-              <View style={styles.communityItem}>
-                <View style={styles.communityAvatar}>
-                  <Activity size={24} color="#666" />
-                </View>
-                <Text style={styles.communityName}>Pilates</Text>
-              </View>
-              <View style={styles.communityItem}>
-                <View style={styles.communityAvatar}>
-                  <Activity size={24} color="#666" />
-                </View>
-                <Text style={styles.communityName}>Yoga</Text>
-              </View>
-              <View style={styles.communityItem}>
-                <View style={styles.communityAvatar}>
-                  <Dumbbell size={24} color="#666" />
-                </View>
-                <Text style={styles.communityName}>Corridas</Text>
-              </View>
-              <View style={styles.communityItem}>
-                <View style={styles.communityAvatar}>
-                  <Dumbbell size={24} color="#666" />
-                </View>
-                <Text style={styles.communityName}>Bodybuilders</Text>
-              </View>
-            </ScrollView>
-          </View>
+          <Communities />
 
           {/* Popular Exercises */}
           <View style={styles.section}>
@@ -130,34 +141,55 @@ const HomeScreen: React.FC = () => {
               showsHorizontalScrollIndicator={false}
               style={styles.exercisesList}
             >
-              <View style={styles.exerciseCard}>
-                <View style={styles.exerciseCardContent}>
-                  <Text style={styles.exerciseTitle}>Agachamento (Squat)</Text>
-                  <View style={styles.exerciseInfo}>
-                    <View style={styles.calorieTag}>
-                      <Text style={styles.calorieText}>180 - 250 Kcal</Text>
+              {exerciseData.map((exercise, index) => (
+                <ImageBackground
+                  key={index}
+                  source={{ uri: exercise.imageUrl }}
+                  style={styles.exerciseCard}
+                  imageStyle={{ borderRadius: 16 }}
+                >
+                  <View style={styles.imageOverlay}>
+                    <View style={styles.exerciseCardContent}>
+                      <Text style={styles.exerciseTitle}>{exercise.title}</Text>
+                      <View style={styles.exerciseInfo}>
+                        <View style={styles.tagsContainer}>
+                          <View style={styles.calorieTag}>
+                            <Text style={styles.calorieText}>{exercise.calories}</Text>
+                          </View>
+                          <View style={styles.MinutesTag}>
+                            <Text style={styles.MinutesText}>{exercise.minutes}</Text>
+                          </View>
+                        </View>
+                        <TouchableOpacity style={styles.playButton}>
+                          <Play size={12} fill={"#192126"} />
+                        </TouchableOpacity>
+                      </View>
                     </View>
-                    <TouchableOpacity style={styles.playButton}>
-                      <Play size={20} color="#fff" />
-                    </TouchableOpacity>
                   </View>
-                </View>
-              </View>
-              <View style={styles.exerciseCard}>
-                <View style={styles.exerciseCardContent}>
-                  <Text style={styles.exerciseTitle}>Supino (Bench Press)</Text>
-                  <View style={styles.exerciseInfo}>
-                    <View style={styles.calorieTag}>
-                      <Text style={styles.calorieText}>150 - 200 Kcal</Text>
-                    </View>
-                    <TouchableOpacity style={styles.playButton}>
-                      <Play size={20} color="#fff" />
-                    </TouchableOpacity>
-                  </View>
-                </View>
-              </View>
+                </ImageBackground>
+              ))}
             </ScrollView>
           </View>
+
+          {/* Plan today */}
+          <PlanCardTraining />
+          
+          {/* Banner */}
+          <TrainingBanner 
+            title="Melhor treino de superiores"
+            imageUrl="https://img.freepik.com/free-photo/view-woman-helping-man-exercise-gym_52683-98092.jpg?t=st=1758297406~exp=1758301006~hmac=66860a69d0b54e22b28d0831392e01278764d6b6d47e956a9576e041c9e016c2&w=1480"
+            onPress={() => console.log('Ver mais treinamento de superiores')}
+          />
+
+          {/* The best for you */}
+          <TheBestForYou />
+
+          {/* Challenges */}
+          <ChallengesSection />
+
+          {/* Rapid heating */}
+          <Heating />
+
         </ScrollView>        
       </View>
     </SidebarProvider>
@@ -202,7 +234,7 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingHorizontal: 20,
     zIndex: 1,
-    paddingBottom: 80, // Adicionei este padding para evitar que o conteúdo seja coberto pela barra de navegação
+    paddingBottom: 80, 
   },
   searchContainer: {
     marginBottom: 20,
@@ -220,43 +252,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: "#666",
   },
-  // Promotional Banner Styles (removidos, pois estão em PromotionalBanner.tsx)
-  // banner: {
-  //   backgroundColor: "#4ade80",
-  //   borderRadius: 16,
-  //   marginBottom: 24,
-  //   overflow: "hidden",
-  //   zIndex: 1,
-  // },
-  // bannerContent: {
-  //   flexDirection: "row",
-  //   alignItems: "center",
-  //   padding: 20,
-  // },
-  // bannerText: {
-  //   flex: 1,
-  // },
-  // bannerTitle: {
-  //   fontSize: 18,
-  //   fontWeight: "bold",
-  //   color: "#fff",
-  //   marginBottom: 16,
-  // },
-  // bannerButton: {
-  //   backgroundColor: "#000",
-  //   paddingHorizontal: 20,
-  //   paddingVertical: 10,
-  //   borderRadius: 8,
-  //   alignSelf: "flex-start",
-  // },
-  // bannerButtonText: {
-  //   color: "#fff",
-  //   fontWeight: "600",
-  // },
-  // bannerImage: {
-  //   marginLeft: 20,
-  //   zIndex: 2,
-  // },
   section: {
     marginBottom: 24,
   },
@@ -276,6 +271,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: "#666",
     textDecorationLine: "underline",
+    marginTop: -18
   },
   workoutTypes: {
     flexDirection: "row",
@@ -306,37 +302,20 @@ const styles = StyleSheet.create({
     color: "#fff",
     fontWeight: "500",
   },
-  communitiesList: {
-    marginLeft: -4,
-  },
-  communityItem: {
-    alignItems: "center",
-    marginRight: 20,
-  },
-  communityAvatar: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    backgroundColor: "#f5f5f5",
-    alignItems: "center",
-    justifyContent: "center",
-    marginBottom: 8,
-  },
-  communityName: {
-    fontSize: 12,
-    color: "#666",
-    textAlign: "center",
-  },
   exercisesList: {
     marginLeft: -4,
   },
   exerciseCard: {
     width: 280,
     height: 160,
-    backgroundColor: "#1f2937",
     borderRadius: 16,
     marginRight: 16,
     overflow: "hidden",
+  },
+  imageOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(31, 41, 55, 0.3)',
+    borderRadius: 16,
   },
   exerciseCardContent: {
     flex: 1,
@@ -350,28 +329,52 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   exerciseInfo: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
+    flexDirection: "column", 
+    justifyContent: "space-between", 
+    alignItems: "flex-start", 
+    flex: 1,
+    paddingBottom: 0,
+    position: 'relative',
+  },
+  tagsContainer: {
+    flexDirection: 'column',
+    marginBottom: 10,
   },
   calorieTag: {
-    backgroundColor: "rgba(255, 255, 255, 0.2)",
+    backgroundColor: "rgba(255, 255, 255, 0.5)",
     paddingHorizontal: 12,
     paddingVertical: 6,
-    borderRadius: 12,
+    borderRadius: 10,
+    marginBottom: 5,
   },
   calorieText: {
     fontSize: 12,
     color: "#fff",
     fontWeight: "500",
   },
+  MinutesTag: {
+    backgroundColor: "rgba(255, 255, 255, 0.5)",
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 10,
+  },
+  MinutesText: {
+    fontSize: 12,
+    color: "#fff",
+    fontWeight: "500",
+  },
   playButton: {
-    backgroundColor: "#10b981",
+    backgroundColor: "#BBF246",
     width: 40,
     height: 40,
     borderRadius: 20,
     alignItems: "center",
     justifyContent: "center",
+    alignSelf: "flex-end",
+    position: 'absolute',
+    bottom: 0,
+    right: 0,
+    marginBottom: 40
   },
   dumbbellsImage: {
     position: 'relative',
