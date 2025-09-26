@@ -7,6 +7,7 @@ import DataScreen from "../screens/App/dataScreen";
 import ChatScreen from "../screens/App/chatScreen";
 import BottomNavigationBar from "../components/BottomNavigationBar";
 import { View, StyleSheet } from "react-native";
+import DietDetailsScreen from "../screens/App/dietDetailsScreen";
 
 const Stack = createNativeStackNavigator();
 
@@ -22,6 +23,7 @@ function AppLayout() {
         <Stack.Screen name="HomeScreen" component={HomeScreen} />
         <Stack.Screen name="MapScreen" component={MapScreen} />
         <Stack.Screen name="DietScreen" component={DietScreen} />
+        <Stack.Screen name="DietDetails" component={DietDetailsScreen} />
         <Stack.Screen name="DataScreen" component={DataScreen} />
         <Stack.Screen name="ChatScreen" component={ChatScreen} />
       </Stack.Navigator>

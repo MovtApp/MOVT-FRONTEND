@@ -13,7 +13,7 @@ export type AuthStackParamList = {
 };
 
 export type VerifyStackParamList = {
-  VerifyAccountScreen: undefined;
+  VerifyAccountScreen: { sessionId?: string };
   VerifyPhoneScreen: undefined;
   VerifyCompanyScreen: undefined;
   VerifyCNPJScreen: undefined;
@@ -41,7 +41,10 @@ export type RootStackParamList = {
         params?: InfoStackParamList[keyof InfoStackParamList];
       }
     | undefined;
-  Verify: { screen: keyof VerifyStackParamList } | undefined;
+  Verify: {
+    screen: keyof VerifyStackParamList;
+    params?: VerifyStackParamList[keyof VerifyStackParamList];
+  } | undefined;
 };
 
 export default RootStackParamList;

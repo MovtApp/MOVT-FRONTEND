@@ -4,6 +4,7 @@ import { SafeAreaProvider } from "react-native-safe-area-context";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { Routes } from "@routes/index";
 import { AuthProvider } from "@contexts/AuthContext";
+import { LocationProvider } from "@contexts/LocationContext";
 import { StatusBar, ActivityIndicator, View } from "react-native";
 import {
   useFonts,
@@ -11,6 +12,8 @@ import {
   Rubik_500Medium,
   Rubik_700Bold,
 } from "@expo-google-fonts/rubik";
+import 'react-native-gesture-handler';
+import 'react-native-reanimated';
 
 export default function App() {
   const [fontsLoaded] = useFonts({
@@ -34,11 +37,13 @@ export default function App() {
           flex: 1,
         }}
       >
+        <StatusBar barStyle={"light-content"} translucent />
         <AuthProvider>
-          <Routes />
+          <LocationProvider>
+            <Routes />
+          </LocationProvider>
         </AuthProvider>
       </GestureHandlerRootView>
-      <StatusBar barStyle={"light-content"} translucent />
     </SafeAreaProvider>
   );
 }

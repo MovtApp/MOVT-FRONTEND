@@ -14,7 +14,7 @@ export const getApiBaseUrl = (): string => {
     // Para alternar entre desenvolvimento e produção durante o desenvolvimento
     // você pode comentar/descomentar a linha abaixo
     return API_CONFIG.PRODUCTION; // Use PRODUCTION para testar com a API da Vercel
-    // return API_CONFIG.DEVELOPMENT; // Use DEVELOPMENT para testar localmente
+    return API_CONFIG.DEVELOPMENT; // Use DEVELOPMENT para testar localmente
   }
 
   // Em produção, sempre usar a URL da Vercel

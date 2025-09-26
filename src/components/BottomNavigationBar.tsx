@@ -1,9 +1,9 @@
 import { View, TouchableOpacity, StyleSheet, Text } from 'react-native';
-import React, { useState, useEffect } from 'react';
-import { useNavigation, useRoute } from '@react-navigation/native';
-import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import RootStackParamList, { AppStackParamList } from '../@types/routes';
+import { useState, useEffect } from 'react';
+import RootStackParamList, { AppStackParamList } from '../@types/routes.ts';
 import { ChartPie, House, Map, MessageCircle, Soup } from 'lucide-react-native';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { useNavigation, useRoute } from '@react-navigation/native';
 
 interface NavItem {
   name: keyof AppStackParamList;
@@ -14,7 +14,7 @@ interface NavItem {
 const BottomNavigationBar = () => {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const route = useRoute();
-  const [activeTab, setActiveTab] = useState<keyof AppStackParamList>('HomeScreen'); // Inicializamos com 'HomeScreen' ou 'primeiroItem.name' por padrão
+  const [activeTab, setActiveTab] = useState<keyof AppStackParamList>('HomeScreen');
 
   // Removemos o useEffect para não rastrear a rota ativa automaticamente
   useEffect(() => {
@@ -60,7 +60,7 @@ const BottomNavigationBar = () => {
         const isActive = activeTab === item.name;
         return (
           <TouchableOpacity
-            key={item.name}
+            key={item.name as string}
             style={[styles.navItem, isActive && styles.activeNavItem]}
             onPress={() => navigateTo(item.name)}
           >

@@ -128,7 +128,7 @@ const HomeScreen: React.FC = () => {
           <PromotionalBanner gender={selectedGender} />
 
           {/* Workout Selection */}
-          <TrainingSelector />
+          <TrainingSelector title="Selecione seu treino" containerStyle={{ marginBottom: 24 }}/>
 
           {/* Communities */}
           <Communities />

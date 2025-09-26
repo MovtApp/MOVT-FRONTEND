@@ -23,6 +23,7 @@ interface CustomInputProps {
   editable?: boolean;
   multiline?: boolean;
   numberOfLines?: number;
+  spellCheck?: boolean; // Adicionado
   /**
    * Ícone opcional exibido à esquerda do input.
    */
@@ -88,6 +89,7 @@ const CustomInput: React.FC<CustomInputProps> = ({
   containerStyle,
   inputStyle,
   showCharacterCount = false,
+  spellCheck = false, // Adicionado e definido como false por padrão
 }) => {
   const hasError = !!error;
   const isMultiline = multiline && numberOfLines > 1;
@@ -134,6 +136,7 @@ const CustomInput: React.FC<CustomInputProps> = ({
           onBlur={onBlur}
           onSubmitEditing={onSubmitEditing}
           returnKeyType={returnKeyType}
+          spellCheck={spellCheck} // Passado para o TextInput
         />
 
         {rightIcon && <View style={styles.rightIcon}>{rightIcon}</View>}

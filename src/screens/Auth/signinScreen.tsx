@@ -1,33 +1,107 @@
 import { useState } from "react";
-import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
-import BackButton from "../../components/BackButton";
-import SocialButton from "../../components/SocialButton";
+import { View, Text, TouchableOpacity, StyleSheet, Alert } from "react-native";
+import BackButton from "@/components/BackButton";
+import SocialButton from "@/components/SocialButton";
 import { useNavigation } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import { RootStackParamList } from "../../@types/routes";
-import CustomInput from "../../components/CustomInput";
+import RootStackParamList from "@typings/routes";
+import CustomInput from "@/components/CustomInput";
 import { Eye, EyeOff } from "lucide-react-native";
+import axios from "axios"; // Adicionei axios
+
+// --- CONFIGURAÇÃO DA URL DA API ---
+// IMPORTANTE: Substitua pelo IP da sua máquina na rede local ou 10.0.2.2 para emuladores Android
+// Exemplo: 'http://192.168.1.100:3000' para um dispositivo físico na mesma rede Wi-Fi
+// Exemplo: 'http://10.0.2.2:3000' para emuladores Android
+const API_BASE_URL = 'http://10.0.2.2:3000';
+// --- FIM DA CONFIGURAÇÃO ---
 
 export const SignInScreen = () => {
   const navigation =
     useNavigation<NativeStackNavigationProp<RootStackParamList>>();
 
+  // Estados locais para os campos
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [loading, setLoading] = useState(false); // Novo estado para feedback de carregamento
+  const [error, setError] = useState<string | null>(null); // Novo estado para exibir erros específicos
+
+  // Estado para armazenar o sessionId e dados do usuário logado
+  // Em um app real, você usaria AsyncStorage para persistir isso entre sessões.
+  const [sessionId, setSessionId] = useState<string | null>(null);
+  const [loggedInUser, setLoggedInUser] = useState<any | null>(null); // Pode ser tipado melhor depois
+
   function handleSignup() {
     navigation.navigate("Auth", { screen: "SignUpScreen" });
   }
 
-  function handleVerifyAccount() {
-    navigation.navigate("Verify", { screen: "VerifyAccountScreen" });
-  }
+  // A função original handleVerifyAccount será substituída pelo nosso handleLogin no botão.
+  // Se "VerifyAccountScreen" for a próxima tela após o login, podemos navegar para ela dentro do handleLogin.
+  // function handleVerifyAccount() {
+  //   navigation.navigate("Verify", { screen: "VerifyAccountScreen" });
+  // }
 
   function handleRecovery() {
     navigation.navigate("Verify", { screen: "RecoveryScreen" });
   }
 
-  // Estados locais para os campos (opcional, já que não há validação)
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [showPassword, setShowPassword] = useState(false);
+  // --- NOVA FUNÇÃO para fazer LOGIN com o backend Node.js ---
+  const handleLogin = async () => {
+    setError(null); // Limpa erros anteriores
+    setLoading(true); // Ativa o estado de carregamento
+
+    if (!email || !password) {
+      setError("Por favor, preencha todos os campos.");
+      setLoading(false);
+      return;
+    }
+
+    try {
+      const response = await axios.post(`${API_BASE_URL}/login`, {
+        email,
+        senha: password, // 'senha' é o nome do campo no seu backend Node.js
+        // Se você quiser enviar o sessionId existente para validação extra no login (conforme implementamos no backend),
+        // pode incluí-lo aqui: sessionId: sessionId,
+      });
+
+      // Sucesso no login
+      Alert.alert('Login Efetuado', response.data.message);
+      console.log('Dados do Usuário Logado:', response.data.user);
+      console.log('Session ID:', response.data.sessionId);
+
+      setSessionId(response.data.sessionId);
+      setLoggedInUser(response.data.user);
+
+      // --- TODO: LÓGICA DE NAVEGAÇÃO APÓS O LOGIN ---
+      // Corrigido: o parâmetro 'sessionId' deve estar dentro de 'params'
+      navigation.navigate("Verify", { 
+        screen: "VerifyAccountScreen", 
+        params: { sessionId: response.data.sessionId } 
+      });
+      // Exemplo de atualização:
+      // export type RootStackParamList = {
+      //   Auth: { screen: 'SignInScreen' } | { screen: 'SignUpScreen' };
+      //   Verify: { screen: 'VerifyAccountScreen', sessionId?: string } | { screen: 'RecoveryScreen' };
+      //   // ... outras rotas
+      // };
+
+    } catch (err: any) {
+      // Corrigido: Mostra erro genérico se não houver resposta do backend
+      if (err.response && err.response.data) {
+        console.error('Erro ao logar:', err.response.data);
+      } else {
+        console.error('Erro ao logar:', err.message);
+      }
+      const errorMessage = err?.response?.data?.error
+        ? err.response.data.error
+        : 'Ocorreu um erro ao fazer login.';
+      setError(errorMessage); // Define o erro para ser exibido na UI
+      Alert.alert('Erro no Login', errorMessage); // Exibe um alerta também para feedback imediato
+    } finally {
+      setLoading(false); // Desativa o estado de carregamento
+    }
+  };
 
   return (
     <View style={styles.container}>
@@ -67,11 +141,16 @@ export const SignInScreen = () => {
         >
           <Text style={styles.forgot}>Esqueceu sua senha ?</Text>
         </TouchableOpacity>
+
+        {/* Exibe o erro se houver */}
+        {error && <Text style={styles.error}>{error}</Text>}
+
         <TouchableOpacity
           style={styles.loginButton}
-          onPress={handleVerifyAccount}
+          onPress={handleLogin} // CHAMA A NOVA FUNÇÃO DE LOGIN
+          disabled={loading} // Desabilita o botão enquanto estiver carregando
         >
-          <Text style={styles.loginButtonText}>Log In</Text>
+          <Text style={styles.loginButtonText}>{loading ? 'Entrando...' : 'Log In'}</Text>
         </TouchableOpacity>
         <View style={styles.separatorContainer}>
           <View style={styles.separatorLine} />
@@ -139,6 +218,7 @@ const styles = StyleSheet.create({
     fontSize: 13,
     marginBottom: 4,
     marginLeft: 2,
+    textAlign: 'center', // Adicionado para melhor alinhamento do erro
   },
   forgot: {
     color: "#BBF246",

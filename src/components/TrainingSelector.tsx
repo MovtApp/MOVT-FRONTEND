@@ -7,7 +7,12 @@ import {
   Activity,
 } from 'lucide-react-native';
 
-const TrainingSelector: React.FC = () => {
+interface TrainingSelectorProps {
+    title?: string;
+    containerStyle?: object;
+}
+
+const TrainingSelector: React.FC<TrainingSelectorProps> = ({ title, containerStyle }) => {
     const [selectedWorkout, setSelectedWorkout] = useState<string | null>('Musculação');
 
     const handleSelectWorkout = (workoutName: string) => {
@@ -46,8 +51,8 @@ const TrainingSelector: React.FC = () => {
     ];
 
     return (
-        <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Selecione seu treino</Text>
+        <View style={[styles.section, containerStyle]}>
+            {title && <Text style={styles.sectionTitle}>{title}</Text>}
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.workoutTypes}>
                 {workoutItems.map((item, index) => {
                     const isActive = selectedWorkout === item.name;
@@ -74,7 +79,7 @@ const TrainingSelector: React.FC = () => {
 
 const styles = StyleSheet.create({
   section: {
-    marginBottom: 24,
+    marginBottom: 24, 
   },
   sectionTitle: {
     fontSize: 20,
@@ -93,21 +98,19 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: '#e5e5e5',
-    backgroundColor: '#fff',
   },
   workoutTypeActive: {
     backgroundColor: '#192126',
     borderColor: '#192126',
   },
   workoutTypeInactive: {
-    backgroundColor: '#fff',
+    backgroundColor: '#f1f1f1',
     borderColor: '#e5e5e5',
+    color: '#666',
   },
   workoutTypeText: {
     marginLeft: 8,
     fontSize: 14,
-    color: '#666',
   },
   workoutTypeTextActive: {
     marginLeft: 8,

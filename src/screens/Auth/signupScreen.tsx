@@ -7,26 +7,28 @@ import {
   Text,
   KeyboardAvoidingView,
   Platform,
+  Alert,
 } from "react-native";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { supabase } from "@services/supabaseClient";
-import BackButton from "@components/BackButton";
-import CustomInput from "@components/CustomInput";
-import { Button } from "@components/Button";
+import axios from "axios";
+import BackButton from "@/components/BackButton";
+import CustomInput from "@/components/CustomInput";
+import { Button } from "@/components/Button";
 import DateTimePickerModal from "react-native-modal-datetime-picker";
 import { Calendar, Eye, EyeOff } from "lucide-react-native";
-import { H4 } from "@components/Typography";
+import { H4 } from "@/components/Typography";
 import { useForm, Controller, ControllerRenderProps } from "react-hook-form";
 
+const API_BASE_URL = 'http://10.0.2.2:3000'; // IP para emuladores Android
 
 const registerSchema = z.object({
-  name: z.string().min(2, { message: "Nome obrigatório" }),
+  nome: z.string().min(2, { message: "Nome obrigatório" }),
   email: z.string().email({ message: "E-mail inválido" }),
-  cpf: z.string().min(11, { message: "CPF obrigatório" }),
-  birth: z.string().min(8, { message: "Data obrigatória" }),
-  phone: z.string().min(8, { message: "Telefone obrigatório" }),
-  password: z
+  cpf_cnpj: z.string().min(11, { message: "Documento obrigatório" }), // Para CPF ou CNPJ
+  data_nascimento: z.string().min(8, { message: "Data de nascimento obrigatória" }),
+  telefone: z.string().min(12, { message: "Telefone obrigatório" }),
+  senha: z
     .string()
     .min(6, { message: "Senha deve ter pelo menos 6 caracteres" }),
 });
@@ -105,18 +107,35 @@ export const SignUpScreen = ({ navigation }: Props) => {
   }
 
   const onSubmit = async (data: RegisterFormData) => {
-    // Aqui você pode adaptar para enviar os outros campos ao backend
-    const { error } = await supabase.auth.signUp({
-      email: data.email,
-      password: data.password,
-    });
-    if (error) {
-      alert(error.message);
-    } else {
-      alert("Cadastro realizado! Verifique seu e-mail.");
-      navigation.navigate("SignInScreen");
+    try {
+      const response = await axios.post(`${API_BASE_URL}/register`, {
+        nome: data.nome,
+        email: data.email,
+        senha: data.senha,
+        cpf_cnpj: data.cpf_cnpj,
+        data_nascimento: data.data_nascimento,
+        telefone: data.telefone,
+        tipo_documento: tab,
+      });
+
+      if (response.status === 201) {
+        Alert.alert("Sucesso", response.data.message);
+        navigation.navigate("SignInScreen");
+      } else {
+        Alert.alert("Erro", response.data.error || "Ocorreu um erro desconhecido.");
+      }
+    } catch (error: any) {
+      console.error("Erro ao registrar usuário:", error);
+      Alert.alert(
+        "Erro no Cadastro",
+        error.response?.data?.error || "Não foi possível conectar ao servidor."
+      );
     }
   };
+
+  function handleSignIn() {
+    navigation.navigate("SignInScreen");
+  }
 
   return (
     <KeyboardAvoidingView
@@ -159,18 +178,19 @@ export const SignUpScreen = ({ navigation }: Props) => {
             <Text style={styles.label}>Nome completo</Text>
             <Controller
               control={control}
-              name="name"
-              render={({ field }: { field: ControllerRenderProps<RegisterFormData, "name"> }) => (
+              name="nome"
+              render={({ field }: { field: ControllerRenderProps<RegisterFormData, "nome"> }) => (
                 <CustomInput
                   value={field.value}
                   onChangeText={field.onChange}
                   placeholder="Nome completo"
-                  autoCapitalize="words"
+                  autoCapitalize="none"
+                  spellCheck={false} // Adicionado explicitamente
                 />
               )}
             />
-            {errors.name && (
-              <Text style={styles.error}>{errors.name.message}</Text>
+            {errors.nome && (
+              <Text style={styles.error}>{errors.nome.message}</Text>
             )}
 
             <Text style={styles.label}>Email</Text>
@@ -194,8 +214,8 @@ export const SignUpScreen = ({ navigation }: Props) => {
             <Text style={styles.label}>{tab === "CPF" ? "CPF" : "CNPJ"}</Text>
             <Controller
               control={control}
-              name="cpf"
-              render={({ field }: { field: ControllerRenderProps<RegisterFormData, "cpf"> }) => (
+              name="cpf_cnpj"
+              render={({ field }: { field: ControllerRenderProps<RegisterFormData, "cpf_cnpj"> }) => (
                 <CustomInput
                   value={field.value}
                   onChangeText={(text: string) =>
@@ -208,23 +228,22 @@ export const SignUpScreen = ({ navigation }: Props) => {
                 />
               )}
             />
-            {errors.cpf && (
-              <Text style={styles.error}>{errors.cpf.message}</Text>
+            {errors.cpf_cnpj && (
+              <Text style={styles.error}>{errors.cpf_cnpj.message}</Text>
             )}
 
             <Text style={styles.label}>Data de nascimento</Text>
             <Controller
               control={control}
-              name="birth"
-              render={({ field }: { field: ControllerRenderProps<RegisterFormData, "birth"> }) => {
-                // Função para formatar a data enquanto digita (DD/MM/AAAA)
+              name="data_nascimento"
+              render={({ field }: { field: ControllerRenderProps<RegisterFormData, "data_nascimento"> }) => {
                 const handleDateInput = (text: string) => {
                   let cleaned = text.replace(/\D/g, "");
                   if (cleaned.length > 2 && cleaned.length <= 4) {
                     cleaned = cleaned.replace(/(\d{2})(\d+)/, "$1/$2");
                   } else if (cleaned.length > 4) {
                     cleaned = cleaned.replace(
-                      /(\d{2})(\d{2})(\d{1,4})/,
+                      /(\d{2})(\d{2})(\d{1,4})/g,
                       "$1/$2/$3",
                     );
                   }
@@ -241,7 +260,7 @@ export const SignUpScreen = ({ navigation }: Props) => {
                         <TouchableOpacity
                           onPress={() => setShowDatePicker(true)}
                           activeOpacity={0.7}
-                          style={{ padding: 2 }}
+                          style={{ padding: 2, paddingRight: 40 }}
                         >
                           <Calendar size={22} color="#888" />
                         </TouchableOpacity>
@@ -266,15 +285,15 @@ export const SignUpScreen = ({ navigation }: Props) => {
                 );
               }}
             />
-            {errors.birth && (
-              <Text style={styles.error}>{errors.birth.message}</Text>
+            {errors.data_nascimento && (
+              <Text style={styles.error}>{errors.data_nascimento.message}</Text>
             )}
 
             <Text style={styles.label}>Número de telefone</Text>
             <Controller
               control={control}
-              name="phone"
-              render={({ field }: { field: ControllerRenderProps<RegisterFormData, "phone"> }) => (
+              name="telefone"
+              render={({ field }: { field: ControllerRenderProps<RegisterFormData, "telefone"> }) => (
                 <CustomInput
                   value={field.value}
                   onChangeText={(text: string) => field.onChange(formatPhone(text))}
@@ -283,15 +302,15 @@ export const SignUpScreen = ({ navigation }: Props) => {
                 />
               )}
             />
-            {errors.phone && (
-              <Text style={styles.error}>{errors.phone.message}</Text>
+            {errors.telefone && (
+              <Text style={styles.error}>{errors.telefone.message}</Text>
             )}
 
             <Text style={styles.label}>Definir senha</Text>
             <Controller
               control={control}
-              name="password"
-              render={({ field }: { field: ControllerRenderProps<RegisterFormData, "password"> }) => (
+              name="senha"
+              render={({ field }: { field: ControllerRenderProps<RegisterFormData, "senha"> }) => (
                 <CustomInput
                   value={field.value}
                   onChangeText={field.onChange}
@@ -300,6 +319,7 @@ export const SignUpScreen = ({ navigation }: Props) => {
                   rightIcon={
                     <TouchableOpacity
                       onPress={() => setShowPassword((prev) => !prev)}
+                      style={{ padding: 2, paddingRight: 40 }}
                     >
                       {showPassword ? (
                         <EyeOff size={24} color="#888" />
@@ -311,8 +331,8 @@ export const SignUpScreen = ({ navigation }: Props) => {
                 />
               )}
             />
-            {errors.password && (
-              <Text style={styles.error}>{errors.password.message}</Text>
+            {errors.senha && (
+              <Text style={styles.error}>{errors.senha.message}</Text>
             )}
 
             <Button
@@ -331,8 +351,10 @@ export const SignUpScreen = ({ navigation }: Props) => {
               variant="default"
               onPress={handleLogin}
             >
-              <H4>Log In</H4>
             </Button>
+            <TouchableOpacity onPress={handleSignIn}>
+                <Text style={styles.signIn}> Log In</Text>
+              </TouchableOpacity>
           </View>
         </ScrollView>
       </View>
@@ -426,6 +448,11 @@ const styles = StyleSheet.create({
     color: "#888",
   },
   loginLink: {
+    fontFamily: "Rubik_500Medium",
+    fontSize: 16,
+    color: "#BBF246",
+  },
+  signIn: {
     fontFamily: "Rubik_500Medium",
     fontSize: 16,
     color: "#BBF246",
