@@ -52,6 +52,7 @@
     "lucide-react": "^0.544.0",
     "lucide-react-native": "^0.541.0",
     "nativewind": "^4.1.23",
+    "nodemailer": "^7.0.6",
     "react": "19.1.0",
     "react-dom": "19.1.0",
     "react-hook-form": "^7.60.0",

@@ -1,59 +1,172 @@
-import React, { useState } from "react";
-import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
-import BackButton from "@components/BackButton";
-import CustomInput from "@components/CustomInput";
-import { useNavigation } from "@react-navigation/native";
+import { useState } from "react";
+import { View, Text, TouchableOpacity, StyleSheet, Alert } from "react-native";
+import BackButton from "@/components/BackButton"; // Ajustei o caminho para o alias
+import CustomInput from "@/components/CustomInput"; // Ajustei o caminho para o alias
+import { Button } from "@/components/Button"; // Ajustei o caminho para o alias
+import { H4 } from "@/components/Typography"; // Adicionado H4
+import { useNavigation, useRoute, RouteProp } from "@react-navigation/native"; // Adicionei useRoute
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import { RootStackParamList } from "../../@types/routes";
+import { RootStackParamList } from "@typings/routes"; // Já corrigido para @typings/routes
+import axios from "axios"; // Adicionado axios
 
-const VerifyAccountScreen = () => {
-  const navigation =
-    useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+// --- CONFIGURAÇÃO DA URL DA API ---
+// IMPORTANTE: Substitua pelo IP da sua máquina na rede local ou 10.0.2.2 para emuladores Android
+// Exemplo: 'http://192.168.1.100:3000' para um dispositivo físico na mesma rede Wi-Fi
+// Exemplo: 'http://10.0.2.2:3000' para emuladores Android
+const API_BASE_URL = 'http://10.0.2.2:3000'; // USE O IP CORRETO AQUI (ex: 10.0.2.2 para Android Emulator)
+// --- FIM DA CONFIGURAÇÃO ---
 
-  const [code, setCode] = useState("");
+// Definindo o tipo da rota para acessar os parâmetros
+type VerifyAccountScreenRouteProp = RouteProp<RootStackParamList, 'Verify'>;
 
-  function handleResend() {
-    // lógica para reenviar código
-  }
+export const VerifyAccountScreen = () => {
+  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  const route = useRoute<VerifyAccountScreenRouteProp>();
+  
+  // O sessionId deve ser passado como parâmetro de navegação do login/registro
+  // Ex: navigation.navigate("Verify", { screen: "VerifyAccountScreen", sessionId: response.data.sessionId });
+  const { sessionId } = route.params?.params || {}; // Acessa params dentro de params, conforme o RootStackParamList
 
-  function handleVerify() {
-    navigation.navigate("Verify", { screen: "VerifyPhoneScreen" });
+  const [code, setCode] = useState(""); // Estado para o código digitado
+  const [loading, setLoading] = useState(false); // Estado de carregamento
+  const [error, setError] = useState<string | null>(null); // Estado para mensagens de erro
+
+  // --- Função para Reenviar o Código de Verificação ---
+  const handleResend = async () => {
+    if (!sessionId) {
+      Alert.alert("Erro", "Sessão inválida. Por favor, faça login novamente.");
+      navigation.navigate("Auth", { screen: "SignInScreen" }); // Redireciona para login se não houver sessionId
+      return;
+    }
+
+    setError(null);
+    setLoading(true);
+    try {
+      const response = await axios.post(
+        `${API_BASE_URL}/user/send-verification`,
+        {}, // Body vazio para reenviar
+        {
+          headers: {
+            Authorization: `Bearer ${sessionId}`, // Envia o sessionId para identificar o usuário
+          },
+        }
+      );
+      Alert.alert("Sucesso", response.data.message);
+    } catch (err: any) {
+      console.error("Erro ao reenviar código:", err.response ? err.response.data : err.message);
+      const errorMessage = err.response?.data?.error || err.response?.data?.message || "Ocorreu um erro ao reenviar o código.";
+      setError(errorMessage);
+      Alert.alert("Erro", errorMessage);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // --- Função para Verificar o Código ---
+  const handleVerify = async () => {
+    if (!sessionId) {
+      Alert.alert("Erro", "Sessão inválida. Por favor, faça login novamente.");
+      navigation.navigate("Auth", { screen: "SignInScreen" });
+      return;
+    }
+    if (!code) {
+      setError("Por favor, digite o código de verificação.");
+      return;
+    }
+    if (code.length !== 6) {
+        setError("O código de verificação deve ter 6 dígitos.");
+        return;
+    }
+
+    setError(null);
+    setLoading(true);
+    try {
+      const response = await axios.post(
+        `${API_BASE_URL}/user/verify`,
+        { code }, // Envia o código digitado pelo usuário
+        {
+          headers: {
+            Authorization: `Bearer ${sessionId}`, // Envia o sessionId para identificar o usuário
+          },
+        }
+      );
+      Alert.alert("Verificação Concluída", response.data.message);
+      
+      // --- Lógica de navegação após a verificação bem-sucedida ---
+      // Redireciona para uma tela principal ou dashboard
+      // Por exemplo: navigation.navigate("App", { screen: "HomeScreen" });
+      // Para o exemplo, vamos para a tela de login
+      navigation.navigate("Auth", { screen: "SignInScreen" }); 
+
+    } catch (err: any) {
+      console.error("Erro ao verificar código:", err.response ? err.response.data : err.message);
+      const errorMessage = err.response?.data?.error || err.response?.data?.message || "Ocorreu um erro ao verificar o código.";
+      setError(errorMessage);
+      Alert.alert("Erro", errorMessage);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Função para navegar para a tela de login
+  function handleLogin() {
+    navigation.navigate("Auth", { screen: "SignInScreen" });
   }
 
   return (
     <View style={styles.container}>
-      <View style={styles.topSection}>
-        <BackButton />
-        <Text style={styles.title}>Verificação de email</Text>
-        <Text style={styles.subtitle}>
-          Digite o código enviado para seu email
-        </Text>
-        <View style={{ marginTop: 30 }}>
-          <Text style={styles.subtitle}>Código de verificação</Text>
-          <CustomInput
-            value={code}
-            onChangeText={setCode}
-            placeholder="Digite o código"
-            maxLength={6}
-            keyboardType="numeric"
-          />
-          <TouchableOpacity
-            onPress={handleResend}
-            style={{ marginBottom: 30, alignSelf: "flex-start" }}
+      <BackButton />
+      <Text style={styles.title}>Verifique sua conta</Text>
+      <Text style={styles.subtitle}>
+        Digite o código de 6 dígitos que enviamos para o seu e-mail.
+      </Text>
+
+      <View style={{ marginTop: 30 }}>
+        <Text style={styles.label}>Código de verificação</Text>
+        <CustomInput
+          value={code}
+          onChangeText={setCode}
+          placeholder="______"
+          keyboardType="numeric"
+          maxLength={6}
+          spellCheck={false} // Garantir que não há interferência
+          autoCapitalize="none" // Garantir que não há interferência
+        />
+        {error && <Text style={styles.error}>{error}</Text>}
+
+        <TouchableOpacity
+          style={styles.resendButton}
+          onPress={handleResend}
+          disabled={loading}
+        >
+          <Text style={styles.resendButtonText}>
+            {loading ? "Reenviando..." : "Reenviar Código"}
+          </Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.verifyButton}
+          onPress={handleVerify}
+          disabled={loading || !code || code.length !== 6} // Desabilita se estiver carregando ou código inválido
+        >
+          <Text style={styles.verifyButtonText}>
+            {loading ? "Verificando..." : "Verificar"}
+          </Text>
+        </TouchableOpacity>
+
+        <View style={styles.footer}>
+          <Text style={styles.footerText}>Já verificou?</Text>
+          <Button
+            variant="default"
+            onPress={handleLogin}
           >
-            <Text style={styles.resend}>Reenviar</Text>
-          </TouchableOpacity>
+            <H4>Log In</H4>
+          </Button>
         </View>
       </View>
-
-      <TouchableOpacity style={styles.verifyButton} onPress={handleVerify}>
-        <Text style={styles.verifyButtonText}>Verificar</Text>
-      </TouchableOpacity>
     </View>
   );
 };
-
-export default VerifyAccountScreen;
 
 const styles = StyleSheet.create({
   container: {
@@ -61,10 +174,6 @@ const styles = StyleSheet.create({
     backgroundColor: "#fff",
     paddingHorizontal: 20,
     paddingTop: 20,
-    justifyContent: "space-between",
-  },
-  topSection: {
-    flex: 1,
   },
   title: {
     fontFamily: "Rubik_700Bold",
@@ -78,23 +187,56 @@ const styles = StyleSheet.create({
     fontSize: 16,
     marginTop: 10,
     color: "#666",
-    marginBottom: 8,
+    marginBottom: 18,
   },
-  resend: {
-    color: "#000",
+  label: {
+    fontFamily: "Rubik_400Regular",
+    fontSize: 16,
+    color: "#666",
+    marginBottom: 6,
+    marginTop: 8,
+  },
+  error: {
+    color: "red",
+    fontFamily: "Rubik_400Regular",
+    fontSize: 13,
+    marginBottom: 4,
+    marginLeft: 2,
+    textAlign: 'center',
+  },
+  resendButton: {
+    marginTop: 20,
+    paddingVertical: 10,
+    alignItems: 'center',
+  },
+  resendButtonText: {
+    color: "#BBF246",
     fontFamily: "Rubik_500Medium",
-    fontSize: 15,
+    fontSize: 16,
   },
   verifyButton: {
-    backgroundColor: "#192126",
+    backgroundColor: "#222",
     borderRadius: 10,
     paddingVertical: 14,
     alignItems: "center",
-    marginBottom: 50,
+    marginTop: 18,
+    marginBottom: 18,
   },
   verifyButtonText: {
     color: "#fff",
     fontFamily: "Rubik_500Medium",
     fontSize: 16,
+  },
+  footer: {
+    flexDirection: "row",
+    justifyContent: "center",
+    alignItems: "center",
+    marginTop: 16,
+    marginBottom: 16,
+  },
+  footerText: {
+    fontFamily: "Rubik_400Regular",
+    fontSize: 16,
+    color: "#888",
   },
 });
