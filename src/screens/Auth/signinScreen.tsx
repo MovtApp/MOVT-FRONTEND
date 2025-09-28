@@ -8,6 +8,7 @@ import RootStackParamList from "@typings/routes";
 import CustomInput from "@/components/CustomInput";
 import { Eye, EyeOff } from "lucide-react-native";
 import axios from "axios"; // Adicionei axios
+import AsyncStorage from "@react-native-async-storage/async-storage"; // Adicionei AsyncStorage
 
 // --- CONFIGURAÇÃO DA URL DA API ---
 // IMPORTANTE: Substitua pelo IP da sua máquina na rede local ou 10.0.2.2 para emuladores Android
@@ -73,6 +74,9 @@ export const SignInScreen = () => {
       setSessionId(response.data.sessionId);
       setLoggedInUser(response.data.user);
 
+      // Salva o sessionId no AsyncStorage
+      await AsyncStorage.setItem('userSessionId', response.data.sessionId);
+
       // --- TODO: LÓGICA DE NAVEGAÇÃO APÓS O LOGIN ---
       // Corrigido: o parâmetro 'sessionId' deve estar dentro de 'params'
       navigation.navigate("Verify", { 
@@ -126,7 +130,7 @@ export const SignInScreen = () => {
           placeholder="Digite aqui sua senha"
           secureTextEntry={!showPassword}
           rightIcon={
-            <TouchableOpacity onPress={() => setShowPassword((prev) => !prev)}>
+            <TouchableOpacity onPress={() => setShowPassword((prev) => !prev)} style={{ marginRight: 22 }}>
               {showPassword ? (
                 <EyeOff size={24} color="#888" />
               ) : (

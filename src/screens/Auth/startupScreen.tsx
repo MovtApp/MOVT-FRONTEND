@@ -52,7 +52,7 @@ export const StartupScreen = ({ navigation }: Props) => {
                   <H4 style={{ fontFamily: "Rubik_700Bold" }}>
                     Encontre personal trainers
                   </H4>
-                  <P>
+                  <P style={{ color: "#666", fontFamily: "Rubik_400Regular" }}>
                     Veja treinadores perto de você com base na localização de
                     forma eficiente.
                   </P>
@@ -66,7 +66,7 @@ export const StartupScreen = ({ navigation }: Props) => {
                   <H4 style={{ fontFamily: "Rubik_700Bold" }}>
                     Integração com empresas parceiras
                   </H4>
-                  <P>
+                  <P style={{ color: "#666", fontFamily: "Rubik_400Regular" }}>
                     Encontre academias parceiras nas proximidades que oferecem
                     benefícios.
                   </P>
@@ -80,7 +80,7 @@ export const StartupScreen = ({ navigation }: Props) => {
                   <H4 style={{ fontFamily: "Rubik_700Bold" }}>
                     Tecnologia a favor do usuário
                   </H4>
-                  <P>
+                  <P style={{ color: "#666", fontFamily: "Rubik_400Regular" }}>
                     Oferecemos soluções tecnológicas para gerenciamento de
                     métricas e resultados.
                   </P>
@@ -94,7 +94,7 @@ export const StartupScreen = ({ navigation }: Props) => {
                   <H4 style={{ fontFamily: "Rubik_700Bold" }}>
                     Saúde e bem-estar
                   </H4>
-                  <P>
+                  <P style={{ color: "#666", fontFamily: "Rubik_400Regular" }}>
                     Facilita o cuidado com a saúde, tornando o acompanhamento de treinos e hábitos mais prático e motivador.
                   </P>
                 </View>
