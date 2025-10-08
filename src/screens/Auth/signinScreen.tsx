@@ -9,6 +9,7 @@ import CustomInput from "@/components/CustomInput";
 import { Eye, EyeOff } from "lucide-react-native";
 import axios from "axios"; // Adicionei axios
 import AsyncStorage from "@react-native-async-storage/async-storage"; // Adicionei AsyncStorage
+import { useAuth } from "@contexts/AuthContext"; // Importar useAuth
 
 // --- CONFIGURAÇÃO DA URL DA API ---
 // IMPORTANTE: Substitua pelo IP da sua máquina na rede local ou 10.0.2.2 para emuladores Android
@@ -20,6 +21,7 @@ const API_BASE_URL = 'http://10.0.2.2:3000';
 export const SignInScreen = () => {
   const navigation =
     useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  const { signIn } = useAuth(); // Obter a função signIn do contexto
 
   // Estados locais para os campos
   const [email, setEmail] = useState("");
@@ -71,24 +73,17 @@ export const SignInScreen = () => {
       console.log('Dados do Usuário Logado:', response.data.user);
       console.log('Session ID:', response.data.sessionId);
 
-      setSessionId(response.data.sessionId);
-      setLoggedInUser(response.data.user);
-
-      // Salva o sessionId no AsyncStorage
-      await AsyncStorage.setItem('userSessionId', response.data.sessionId);
-
-      // --- TODO: LÓGICA DE NAVEGAÇÃO APÓS O LOGIN ---
-      // Corrigido: o parâmetro 'sessionId' deve estar dentro de 'params'
-      navigation.navigate("Verify", { 
-        screen: "VerifyAccountScreen", 
-        params: { sessionId: response.data.sessionId } 
+      // Chamar signIn do AuthContext para gerenciar a sessão
+      await signIn(response.data.sessionId, { 
+        id: response.data.user.id, 
+        name: response.data.user.nome, 
+        email: response.data.user.email, 
+        username: response.data.user.username,
+        isVerified: response.data.user.isVerified 
       });
-      // Exemplo de atualização:
-      // export type RootStackParamList = {
-      //   Auth: { screen: 'SignInScreen' } | { screen: 'SignUpScreen' };
-      //   Verify: { screen: 'VerifyAccountScreen', sessionId?: string } | { screen: 'RecoveryScreen' };
-      //   // ... outras rotas
-      // };
+
+      // As navegações serão tratadas pelo App.tsx com base no estado do AuthContext
+      // Não precisamos de navegação condicional aqui, pois App.tsx lida com isso.
 
     } catch (err: any) {
       // Corrigido: Mostra erro genérico se não houver resposta do backend

@@ -12,16 +12,21 @@ import InfoRoutes from "./Info.routes";
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
-export function Routes() {
+interface RoutesProps {
+  initialRouteName?: "Auth" | "Verify" | "App"; // Aceita a rota inicial como prop
+}
+
+export function Routes({ initialRouteName }: RoutesProps) {
   return (
     <NavigationContainer>
       <Stack.Navigator
-        initialRouteName="SplashScreen"
+        initialRouteName={initialRouteName || "Auth"} // Usa a prop, ou 'Auth' como padrão
         screenOptions={{
           headerShown: false,
         }}
       >
-        <Stack.Screen name="SplashScreen" component={SplashScreen} />
+        {/* A SplashScreen será gerenciada pelo App.tsx ou exibida apenas brevemente */}
+        {/* <Stack.Screen name="SplashScreen" component={SplashScreen} /> */}
         <Stack.Screen name="App" component={AppRoutes} />
         <Stack.Screen name="Auth" component={AuthRoutes} />
         <Stack.Screen name="Info" component={InfoRoutes} />

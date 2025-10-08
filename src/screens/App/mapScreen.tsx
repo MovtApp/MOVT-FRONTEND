@@ -21,6 +21,17 @@ const MapScreen: React.FC = () => {
     const [mapSheetIndex, setMapSheetIndex] = useState(0);
     const mapBottomSheetRef = useRef<BottomSheet>(null);
 
+    // Estados para as configurações do mapa
+    const [mapType, setMapType] = useState<"standard" | "satellite" | "hybrid" | "terrain">("standard");
+    const [showsUserLocation, setShowsUserLocation] = useState(true);
+    const [showsCompass, setShowsCompass] = useState(false);
+    const [displayRadiusKm, setDisplayRadiusKm] = useState(5); // Valor inicial em Km
+
+    // Calcula os deltas com base no raio de exibição
+    // Verifica se location é nulo antes de acessar location.latitude
+    const latitudeDelta = displayRadiusKm * 2 / 111.32;
+    const longitudeDelta = location ? (displayRadiusKm * 2) / (111.32 * Math.cos(location.latitude * Math.PI / 180)) : 0.0421; // Valor padrão se location for nulo
+
     // Dados de exemplo para os personal trainers
     const sampleTrainers = [
         {
@@ -87,14 +98,15 @@ const MapScreen: React.FC = () => {
                 initialRegion={{
                     latitude: location.latitude,
                     longitude: location.longitude,
-                    latitudeDelta: 0.0922,
-                    longitudeDelta: 0.0421,
+                    latitudeDelta: latitudeDelta,
+                    longitudeDelta: longitudeDelta,
                 }}
-                showsUserLocation={false}
+                showsUserLocation={showsUserLocation}
                 followsUserLocation={true}
-                showsCompass={false}
+                showsCompass={showsCompass}
                 toolbarEnabled={false}
                 zoomControlEnabled={false}
+                mapType={mapType}
             >
                 <Marker
                     coordinate={{
@@ -166,6 +178,14 @@ const MapScreen: React.FC = () => {
                 bottomSheetRef={mapBottomSheetRef}
                 sheetIndex={mapSheetIndex}
                 setSheetIndex={setMapSheetIndex}
+                mapType={mapType}
+                onMapTypeChange={setMapType}
+                showsUserLocation={showsUserLocation}
+                onShowsUserLocationChange={setShowsUserLocation}
+                showsCompass={showsCompass}
+                onShowsCompassChange={setShowsCompass}
+                displayRadiusKm={displayRadiusKm}
+                onDisplayRadiusKmChange={setDisplayRadiusKm}
             />
         </View>
     )

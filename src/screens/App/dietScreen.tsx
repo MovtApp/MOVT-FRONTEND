@@ -1,10 +1,28 @@
 import React, { useMemo, useRef, useState } from 'react'
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, ImageBackground, Image } from 'react-native'
-import { Bell, ChevronLeft, Clock4, Flame, Menu, Plus, Search } from 'lucide-react-native'
+import { Bell, ChevronLeft, CirclePlus, Clock4, Flame, Menu, Plus, Search, SquarePen, Trash } from 'lucide-react-native'
 import BottomSheet, { BottomSheetView } from '@gorhom/bottom-sheet'
 import SearchInput from '../../components/SearchInput'
-import { Description } from '@radix-ui/react-dialog'
+import { Alert } from 'react-native'
+import { useEffect } from 'react';
+import { api } from '../../services/api';
+import { useAuth } from '../../hooks/useAuth';
+import DietFormSheet from '../../components/DietFormSheet'; // Importar o novo componente
 
+interface DietMeal {
+    id_dieta: string; // ID da dieta (backend)
+    id: string; // Mapeado do id_dieta para uso no frontend
+    title: string; // Mapeado do nome (backend)
+    calories: string; // Mapeado de calorias (backend)
+    minutes: string; // Mapeado de tempo_preparo (backend)
+    imageUrl: string; // Mapeado de imageurl (backend)
+    authorName: string; // Mapeado de nome_autor (backend)
+    authorAvatar: string; // Mapeado de avatar_autor_url (backend)
+    description?: string; // Mapeado de descricao (backend)
+    fat?: string;
+    protein?: string;
+    carbs?: string;
+}
 
 const categories = [
     { key: 'breakfast', label: 'Café da manhã' },
@@ -12,61 +30,18 @@ const categories = [
     { key: 'dinner', label: 'Janta' },
 ]
 
-const meals = [
-    {
-        id: '1',
-        title: 'Salada de vagem com ovos e tomates',
-        calories: '150 kcal',
-        minutes: '20 min',
-        imageUrl: 'https://img.freepik.com/free-photo/flat-lay-high-protein-meal-composition_23-2149089617.jpg?t=st=1758659698~exp=1758663298~hmac=b661d6019bff216241319760d77f0f38728ca66a81a64aa55467b1bac2872617&w=1480',
-        authorName: 'Luana Alves',
-        authorAvatar: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?q=80&w=100&h=100&fit=crop',
-        description: 'Uma refeição leve e rica em proteínas, perfeita para o almoço ou jantar rápido. Prato completo com vegetais frescos e carboidratos complexos para energia sustentada.',
-        fat: '1.5 g',
-        protein: '10.9 g',
-        carbs: '13.5 g'
-    },
-    {
-        id: '2',
-        title: 'Refeição vegetariana balanceada',
-        calories: '365 kcal',
-        minutes: '30 min',
-        imageUrl: 'https://images.unsplash.com/photo-1512621776951-a57141f2eefd?q=80&w=1935&auto=format&fit=crop',
-        authorName: 'Carlos Lima',
-        authorAvatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?q=80&w=100&h=100&fit=crop',
-        description: 'Prato completo com vegetais frescos e carboidratos complexos para energia sustentada.',
-        fat: '2.2 g',
-        protein: '8.3 g',
-        carbs: '15.1 g'
-    },
-]
-
-const planMeals = [
-    { 
-        title: 'Wrap de tortilha com falafel e salada fresca', 
-        imageUrl: 'https://img.freepik.com/free-photo/fresh-homemade-chicken-tacos-recipe-idea_53876-105981.jpg?t=st=1758739113~exp=1758742713~hmac=476a012cf2ec3c6ea60c787aa2accd43889be8233062713720c7ca8fd5d90092&w=1060', 
-        description: 'Um wrap leve e saboroso feito com tortilha macia, recheado com falafel crocante e uma salada fresca de vegetais. Ideal para uma refeição prática, nutritiva e cheia de proteínas vegetais, perfeito para quem busca uma opção saudável e deliciosa.',
-        fat: '1.5 g', 
-        protein: '10.9 g', 
-        carbs: '13.5 g' 
-    },
-    { 
-        title: 'Salada vegana saudável de vegetais', 
-        imageUrl: 'https://img.freepik.com/free-photo/healthy-chickpea-salad-with-tomatolettuce-cucumber-black-slate-background_123827-32067.jpg?t=st=1758739142~exp=1758742742~hmac=d171927e554b693cf5605cb518281444f1b171f37e5b996fff113b6d0e58f748&w=1480', 
-        description: 'Uma salada vegana nutritiva, composta por grão-de-bico, tomate, alface e pepino, perfeita para quem busca uma refeição leve, saudável e cheia de sabor. Rica em fibras, proteínas vegetais e vitaminas, é ideal para o almoço ou jantar.',
-        fat: '1.5 g', 
-        protein: '10.9 g', 
-        carbs: '13.5 g' 
-    }
-  ];
-
 const DietScreen: React.FC<any> = ({ navigation }) => {
     const [search, setSearch] = useState('')
     const [selectedCategory, setSelectedCategory] = useState('breakfast')
     const [isSheetOpen, setIsSheetOpen] = useState(false)
     const [sheetIndex, setSheetIndex] = useState(0)
     const bottomSheetRef = useRef<BottomSheet | null>(null)
-    const snapPoints = useMemo(() => ['30%', '55%'], [])
+    const snapPoints = useMemo(() => ['34%', '50%'], [])
+    const [dietMeals, setDietMeals] = useState<DietMeal[]>([]); // Estado para armazenar as dietas, tipado
+    const { user } = useAuth(); // Obter o usuário do AuthContext
+    const [isFormSheetOpen, setIsFormSheetOpen] = useState(false); // Estado para controlar o DietFormSheet
+    const [formInitialData, setFormInitialData] = useState<DietMeal | undefined>(undefined); // Dados para edição
+    const dietFormSheetRef = useRef<BottomSheet | null>(null); // Ref para o DietFormSheet
 
     const openSheet = () => {
         setIsSheetOpen(true)
@@ -77,6 +52,122 @@ const DietScreen: React.FC<any> = ({ navigation }) => {
         setIsSheetOpen(false)
         setSheetIndex(0)
     }
+
+    const fetchMeals = async () => {
+        try {
+            console.log("Tentando buscar dietas...");
+            console.log("URL da API:", "/dietas");
+            console.log("Session ID:", user?.sessionId);
+            
+            const response = await api.get('/dietas', {
+                headers: {
+                    Authorization: `Bearer ${user?.sessionId}`,
+                },
+            });
+            // Mapeia os dados do backend para o formato esperado pelo frontend
+            const mappedMeals: DietMeal[] = response.data.data.map((backendMeal: any) => ({
+                id: String(backendMeal.id_dieta),
+                id_dieta: String(backendMeal.id_dieta),
+                title: backendMeal.nome,
+                calories: `${backendMeal.calorias || 0} kcal`,
+                minutes: `${backendMeal.tempo_preparo || 0} min`,
+                imageUrl: backendMeal.imageurl || 'https://via.placeholder.com/150',
+                authorName: backendMeal.nome_autor || 'Desconhecido',
+                authorAvatar: backendMeal.avatar_autor_url || 'https://via.placeholder.com/30',
+                description: backendMeal.descricao || '',
+                fat: `${backendMeal.gordura || 0} g`,
+                protein: `${backendMeal.proteina || 0} g`,
+                carbs: `${backendMeal.carboidratos || 0} g`,
+            }));
+            console.log("Dietas mapeadas:", mappedMeals);
+            setDietMeals(mappedMeals); // Atualiza o estado com as dietas mapeadas do backend
+        } catch (error) {
+            console.error("Erro ao buscar dietas:", error);
+            console.error("Detalhes do erro:", (error as any).response?.data || (error as any).message);
+            Alert.alert("Erro", "Não foi possível carregar as dietas.");
+        }
+    };
+
+    useEffect(() => {
+        fetchMeals();
+    }, []);
+
+    const handleAddDiet = () => {
+        setFormInitialData(undefined); // Limpa os dados iniciais para adicionar nova dieta
+        setIsFormSheetOpen(true); // Abre o DietFormSheet
+        closeSheet(); // Fecha o BottomSheet de ações
+    };
+
+    const handleEditDiet = (dietId: string) => {
+        const dietToEdit = dietMeals.find(meal => meal.id === dietId); // Encontra a dieta para edição
+        if (dietToEdit) {
+            setFormInitialData(dietToEdit); // Define os dados iniciais para edição
+            setIsFormSheetOpen(true); // Abre o DietFormSheet
+            closeSheet(); // Fecha o BottomSheet de ações
+        } else {
+            Alert.alert("Erro", "Dieta não encontrada para edição.");
+        }
+    };
+
+    const handleFormSubmit = async (dietData: any) => {
+        // Esta função será chamada pelo DietFormSheet quando o formulário for enviado
+        console.log("Dados do formulário enviados:", dietData);
+        if (dietData.id_dieta) {
+            // Modo de Edição
+            try {
+                await api.put(`/dietas/${dietData.id_dieta}`, dietData, {
+                    headers: {
+                        Authorization: `Bearer ${user?.sessionId}`,
+                    },
+                });
+                Alert.alert("Sucesso", "Dieta editada com sucesso!");
+                fetchMeals();
+            } catch (error) {
+                console.error("Erro ao editar dieta:", error);
+                Alert.alert("Erro", "Não foi possível editar a dieta.");
+            }
+        } else {
+            // Modo de Adição
+            try {
+                await api.post('/dietas', dietData, {
+                    headers: {
+                        Authorization: `Bearer ${user?.sessionId}`,
+                    },
+                });
+                Alert.alert("Sucesso", "Dieta adicionada com sucesso!");
+                fetchMeals();
+            } catch (error) {
+                console.error("Erro ao adicionar dieta:", error);
+                Alert.alert("Erro", "Não foi possível adicionar a dieta.");
+            }
+        }
+        setIsFormSheetOpen(false); // Fecha o DietFormSheet
+    };
+
+    const handleDeleteDiet = async (dietId: string) => {
+        console.log(`Função para excluir dieta (ID: ${dietId}) chamada.`);
+        Alert.alert("Confirmar Exclusão", "Tem certeza que deseja excluir esta dieta?", [
+            { text: "Cancelar", style: "cancel" },
+            {
+                text: "Excluir",
+                onPress: async () => {
+                    try {
+                        await api.delete(`/dietas/${dietId}`, {
+                            headers: {
+                                Authorization: `Bearer ${user?.sessionId}`,
+                            },
+                        });
+                        Alert.alert("Sucesso", "Dieta excluída com sucesso!");
+                        fetchMeals(); // Recarrega as dietas após excluir
+                    } catch (error) {
+                        console.error("Erro ao excluir dieta:", error);
+                        Alert.alert("Erro", "Não foi possível excluir a dieta.");
+                    }
+                    closeSheet();
+                },
+            },
+        ]);
+    };
 
     return (
         <View style={styles.container}>        
@@ -122,8 +213,8 @@ const DietScreen: React.FC<any> = ({ navigation }) => {
 
                 <Text style={styles.sectionTitle}>Refeições</Text>
 
-                {meals.map((meal) => (
-                    <TouchableOpacity key={meal.id} style={styles.mealCard} activeOpacity={0.9} onPress={() => navigation.navigate('DietDetails', { meal: { ...meal, planMeals } })}>
+                {dietMeals.map((meal) => (
+                    <TouchableOpacity key={meal.id} style={styles.mealCard} activeOpacity={0.9} onPress={() => navigation.navigate('DietDetails', { meal: { ...meal } })}>
                         <Image source={{ uri: meal.imageUrl }} style={{ width: '100%', height: 160 }} />
                         <View style={styles.mealInfo}>
                             <Text style={styles.mealTitle}>{meal.title}</Text>
@@ -171,20 +262,33 @@ const DietScreen: React.FC<any> = ({ navigation }) => {
                 >
                     <BottomSheetView style={styles.sheetContent}>
                         <Text style={styles.sheetTitle}>Ações</Text>
-                        <TouchableOpacity style={styles.sheetItem} activeOpacity={0.85}>
-                            <Text style={styles.sheetItemText}>Adicionar refeição</Text>
+                        <TouchableOpacity style={styles.sheetItem} activeOpacity={0.85} onPress={() => handleAddDiet()}> 
+                            <CirclePlus size={20} color="#192126" />
+                            <Text style={styles.sheetItemText}>Adicionar dieta</Text>
                         </TouchableOpacity>
-                        <TouchableOpacity style={styles.sheetItem} activeOpacity={0.85}>
-                            <Text style={styles.sheetItemText}>Criar plano de dieta</Text>
+                        <TouchableOpacity style={styles.sheetItem} activeOpacity={0.85} onPress={() => handleEditDiet("mock_diet_id_1")}> 
+                            <SquarePen size={20} color="#192126" />
+                            <Text style={styles.sheetItemText}>Editar dieta</Text>
                         </TouchableOpacity>
-                        <TouchableOpacity style={styles.sheetItem} activeOpacity={0.85}>
-                            <Text style={styles.sheetItemText}>Importar receita</Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity style={styles.sheetCloseBtn} onPress={closeSheet} activeOpacity={0.9}>
-                            <Text style={styles.sheetCloseText}>Fechar</Text>
+                        <TouchableOpacity style={styles.sheetItem} activeOpacity={0.85} onPress={() => handleDeleteDiet("mock_diet_id_1")}> 
+                            <Trash size={20} color="#192126"/>
+                            <Text style={styles.sheetItemText}>Excluir</Text>
                         </TouchableOpacity>
                     </BottomSheetView>
                 </BottomSheet>
+            )}
+
+            {/* DietFormSheet para Adicionar/Editar Dieta */}
+            {isFormSheetOpen && (
+                <DietFormSheet
+                    isOpen={isFormSheetOpen}
+                    onClose={() => setIsFormSheetOpen(false)}
+                    onSubmit={handleFormSubmit}
+                    initialData={formInitialData}
+                    bottomSheetRef={dietFormSheetRef}
+                    sheetIndex={1} // Inicia aberto em um ponto maior
+                    setSheetIndex={() => {}} // Não precisamos de controle externo de index aqui
+                />
             )}
         </View>
     )
@@ -233,7 +337,7 @@ const styles = StyleSheet.create({
         marginBottom: 12,
     },
     chip: {
-        backgroundColor: '#F3F4F6',
+        backgroundColor: '#192126',
         borderRadius: 10,
         paddingHorizontal: 29,
         paddingVertical: 8,
@@ -242,7 +346,7 @@ const styles = StyleSheet.create({
         backgroundColor: '#BBF246',
     },
     chipText: {
-        color: '#111827',
+        color: '#fff',
         fontWeight: '600',
     },
     chipTextActive: {
@@ -357,11 +461,11 @@ const styles = StyleSheet.create({
     },
     sheetBackground: {
         backgroundColor: '#fff',
-        shadowColor: '#000',
+        shadowColor: 'rgba(0, 0, 0, 0.7)',
         shadowOffset: { width: 0, height: -6 },
-        shadowOpacity: 0.25,
-        shadowRadius: 12,
-        elevation: 18,
+        shadowOpacity: 0.5,
+        shadowRadius: 10,
+        elevation: 15,
     },
     sheetHandle: {
         backgroundColor: '#d1d5db',
@@ -382,6 +486,9 @@ const styles = StyleSheet.create({
         paddingVertical: 14,
         borderBottomWidth: 1,
         borderBottomColor: '#E5E7EB',
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 12,
     },
     sheetItemText: {
         color: '#111827',

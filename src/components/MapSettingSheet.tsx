@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from "react";
-import { View, ScrollView, StyleSheet, TouchableOpacity, Text, Switch } from "react-native";
+import { View, ScrollView, StyleSheet, TouchableOpacity, Text, Switch, TextInput } from "react-native";
 import BottomSheet, { BottomSheetView } from "@gorhom/bottom-sheet";
 // ProgressBar local para evitar dependências de terceiros
 function ProgressBar({ value }: { value: number }) {
@@ -17,6 +17,15 @@ interface MapSettingSheetProps {
   bottomSheetRef: React.RefObject<BottomSheet | null>;
   sheetIndex: number;
   setSheetIndex: (idx: number) => void;
+  // Novas props para controle do mapa
+  mapType: "standard" | "satellite" | "hybrid" | "terrain";
+  onMapTypeChange: (type: "standard" | "satellite" | "hybrid" | "terrain") => void;
+  showsUserLocation: boolean;
+  onShowsUserLocationChange: (value: boolean) => void;
+  showsCompass: boolean;
+  onShowsCompassChange: (value: boolean) => void;
+  displayRadiusKm: number;
+  onDisplayRadiusKmChange: (value: number) => void;
 }
 
 export function MapSettingSheet({
@@ -25,19 +34,29 @@ export function MapSettingSheet({
   bottomSheetRef,
   sheetIndex,
   setSheetIndex,
+  mapType,
+  onMapTypeChange,
+  showsUserLocation,
+  onShowsUserLocationChange,
+  showsCompass,
+  onShowsCompassChange,
+  displayRadiusKm,
+  onDisplayRadiusKmChange,
 }: MapSettingSheetProps) {
   const snapPoints = useMemo(() => ["40%", "70%"], []);
-  const [mapType, setMapType] = useState<"standard" | "satellite" | "hybrid" | "terrain">("standard");
-  const [showsUserLocation, setShowsUserLocation] = useState(true);
-  const [showsCompass, setShowsCompass] = useState(false);
-  const [zoomProgress, setZoomProgress] = useState(0.5); // 0..1
+  // Remover estados de zoom
+  // const [mapType, setMapType] = useState<"standard" | "satellite" | "hybrid" | "terrain">("standard");
+  // const [showsUserLocation, setShowsUserLocation] = useState(true);
+  // const [showsCompass, setShowsCompass] = useState(false);
+  // const [zoomProgress, setZoomProgress] = useState(0.5); // 0..1
 
   if (!isOpen) {
     return null;
   }
 
-  const increaseZoom = () => setZoomProgress((v) => Math.min(1, v + 0.1));
-  const decreaseZoom = () => setZoomProgress((v) => Math.max(0, v - 0.1));
+  // Remover funções de zoom
+  // const increaseZoom = () => setZoomProgress((v) => Math.min(1, v + 0.1));
+  // const decreaseZoom = () => setZoomProgress((v) => Math.max(0, v - 0.1));
 
   return (
     <BottomSheet
@@ -65,7 +84,7 @@ export function MapSettingSheet({
               ].map((opt) => (
                 <TouchableOpacity
                   key={opt.key}
-                  onPress={() => setMapType(opt.key as any)}
+                  onPress={() => onMapTypeChange(opt.key as any)}
                   style={[styles.chip, mapType === opt.key && styles.chipActive]}
                   activeOpacity={0.8}
                 >
@@ -79,7 +98,12 @@ export function MapSettingSheet({
             <Text style={styles.sectionTitle}>Localização do usuário</Text>
             <View style={styles.rowBetween}>
               <Text style={styles.itemLabel}>Exibir localização</Text>
-              <Switch value={showsUserLocation} onValueChange={setShowsUserLocation} />
+              <Switch 
+                value={showsUserLocation}
+                onValueChange={onShowsUserLocationChange}
+                trackColor={{ false: "#192126", true: "#BBF246" }}
+                thumbColor={showsUserLocation ? "#192126" : "#BBF246"} // O thumbColor pode ser o mesmo ou personalizado
+              />
             </View>
           </View>
 
@@ -87,29 +111,33 @@ export function MapSettingSheet({
             <Text style={styles.sectionTitle}>Bússola</Text>
             <View style={styles.rowBetween}>
               <Text style={styles.itemLabel}>Exibir bússola</Text>
-              <Switch value={showsCompass} onValueChange={setShowsCompass} />
+              <Switch 
+                value={showsCompass} 
+                onValueChange={onShowsCompassChange} 
+                trackColor={{ false: "#192126", true: "#BBF246" }}
+                thumbColor={showsCompass ? "#192126" : "#BBF246"}
+              />
             </View>
           </View>
 
+          {/* Nova seção para área de exibição por km */}
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Zoom</Text>
-            <View style={styles.rowBetween}>
-              <TouchableOpacity onPress={decreaseZoom} style={styles.circleBtn}>
-                <Text style={styles.circleBtnText}>-</Text>
-              </TouchableOpacity>
-              <View style={{ flex: 1, marginHorizontal: 12 }}>
-                <ProgressBar value={zoomProgress} />
-              </View>
-              <TouchableOpacity onPress={increaseZoom} style={styles.circleBtn}>
-                <Text style={styles.circleBtnText}>+</Text>
-              </TouchableOpacity>
-            </View>
-            <Text style={styles.helperText}>{Math.round(zoomProgress * 100)}%</Text>
+            <Text style={styles.sectionTitle}>Área de exibição (Km)</Text>
+            <TextInput
+              style={styles.input}
+              keyboardType="numeric"
+              value={String(displayRadiusKm)}
+              onChangeText={(text) => {
+                const num = parseFloat(text);
+                if (!isNaN(num) && num >= 0) {
+                  onDisplayRadiusKmChange(num);
+                } else if (text === '') { // Permite apagar o texto
+                  onDisplayRadiusKmChange(0);
+                }
+              }}
+            />
+            <Text style={styles.helperText}>Defina o raio de exibição do mapa em quilômetros.</Text>
           </View>
-
-          <TouchableOpacity onPress={onClose} style={styles.primaryBtn} activeOpacity={0.85}>
-            <Text style={styles.primaryBtnText}>Fechar</Text>
-          </TouchableOpacity>
         </ScrollView>
       </BottomSheetView>
     </BottomSheet>
@@ -161,13 +189,13 @@ const styles = StyleSheet.create({
   chip: {
     paddingHorizontal: 12,
     paddingVertical: 8,
-    borderRadius: 16,
-    backgroundColor: "#f3f4f6",
+    borderRadius: 8,
+    backgroundColor: "#BBF246",
     marginRight: 8,
     marginBottom: 8,
   },
   chipActive: {
-    backgroundColor: "#1e3a8a",
+    backgroundColor: "#192126",
   },
   chipText: {
     color: "#111827",
@@ -211,6 +239,16 @@ const styles = StyleSheet.create({
     textAlign: "center",
     color: "#6b7280",
     marginTop: 6,
+  },
+  input: {
+    borderWidth: 1,
+    borderColor: "#d1d5db",
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    fontSize: 16,
+    color: "#111827",
+    marginBottom: 8,
   },
   primaryBtn: {
     marginTop: 16,

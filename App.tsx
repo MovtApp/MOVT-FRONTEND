@@ -1,5 +1,5 @@
 import "./src/styles/global.css";
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { Routes } from "@routes/index";
@@ -14,15 +14,18 @@ import {
 } from "@expo-google-fonts/rubik";
 import 'react-native-gesture-handler';
 import 'react-native-reanimated';
+import { useAuth } from "./src/hooks/useAuth";
 
-export default function App() {
+function AppContent() {
   const [fontsLoaded] = useFonts({
     Rubik_400Regular,
     Rubik_500Medium,
     Rubik_700Bold,
   });
 
-  if (!fontsLoaded) {
+  const { loading: isLoadingAuth, user } = useAuth();
+
+  if (!fontsLoaded || isLoadingAuth) {
     return (
       <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
         <ActivityIndicator size="large" color="#000" />
@@ -30,6 +33,23 @@ export default function App() {
     );
   }
 
+  let initialRouteName: "Auth" | "Verify" | "App" = "Auth";
+  if (user) {
+    if (user.isVerified) {
+      initialRouteName = "App";
+    } else {
+      initialRouteName = "Verify";
+    }
+  }
+
+  return (
+    <LocationProvider>
+      <Routes initialRouteName={initialRouteName} />
+    </LocationProvider>
+  );
+}
+
+export default function App() {
   return (
     <SafeAreaProvider>
       <GestureHandlerRootView
@@ -39,9 +59,7 @@ export default function App() {
       >
         <StatusBar barStyle={"light-content"} translucent />
         <AuthProvider>
-          <LocationProvider>
-            <Routes />
-          </LocationProvider>
+          <AppContent />
         </AuthProvider>
       </GestureHandlerRootView>
     </SafeAreaProvider>

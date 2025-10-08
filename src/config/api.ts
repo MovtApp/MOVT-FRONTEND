@@ -1,7 +1,7 @@
 // Configuração da API
 export const API_CONFIG = {
   // URL de desenvolvimento (local)
-  DEVELOPMENT: "http://192.168.15.25:3000",
+  DEVELOPMENT: "http://192.168.15.45:3000/api",
   // URL de produção (Vercel)
   PRODUCTION: "",
 };
@@ -13,7 +13,7 @@ export const getApiBaseUrl = (): string => {
   if (__DEV__) {
     // Para alternar entre desenvolvimento e produção durante o desenvolvimento
     // você pode comentar/descomentar a linha abaixo
-    return API_CONFIG.PRODUCTION; // Use PRODUCTION para testar com a API da Vercel
+    // return API_CONFIG.PRODUCTION; // Use PRODUCTION para testar com a API da Vercel
     return API_CONFIG.DEVELOPMENT; // Use DEVELOPMENT para testar localmente
   }
 

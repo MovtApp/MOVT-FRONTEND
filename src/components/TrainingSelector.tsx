@@ -65,7 +65,7 @@ const TrainingSelector: React.FC<TrainingSelectorProps> = ({ title, containerSty
                             ]}
                             onPress={() => handleSelectWorkout(item.name)}
                         >
-                            <item.icon size={20} color={isActive ? "#fff" : "#666"} />
+                            <item.icon size={20} color={isActive ? "#fff" : "#192126"} />
                             <Text style={isActive ? styles.workoutTypeTextActive : styles.workoutTypeText}>
                                 {item.name}
                             </Text>
@@ -104,8 +104,8 @@ const styles = StyleSheet.create({
     borderColor: '#192126',
   },
   workoutTypeInactive: {
-    backgroundColor: '#f1f1f1',
-    borderColor: '#e5e5e5',
+    backgroundColor: '#BBF246',
+    borderColor: '#BBF246',
     color: '#666',
   },
   workoutTypeText: {

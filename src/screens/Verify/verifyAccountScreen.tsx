@@ -74,7 +74,14 @@ const VerifyAccountScreen = () => {
           },
         }
       );
-      Alert.alert("Sucesso", response.data.message);
+      
+      // Verifica se o e-mail já está verificado para redirecionar
+      if (response.data.message === "Seu e-mail já está verificado.") {
+        Alert.alert("Sucesso", response.data.message);
+        navigation.navigate("App", { screen: "HomeScreen" });
+      } else {
+        Alert.alert("Sucesso", response.data.message);
+      }
     } catch (err: any) {
       console.error("Erro ao reenviar código:", err.response ? err.response.data : err.message);
       const errorMessage = err.response?.data?.error || err.response?.data?.message || "Ocorreu um erro ao reenviar o código.";
@@ -138,7 +145,7 @@ const VerifyAccountScreen = () => {
   return (
     <View style={styles.container}>
       <BackButton />
-      <Text style={styles.title}>Verifique sua </Text>
+      <Text style={styles.title}>Verifique sua conta </Text>
       <Text style={styles.subtitle}>
         Digite o código de 6 dígitos que enviamos para o seu e-mail.
       </Text>
@@ -175,16 +182,6 @@ const VerifyAccountScreen = () => {
             {loading ? "Verificando..." : "Verificar"}
           </Text>
         </TouchableOpacity>
-
-        <View style={styles.footer}>
-          <Text style={styles.footerText}>Já verificou?</Text>
-          <Button
-            variant="default"
-            onPress={handleLogin}
-          >
-            <H4>Log In</H4>
-          </Button>
-        </View>
       </View>
     </View>
   );
