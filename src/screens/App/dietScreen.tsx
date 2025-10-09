@@ -25,6 +25,7 @@ interface DietMeal {
 }
 
 const categories = [
+    { key: 'all', label: 'Todas' }, // Adiciona a opção 'Todas'
     { key: 'breakfast', label: 'Café da manhã' },
     { key: 'lunch', label: 'Almoço' },
     { key: 'dinner', label: 'Janta' },
@@ -32,7 +33,7 @@ const categories = [
 
 const DietScreen: React.FC<any> = ({ navigation }) => {
     const [search, setSearch] = useState('')
-    const [selectedCategory, setSelectedCategory] = useState('breakfast')
+    const [selectedCategory, setSelectedCategory] = useState('all') // Define a categoria inicial como 'all'
     const [isSheetOpen, setIsSheetOpen] = useState(false)
     const [sheetIndex, setSheetIndex] = useState(0)
     const bottomSheetRef = useRef<BottomSheet | null>(null)
@@ -55,13 +56,12 @@ const DietScreen: React.FC<any> = ({ navigation }) => {
 
     const fetchMeals = async () => {
         try {
-            console.log("Tentando buscar dietas...");
-            console.log("URL da API:", "/dietas");
-            console.log("Session ID:", user?.sessionId);
-            
             const response = await api.get('/dietas', {
                 headers: {
                     Authorization: `Bearer ${user?.sessionId}`,
+                },
+                params: {
+                    categoria: selectedCategory === 'all' ? undefined : selectedCategory,
                 },
             });
             // Mapeia os dados do backend para o formato esperado pelo frontend
@@ -78,9 +78,12 @@ const DietScreen: React.FC<any> = ({ navigation }) => {
                 fat: `${backendMeal.gordura || 0} g`,
                 protein: `${backendMeal.proteina || 0} g`,
                 carbs: `${backendMeal.carboidratos || 0} g`,
+                categoria: backendMeal.categoria || undefined, // Inclui a categoria
             }));
-            console.log("Dietas mapeadas:", mappedMeals);
-            setDietMeals(mappedMeals); // Atualiza o estado com as dietas mapeadas do backend
+            // Remove dietas duplicadas com base no ID
+            const uniqueMeals = Array.from(new Map(mappedMeals.map(meal => [meal.id, meal])).values());
+            console.log("Dietas mapeadas com sucesso.");
+            setDietMeals(uniqueMeals); // Atualiza o estado com as dietas mapeadas e únicas
         } catch (error) {
             console.error("Erro ao buscar dietas:", error);
             console.error("Detalhes do erro:", (error as any).response?.data || (error as any).message);
@@ -90,7 +93,7 @@ const DietScreen: React.FC<any> = ({ navigation }) => {
 
     useEffect(() => {
         fetchMeals();
-    }, []);
+    }, [user?.sessionId, selectedCategory]); // Adiciona selectedCategory como dependência
 
     const handleAddDiet = () => {
         setFormInitialData(undefined); // Limpa os dados iniciais para adicionar nova dieta
@@ -111,7 +114,6 @@ const DietScreen: React.FC<any> = ({ navigation }) => {
 
     const handleFormSubmit = async (dietData: any) => {
         // Esta função será chamada pelo DietFormSheet quando o formulário for enviado
-        console.log("Dados do formulário enviados:", dietData);
         if (dietData.id_dieta) {
             // Modo de Edição
             try {
@@ -145,7 +147,6 @@ const DietScreen: React.FC<any> = ({ navigation }) => {
     };
 
     const handleDeleteDiet = async (dietId: string) => {
-        console.log(`Função para excluir dieta (ID: ${dietId}) chamada.`);
         Alert.alert("Confirmar Exclusão", "Tem certeza que deseja excluir esta dieta?", [
             { text: "Cancelar", style: "cancel" },
             {
@@ -214,7 +215,7 @@ const DietScreen: React.FC<any> = ({ navigation }) => {
                 <Text style={styles.sectionTitle}>Refeições</Text>
 
                 {dietMeals.map((meal) => (
-                    <TouchableOpacity key={meal.id} style={styles.mealCard} activeOpacity={0.9} onPress={() => navigation.navigate('DietDetails', { meal: { ...meal } })}>
+                    <TouchableOpacity key={meal.id_dieta} style={styles.mealCard} activeOpacity={0.9} onPress={() => navigation.navigate('DietDetails', { meal: { ...meal } })}>
                         <Image source={{ uri: meal.imageUrl }} style={{ width: '100%', height: 160 }} />
                         <View style={styles.mealInfo}>
                             <Text style={styles.mealTitle}>{meal.title}</Text>
