@@ -70,8 +70,6 @@ export const SignInScreen = () => {
 
       // Sucesso no login
       Alert.alert('Login Efetuado', response.data.message);
-      console.log('Dados do Usuário Logado:', response.data.user);
-      console.log('Session ID:', response.data.sessionId);
 
       // Chamar signIn do AuthContext para gerenciar a sessão
       await signIn(response.data.sessionId, { 
@@ -87,11 +85,6 @@ export const SignInScreen = () => {
 
     } catch (err: any) {
       // Corrigido: Mostra erro genérico se não houver resposta do backend
-      if (err.response && err.response.data) {
-        console.error('Erro ao logar:', err.response.data);
-      } else {
-        console.error('Erro ao logar:', err.message);
-      }
       const errorMessage = err?.response?.data?.error
         ? err.response.data.error
         : 'Ocorreu um erro ao fazer login.';

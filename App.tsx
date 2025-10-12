@@ -14,7 +14,7 @@ import {
 } from "@expo-google-fonts/rubik";
 import 'react-native-gesture-handler';
 import 'react-native-reanimated';
-import { useAuth } from "./src/hooks/useAuth";
+import { useAuth } from "@contexts/AuthContext";
 
 function AppContent() {
   const [fontsLoaded] = useFonts({

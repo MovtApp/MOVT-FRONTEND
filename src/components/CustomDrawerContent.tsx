@@ -1,0 +1,202 @@
+import { View, Text, TouchableOpacity, StyleSheet, Image } from 'react-native';
+import { DrawerContentScrollView, DrawerContentComponentProps } from '@react-navigation/drawer';
+import {
+  X,
+  Home,
+  Map,
+  Utensils, 
+  Activity, 
+  MessageCircle, 
+  Dumbbell, 
+  Calendar,
+  Users, 
+  Settings, 
+  HelpCircle,
+  Info,
+  LogOut, 
+} from 'lucide-react-native';
+import { AppStackParamList } from "../@types/routes";
+import { useAuth } from "../hooks/useAuth";
+
+export function CustomDrawerContent(props: DrawerContentComponentProps) {
+  const { user, signOut } = useAuth();
+  const userWithPhoto = user as (typeof user & { photo?: string | null });
+
+  const handleCloseDrawer = () => {
+    props.navigation.closeDrawer();
+  };
+
+  const menuItems = [
+    { name: 'Início', icon: Home, route: 'HomeScreen' },
+    { name: 'Mapa', icon: Map, route: 'MapScreen' },
+    { name: 'Dietas', icon: Utensils, route: 'DietScreen' },
+    { name: 'Dados', icon: Activity, route: 'DataScreen' },
+    { name: 'Chat', icon: MessageCircle, route: 'ChatScreen' },
+  ];
+
+  const panelItems = [
+    { name: 'Treinos', icon: Dumbbell, route: 'TrainingScreen' }, // Substituir 'TreinosScreen' pela rota real
+    { name: 'Agendamentos', icon: Calendar, route: 'AppointmentsScreen' }, // Substituir pela rota real
+    { name: 'Comunidades', icon: Users, route: 'CommunityScreen' }, // Substituir pela rota real
+  ];
+
+  const accountItems = [
+    { name: 'Configurações e privacidades', icon: Settings, route: 'ConfigScreen' }, // Substituir pela rota real
+    { name: 'Ajuda e suporte', icon: HelpCircle, route: 'SupportScreen' }, // Substituir pela rota real
+    { name: 'Sobre', icon: Info, route: 'AboutScreen' }, // Substituir pela rota real
+  ];
+
+  return (
+    <DrawerContentScrollView {...props} contentContainerStyle={styles.drawerContent}>
+      <View style={styles.header}>
+        <TouchableOpacity onPress={handleCloseDrawer} style={styles.closeButton}>
+          <X size={24} color="#BBF246" />
+        </TouchableOpacity>
+        <Text style={styles.menuTitle}>Menu</Text>
+      </View>
+
+      <View style={styles.profileSection}>
+        <Image 
+          source={userWithPhoto?.photo ? { uri: userWithPhoto.photo } : { uri: 'https://img.freepik.com/vetores-gratis/circulo-azul-com-usuario-branco_78370-4707.jpg?t=st=1760290901~exp=1760294501~hmac=54c484fcb1eb3bfdc377aeeaa901c951421c366a6a55921cf0ce792c078fe4df&w=1480' }} // Usar foto do usuário ou imagem padrão online
+          style={styles.profileImage}
+        />
+        <View style={styles.profileInfo}>
+          <Text style={styles.profileName}>{userWithPhoto?.name || "Visitante"}</Text>
+        </View>
+      </View>
+
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Menu principal</Text>
+        {menuItems.map((item, index) => (
+          <TouchableOpacity
+            key={index}
+            style={styles.drawerItem}
+            onPress={() => props.navigation.navigate('App', { screen: 'HomeStack', params: { screen: item.route as keyof AppStackParamList } })} // Navegação corrigida
+          >
+            <item.icon size={20} color="#FFFFFF" style={styles.drawerItemIcon} />
+            <Text style={styles.drawerItemText}>{item.name}</Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Painel</Text>
+        {panelItems.map((item, index) => (
+          <TouchableOpacity
+            key={index}
+            style={styles.drawerItem}
+            onPress={() => props.navigation.navigate('App', { screen: 'HomeStack', params: { screen: item.route as keyof AppStackParamList } })} // Navegação corrigida
+          >
+            <item.icon size={20} color="#FFFFFF" style={styles.drawerItemIcon} />
+            <Text style={styles.drawerItemText}>{item.name}</Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Sua conta</Text>
+        {accountItems.map((item, index) => (
+          <TouchableOpacity
+            key={index}
+            style={styles.drawerItem}
+            onPress={() => props.navigation.navigate('App', { screen: 'HomeStack', params: { screen: item.route as keyof AppStackParamList } })} // Navegação corrigida
+          >
+            <item.icon size={20} color="#FFFFFF" style={styles.drawerItemIcon} />
+            <Text style={styles.drawerItemText}>{item.name}</Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+
+      <TouchableOpacity style={styles.logoutButton} onPress={signOut}>
+        <LogOut size={20} color="#BBF246" style={styles.drawerItemIcon} />
+        <Text style={styles.logoutText}>Desconectar</Text>
+      </TouchableOpacity>
+    </DrawerContentScrollView>
+  );
+}
+
+const styles = StyleSheet.create({
+  drawerContent: {
+    // flex: 1, // Removido para permitir rolagem natural
+    backgroundColor: '#192126',
+    paddingTop: 40, // Ajuste para o padding superior
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    marginBottom: 30,
+  },
+  closeButton: {
+    marginRight: 10,
+  },
+  menuTitle: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#BBF246',
+  },
+  profileSection: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    marginBottom: 30,
+  },
+  profileImage: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    marginRight: 15,
+  },
+  profileInfo: {
+    flex: 1,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  profileName: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#FFFFFF',
+  },
+  viewMoreText: {
+    fontSize: 14,
+    color: '#BBF246',
+  },
+  section: {
+    marginBottom: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255, 255, 255, 0.1)',
+    paddingBottom: 15,
+  },
+  sectionTitle: {
+    fontSize: 14,
+    color: '#BBF246',
+    paddingHorizontal: 20,
+    marginBottom: 10,
+    textTransform: 'uppercase',
+  },
+  drawerItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+  },
+  drawerItemIcon: {
+    marginRight: 15,
+  },
+  drawerItemText: {
+    fontSize: 16,
+    color: '#FFFFFF',
+  },
+  logoutButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+  },
+  logoutText: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#BBF246',
+  },
+});

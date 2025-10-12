@@ -35,21 +35,20 @@ const VerifyAccountScreen = () => {
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(routeSessionId ?? null);
 
   useEffect(() => {
-    const loadSessionId = async () => {
-      if (!routeSessionId) {
+    const loadAndCheckSessionId = async () => {
+      if (routeSessionId) {
+        setCurrentSessionId(routeSessionId);
+      } else {
         const storedSessionId = await AsyncStorage.getItem('userSessionId');
         if (storedSessionId) {
           setCurrentSessionId(storedSessionId);
         } else {
-          // Se não há sessionId na rota nem no storage, redirecionar para login
           Alert.alert("Erro", "Sessão inválida. Por favor, faça login novamente.");
           navigation.navigate("Auth", { screen: "SignInScreen" });
         }
-      } else {
-          setCurrentSessionId(routeSessionId);
       }
     };
-    loadSessionId();
+    loadAndCheckSessionId();
   }, [routeSessionId, navigation]);
 
   // --- Função para Reenviar o Código de Verificação ---
@@ -63,8 +62,6 @@ const VerifyAccountScreen = () => {
     setError(null);
     setLoading(true);
     try {
-      console.log("Enviando requisição de reenvio de código para:", `${API_BASE_URL}/user/send-verification`);
-      console.log("Headers de autorização:", `Bearer ${currentSessionId}`);
       const response = await axios.post(
         `${API_BASE_URL}/user/send-verification`,
         {}, // Body vazio para reenviar
@@ -128,7 +125,6 @@ const VerifyAccountScreen = () => {
       navigation.navigate("App", { screen: "HomeScreen" }); 
 
     } catch (err: any) {
-      console.error("Erro ao verificar código:", err.response ? err.response.data : err.message);
       const errorMessage = err.response?.data?.error || err.response?.data?.message || "Ocorreu um erro ao verificar o código.";
       setError(errorMessage);
       Alert.alert("Erro", errorMessage);

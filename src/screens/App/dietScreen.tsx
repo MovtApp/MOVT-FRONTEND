@@ -189,7 +189,7 @@ const DietScreen: React.FC<any> = ({ navigation }) => {
             </TouchableOpacity>
             </View>
 
-            <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+            <ScrollView style={styles.content} showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 180 }}>
                 <SearchInput
                     value={search}
                     onChangeText={setSearch}
@@ -197,7 +197,7 @@ const DietScreen: React.FC<any> = ({ navigation }) => {
                     icon={<Search size={20} color="#888" />}
                 />
 
-                <View style={styles.categoriesRow}>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.categoriesRow}>
                     {categories.map((c) => (
                         <TouchableOpacity
                             key={c.key}
@@ -210,7 +210,7 @@ const DietScreen: React.FC<any> = ({ navigation }) => {
                             </Text>
                         </TouchableOpacity>
                     ))}
-                </View>
+                </ScrollView>
 
                 <Text style={styles.sectionTitle}>Refeições</Text>
 
@@ -342,6 +342,7 @@ const styles = StyleSheet.create({
         borderRadius: 10,
         paddingHorizontal: 29,
         paddingVertical: 8,
+        marginRight: 10, // Espaçamento entre os botões
     },
     chipActive: {
         backgroundColor: '#BBF246',

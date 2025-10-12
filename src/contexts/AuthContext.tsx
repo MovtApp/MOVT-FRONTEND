@@ -35,40 +35,46 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     async function loadUserData() {
       try {
         const storedSessionId = await AsyncStorage.getItem('userSessionId');
+        const storedUserDetails = await AsyncStorage.getItem('@Auth:user'); // Carrega os detalhes do usuário armazenados
 
-        if (storedSessionId) {
-          // Tenta validar a sessão com o backend
-          const response = await axios.get(`${API_BASE_URL}/user/session-status`, {
-            headers: {
-              Authorization: `Bearer ${storedSessionId}`,
-            },
-          });
+        if (storedSessionId && storedUserDetails) {
+          const parsedUserDetails = JSON.parse(storedUserDetails);
+          // Define o usuário imediatamente com os dados armazenados para redirecionamento instantâneo
+          setUser({ ...parsedUserDetails, sessionId: storedSessionId });
+          setLoading(false); // Para o loading imediatamente após definir o usuário
 
-          if (response.status === 200 && response.data.user) {
-            const userData = response.data.user;
-            setUser({
-              id: userData.id,
-              name: userData.nome, // Assumindo que o backend retorna 'nome' para o nome
-              email: userData.email,
-              username: userData.username,
-              isVerified: userData.isVerified,
-              sessionId: storedSessionId, // Adiciona o sessionId ao objeto user
+          // Em seguida, valida a sessão em segundo plano
+          try {
+            const response = await axios.get(`${API_BASE_URL}/user/session-status`, {
+              headers: {
+                Authorization: `Bearer ${storedSessionId}`,
+              },
             });
-          } else {
-            // Sessão inválida ou erro, limpa o AsyncStorage
+
+            if (response.status === 200 && response.data.user) {
+              // A sessão ainda é válida, os dados do usuário estão atualizados
+              // Não é necessário chamar setUser novamente, a menos que os dados sejam diferentes
+            } else {
+              // Sessão inválida ou erro, limpa os dados armazenados
+              await AsyncStorage.removeItem('userSessionId');
+              await AsyncStorage.removeItem('@Auth:user');
+              setUser(null);
+            }
+          } catch (apiError) {
             await AsyncStorage.removeItem('userSessionId');
+            await AsyncStorage.removeItem('@Auth:user');
             setUser(null);
           }
         } else {
           // Sem sessionId armazenado
           setUser(null);
+          setLoading(false);
         }
       } catch (error) {
-        console.error("Error loading user data:", error);
-        await AsyncStorage.removeItem('userSessionId'); // Em caso de erro, remove a sessão inválida
+        await AsyncStorage.removeItem('userSessionId');
+        await AsyncStorage.removeItem('@Auth:user');
         setUser(null);
-      } finally {
-        setLoading(false); // Sempre parar o loading
+        setLoading(false);
       }
     }
 
@@ -83,7 +89,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
 
       setUser({ ...userDetails, sessionId });
     } catch (error) {
-      console.error("Error during signIn:", error);
       throw new Error("Failed to sign in");
     }
   }

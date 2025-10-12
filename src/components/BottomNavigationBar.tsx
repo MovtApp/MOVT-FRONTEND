@@ -1,9 +1,9 @@
 import { View, TouchableOpacity, StyleSheet, Text } from 'react-native';
 import { useState, useEffect } from 'react';
-import RootStackParamList, { AppStackParamList } from '../@types/routes.ts';
+import RootStackParamList, { AppStackParamList, AppDrawerParamList } from '../@types/routes';
 import { ChartPie, House, Map, MessageCircle, Soup } from 'lucide-react-native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { useNavigation, useRoute } from '@react-navigation/native';
+import { useNavigation, useRoute, useIsFocused, RouteProp } from '@react-navigation/native';
 
 interface NavItem {
   name: keyof AppStackParamList;
@@ -12,14 +12,35 @@ interface NavItem {
 }
 
 const BottomNavigationBar = () => {
-  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
-  const route = useRoute();
+  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList & AppDrawerParamList>>();
+  const route = useRoute<RouteProp<AppDrawerParamList, keyof AppDrawerParamList>>();
+  const isFocused = useIsFocused();
   const [activeTab, setActiveTab] = useState<keyof AppStackParamList>('HomeScreen');
 
-  // Removemos o useEffect para não rastrear a rota ativa automaticamente
+  const appStackScreenNames: (keyof AppStackParamList)[] = [
+    'HomeScreen',
+    'MapScreen',
+    'DietScreen',
+    'DataScreen',
+    'ChatScreen',
+  ];
+
   useEffect(() => {
-    setActiveTab(route.name as keyof AppStackParamList);
-  }, [route.name]);
+    let currentScreenName: keyof AppStackParamList | undefined;
+
+    if (isFocused) {
+      if (route.name === 'HomeStack' && route.params && typeof route.params === 'object' && 'screen' in route.params) {
+        currentScreenName = (route.params as { screen: keyof AppStackParamList }).screen;
+      } else if (appStackScreenNames.includes(route.name as keyof AppStackParamList)) {
+        // Fallback for direct navigation to AppStack screens (if any)
+        currentScreenName = route.name as keyof AppStackParamList;
+      }
+    }
+
+    if (currentScreenName) {
+      setActiveTab(currentScreenName);
+    }
+  }, [route.name, route.params, isFocused, appStackScreenNames]);
 
   const navItems: NavItem[] = [
     {
@@ -51,7 +72,7 @@ const BottomNavigationBar = () => {
 
   const navigateTo = (screenName: keyof AppStackParamList) => {
     setActiveTab(screenName);
-    navigation.navigate('App', { screen: screenName });
+    navigation.navigate('App', { screen: 'HomeStack', params: { screen: screenName } });
   };
 
   return (

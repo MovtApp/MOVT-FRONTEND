@@ -12,6 +12,37 @@ interface TrainingSelectorProps {
     containerStyle?: object;
 }
 
+const workoutItems = [
+    {
+        name: 'Musculação',
+        icon: Dumbbell,
+    },
+    {
+        name: 'Funcional',
+        icon: BicepsFlexed,
+    },
+    {
+        name: 'Reabilitação física',
+        icon: Activity,
+    },
+    {
+        name: 'Emagrecimento',
+        icon: Target,
+    },
+    {
+        name: 'Condicionamento físico',
+        icon: Target,
+    },
+    {
+        name: 'Gravidez',
+        icon: Activity,
+    },
+    {
+        name: 'Performance esportiva',
+        icon: Activity,
+    },
+];
+
 const TrainingSelector: React.FC<TrainingSelectorProps> = ({ title, containerStyle }) => {
     const [selectedWorkout, setSelectedWorkout] = useState<string | null>('Musculação');
 
@@ -19,46 +50,15 @@ const TrainingSelector: React.FC<TrainingSelectorProps> = ({ title, containerSty
         setSelectedWorkout(workoutName);
     };
 
-    const workoutItems = [
-        {
-            name: 'Musculação',
-            icon: Dumbbell,
-        },
-        {
-            name: 'Funcional',
-            icon: BicepsFlexed,
-        },
-        {
-            name: 'Reabilitação física',
-            icon: Activity,
-        },
-        {
-            name: 'Emagrecimento',
-            icon: Target,
-        },
-        {
-            name: 'Condicionamento físico',
-            icon: Target,
-        },
-        {
-            name: 'Gravidez',
-            icon: Activity,
-        },
-        {
-            name: 'Performance esportiva',
-            icon: Activity,
-        },
-    ];
-
     return (
         <View style={[styles.section, containerStyle]}>
             {title && <Text style={styles.sectionTitle}>{title}</Text>}
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.workoutTypes}>
-                {workoutItems.map((item, index) => {
+                {workoutItems.map((item) => {
                     const isActive = selectedWorkout === item.name;
                     return (
                         <TouchableOpacity
-                            key={index}
+                            key={item.name}
                             style={[
                                 styles.workoutType,
                                 isActive ? styles.workoutTypeActive : styles.workoutTypeInactive,

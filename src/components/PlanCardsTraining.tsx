@@ -8,7 +8,35 @@ export interface Plan {
     description: string;
     sets: string;
     calories: string;
+    id: string; // Adicionado o id para usar como key
 }
+
+const planData: Plan[] = [
+    {
+      id: '1',
+      title: 'Prancha (Plank)',
+      description: '20 - 30 segundos por série',
+      sets: '3 séries por dia',
+      calories: '9 - 18 Kcal',
+      imageUrl: 'https://res.cloudinary.com/ditlmzgrh/image/upload/v1757513125/prancha_g1v30x.png',
+    },
+    {
+      id: '2',
+      title: 'Bicicleta no ar',
+      description: '60 segundos por série',
+      sets: '3 séries por dia',
+      calories: '18 - 24 Kcal',
+      imageUrl: 'https://res.cloudinary.com/ditlmzgrh/image/upload/v1757513124/bicicleta_yqrmzr.png',
+    },
+    {
+      id: '3',
+      title: 'Elevação de pernas',
+      description: '60 segundos por série',
+      sets: '3 séries por dia',
+      calories: '12 - 18 Kcal',
+      imageUrl: 'https://res.cloudinary.com/ditlmzgrh/image/upload/v1757513123/elevacao_vufoer.png',
+    },
+];
 
 interface PlanCardTrainingProps {
     planData?: Plan[]; 
@@ -16,37 +44,13 @@ interface PlanCardTrainingProps {
 
 const PlanCardTraining: React.FC<PlanCardTrainingProps> = ({ planData: _propPlanData }) => {
     
-    const planData: Plan[] = [
-        {
-          title: 'Prancha (Plank)',
-          description: '20 - 30 segundos por série',
-          sets: '3 séries por dia',
-          calories: '9 - 18 Kcal',
-          imageUrl: 'https://res.cloudinary.com/ditlmzgrh/image/upload/v1757513125/prancha_g1v30x.png',
-        },
-        {
-          title: 'Bicicleta no ar',
-          description: '60 segundos por série',
-          sets: '3 séries por dia',
-          calories: '18 - 24 Kcal',
-          imageUrl: 'https://res.cloudinary.com/ditlmzgrh/image/upload/v1757513124/bicicleta_yqrmzr.png',
-        },
-        {
-          title: 'Elevação de pernas',
-          description: '60 segundos por série',
-          sets: '3 séries por dia',
-          calories: '12 - 18 Kcal',
-          imageUrl: 'https://res.cloudinary.com/ditlmzgrh/image/upload/v1757513123/elevacao_vufoer.png',
-        },
-    ];
-    
     return (
         <View style={styles.section}>
             {/* Plano de hoje */}
             <Text style={styles.sectionTitle}>Plano de hoje</Text>
             <View style={styles.planCardsContainer}>
-                {planData.map((plan, index) => (
-                    <TouchableOpacity key={index} style={styles.planCard}>
+                {planData.map((plan) => (
+                    <TouchableOpacity key={plan.id} style={styles.planCard}>
                         <Image source={{ uri: plan.imageUrl }} style={styles.planCardImage} />
                         <View style={styles.planCardContent}>
                             <Text style={styles.planCardTitle}>{plan.title}</Text>

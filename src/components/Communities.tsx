@@ -8,6 +8,40 @@ import {
 import { Users, Dumbbell, Activity } from "lucide-react-native";
 import { StyleSheet } from "react-native";
 
+interface CommunityItem {
+    id: string;
+    name: string;
+    icon: React.ComponentType<any>;
+}
+
+const communityData: CommunityItem[] = [
+    {
+        id: "1",
+        name: "Powerlifters",
+        icon: Users,
+    },
+    {
+        id: "2",
+        name: "Pilates",
+        icon: Activity,
+    },
+    {
+        id: "3",
+        name: "Yoga",
+        icon: Activity,
+    },
+    {
+        id: "4",
+        name: "Corridas",
+        icon: Dumbbell,
+    },
+    {
+        id: "5",
+        name: "Bodybuilders",
+        icon: Dumbbell,
+    },
+];
+
 const Communities: React.FC = () => {
   return (
     <View style={styles.section}>
@@ -22,36 +56,14 @@ const Communities: React.FC = () => {
             showsHorizontalScrollIndicator={false}
             style={styles.communitiesList}
         >
-        <View style={styles.communityItem}>
-            <View style={styles.communityAvatar}>
-                <Users size={24} color="#666" />
+        {communityData.map((community) => (
+            <View key={community.id} style={styles.communityItem}>
+                <View style={styles.communityAvatar}>
+                    <community.icon size={24} color="#666" />
+                </View>
+                <Text style={styles.communityName}>{community.name}</Text>
             </View>
-            <Text style={styles.communityName}>Powerlifters</Text>
-        </View>
-        <View style={styles.communityItem}>
-            <View style={styles.communityAvatar}>
-                <Activity size={24} color="#666" />
-            </View>
-            <Text style={styles.communityName}>Pilates</Text>
-        </View>
-        <View style={styles.communityItem}>
-            <View style={styles.communityAvatar}>
-                <Activity size={24} color="#666" />
-            </View>
-            <Text style={styles.communityName}>Yoga</Text>
-        </View>
-        <View style={styles.communityItem}>
-            <View style={styles.communityAvatar}>
-                <Dumbbell size={24} color="#666" />
-            </View>
-            <Text style={styles.communityName}>Corridas</Text>
-        </View>
-        <View style={styles.communityItem}>
-            <View style={styles.communityAvatar}>
-                <Dumbbell size={24} color="#666" />
-            </View>
-            <Text style={styles.communityName}>Bodybuilders</Text>
-        </View>
+        ))}
         </ScrollView>
     </View>
   )

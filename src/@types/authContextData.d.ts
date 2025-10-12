@@ -2,6 +2,7 @@ declare type User = {
   id: number;
   name: string;
   token: string;
+  photo?: string | null;
 };
 
 declare type AuthContextData = {

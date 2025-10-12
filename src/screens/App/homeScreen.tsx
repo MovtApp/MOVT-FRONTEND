@@ -17,9 +17,11 @@ import {
   Activity,
   Menu,
 } from "lucide-react-native";
+import { useNavigation } from "@react-navigation/native";
+import { DrawerNavigationProp } from "@react-navigation/drawer";
 import TrainingSelector from "../../components/TrainingSelector";
 import PromotionalBanner from "../../components/PromotionalBanner";
-import PlanCardTraining from "../../components/PlanCardsTraining.tsx";
+import PlanCardTraining from "../../components/PlanCardsTraining";
 import TrainingBanner from "../../components/TrainingBanner";
 import {
   SidebarProvider,
@@ -29,170 +31,203 @@ import Communities from "@components/Communities";
 import TheBestForYou from "@components/TheBestForYou";
 import ChallengesSection from "../../components/ChallengesSection";
 import Heating from "@components/Heating";
+import { AppStackParamList, AppDrawerParamList } from "../../@types/routes";
+import { CompositeNavigationProp } from "@react-navigation/native";
+import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 
-const MenuButton: React.FC = () => {
+interface MenuButtonProps {
+  onPress: () => void;
+}
 
+const MenuButton: React.FC<MenuButtonProps> = ({ onPress }) => {
   return (
-    <TouchableOpacity style={styles.menuButton}>
+    <TouchableOpacity style={styles.menuButton} onPress={onPress}>
       <Menu size={24} color="#000" />
     </TouchableOpacity>
   );
 };
 
+interface ExerciseItem {
+  id: string;
+  title: string;
+  calories: string;
+  minutes: string;
+  imageUrl: string;
+}
+
+const exerciseData: ExerciseItem[] = [
+  {
+    id: '1',
+    title: 'Agachamento',
+    calories: '180 - 250 Kcal',
+    minutes: '15 min',
+    imageUrl: 'https://res.cloudinary.com/ditlmzgrh/image/upload/v1757229915/image_71_jntmsv.jpg', 
+  },
+  {
+    id: '2',
+    title: 'Supino',
+    calories: '150 - 200 Kcal',
+    minutes: '12 min',
+    imageUrl: 'https://res.cloudinary.com/ditlmzgrh/image/upload/v1757229915/image_txncpp.jpg', 
+  },
+  {
+    id: '3',
+    title: 'Remada curvada',
+    calories: '160 - 220 Kcal',
+    minutes: '12 min',
+    imageUrl: 'https://res.cloudinary.com/ditlmzgrh/image/upload/v1757229918/image_75_drh4vh.jpg', 
+  },
+  {
+    id: '4',
+    title: 'Levantamento Terra',
+    calories: '160 - 220 Kcal',
+    minutes: '15 min',
+    imageUrl: 'https://res.cloudinary.com/ditlmzgrh/image/upload/v1757229918/image111_gu6iim.jpg', 
+  },
+  {
+    id: '5',
+    title: 'Puxada na Barra',
+    calories: '140 - 200 Kcal',
+    minutes: '12 min',
+    imageUrl: 'https://res.cloudinary.com/ditlmzgrh/image/upload/v1757229918/image_73_co9eqf.jpg', 
+  },
+];
+
+interface BestForYouItem {
+  id: string;
+  image: { uri: string };
+  title: string;
+  minutes: string;
+  level: string;
+}
+
+const bestForYouData: BestForYouItem[] = [
+  {
+    id: '1',
+    image: { uri: "https://res.cloudinary.com/ditlmzgrh/image/upload/v1757229918/image111_gu6iim.jpg" },
+    title: "Flexão de Braços",
+    minutes: "10 min",
+    level: "Iniciante",
+  },
+  {
+    id: '2',
+    image: { uri: "https://res.cloudinary.com/ditlmzgrh/image/upload/v1757229915/image_71_jntmsv.jpg" },
+    title: "Prancha com toque no ombro",
+    minutes: "5 min",
+    level: "Intermediário",
+  },
+  {
+    id: '3',
+    image: { uri: "https://res.cloudinary.com/ditlmzgrh/image/upload/v1757229915/image_txncpp.jpg" },
+    title: "Agachamento",
+    minutes: "15 min",
+    level: "Avançado",
+  },
+];
+
 const HomeScreen: React.FC = () => {
+  type HomeScreenNavigationProp = CompositeNavigationProp<
+    DrawerNavigationProp<AppDrawerParamList, 'HomeStack'>,
+    NativeStackNavigationProp<AppStackParamList, 'HomeScreen'>
+  >;
+  const navigation = useNavigation<HomeScreenNavigationProp>();
   const [search, setSearch] = useState("");
   const [selectedGender] = useState<'male' | 'female'>('female');
 
-  const exerciseData = [
-    {
-      title: 'Agachamento',
-      calories: '180 - 250 Kcal',
-      minutes: '15 min',
-      imageUrl: 'https://res.cloudinary.com/ditlmzgrh/image/upload/v1757229915/image_71_jntmsv.jpg', 
-    },
-    {
-      title: 'Supino',
-      calories: '150 - 200 Kcal',
-      minutes: '12 min',
-      imageUrl: 'https://res.cloudinary.com/ditlmzgrh/image/upload/v1757229915/image_txncpp.jpg', 
-    },
-    {
-      title: 'Remada curvada',
-      calories: '160 - 220 Kcal',
-      minutes: '12 min',
-      imageUrl: 'https://res.cloudinary.com/ditlmzgrh/image/upload/v1757229918/image_75_drh4vh.jpg', 
-    },
-    {
-      title: 'Levantamento Terra',
-      calories: '160 - 220 Kcal',
-      minutes: '15 min',
-      imageUrl: 'https://res.cloudinary.com/ditlmzgrh/image/upload/v1757229918/image111_gu6iim.jpg', 
-    },
-    {
-      title: 'Puxada na Barra',
-      calories: '140 - 200 Kcal',
-      minutes: '12 min',
-      imageUrl: 'https://res.cloudinary.com/ditlmzgrh/image/upload/v1757229918/image_73_co9eqf.jpg', 
-    },
-  ];
-
-  const bestForYouData = [
-    {
-      image: { uri: "https://res.cloudinary.com/ditlmzgrh/image/upload/v1757229918/image111_gu6iim.jpg" },
-      title: "Flexão de Braços",
-      minutes: "10 min",
-      level: "Iniciante",
-    },
-    {
-      image: { uri: "https://res.cloudinary.com/ditlmzgrh/image/upload/v1757229915/image_71_jntmsv.jpg" },
-      title: "Prancha com toque no ombro",
-      minutes: "5 min",
-      level: "Intermediário",
-    },
-    {
-      image: { uri: "https://res.cloudinary.com/ditlmzgrh/image/upload/v1757229915/image_txncpp.jpg" },
-      title: "Agachamento",
-      minutes: "15 min",
-      level: "Avançado",
-    },
-  ];
-
   return (
-    <SidebarProvider>
-      <View style={styles.container}>
-        
-        {/* Header */}
-        <View style={styles.header}>
-          <MenuButton />
-
+    <View style={styles.container}>
+      {/* Header */}
+      <View style={styles.header}>
+        <View style={styles.headerTop}>
+          <MenuButton onPress={() => navigation.openDrawer()} />
           <Image
             source={{ uri: "https://res.cloudinary.com/ditlmzgrh/image/upload/v1758030169/MV_pukwcn.png" }}
             style={{ width: 80, height: 40 }}
             resizeMode="cover"
           />
-
-          <TouchableOpacity style={styles.notificationButton}>
+          <TouchableOpacity style={styles.iconButton}>
             <Bell size={24} color="#000" />
           </TouchableOpacity>
         </View>
+      </View>
 
-        <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-          <SearchInput
-            value={search}
-            onChangeText={setSearch}
-            placeholder="Pesquisar"
-            icon={<Search size={24} color="#888" />}
-          />
-          
-          {/* Promotional Banner */}
-          <PromotionalBanner gender={selectedGender} />
+      {/* Search Bar */}
+      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+        <SearchInput
+          value={search}
+          onChangeText={setSearch}
+          placeholder="Pesquisar"
+          icon={<Search size={24} color="#888" />}
+        />
+        
+        {/* Promotional Banner */}
+        <PromotionalBanner gender={selectedGender} />
 
-          {/* Workout Selection */}
-          <TrainingSelector title="Selecione seu treino" containerStyle={{ marginBottom: 24 }}/>
+        {/* Workout Selection */}
+        <TrainingSelector title="Selecione seu treino" containerStyle={{ marginBottom: 24 }}/>
 
-          {/* Communities */}
-          <Communities />
+        {/* Communities */}
+        <Communities />
 
-          {/* Popular Exercises */}
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Exercícios populares</Text>
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              style={styles.exercisesList}
-            >
-              {exerciseData.map((exercise, index) => (
-                <ImageBackground
-                  key={index}
-                  source={{ uri: exercise.imageUrl }}
-                  style={styles.exerciseCard}
-                  imageStyle={{ borderRadius: 16 }}
-                >
-                  <View style={styles.imageOverlay}>
-                    <View style={styles.exerciseCardContent}>
-                      <Text style={styles.exerciseTitle}>{exercise.title}</Text>
-                      <View style={styles.exerciseInfo}>
-                        <View style={styles.tagsContainer}>
-                          <View style={styles.calorieTag}>
-                            <Text style={styles.calorieText}>{exercise.calories}</Text>
-                          </View>
-                          <View style={styles.MinutesTag}>
-                            <Text style={styles.MinutesText}>{exercise.minutes}</Text>
-                          </View>
+        {/* Popular Exercises */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Exercícios populares</Text>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            style={styles.exercisesList}
+          >
+            {exerciseData.map((exercise) => (
+              <ImageBackground
+                key={exercise.id}
+                source={{ uri: exercise.imageUrl }}
+                style={styles.exerciseCard}
+                imageStyle={{ borderRadius: 16 }}
+              >
+                <View style={styles.imageOverlay}>
+                  <View style={styles.exerciseCardContent}>
+                    <Text style={styles.exerciseTitle}>{exercise.title}</Text>
+                    <View style={styles.exerciseInfo}>
+                      <View style={styles.tagsContainer}>
+                        <View style={styles.calorieTag}>
+                          <Text style={styles.calorieText}>{exercise.calories}</Text>
                         </View>
-                        <TouchableOpacity style={styles.playButton}>
-                          <Play size={12} fill={"#192126"} />
-                        </TouchableOpacity>
+                        <View style={styles.MinutesTag}>
+                          <Text style={styles.MinutesText}>{exercise.minutes}</Text>
+                        </View>
                       </View>
+                      <TouchableOpacity style={styles.playButton}>
+                        <Play size={12} fill={"#192126"} />
+                      </TouchableOpacity>
                     </View>
                   </View>
-                </ImageBackground>
-              ))}
-            </ScrollView>
-          </View>
+                </View>
+              </ImageBackground>
+            ))}
+          </ScrollView>
+        </View>
 
-          {/* Plan today */}
-          <PlanCardTraining />
-          
-          {/* Banner */}
-          <TrainingBanner 
-            title="Melhor treino de superiores"
-            imageUrl="https://img.freepik.com/free-photo/view-woman-helping-man-exercise-gym_52683-98092.jpg?t=st=1758297406~exp=1758301006~hmac=66860a69d0b54e22b28d0831392e01278764d6b6d47e956a9576e041c9e016c2&w=1480"
-            onPress={() => console.log('Ver mais treinamento de superiores')}
-          />
+        {/* Plan today */}
+        <PlanCardTraining />
+        
+        {/* Banner */}
+        <TrainingBanner 
+          title="Melhor treino de superiores"
+          imageUrl="https://img.freepik.com/free-photo/view-woman-helping-man-exercise-gym_52683-98092.jpg?t=st=1758297406~exp=1758301006~hmac=66860a69d0b54e22b28d0831392e01278764d6b6d47e956a9576e041c9e016c2&w=1480"
+          onPress={() => {}}
+        />
 
-          {/* The best for you */}
-          <TheBestForYou />
+        {/* The best for you */}
+        <TheBestForYou />
 
-          {/* Challenges */}
-          <ChallengesSection />
+        {/* Challenges */}
+        <ChallengesSection />
 
-          {/* Rapid heating */}
-          <Heating />
+        {/* Rapid heating */}
+        <Heating />
 
-        </ScrollView>        
-      </View>
-    </SidebarProvider>
+      </ScrollView>        
+    </View>
   );
 };
 
@@ -200,17 +235,22 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "#fff",
-    zIndex: 1,
   },
   header: {
+    backgroundColor: "#fff",
+    paddingVertical: 10,
+    alignItems: "center",
+    justifyContent: "center",
+    position: "relative",
+    zIndex: 45,
+  },
+  headerTop: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
+    width: "100%",
     paddingHorizontal: 20,
-    paddingTop: 20,
-    paddingBottom: 20,
-    backgroundColor: "#fff",
-    zIndex: 45,
+    paddingTop: 10,
   },
   menuButton: {
     padding: 10,
@@ -220,23 +260,23 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  title: {
-    fontSize: 28,
-    fontWeight: "bold",
-    color: "#000",
-    zIndex: 45,
+  iconButton: {
+    padding: 10,
+    zIndex: 46,
+    minWidth: 44,
+    minHeight: 44,
+    alignItems: "center",
+    justifyContent: "center",
   },
   notificationButton: {
-    padding: 8,
-    zIndex: 45,
+    padding: 10,
   },
   content: {
     flex: 1,
     paddingHorizontal: 20,
-    zIndex: 1,
-    paddingBottom: 80, 
+    paddingTop: 20,
   },
-  searchContainer: {
+  searchInput: {
     marginBottom: 20,
   },
   searchBar: {

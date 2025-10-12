@@ -6,6 +6,11 @@ export type AppStackParamList = {
   ChatScreen: undefined;
 };
 
+export type AppDrawerParamList = {
+  HomeStack: { screen: keyof AppStackParamList; params?: any };
+  // Adicione aqui outras rotas diretas do drawer, se houver
+};
+
 export type AuthStackParamList = {
   SignInScreen: undefined;
   SignUpScreen: undefined;
@@ -33,7 +38,9 @@ export type InfoStackParamList = {
 
 export type RootStackParamList = {
   SplashScreen: undefined;
-  App: { screen: keyof AppStackParamList } | undefined;
+  App:
+    | { screen: keyof AppDrawerParamList; params?: AppDrawerParamList[keyof AppDrawerParamList] }
+    | undefined;
   Auth: { screen: keyof AuthStackParamList } | undefined;
   Info:
     | {
