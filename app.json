@@ -2,6 +2,8 @@
   "expo": {
     "name": "MOVT",
     "slug": "movt",
+    "scheme": "movt",
+    
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./src/assets/iconBuild.png",

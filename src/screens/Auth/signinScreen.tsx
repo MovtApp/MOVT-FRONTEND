@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { View, Text, TouchableOpacity, StyleSheet, Alert } from "react-native";
 import BackButton from "@/components/BackButton";
 import SocialButton from "@/components/SocialButton";
@@ -7,52 +7,50 @@ import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import RootStackParamList from "@typings/routes";
 import CustomInput from "@/components/CustomInput";
 import { Eye, EyeOff } from "lucide-react-native";
-import axios from "axios"; // Adicionei axios
-import AsyncStorage from "@react-native-async-storage/async-storage"; // Adicionei AsyncStorage
-import { useAuth } from "@contexts/AuthContext"; // Importar useAuth
+import axios from "axios";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { useAuth } from "@contexts/AuthContext";
+import { supabase } from '../../services/supabaseClient';
+import * as WebBrowser from "expo-web-browser";
+import * as Google from "expo-auth-session/providers/google";
+import * as AuthSession from "expo-auth-session";
+// import { LoginManager, AccessToken } from 'react-native-fbsdk-next'; // Para Facebook (Removido)
 
 // --- CONFIGURAÇÃO DA URL DA API ---
-// IMPORTANTE: Substitua pelo IP da sua máquina na rede local ou 10.0.2.2 para emuladores Android
-// Exemplo: 'http://192.168.1.100:3000' para um dispositivo físico na mesma rede Wi-Fi
-// Exemplo: 'http://10.0.2.2:3000' para emuladores Android
 const API_BASE_URL = 'http://10.0.2.2:3000';
 // --- FIM DA CONFIGURAÇÃO ---
+
+// URL da sua Edge Function que receberá os tokens dos provedores
+const SOCIAL_SIGN_IN_EDGE_FUNCTION_URL = 'https://ukxvqhguvbyhcvpkxyky.supabase.co/functions/v1/auth/social-sign-in';
+
+// Variáveis de ambiente (usa EXPO_PUBLIC_* e faz fallback)
+const GOOGLE_WEB_CLIENT_ID = process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID || process.env.GOOGLE_WEB_CLIENT_ID;
 
 export const SignInScreen = () => {
   const navigation =
     useNavigation<NativeStackNavigationProp<RootStackParamList>>();
-  const { signIn } = useAuth(); // Obter a função signIn do contexto
+  const { signIn } = useAuth();
 
-  // Estados locais para os campos
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
-  const [loading, setLoading] = useState(false); // Novo estado para feedback de carregamento
-  const [error, setError] = useState<string | null>(null); // Novo estado para exibir erros específicos
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  // Estado para armazenar o sessionId e dados do usuário logado
-  // Em um app real, você usaria AsyncStorage para persistir isso entre sessões.
   const [sessionId, setSessionId] = useState<string | null>(null);
-  const [loggedInUser, setLoggedInUser] = useState<any | null>(null); // Pode ser tipado melhor depois
+  const [loggedInUser, setLoggedInUser] = useState<any | null>(null);
 
   function handleSignup() {
     navigation.navigate("Auth", { screen: "SignUpScreen" });
   }
 
-  // A função original handleVerifyAccount será substituída pelo nosso handleLogin no botão.
-  // Se "VerifyAccountScreen" for a próxima tela após o login, podemos navegar para ela dentro do handleLogin.
-  // function handleVerifyAccount() {
-  //   navigation.navigate("Verify", { screen: "VerifyAccountScreen" });
-  // }
-
   function handleRecovery() {
     navigation.navigate("Verify", { screen: "RecoveryScreen" });
   }
 
-  // --- NOVA FUNÇÃO para fazer LOGIN com o backend Node.js ---
   const handleLogin = async () => {
-    setError(null); // Limpa erros anteriores
-    setLoading(true); // Ativa o estado de carregamento
+    setError(null);
+    setLoading(true);
 
     if (!email || !password) {
       setError("Por favor, preencha todos os campos.");
@@ -63,37 +61,109 @@ export const SignInScreen = () => {
     try {
       const response = await axios.post(`${API_BASE_URL}/login`, {
         email,
-        senha: password, // 'senha' é o nome do campo no seu backend Node.js
-        // Se você quiser enviar o sessionId existente para validação extra no login (conforme implementamos no backend),
-        // pode incluí-lo aqui: sessionId: sessionId,
+        senha: password,
       });
 
-      // Sucesso no login
       Alert.alert('Login Efetuado', response.data.message);
 
-      // Chamar signIn do AuthContext para gerenciar a sessão
-      await signIn(response.data.sessionId, { 
-        id: response.data.user.id, 
-        name: response.data.user.nome, 
-        email: response.data.user.email, 
+      await signIn(response.data.sessionId, {
+        id: response.data.user.id,
+        name: response.data.user.nome,
+        email: response.data.user.email,
         username: response.data.user.username,
-        isVerified: response.data.user.isVerified 
+        isVerified: response.data.user.isVerified
       });
 
-      // As navegações serão tratadas pelo App.tsx com base no estado do AuthContext
-      // Não precisamos de navegação condicional aqui, pois App.tsx lida com isso.
-
     } catch (err: any) {
-      // Corrigido: Mostra erro genérico se não houver resposta do backend
       const errorMessage = err?.response?.data?.error
         ? err.response.data.error
         : 'Ocorreu um erro ao fazer login.';
-      setError(errorMessage); // Define o erro para ser exibido na UI
-      Alert.alert('Erro no Login', errorMessage); // Exibe um alerta também para feedback imediato
+      setError(errorMessage);
+      Alert.alert('Erro no Login', errorMessage);
     } finally {
-      setLoading(false); // Desativa o estado de carregamento
+      setLoading(false);
     }
   };
+
+  WebBrowser.maybeCompleteAuthSession();
+
+  // @ts-expect-error 'useProxy' é suportado em runtime para forçar proxy do Expo
+  const redirectUri = AuthSession.makeRedirectUri({ useProxy: true });
+
+  const [request, response, promptAsync] = Google.useAuthRequest({
+    clientId: GOOGLE_WEB_CLIENT_ID,
+    scopes: ["profile", "email"],
+    redirectUri,
+  });
+
+  useEffect(() => {
+    if (response?.type === "success") {
+      const idToken = response.authentication?.idToken;
+      if (idToken) {
+        handleSignInWithSocialToken('google', idToken);
+      } else if ((response as any).params?.id_token) {
+        handleSignInWithSocialToken('google', (response as any).params.id_token as string);
+      }
+    }
+  }, [response]);
+
+  const handleSignInWithSocialToken = async (provider: 'google', token: string) => {
+    try {
+      const response = await fetch(SOCIAL_SIGN_IN_EDGE_FUNCTION_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ provider, token }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Erro ao autenticar via Edge Function.');
+      }
+
+      const { access_token, refresh_token } = await response.json();
+
+      if (access_token && refresh_token) {
+        await supabase.auth.setSession({ access_token, refresh_token });
+        console.log('Login social bem-sucedido via Edge Function!');
+        // navigation.navigate('AppStack');
+      } else {
+        throw new Error('Tokens de sessão Supabase não recebidos da Edge Function.');
+      }
+    } catch (error: any) {
+      console.error('Erro na autenticação social via Edge Function:', error.message);
+      Alert.alert('Erro de Login', error.message);
+    }
+  };
+
+  const signInWithGoogle = async () => {
+    try {
+      await promptAsync();
+    } catch (error: any) {
+      Alert.alert('Erro', `Falha no login com Google: ${error.message}`);
+    }
+  };
+
+  // const signInWithFacebook = async () => {
+  //   try {
+  //     const result = await LoginManager.logInWithPermissions(['public_profile', 'email']);
+  //     if (result.isCancelled) {
+  //       console.log('Login do Facebook cancelado.');
+  //       return;
+  //     }
+  //     const data = await AccessToken.getCurrentAccessToken();
+  //     if (data?.accessToken) {
+  //       await handleSignInWithSocialToken('facebook', data.accessToken);
+  //     } else {
+  //       Alert.alert('Erro', 'Token de acesso do Facebook não encontrado.');
+  //     }
+  //   } catch (error: any) {
+  //     console.error('Erro no login do Facebook:', error);
+  //     Alert.alert('Erro', `Falha no login com Facebook: ${error.message}`);
+  //   }
+  // };
+
 
   return (
     <View style={styles.container}>
@@ -139,8 +209,8 @@ export const SignInScreen = () => {
 
         <TouchableOpacity
           style={styles.loginButton}
-          onPress={handleLogin} // CHAMA A NOVA FUNÇÃO DE LOGIN
-          disabled={loading} // Desabilita o botão enquanto estiver carregando
+          onPress={handleLogin}
+          disabled={loading}
         >
           <Text style={styles.loginButtonText}>{loading ? 'Entrando...' : 'Log In'}</Text>
         </TouchableOpacity>
@@ -148,22 +218,12 @@ export const SignInScreen = () => {
           <View style={styles.separatorLine} />
           <Text style={styles.separatorText}>Ou</Text>
           <View style={styles.separatorLine} />
-        </View>
+          </View>
         <View>
           <SocialButton
             type="google"
             text="Continue com Google"
-            onPress={() => {}}
-          />
-          <SocialButton
-            type="facebook"
-            text="Continue com Facebook"
-            onPress={() => {}}
-          />
-          <SocialButton
-            type="apple"
-            text="Continue com Icloud"
-            onPress={() => {}}
+            onPress={signInWithGoogle}
           />
         </View>
         <View
@@ -210,7 +270,7 @@ const styles = StyleSheet.create({
     fontSize: 13,
     marginBottom: 4,
     marginLeft: 2,
-    textAlign: 'center', // Adicionado para melhor alinhamento do erro
+    textAlign: 'center',
   },
   forgot: {
     color: "#BBF246",
