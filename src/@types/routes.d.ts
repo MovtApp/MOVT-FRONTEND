@@ -1,10 +1,27 @@
 export type AppStackParamList = {
   HomeScreen: undefined;
   MapScreen: undefined;
-  DietScreen: undefined;
+  DietScreen: { setIsDietSheetOpen: (isOpen: boolean) => void };
   DataScreen: undefined;
   ChatScreen: undefined;
+  DietDetails: { meal: DietMeal };
 };
+
+export interface DietMeal {
+  id_dieta: string;
+  id: string;
+  title: string;
+  calories?: string | undefined;
+  minutes?: string | undefined;
+  imageUrl: string;
+  authorName: string;
+  authorAvatar: string;
+  description?: string;
+  fat?: string | undefined;
+  protein?: string | undefined;
+  carbs?: string | undefined;
+  categoria?: string;
+}
 
 export type AppDrawerParamList = {
   HomeStack: { screen: keyof AppStackParamList; params?: any };

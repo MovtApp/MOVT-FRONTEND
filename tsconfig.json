@@ -25,6 +25,7 @@
       "@theme/*": ["./src/theme/*"],
       "@typings/*": ["./src/@types/*"],
       "@utils/*": ["./src/utils/*"],
+      "@services/geminiApi": ["./src/services/geminiApi.ts"],
       "@/*": ["./src/*"]
     }
   }

@@ -11,7 +11,8 @@ interface User {
   email: string;
   username: string;
   isVerified: boolean; // Adicionado o status de verificação do e-mail
-  sessionId: string; // Adicionado o sessionId
+  sessionId?: string; // Adicionado o sessionId
+  photo?: string | null; // Adicionado para o avatar do usuário
 }
 
 interface AuthContextData {

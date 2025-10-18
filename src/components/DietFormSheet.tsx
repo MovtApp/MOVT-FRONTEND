@@ -1,131 +1,305 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, TextInput, Image, ScrollView, Alert, Platform } from 'react-native';
-import BottomSheet, { BottomSheetView } from '@gorhom/bottom-sheet';
-import { Camera, Image as ImageIcon, Upload } from 'lucide-react-native';
+import { View, Text, StyleSheet, TouchableOpacity, TextInput, Image, ScrollView, Alert, KeyboardAvoidingView, Platform } from 'react-native';
+import BottomSheet, { BottomSheetScrollView, BottomSheetView } from '@gorhom/bottom-sheet';
+import { Image as ImageIcon } from 'lucide-react-native';
 import * as ImagePicker from 'expo-image-picker';
+import { useForm, Controller } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { dietFormSchema, DietFormInputs } from './dietFormSchema';
+import { useAuth } from '../hooks/useAuth';
+import SelectInput from './SelectInput';
+import { uploadImageToSupabase } from '../services/services';
+import { api } from '../services/api';
+
+interface DietMeal {
+  id_dieta?: string;
+  id: string;
+  title: string;
+  imageUrl: string;
+  authorName: string;
+  authorAvatar: string;
+  description?: string;
+  categoria?: string;
+  calorias?: number;
+  tempo_preparo?: number;
+  carboidratos?: number;
+  gordura?: number;
+  proteina?: number;
+}
 
 interface DietFormSheetProps {
   isOpen: boolean;
   onClose: () => void;
-  onSubmit: (dietData: any) => void; // Função para enviar os dados da dieta (add ou edit)
-  initialData?: any; // Dados iniciais da dieta para edição
+  initialData?: DietMeal;
   bottomSheetRef: React.RefObject<BottomSheet | null>;
   sheetIndex: number;
   setSheetIndex: (idx: number) => void;
+  onSuccess?: () => void;
 }
+
+const mapDietMealToDietFormInputs = (meal: DietMeal | undefined, user: any): DietFormInputs => {
+  return {
+    id_dieta: meal?.id_dieta || undefined,
+    nome: meal?.title || '',
+    descricao: meal?.description || '',
+    imageurl: meal?.imageUrl || '',
+    categoria: meal?.categoria || '',
+    calorias: meal?.calorias || undefined,
+    tempo_preparo: meal?.tempo_preparo || undefined,
+    carboidratos: meal?.carboidratos || undefined,
+    gordura: meal?.gordura || undefined,
+    proteina: meal?.proteina || undefined,
+    nome_autor: meal?.authorName || user?.name || '',
+    avatar_autor_url: meal?.authorAvatar || user?.photo || '',
+  };
+};
 
 const DietFormSheet: React.FC<DietFormSheetProps> = ({
   isOpen,
   onClose,
-  onSubmit,
   initialData,
   bottomSheetRef,
   sheetIndex,
   setSheetIndex,
+  onSuccess,
 }) => {
-  const snapPoints = useMemo(() => ['70%', '90%'], []);
-  const [nome, setNome] = useState(initialData?.title || '');
-  const [descricao, setDescricao] = useState(initialData?.description || '');
-  const [calorias, setCalorias] = useState(initialData?.calories?.replace(' kcal', '') || '');
-  const [tempoPreparo, setTempoPreparo] = useState(initialData?.minutes?.replace(' min', '') || '');
-  const [gordura, setGordura] = useState(initialData?.fat?.replace(' g', '') || '');
-  const [proteina, setProteina] = useState(initialData?.protein?.replace(' g', '') || '');
-  const [carboidratos, setCarboidratos] = useState(initialData?.carbs?.replace(' g', '') || '');
-  const [nomeAutor, setNomeAutor] = useState(initialData?.authorName || '');
-  const [avatarAutorUrl, setAvatarAutorUrl] = useState(initialData?.authorAvatar || '');
-  const [imageUri, setImageUri] = useState(initialData?.imageUrl || null);
+  const { user } = useAuth();
+  const snapPoints = useMemo(() => ['90%', '100%'], []);
+  
+  const isAddingNewDiet = !initialData;
+  const initialFormValues = useMemo(() => mapDietMealToDietFormInputs(initialData, user), [initialData, user]);
+
+  const { control, handleSubmit, reset, setValue, watch, formState: { errors } } = useForm<DietFormInputs>({
+    resolver: zodResolver(dietFormSchema),
+    defaultValues: initialFormValues,
+  });
+  const selectedCategory = watch('categoria');
+
+  const [imageUri, setImageUri] = useState<string | null>(initialFormValues.imageurl || null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const categoryOptions = [
+    { label: "Café da manhã", value: "breakfast" },
+    { label: "Almoço", value: "lunch" },
+    { label: "Janta", value: "dinner" },
+  ];
 
   useEffect(() => {
-    if (initialData) {
-      setNome(initialData.title || '');
-      setDescricao(initialData.description || '');
-      setCalorias(initialData.calories?.replace(' kcal', '') || '');
-      setTempoPreparo(initialData.minutes?.replace(' min', '') || '');
-      setGordura(initialData.fat?.replace(' g', '') || '');
-      setProteina(initialData.protein?.replace(' g', '') || '');
-      setCarboidratos(initialData.carbs?.replace(' g', '') || '');
-      setNomeAutor(initialData.authorName || '');
-      setAvatarAutorUrl(initialData.authorAvatar || '');
-      setImageUri(initialData.imageUrl || null);
-    } else {
-      // Limpar formulário quando não há initialData (modo de adição)
-      setNome('');
-      setDescricao('');
-      setCalorias('');
-      setTempoPreparo('');
-      setGordura('');
-      setProteina('');
-      setCarboidratos('');
-      setNomeAutor('');
-      setAvatarAutorUrl('');
-      setImageUri(null);
-    }
-  }, [initialData]);
+    reset(initialFormValues);
+    setImageUri(initialFormValues.imageurl || null);
+  }, [initialData, reset, initialFormValues]);
 
-  const pickImage = async () => {
-    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (status !== 'granted') {
-      Alert.alert(
-        'Permissão Necessária',
-        'Precisamos da sua permissão para acessar a galeria de imagens para que isso funcione!'
-      );
-      return;
+  useEffect(() => {
+    if (isOpen && bottomSheetRef.current) {
+      // Garantir que o sheet abra na posição correta
+      setTimeout(() => {
+        bottomSheetRef.current?.snapToIndex(0);
+      }, 100);
     }
+  }, [isOpen]);
 
-    let result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
-      aspect: [4, 3],
-      quality: 1,
-    });
+  // Debug do estado isSubmitting
+  useEffect(() => {
+    console.log('🔄 Estado isSubmitting mudou para:', isSubmitting);
+  }, [isSubmitting]);
 
-    if (!result.canceled) {
-      setImageUri(result.assets[0].uri);
-    }
+  const setPickedImage = (uri: string) => {
+    setImageUri(uri);
+    setValue('imageurl', uri);
   };
 
-  const takePhoto = async () => {
-    const { status } = await ImagePicker.requestCameraPermissionsAsync();
-    if (status !== 'granted') {
-      Alert.alert(
-        'Permissão Necessária',
-        'Precisamos da sua permissão para acessar a câmera para que isso funcione!'
-      );
-      return;
-    }
-
-    let result = await ImagePicker.launchCameraAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
-      aspect: [4, 3],
-      quality: 1,
-    });
-
-    if (!result.canceled) {
-      setImageUri(result.assets[0].uri);
-    }
+  const handleImageSelection = () => {
+    Alert.alert(
+      "Selecionar Imagem",
+      "Escolha a origem da imagem:",
+      [
+        {
+          text: "Cancelar",
+          style: "cancel",
+        },
+        {
+          text: "Tirar Foto",
+          onPress: async () => {
+            const { status } = await ImagePicker.requestCameraPermissionsAsync();
+            if (status !== 'granted') {
+              Alert.alert("Permissão Necessária", "Precisamos da sua permissão para acessar a câmera.");
+              return;
+            }
+            let result = await ImagePicker.launchCameraAsync({
+              mediaTypes: 'images',
+              allowsEditing: true,
+              aspect: [4, 3],
+              quality: 1,
+            });
+            if (!result.canceled) {
+              const uri = result.assets[0].uri;
+              setPickedImage(uri);
+            }
+          },
+        },
+        {
+          text: "Selecionar da Galeria",
+          onPress: async () => {
+            const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+            if (status !== 'granted') {
+              Alert.alert("Permissão Necessária", "Precisamos da sua permissão para acessar a galeria de imagens.");
+              return;
+            }
+            let result = await ImagePicker.launchImageLibraryAsync({
+              mediaTypes: 'images',
+              allowsEditing: true,
+              aspect: [4, 3],
+              quality: 1,
+            });
+            if (!result.canceled) {
+              const uri = result.assets[0].uri;
+              setPickedImage(uri);
+            }
+          },
+        },
+      ],
+      { cancelable: true }
+    );
   };
 
-  const handleSubmit = () => {
-    if (!nome.trim()) {
-      Alert.alert('Erro', 'O nome da dieta é obrigatório.');
+
+  const onSubmitForm = async (data: DietFormInputs) => {
+    console.log('🎯 onSubmitForm chamada, isSubmitting atual:', isSubmitting);
+    
+    if (isSubmitting) {
+      console.log('⚠️ Prevenindo múltiplos envios');
+      return; // Prevenir múltiplos envios
+    }
+    
+    if (!user || !user.sessionId) {
+      Alert.alert('Erro', 'Usuário não autenticado. Por favor, faça login novamente.');
       return;
     }
-    // Adicione validações para outros campos importantes aqui
 
-    onSubmit({
-      id_dieta: initialData?.id_dieta, // Passa o ID se for edição
-      nome: nome.trim(),
-      descricao: descricao.trim(),
-      calorias: calorias ? parseFloat(calorias) : 0,
-      tempo_preparo: tempoPreparo ? parseInt(tempoPreparo) : 0,
-      gordura: gordura ? parseFloat(gordura) : 0,
-      proteina: proteina ? parseFloat(proteina) : 0,
-      carboidratos: carboidratos ? parseFloat(carboidratos) : 0,
-      nome_autor: nomeAutor.trim(),
-      avatar_autor_url: avatarAutorUrl.trim(),
-      imageurl: imageUri, // A URL da imagem ou base64, dependendo de como você fará o upload
-    });
+    // Validação adicional dos campos obrigatórios
+    if (!data.nome || !data.descricao || !data.imageurl || !data.categoria) {
+      Alert.alert('Erro', 'Por favor, preencha todos os campos obrigatórios: Nome, Descrição, Imagem e Categoria.');
+      return;
+    }
+
+    console.log('✅ Validações passaram, definindo isSubmitting = true');
+    setIsSubmitting(true);
+    
+    // Fallback para garantir que o estado seja resetado após 15 segundos
+    const fallbackTimeout = setTimeout(() => {
+      console.warn('⚠️ Timeout de segurança ativado - resetando estado');
+      setIsSubmitting(false);
+    }, 15000);
+
+    let imageUrlToUpload = data.imageurl;
+    console.log('🖼️ URL da imagem:', imageUrlToUpload);
+
+    // Se a imagem for uma URI local, faça o upload para o Supabase
+    if (imageUrlToUpload && imageUrlToUpload.startsWith('file://')) {
+      console.log('📤 Fazendo upload da imagem para Supabase...');
+      try {
+        const publicUrl = await uploadImageToSupabase(imageUrlToUpload);
+        if (publicUrl) {
+          imageUrlToUpload = publicUrl;
+          console.log('✅ Upload da imagem concluído:', publicUrl);
+        } else {
+          console.error('❌ Falha no upload da imagem');
+          Alert.alert('Erro', 'Falha ao fazer upload da imagem.');
+          setIsSubmitting(false);
+          return;
+        }
+      } catch (uploadError) {
+        console.error('❌ Erro no upload:', uploadError);
+        Alert.alert('Erro', 'Falha ao fazer upload da imagem.');
+        setIsSubmitting(false);
+        return;
+      }
+    }
+
+    const payload = {
+      nome: data.nome,
+      descricao: data.descricao,
+      imageurl: imageUrlToUpload,
+      categoria: data.categoria,
+      calorias: data.calorias === null || data.calorias === undefined ? null : data.calorias,
+      tempo_preparo: data.tempo_preparo === null || data.tempo_preparo === undefined ? null : data.tempo_preparo,
+      gordura: data.gordura === null || data.gordura === undefined ? null : data.gordura,
+      proteina: data.proteina === null || data.proteina === undefined ? null : data.proteina,
+      carboidratos: data.carboidratos === null || data.carboidratos === undefined ? null : data.carboidratos,
+    };
+
+    try {
+      console.log('=== ENVIANDO DIETA PARA O BACKEND ===');
+      console.log('Payload completo:', JSON.stringify(payload, null, 2));
+      console.log('URL da imagem final:', imageUrlToUpload);
+      console.log('Usuário autenticado:', user?.name);
+      console.log('Session ID:', user?.sessionId);
+      console.log('Base URL da API:', api.defaults.baseURL);
+      console.log('Headers padrão:', api.defaults.headers);
+      
+      if (initialData?.id_dieta) {
+        // Editar dieta existente
+        console.log('Editando dieta existente:', initialData.id_dieta);
+        const response = await api.put(`/dietas/${initialData.id_dieta}`, payload, {
+          headers: {
+            Authorization: `Bearer ${user.sessionId}`,
+          },
+        });
+        console.log('✅ Resposta da API (editar):', response.data);
+        Alert.alert('Sucesso', 'Dieta atualizada com sucesso!');
+      } else {
+        // Criar nova dieta
+        console.log('📝 Criando nova dieta');
+        console.log('URL completa:', `${api.defaults.baseURL}/dietas`);
+        console.log('Iniciando requisição POST...');
+        
+        const response = await api.post('/dietas', payload, {
+          headers: {
+            Authorization: `Bearer ${user.sessionId}`,
+          },
+          timeout: 15000, // 15 segundos de timeout
+        });
+        console.log('✅ Resposta da API (criar):', response.data);
+        Alert.alert('Sucesso', 'Dieta criada com sucesso!');
+      }
+      
+      // Chamar callback de sucesso para atualizar a lista
+      if (onSuccess) {
+        onSuccess();
+      }
+      
+      onClose();
+      reset();
+    } catch (error: any) {
+      console.error('❌ Erro ao salvar dieta:', error);
+      console.error('❌ Tipo do erro:', error.code || error.name);
+      console.error('❌ Mensagem:', error.message);
+      console.error('❌ Status:', error.response?.status);
+      console.error('❌ Data do erro:', error.response?.data);
+      console.error('❌ URL tentada:', error.config?.url);
+      
+      let errorMessage = 'Ocorreu um erro ao processar sua solicitação.';
+      
+      if (error.code === 'ECONNABORTED' || error.message.includes('timeout')) {
+        errorMessage = 'Timeout na requisição. Verifique sua conexão e tente novamente.';
+      } else if (error.code === 'NETWORK_ERROR' || error.message.includes('Network Error')) {
+        errorMessage = 'Erro de conexão. Verifique se o servidor está rodando.';
+      } else if (error.response?.status === 401) {
+        errorMessage = 'Não autorizado. Faça login novamente.';
+      } else if (error.response?.status === 400) {
+        errorMessage = error.response?.data?.error || 'Dados inválidos.';
+      } else if (error.response?.data?.error) {
+        errorMessage = error.response.data.error;
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
+      Alert.alert('Erro', errorMessage);
+    } finally {
+      console.log('🔄 Finalizando submit, resetando estado');
+      clearTimeout(fallbackTimeout);
+      setIsSubmitting(false);
+    }
   };
 
   if (!isOpen) {
@@ -142,119 +316,192 @@ const DietFormSheet: React.FC<DietFormSheetProps> = ({
       onChange={setSheetIndex}
       backgroundStyle={styles.sheetBackground}
       handleIndicatorStyle={styles.sheetHandle}
+      enableOverDrag={false}
+      enableHandlePanningGesture={true}
+      enableContentPanningGesture={true}
+      activeOffsetY={[-1, 1]}
+      failOffsetX={[-5, 5]}
     >
-      <BottomSheetView style={styles.sheetContent}>
-        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
-          <Text style={styles.sheetTitle}>{initialData ? 'Editar Dieta' : 'Adicionar Nova Dieta'}</Text>
+      <BottomSheetScrollView 
+        style={styles.sheetContent}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={true}
+        keyboardShouldPersistTaps="handled"
+        nestedScrollEnabled={true}
+      >
+          <Text style={styles.sheetTitle}>{isAddingNewDiet ? 'Adicionar Nova Dieta' : 'Editar Dieta'}</Text>
 
-          {/* Campos do Formulário */}
           <Text style={styles.label}>Nome da Dieta:</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="Ex: Salada de Frango"
-            value={nome}
-            onChangeText={setNome}
+          <Controller
+            control={control}
+            name="nome"
+            render={({ field: { onChange, onBlur, value } }) => (
+              <TextInput
+                style={styles.input}
+                placeholder="Ex: Salada de Frango"
+                onBlur={onBlur}
+                onChangeText={onChange}
+                value={value}
+              />
+            )}
           />
+          {errors.nome && <Text style={styles.errorText}>{errors.nome.message}</Text>}
 
           <Text style={styles.label}>Descrição:</Text>
-          <TextInput
-            style={[styles.input, styles.textArea]}
-            placeholder="Descreva a dieta..."
-            value={descricao}
-            onChangeText={setDescricao}
-            multiline
-            numberOfLines={4}
+          <Controller
+            control={control}
+            name="descricao"
+            render={({ field: { onChange, onBlur, value } }) => (
+              <TextInput
+                style={[styles.input, styles.textArea]}
+                placeholder="Descreva a dieta..."
+                onBlur={onBlur}
+                onChangeText={onChange}
+                value={value}
+                multiline
+                numberOfLines={4}
+              />
+            )}
           />
+          {errors.descricao && <Text style={styles.errorText}>{errors.descricao.message}</Text>}
+
+          <Text style={styles.label}>Categoria:</Text>
+          <Controller
+            control={control}
+            name="categoria"
+            render={({ field: { onChange, value } }) => (
+              <SelectInput
+                value={value}
+                onChange={onChange}
+                placeholder="Selecione a categoria"
+                options={categoryOptions}
+              />
+            )}
+          />
+          {errors.categoria && <Text style={styles.errorText}>{errors.categoria.message}</Text>}
 
           <Text style={styles.label}>Calorias (kcal):</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="Ex: 350"
-            keyboardType="numeric"
-            value={calorias}
-            onChangeText={setCalorias}
+          <Controller
+            control={control}
+            name="calorias"
+            render={({ field: { onChange, onBlur, value } }) => (
+              <TextInput
+                style={styles.input}
+                placeholder="Ex: 300"
+                onBlur={onBlur}
+                onChangeText={text => onChange(text === '' ? undefined : Number(text))}
+                value={value?.toString() || ''}
+                keyboardType="numeric"
+              />
+            )}
           />
+          {errors.calorias && <Text style={styles.errorText}>{errors.calorias.message}</Text>}
 
-          <Text style={styles.label}>Tempo de Preparo (min):</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="Ex: 30"
-            keyboardType="numeric"
-            value={tempoPreparo}
-            onChangeText={setTempoPreparo}
+          <Text style={styles.label}>Tempo de Preparo (minutos):</Text>
+          <Controller
+            control={control}
+            name="tempo_preparo"
+            render={({ field: { onChange, onBlur, value } }) => (
+              <TextInput
+                style={styles.input}
+                placeholder="Ex: 30"
+                onBlur={onBlur}
+                onChangeText={text => onChange(text === '' ? undefined : Number(text))}
+                value={value?.toString() || ''}
+                keyboardType="numeric"
+              />
+            )}
           />
-
-          <Text style={styles.label}>Gordura (g):</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="Ex: 10.5"
-            keyboardType="numeric"
-            value={gordura}
-            onChangeText={setGordura}
-          />
-
-          <Text style={styles.label}>Proteína (g):</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="Ex: 25"
-            keyboardType="numeric"
-            value={proteina}
-            onChangeText={setProteina}
-          />
+          {errors.tempo_preparo && <Text style={styles.errorText}>{errors.tempo_preparo.message}</Text>}
 
           <Text style={styles.label}>Carboidratos (g):</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="Ex: 40"
-            keyboardType="numeric"
-            value={carboidratos}
-            onChangeText={setCarboidratos}
+          <Controller
+            control={control}
+            name="carboidratos"
+            render={({ field: { onChange, onBlur, value } }) => (
+              <TextInput
+                style={styles.input}
+                placeholder="Ex: 40"
+                onBlur={onBlur}
+                onChangeText={text => onChange(text === '' ? undefined : Number(text))}
+                value={value?.toString() || ''}
+                keyboardType="numeric"
+              />
+            )}
           />
+          {errors.carboidratos && <Text style={styles.errorText}>{errors.carboidratos.message}</Text>}
 
-          <Text style={styles.label}>Nome do Autor:</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="Ex: Chef Saudável"
-            value={nomeAutor}
-            onChangeText={setNomeAutor}
+          <Text style={styles.label}>Gordura (g):</Text>
+          <Controller
+            control={control}
+            name="gordura"
+            render={({ field: { onChange, onBlur, value } }) => (
+              <TextInput
+                style={styles.input}
+                placeholder="Ex: 15"
+                onBlur={onBlur}
+                onChangeText={text => onChange(text === '' ? undefined : Number(text))}
+                value={value?.toString() || ''}
+                keyboardType="numeric"
+              />
+            )}
           />
+          {errors.gordura && <Text style={styles.errorText}>{errors.gordura.message}</Text>}
 
-          <Text style={styles.label}>URL do Avatar do Autor:</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="Ex: https://example.com/avatar.jpg"
-            value={avatarAutorUrl}
-            onChangeText={setAvatarAutorUrl}
+          <Text style={styles.label}>Proteína (g):</Text>
+          <Controller
+            control={control}
+            name="proteina"
+            render={({ field: { onChange, onBlur, value } }) => (
+              <TextInput
+                style={styles.input}
+                placeholder="Ex: 25"
+                onBlur={onBlur}
+                onChangeText={text => onChange(text === '' ? undefined : Number(text))}
+                value={value?.toString() || ''}
+                keyboardType="numeric"
+              />
+            )}
           />
+          {errors.proteina && <Text style={styles.errorText}>{errors.proteina.message}</Text>}
 
-          {/* Área de Imagem */}
           <Text style={styles.label}>Imagem da Dieta:</Text>
           <View style={styles.imagePickerContainer}>
             {imageUri ? (
-              <Image source={{ uri: imageUri }} style={styles.selectedImage} />
+              <TouchableOpacity onPress={handleImageSelection}>
+                <Image source={{ uri: imageUri }} style={styles.selectedImage} />
+              </TouchableOpacity>
             ) : (
-              <View style={styles.imagePlaceholder}>
-                <ImageIcon size={40} color="#ccc" />
-                <Text style={styles.imagePlaceholderText}>Nenhuma imagem selecionada</Text>
-              </View>
+              <TouchableOpacity onPress={handleImageSelection}>
+                <View style={styles.imagePlaceholder}>
+                  <ImageIcon size={40} color="#ccc" />
+                  <Text style={[styles.imagePlaceholderText, { textAlign: 'center' }]}>
+                    Tire uma foto{'\n'} ou selecione uma imagem {'\n'}da sua galeria.
+                  </Text>
+                </View>
+              </TouchableOpacity>
             )}
-            <View style={styles.imagePickerButtons}>
-              <TouchableOpacity style={styles.iconButton} onPress={pickImage}>
-                <ImageIcon size={24} color="#111827" />
-                <Text style={styles.iconButtonText}>Galeria</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.iconButton} onPress={takePhoto}>
-                <Camera size={24} color="#111827" />
-                <Text style={styles.iconButtonText}>Câmera</Text>
-              </TouchableOpacity>
-            </View>
           </View>
+          {errors.imageurl && <Text style={styles.errorText}>{errors.imageurl.message}</Text>}
 
-          <TouchableOpacity style={styles.submitButton} onPress={handleSubmit}>
-            <Text style={styles.submitButtonText}>{initialData ? 'Salvar Alterações' : 'Adicionar Dieta'}</Text>
-          </TouchableOpacity>
-        </ScrollView>
-      </BottomSheetView>
+          <View style={styles.bottomButtonsContainer}>
+            <TouchableOpacity style={[styles.submitButton, styles.cancelButton]} onPress={onClose}>
+              <Text style={styles.submitButtonText}>Cancelar</Text>
+            </TouchableOpacity>
+            <TouchableOpacity 
+              style={[styles.submitButton, isSubmitting && styles.submitButtonDisabled]} 
+              onPress={handleSubmit(onSubmitForm)}
+              disabled={isSubmitting}
+            >
+              <Text style={styles.submitButtonText}>
+                {isSubmitting ? 'Salvando...' : 'Salvar'}
+              </Text>
+            </TouchableOpacity>
+          </View>
+          
+          {/* Espaço extra para garantir que os botões sejam totalmente visíveis */}
+          <View style={styles.extraBottomSpace} />
+      </BottomSheetScrollView>
     </BottomSheet>
   );
 };
@@ -275,10 +522,12 @@ const styles = StyleSheet.create({
   },
   sheetContent: {
     flex: 1,
-    padding: 16,
+    paddingHorizontal: 16,
+    paddingTop: 16,
   },
   scrollContent: {
-    paddingBottom: 40, // Espaço extra para o botão de enviar não ficar escondido
+    paddingBottom: 120,
+    paddingHorizontal: 0,
   },
   sheetTitle: {
     fontSize: 20,
@@ -291,8 +540,8 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
     color: '#111827',
-    marginTop: 10,
-    marginBottom: 5,
+    marginTop: 15,
+    marginBottom: 8,
   },
   input: {
     borderWidth: 1,
@@ -310,14 +559,13 @@ const styles = StyleSheet.create({
   },
   imagePickerContainer: {
     marginTop: 15,
-    marginBottom: 20,
-    alignItems: 'center',
+    marginHorizontal: -16,
   },
   imagePlaceholder: {
     width: '100%',
     height: 150,
     backgroundColor: '#f3f4f6',
-    borderRadius: 10,
+    borderRadius: 20,
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 10,
@@ -336,34 +584,46 @@ const styles = StyleSheet.create({
     resizeMode: 'cover',
     marginBottom: 10,
   },
-  imagePickerButtons: {
-    flexDirection: 'row',
-    gap: 10, // Usando gap para espaçamento
-  },
-  iconButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#BBF246',
-    paddingVertical: 10,
-    paddingHorizontal: 15,
-    borderRadius: 8,
-    gap: 8, // Espaçamento entre ícone e texto
-  },
-  iconButtonText: {
-    color: '#111827',
-    fontWeight: '600',
-  },
   submitButton: {
     backgroundColor: '#111827',
     paddingVertical: 14,
     borderRadius: 10,
     alignItems: 'center',
-    marginTop: 20,
+    flex: 1,
+    minHeight: 50,
   },
   submitButtonText: {
     color: '#fff',
     fontWeight: '700',
     fontSize: 16,
+  },
+  errorText: {
+    color: 'red',
+    fontSize: 12,
+    marginBottom: 5,
+    marginTop: -5,
+  },
+  bottomButtonsContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 12,
+    marginTop: 40,
+    marginBottom: -120,
+    paddingHorizontal: 0,
+  },
+  cancelButton: {
+    backgroundColor: '#192126',
+    paddingVertical: 14,
+    borderRadius: 10,
+    alignItems: 'center',
+    flex: 1,
+  },
+  extraBottomSpace: {
+    height: 80,
+  },
+  submitButtonDisabled: {
+    backgroundColor: '#9ca3af',
+    opacity: 0.6,
   },
 });
 

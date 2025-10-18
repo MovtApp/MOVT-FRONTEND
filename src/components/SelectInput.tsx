@@ -5,6 +5,7 @@ import {
   TouchableOpacity,
   StyleSheet,
   FlatList,
+  Modal, // Importar Modal
 } from "react-native";
 import { ChevronDown } from "lucide-react-native";
 
@@ -33,7 +34,7 @@ const SelectInput: React.FC<SelectInputProps> = ({
     <View style={{ position: "relative" }}>
       <TouchableOpacity
         style={styles.input}
-        onPress={() => setModalVisible((v) => !v)}
+        onPress={() => setModalVisible(true)}
         activeOpacity={0.8}
       >
         <Text style={[styles.text, !value && { color: "#888" }]}>
@@ -43,25 +44,36 @@ const SelectInput: React.FC<SelectInputProps> = ({
           <ChevronDown size={24} color="#888" />
         </View>
       </TouchableOpacity>
-      {modalVisible && (
-        <View style={styles.dropdown}>
-          <FlatList
-            data={options}
-            keyExtractor={(item) => item.value?.toString() || "default"}
-            renderItem={({ item }) => (
-              <TouchableOpacity
-                style={styles.option}
-                onPress={() => {
-                  onChange(item.value);
-                  setModalVisible(false);
-                }}
-              >
-                <Text style={styles.optionText}>{item.label}</Text>
-              </TouchableOpacity>
-            )}
-          />
-        </View>
-      )}
+
+      <Modal
+        transparent={true}
+        visible={modalVisible}
+        onRequestClose={() => setModalVisible(false)}
+      >
+        <TouchableOpacity
+          style={styles.modalOverlay}
+          activeOpacity={1} // Garante que o toque no overlay feche o modal
+          onPress={() => setModalVisible(false)}
+        >
+          <View style={styles.modalContent}>
+            <FlatList
+              data={options}
+              keyExtractor={(item) => item.value?.toString() || "default"}
+              renderItem={({ item }) => (
+                <TouchableOpacity
+                  style={styles.option}
+                  onPress={() => {
+                    onChange(item.value);
+                    setModalVisible(false);
+                  }}
+                >
+                  <Text style={styles.optionText}>{item.label}</Text>
+                </TouchableOpacity>
+              )}
+            />
+          </View>
+        </TouchableOpacity>
+      </Modal>
     </View>
   );
 };
@@ -117,20 +129,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: "#111",
     fontFamily: "Rubik_400Regular",
-  },
-  dropdown: {
-    backgroundColor: "#fff",
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: "#E5E7EB",
-    width: "100%",
-    maxHeight: 300,
-    elevation: 5,
-    zIndex: 10,
-    marginTop: 0, // Sem espaçamento extra
-    position: "absolute",
-    top: "100%",
-    left: 0,
   },
 });
 

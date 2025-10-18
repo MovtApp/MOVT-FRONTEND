@@ -1,6 +1,6 @@
 // Configuração da API
 export const API_CONFIG = {
-  // URL de desenvolvimento (local)
+  // URL de desenvolvimento (local) - IP da rede para Android
   DEVELOPMENT: "http://192.168.15.45:3000/api",
   // URL de produção (Vercel)
   PRODUCTION: "",

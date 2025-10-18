@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { createDrawerNavigator } from "@react-navigation/drawer"; // Importar createDrawerNavigator
 import HomeScreen from "../screens/App/homeScreen";
@@ -10,11 +10,14 @@ import BottomNavigationBar from "../components/BottomNavigationBar";
 import { View, StyleSheet } from "react-native";
 import DietDetailsScreen from "../screens/App/dietDetailsScreen";
 import { CustomDrawerContent } from "../components/CustomDrawerContent"; // Importar CustomDrawerContent
+import { AppStackParamList } from "../@types/routes";
 
-const Stack = createNativeStackNavigator();
+const Stack = createNativeStackNavigator<AppStackParamList>();
 const Drawer = createDrawerNavigator(); // Definir o Drawer Navigator
 
 function AppLayout() {
+  const [isDietSheetOpen, setIsDietSheetOpen] = useState(false);
+
   return (
     <View style={styles.container}>
       <Stack.Navigator
@@ -25,12 +28,12 @@ function AppLayout() {
       >
         <Stack.Screen name="HomeScreen" component={HomeScreen} />
         <Stack.Screen name="MapScreen" component={MapScreen} />
-        <Stack.Screen name="DietScreen" component={DietScreen} />
+        <Stack.Screen name="DietScreen" component={DietScreen} initialParams={{ setIsDietSheetOpen }} />
         <Stack.Screen name="DietDetails" component={DietDetailsScreen} />
         <Stack.Screen name="DataScreen" component={DataScreen} />
         <Stack.Screen name="ChatScreen" component={ChatScreen} />
       </Stack.Navigator>
-      <BottomNavigationBar />
+      {!isDietSheetOpen && <BottomNavigationBar />}
     </View>
   );
 }
