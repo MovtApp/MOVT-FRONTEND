@@ -1,19 +1,14 @@
-import React, { useMemo, useRef, useState, useEffect } from 'react';
+import React, { useMemo, useRef, useState, useEffect, useCallback } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Image, Alert } from 'react-native';
-import { Bell, CirclePlus, Clock4, Flame, Menu, Plus, Search, SquarePen, Trash } from 'lucide-react-native';
+import { Bell, CirclePlus, Clock4, Flame, Menu, Plus, Search, SquarePen, Trash, Check } from 'lucide-react-native';
 import SearchInput from '../../components/SearchInput';
 import { api } from '../../services/api';
 import { useAuth } from '../../hooks/useAuth';
 import DietFormSheet from '../../components/DietFormSheet';
-import { Check } from 'lucide-react-native';
-import { DietFormInputs } from '../../components/dietFormSchema';
-import { useNavigation, useRoute } from '@react-navigation/native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { AppStackParamList, DietMeal } from '../../@types/routes';
 
-interface DietScreenProps extends NativeStackScreenProps<AppStackParamList, 'DietScreen'> { }
-
-const DietScreen: React.FC<DietScreenProps> = ({ navigation, route }) => {
+const DietScreen: React.FC<NativeStackScreenProps<AppStackParamList, 'DietScreen'>> = ({ navigation, route }) => {
     const [search, setSearch] = useState('');
     const [selectedCategory, setSelectedCategory] = useState('all');
     const [dietMeals, setDietMeals] = useState<DietMeal[]>([]);
@@ -24,11 +19,11 @@ const DietScreen: React.FC<DietScreenProps> = ({ navigation, route }) => {
     const [selectedDietIds, setSelectedDietIds] = useState<string[]>([]);
     const [sheetIndex, setSheetIndex] = useState(0);
 
-    const { setIsDietSheetOpen } = route.params;
+    // const { setIsDietSheetOpen } = route.params;
 
-    useEffect(() => {
-        setIsDietSheetOpen(isFormSheetOpen);
-    }, [isFormSheetOpen, setIsDietSheetOpen]);
+    // useEffect(() => {
+    //     setIsDietSheetOpen(isFormSheetOpen);
+    // }, [isFormSheetOpen, setIsDietSheetOpen]);
 
     const categories = useMemo(() => [
         { key: 'all', label: 'Todas' },
@@ -52,11 +47,11 @@ const DietScreen: React.FC<DietScreenProps> = ({ navigation, route }) => {
         if (isAllSelected) {
             setSelectedDietIds([]);
         } else {
-            setSelectedDietIds(dietMeals.map(m => m.id_dieta));
+            setSelectedDietIds(dietMeals.map(m => m.id_dieta as string));
         }
     };
 
-    const fetchMeals = async () => {
+    const fetchMeals = useCallback(async () => {
         try {
             const response = await api.get('/dietas', {
                 headers: {
@@ -97,11 +92,11 @@ const DietScreen: React.FC<DietScreenProps> = ({ navigation, route }) => {
             console.error("Detalhes do erro:", (error as any).response?.data || (error as any).message);
             Alert.alert("Erro", "Não foi possível carregar as dietas.");
         }
-    };
+    }, [user?.sessionId, selectedCategory]);
 
     useEffect(() => {
         fetchMeals();
-    }, [user?.sessionId, selectedCategory]);
+    }, [user?.sessionId, selectedCategory, fetchMeals]);
 
     const handleAddDiet = () => {
         setFormInitialData(undefined);
@@ -159,29 +154,6 @@ const DietScreen: React.FC<DietScreenProps> = ({ navigation, route }) => {
         setIsFormSheetOpen(false);
         setSheetIndex(0);
         setFormInitialData(undefined);
-    };
-
-    const handleDeleteDiet = async (dietId: string) => {
-        Alert.alert("Confirmar Exclusão", "Tem certeza que deseja excluir esta dieta?", [
-            { text: "Cancelar", style: "cancel" },
-            {
-                text: "Excluir",
-                onPress: async () => {
-                    try {
-                        await api.delete(`/dietas/${dietId}`, {
-                            headers: {
-                                Authorization: `Bearer ${user?.sessionId}`,
-                            },
-                        });
-                        Alert.alert("Sucesso", "Dieta excluída com sucesso!");
-                        fetchMeals();
-                    } catch (error) {
-                        console.error("Erro ao excluir dieta:", error);
-                        Alert.alert("Erro", "Não foi possível excluir a dieta.");
-                    }
-                },
-            },
-        ]);
     };
 
     return (
@@ -264,7 +236,9 @@ const DietScreen: React.FC<DietScreenProps> = ({ navigation, route }) => {
                                 navigation.navigate('DietDetails', { meal: { ...meal } });
                             }
                         }}
-                        onLongPress={() => toggleSelect(meal.id_dieta)}
+                        onLongPress={() => {
+                            toggleSelect(meal.id_dieta);
+                        }}
                     >
                         <Image 
                             source={{ uri: meal.imageUrl }} 

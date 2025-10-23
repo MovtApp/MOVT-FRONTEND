@@ -1,8 +1,7 @@
-import React, { useMemo } from "react";
+import React from "react";
 import {
   View,
   ActivityIndicator,
-  TextInput,
   ScrollView,
   Dimensions,
   StyleSheet,
@@ -12,13 +11,6 @@ import {
 import BottomSheet, { BottomSheetView } from "@gorhom/bottom-sheet";
 import { H4, P } from "./Typography";
 import { Star } from "lucide-react-native";
-import BackButton from "./BackButton";
-const { width: screenWidth } = Dimensions.get("window");
-
-interface PrimaryField {
-  label: string;
-  value: string | number;
-}
 
 interface PersonalTrainer {
   id: string;

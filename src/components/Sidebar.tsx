@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, ReactNode } from "react";
-import { View, Text, TouchableOpacity, ScrollView, Dimensions } from "react-native";
+import { View, Text, TouchableOpacity, ScrollView } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useNavigation } from "@react-navigation/native";
 // import { cn } from "../lib/utils"; // Removendo importação não utilizada
@@ -66,11 +66,9 @@ export const SidebarProvider: React.FC<SidebarProviderProps> = ({
 };
 
 // Componente principal do Sidebar
-interface SidebarProps {
-  // className?: string; // Removido, pois não será mais usado
-}
+type SidebarProps = Record<string, never>;
 
-export const Sidebar: React.FC<SidebarProps> = ({ /* className */ }) => {
+export const Sidebar: React.FC<SidebarProps> = () => {
   const { isOpen, close } = useSidebar();
   const { top } = useSafeAreaInsets();
   const navigation = useNavigation();

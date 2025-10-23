@@ -1,9 +1,8 @@
-import React, { useState, useEffect, useRef } from 'react'
+import React, { useState, useRef } from 'react'
 import { SafeAreaView, ScrollView, Text, View, StyleSheet, TouchableOpacity, FlatList, Dimensions, Image } from 'react-native'
 import { Bell, Menu } from 'lucide-react-native';
-import { useNavigation } from "@react-navigation/native";
+import { useNavigation, CompositeNavigationProp } from "@react-navigation/native";
 import { DrawerNavigationProp } from "@react-navigation/drawer";
-import { CompositeNavigationProp } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { AppDrawerParamList, AppStackParamList } from "../../@types/routes";
 
@@ -28,7 +27,7 @@ const DataScreen: React.FC = () => {
     >;
     const navigation = useNavigation<DataScreenNavigationProp>();
 
-    const [currentDate, setCurrentDate] = useState(new Date());
+    const [currentDate] = useState(new Date());
     const [selectedDay, setSelectedDay] = useState(currentDate.getDate());
     const flatListRef = useRef<FlatList>(null);
 

@@ -10,7 +10,7 @@ import {
 import BackButton from "@components/BackButton";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useNavigation } from "@react-navigation/native";
-import RootStackParamList from "@typings/routes";
+import { RootStackParamList } from "@typings/routes"; // Corrigida a importação de RootStackParamList
 
 const { width: screenWidth } = Dimensions.get("window");
 const ITEM_WIDTH = 80; // Largura de cada item de peso

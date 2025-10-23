@@ -1,12 +1,11 @@
-import React, { useEffect, useRef, useState } from 'react'
-import { Text, View, Platform, TouchableOpacity, Image } from 'react-native'
+import React, { useRef, useState } from 'react'
+import { Text, View, TouchableOpacity } from 'react-native'
 import MapView, { Marker } from 'react-native-maps'
-import * as Location from 'expo-location'
 import TrainingSelector from '@components/TrainingSelector'
 import { DetailsBottomSheet } from '@components/DetailsBottomSheet'
 import { MapSettingSheet } from '@components/MapSettingSheet'
 import BottomSheet from '@gorhom/bottom-sheet'
-import { Cog, Globe, Settings, Settings2 } from 'lucide-react-native';
+import { Globe, Settings2 } from 'lucide-react-native';
 import { useLocationContext } from '@contexts/LocationContext'
 
 

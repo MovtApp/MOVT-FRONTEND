@@ -7,4 +7,10 @@ module.exports = defineConfig([
   {
     ignores: ["dist/*"],
   },
+  {
+    files: ["metro.config.cjs"],
+    languageOptions: {
+      globals: { __dirname: true, module: true, require: true },
+    },
+  },
 ]);

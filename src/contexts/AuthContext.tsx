@@ -1,6 +1,5 @@
 import React, { createContext, useState, useEffect } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { auth_login } from "../services/services";
 import axios from "axios";
 
 const API_BASE_URL = 'http://10.0.2.2:3000'; // Certifique-se de que é o mesmo do signinScreen.tsx e App.tsx
@@ -61,7 +60,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
               await AsyncStorage.removeItem('@Auth:user');
               setUser(null);
             }
-          } catch (apiError) {
+          } catch (_apiError) { // Sintaxe corrigida
             await AsyncStorage.removeItem('userSessionId');
             await AsyncStorage.removeItem('@Auth:user');
             setUser(null);
@@ -71,7 +70,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
           setUser(null);
           setLoading(false);
         }
-      } catch (error) {
+      } catch (_error) { // Sintaxe corrigida
         await AsyncStorage.removeItem('userSessionId');
         await AsyncStorage.removeItem('@Auth:user');
         setUser(null);
@@ -89,7 +88,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
       await AsyncStorage.setItem('@Auth:user', JSON.stringify(userDetails));
 
       setUser({ ...userDetails, sessionId });
-    } catch (error) {
+    } catch (_error) { // Sintaxe corrigida
       throw new Error("Failed to sign in");
     }
   }

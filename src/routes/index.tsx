@@ -1,8 +1,8 @@
 import React from "react";
 import { NavigationContainer } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
-import { SplashScreen } from "../screens/splashScreen";
-import RootStackParamList from "../@types/routes";
+// import { SplashScreen } from "../screens/splashScreen"; // Removida importação não utilizada
+import { RootStackParamList } from "../@types/routes"; // Corrigida a importação de RootStackParamList
 
 // Import routes
 import AuthRoutes from "./Auth.routes";

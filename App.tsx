@@ -1,9 +1,9 @@
 import "./src/styles/global.css";
-import React, { useState, useEffect } from "react";
+import React from "react";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { Routes } from "@routes/index";
-import { AuthProvider } from "@contexts/AuthContext";
+import { AuthProvider, useAuth } from "@contexts/AuthContext";
 import { LocationProvider } from "@contexts/LocationContext";
 import { StatusBar, ActivityIndicator, View } from "react-native";
 import {
@@ -12,9 +12,7 @@ import {
   Rubik_500Medium,
   Rubik_700Bold,
 } from "@expo-google-fonts/rubik";
-import 'react-native-gesture-handler';
 import 'react-native-reanimated';
-import { useAuth } from "@contexts/AuthContext";
 
 function AppContent() {
   const [fontsLoaded] = useFonts({

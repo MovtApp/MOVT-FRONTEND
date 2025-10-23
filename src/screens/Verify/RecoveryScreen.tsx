@@ -4,7 +4,7 @@ import BackButton from "@components/BackButton";
 import { useNavigation } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import CustomInput from "@components/CustomInput";
-import RootStackParamList from "@typings/routes";
+import { RootStackParamList } from "@typings/routes"; // Corrigida a importação de RootStackParamList
 
 const RecoveryScreen = () => {
   const navigation =

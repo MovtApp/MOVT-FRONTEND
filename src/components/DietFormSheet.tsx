@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, TextInput, Image, ScrollView, Alert, KeyboardAvoidingView, Platform } from 'react-native';
-import BottomSheet, { BottomSheetScrollView, BottomSheetView } from '@gorhom/bottom-sheet';
+import React, { useState, useEffect, useMemo } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, TextInput, Image, Alert } from 'react-native';
+import BottomSheet, { BottomSheetScrollView } from '@gorhom/bottom-sheet';
 import { Image as ImageIcon } from 'lucide-react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { useForm, Controller } from 'react-hook-form';
@@ -73,7 +73,7 @@ const DietFormSheet: React.FC<DietFormSheetProps> = ({
     resolver: zodResolver(dietFormSchema),
     defaultValues: initialFormValues,
   });
-  const selectedCategory = watch('categoria');
+  // const selectedCategory = watch('categoria'); // Variável não utilizada removida
 
   const [imageUri, setImageUri] = useState<string | null>(initialFormValues.imageurl || null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -96,7 +96,7 @@ const DietFormSheet: React.FC<DietFormSheetProps> = ({
         bottomSheetRef.current?.snapToIndex(0);
       }, 100);
     }
-  }, [isOpen]);
+  }, [isOpen, bottomSheetRef]); // bottomSheetRef adicionado como dependência
 
   // Debug do estado isSubmitting
   useEffect(() => {
@@ -189,7 +189,7 @@ const DietFormSheet: React.FC<DietFormSheetProps> = ({
     const fallbackTimeout = setTimeout(() => {
       console.warn('⚠️ Timeout de segurança ativado - resetando estado');
       setIsSubmitting(false);
-    }, 15000);
+    }, 30000); // Reduzido para 30 segundos
 
     let imageUrlToUpload = data.imageurl;
     console.log('🖼️ URL da imagem:', imageUrlToUpload);
@@ -203,15 +203,13 @@ const DietFormSheet: React.FC<DietFormSheetProps> = ({
           imageUrlToUpload = publicUrl;
           console.log('✅ Upload da imagem concluído:', publicUrl);
         } else {
-          console.error('❌ Falha no upload da imagem');
-          Alert.alert('Erro', 'Falha ao fazer upload da imagem.');
-          setIsSubmitting(false);
-          return;
+          throw new Error('Falha ao obter a URL pública da imagem');
         }
-      } catch (uploadError) {
-        console.error('❌ Erro no upload:', uploadError);
-        Alert.alert('Erro', 'Falha ao fazer upload da imagem.');
+      } catch (uploadError: any) {
+        console.error('❌ Erro no upload:', uploadError.message);
+        Alert.alert('Erro', `Falha ao fazer upload da imagem: ${uploadError.message}`);
         setIsSubmitting(false);
+        clearTimeout(fallbackTimeout);
         return;
       }
     }
@@ -221,16 +219,16 @@ const DietFormSheet: React.FC<DietFormSheetProps> = ({
       descricao: data.descricao,
       imageurl: imageUrlToUpload,
       categoria: data.categoria,
-      calorias: data.calorias === null || data.calorias === undefined ? null : data.calorias,
-      tempo_preparo: data.tempo_preparo === null || data.tempo_preparo === undefined ? null : data.tempo_preparo,
-      gordura: data.gordura === null || data.gordura === undefined ? null : data.gordura,
-      proteina: data.proteina === null || data.proteina === undefined ? null : data.proteina,
-      carboidratos: data.carboidratos === null || data.carboidratos === undefined ? null : data.carboidratos,
+      calorias: data.calorias ?? null,
+      tempo_preparo: data.tempo_preparo ?? null,
+      gordura: data.gordura ?? null,
+      proteina: data.proteina ?? null,
+      carboidratos: data.carboidratos ?? null,
     };
 
     try {
       console.log('=== ENVIANDO DIETA PARA O BACKEND ===');
-      console.log('Payload completo:', JSON.stringify(payload, null, 2));
+      console.log('Payload:', JSON.stringify(payload, null, 2));
       console.log('URL da imagem final:', imageUrlToUpload);
       console.log('Usuário autenticado:', user?.name);
       console.log('Session ID:', user?.sessionId);
@@ -271,29 +269,17 @@ const DietFormSheet: React.FC<DietFormSheetProps> = ({
       onClose();
       reset();
     } catch (error: any) {
-      console.error('❌ Erro ao salvar dieta:', error);
-      console.error('❌ Tipo do erro:', error.code || error.name);
-      console.error('❌ Mensagem:', error.message);
-      console.error('❌ Status:', error.response?.status);
-      console.error('❌ Data do erro:', error.response?.data);
-      console.error('❌ URL tentada:', error.config?.url);
-      
-      let errorMessage = 'Ocorreu um erro ao processar sua solicitação.';
-      
-      if (error.code === 'ECONNABORTED' || error.message.includes('timeout')) {
-        errorMessage = 'Timeout na requisição. Verifique sua conexão e tente novamente.';
-      } else if (error.code === 'NETWORK_ERROR' || error.message.includes('Network Error')) {
-        errorMessage = 'Erro de conexão. Verifique se o servidor está rodando.';
+      console.error('❌ Erro ao salvar dieta:', error.message);
+      let errorMessage = 'Ocorreu um erro ao salvar a dieta.';
+      if (error.code === 'ECONNABORTED') {
+        errorMessage = 'Tempo de conexão esgotado. Verifique sua internet.';
+      } else if (error.message.includes('Network Error')) {
+        errorMessage = 'Erro de rede. Verifique sua conexão.';
       } else if (error.response?.status === 401) {
         errorMessage = 'Não autorizado. Faça login novamente.';
-      } else if (error.response?.status === 400) {
-        errorMessage = error.response?.data?.error || 'Dados inválidos.';
       } else if (error.response?.data?.error) {
         errorMessage = error.response.data.error;
-      } else if (error.message) {
-        errorMessage = error.message;
       }
-      
       Alert.alert('Erro', errorMessage);
     } finally {
       console.log('🔄 Finalizando submit, resetando estado');
@@ -585,7 +571,7 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   submitButton: {
-    backgroundColor: '#111827',
+    backgroundColor: '#192126',
     paddingVertical: 14,
     borderRadius: 10,
     alignItems: 'center',
@@ -607,7 +593,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     gap: 12,
-    marginTop: 40,
+    marginTop: 20,
     marginBottom: -120,
     paddingHorizontal: 0,
   },

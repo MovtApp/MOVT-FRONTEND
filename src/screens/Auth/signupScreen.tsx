@@ -17,7 +17,6 @@ import CustomInput from "@/components/CustomInput";
 import { Button } from "@/components/Button";
 import DateTimePickerModal from "react-native-modal-datetime-picker";
 import { Calendar, Eye, EyeOff } from "lucide-react-native";
-import { H4 } from "@/components/Typography";
 import { useForm, Controller, ControllerRenderProps } from "react-hook-form";
 
 const API_BASE_URL = 'http://10.0.2.2:3000'; // IP para emuladores Android

@@ -1,6 +1,6 @@
 import { View, TouchableOpacity, StyleSheet, Text } from 'react-native';
-import { useState, useEffect } from 'react';
-import RootStackParamList, { AppStackParamList, AppDrawerParamList } from '../@types/routes';
+import { useState, useEffect, useMemo } from 'react';
+import { RootStackParamList, AppStackParamList, AppDrawerParamList } from '../@types/routes';
 import { ChartPie, House, Map, MessageCircle, Soup } from 'lucide-react-native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useNavigation, useRoute, useIsFocused, RouteProp } from '@react-navigation/native';
@@ -17,13 +17,13 @@ const BottomNavigationBar = () => {
   const isFocused = useIsFocused();
   const [activeTab, setActiveTab] = useState<keyof AppStackParamList>('HomeScreen');
 
-  const appStackScreenNames: (keyof AppStackParamList)[] = [
+  const appStackScreenNames = useMemo(() => ([
     'HomeScreen',
     'MapScreen',
     'DietScreen',
     'DataScreen',
     'ChatScreen',
-  ];
+  ]), []);
 
   useEffect(() => {
     let currentScreenName: keyof AppStackParamList | undefined;

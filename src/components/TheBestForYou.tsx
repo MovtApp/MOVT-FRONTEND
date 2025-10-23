@@ -1,6 +1,5 @@
 import React from 'react'
-import { Text, TouchableOpacity, View, Image } from 'react-native'
-import { StyleSheet } from 'react-native'
+import { Text, TouchableOpacity, View, Image, StyleSheet } from 'react-native'
 
 export interface Plan {
     imageUrl: string;

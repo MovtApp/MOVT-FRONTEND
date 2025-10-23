@@ -12,28 +12,21 @@ import {
   Bell,
   Search,
   Play,
-  Users,
-  Dumbbell,
-  Activity,
   Menu,
 } from "lucide-react-native";
-import { useNavigation } from "@react-navigation/native";
+import { useNavigation, CompositeNavigationProp } from "@react-navigation/native";
 import { DrawerNavigationProp } from "@react-navigation/drawer";
+import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import TrainingSelector from "../../components/TrainingSelector";
 import PromotionalBanner from "../../components/PromotionalBanner";
 import PlanCardTraining from "../../components/PlanCardsTraining";
 import TrainingBanner from "../../components/TrainingBanner";
-import {
-  SidebarProvider,
-} from "../../components/Sidebar";
 import SearchInput from "../../components/SearchInput";
 import Communities from "@components/Communities";
 import TheBestForYou from "@components/TheBestForYou";
 import ChallengesSection from "../../components/ChallengesSection";
 import Heating from "@components/Heating";
 import { AppStackParamList, AppDrawerParamList } from "../../@types/routes";
-import { CompositeNavigationProp } from "@react-navigation/native";
-import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 
 interface MenuButtonProps {
   onPress: () => void;
@@ -100,30 +93,6 @@ interface BestForYouItem {
   minutes: string;
   level: string;
 }
-
-const bestForYouData: BestForYouItem[] = [
-  {
-    id: '1',
-    image: { uri: "https://res.cloudinary.com/ditlmzgrh/image/upload/v1757229918/image111_gu6iim.jpg" },
-    title: "Flexão de Braços",
-    minutes: "10 min",
-    level: "Iniciante",
-  },
-  {
-    id: '2',
-    image: { uri: "https://res.cloudinary.com/ditlmzgrh/image/upload/v1757229915/image_71_jntmsv.jpg" },
-    title: "Prancha com toque no ombro",
-    minutes: "5 min",
-    level: "Intermediário",
-  },
-  {
-    id: '3',
-    image: { uri: "https://res.cloudinary.com/ditlmzgrh/image/upload/v1757229915/image_txncpp.jpg" },
-    title: "Agachamento",
-    minutes: "15 min",
-    level: "Avançado",
-  },
-];
 
 const HomeScreen: React.FC = () => {
   type HomeScreenNavigationProp = CompositeNavigationProp<

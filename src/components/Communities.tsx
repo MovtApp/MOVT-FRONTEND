@@ -4,9 +4,9 @@ import {
   Text,
   TouchableOpacity,
   ScrollView,
+  StyleSheet,
 } from "react-native";
 import { Users, Dumbbell, Activity } from "lucide-react-native";
-import { StyleSheet } from "react-native";
 
 interface CommunityItem {
     id: string;

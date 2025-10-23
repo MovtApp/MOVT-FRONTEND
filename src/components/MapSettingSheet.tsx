@@ -1,15 +1,15 @@
-import React, { useMemo, useState } from "react";
+import React, { useMemo } from "react";
 import { View, ScrollView, StyleSheet, TouchableOpacity, Text, Switch, TextInput } from "react-native";
 import BottomSheet, { BottomSheetView } from "@gorhom/bottom-sheet";
-// ProgressBar local para evitar dependências de terceiros
-function ProgressBar({ value }: { value: number }) {
-  const clamped = Math.max(0, Math.min(1, value));
-  return (
-    <View style={styles.progress}>
-      <View style={[styles.progressFill, { width: `${clamped * 100}%` }]} />
-    </View>
-  );
-}
+// ProgressBar local para evitar dependências de terceiros - Removido componente não utilizado
+// function ProgressBar({ value }: { value: number }) {
+//   const clamped = Math.max(0, Math.min(1, value));
+//   return (
+//     <View style={styles.progress}>
+//       <View style={[styles.progressFill, { width: `${clamped * 100}%` }]} />
+//     </View>
+//   );
+// }
 
 interface MapSettingSheetProps {
   isOpen: boolean;

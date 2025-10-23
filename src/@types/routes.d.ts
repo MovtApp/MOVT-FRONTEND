@@ -1,10 +1,14 @@
 export type AppStackParamList = {
+  HomeStack: undefined;
   HomeScreen: undefined;
+  DietScreen: undefined;
   MapScreen: undefined;
-  DietScreen: { setIsDietSheetOpen: (isOpen: boolean) => void };
-  DataScreen: undefined;
-  ChatScreen: undefined;
   DietDetails: { meal: DietMeal };
+  DataScreen: undefined;
+  HeightScreen: undefined;
+  WeightScreen: undefined;
+  AgeScreen: undefined;
+  WelcomeScreen: undefined;
 };
 
 export interface DietMeal {

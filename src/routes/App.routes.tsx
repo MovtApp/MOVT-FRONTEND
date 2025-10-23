@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { createDrawerNavigator } from "@react-navigation/drawer"; // Importar createDrawerNavigator
 import HomeScreen from "../screens/App/homeScreen";
@@ -28,7 +28,7 @@ function AppLayout() {
       >
         <Stack.Screen name="HomeScreen" component={HomeScreen} />
         <Stack.Screen name="MapScreen" component={MapScreen} />
-        <Stack.Screen name="DietScreen" component={DietScreen} initialParams={{ setIsDietSheetOpen }} />
+        <Stack.Screen name="DietScreen" component={DietScreen} />
         <Stack.Screen name="DietDetails" component={DietDetailsScreen} />
         <Stack.Screen name="DataScreen" component={DataScreen} />
         <Stack.Screen name="ChatScreen" component={ChatScreen} />

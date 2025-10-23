@@ -4,11 +4,11 @@ import BackButton from "@/components/BackButton";
 import SocialButton from "@/components/SocialButton";
 import { useNavigation } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import RootStackParamList from "@typings/routes";
+import { RootStackParamList } from "@typings/routes"; // Corrigida importação de RootStackParamList
 import CustomInput from "@/components/CustomInput";
 import { Eye, EyeOff } from "lucide-react-native";
 import axios from "axios";
-import AsyncStorage from "@react-native-async-storage/async-storage";
+// import AsyncStorage from "@react-native-async-storage/async-storage"; // Removida importação não utilizada
 import { useAuth } from "@contexts/AuthContext";
 import { supabase } from '../../services/supabaseClient';
 import * as WebBrowser from "expo-web-browser";
@@ -37,8 +37,8 @@ export const SignInScreen = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const [sessionId, setSessionId] = useState<string | null>(null);
-  const [loggedInUser, setLoggedInUser] = useState<any | null>(null);
+  // const [sessionId, setSessionId] = useState<string | null>(null); // Variável não utilizada removida
+  // const [loggedInUser, setLoggedInUser] = useState<any | null>(null); // Variável não utilizada removida
 
   function handleSignup() {
     navigation.navigate("Auth", { screen: "SignUpScreen" });
@@ -90,7 +90,7 @@ export const SignInScreen = () => {
   // @ts-expect-error 'useProxy' é suportado em runtime para forçar proxy do Expo
   const redirectUri = AuthSession.makeRedirectUri({ useProxy: true });
 
-  const [request, response, promptAsync] = Google.useAuthRequest({
+  const [, response, promptAsync] = Google.useAuthRequest({ // request removido
     clientId: GOOGLE_WEB_CLIENT_ID,
     scopes: ["profile", "email"],
     redirectUri,

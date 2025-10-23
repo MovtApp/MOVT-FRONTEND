@@ -4,7 +4,7 @@ import BackButton from "@components/BackButton";
 import CustomInput from "@components/CustomInput";
 import { useNavigation } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import RootStackParamList from "@typings/routes";
+import { RootStackParamList } from "@typings/routes"; // Corrigida a importação de RootStackParamList
 
 const VerifyPhoneScreen = () => {
   const navigation =

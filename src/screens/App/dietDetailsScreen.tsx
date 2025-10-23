@@ -31,10 +31,6 @@ const DietDetailsScreen: React.FC<DietDetailsScreenProps> = ({ route, navigation
         return '—'
     }
 
-    const fatValue = getMacroValue(['fat', 'fats', 'lipid', 'lipids', 'gordura'])
-    const proteinValue = getMacroValue(['protein', 'proteins', 'proteina'])
-    const carbsValue = getMacroValue(['carbs', 'carbohydrate', 'carbohydrates', 'carboidrato'])
-
     const goBack = () => {
         if (navigation?.goBack) navigation.goBack()
     }

@@ -2,7 +2,6 @@ import { Image, ScrollView, View, StyleSheet, Text, TouchableOpacity } from "rea
 
 import LogoIcon from "@assets/icon.png";
 import {
-  Radar,
   MapPin,
   QrCode,
   Network,
@@ -10,7 +9,6 @@ import {
 } from "lucide-react-native";
 import { ContainerX } from "@components/ContainerX";
 import { H4, P } from "@components/Typography";
-import { Button } from "@components/Button";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 
 type Props = NativeStackScreenProps<any, "StartupScreen">;

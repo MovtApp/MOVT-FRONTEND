@@ -2,8 +2,6 @@ import { useState, useEffect } from "react";
 import { View, Text, TouchableOpacity, StyleSheet, Alert } from "react-native";
 import BackButton from "@/components/BackButton"; // Ajustei o caminho para o alias
 import CustomInput from "@/components/CustomInput"; // Ajustei o caminho para o alias
-import { Button } from "@/components/Button"; // Ajustei o caminho para o alias
-import { H4 } from "@/components/Typography"; // Adicionado H4
 import { useNavigation, useRoute, RouteProp } from "@react-navigation/native"; // Adicionei useRoute
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { RootStackParamList } from "@typings/routes"; // Já corrigido para @typings/routes
@@ -132,11 +130,6 @@ const VerifyAccountScreen = () => {
       setLoading(false);
     }
   };
-
-  // Função para navegar para a tela de login
-  function handleLogin() {
-    navigation.navigate("Auth", { screen: "SignInScreen" });
-  }
 
   return (
     <View style={styles.container}>
