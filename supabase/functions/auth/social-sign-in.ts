@@ -1,11 +1,12 @@
+// eslint-disable-next-line import/no-unresolved
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts';
+// eslint-disable-next-line import/no-unresolved
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.42.0';
+// eslint-disable-next-line @typescript-eslint/no-unused-vars, import/no-unresolved
 import { load } from 'https://deno.land/std@0.223.0/dotenv/mod.ts';
 
 // Carregar variáveis de ambiente - embora para Google SignInWithIdToken, o Supabase geralmente faz a validação
 // Se houver necessidade de validação mais profunda ou de outras credenciais, elas seriam carregadas aqui.
-const env = await load();
-// Não precisamos de FACEBOOK_APP_ID/SECRET ou APPLE_AUDIENCE/KEYS se focando apenas no Google.
 
 
 // Inicializar cliente Supabase com service_role key para acesso administrativo

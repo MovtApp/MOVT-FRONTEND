@@ -17,16 +17,16 @@ import {
 import { useNavigation, CompositeNavigationProp } from "@react-navigation/native";
 import { DrawerNavigationProp } from "@react-navigation/drawer";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import TrainingSelector from "../../components/TrainingSelector";
-import PromotionalBanner from "../../components/PromotionalBanner";
-import PlanCardTraining from "../../components/PlanCardsTraining";
-import TrainingBanner from "../../components/TrainingBanner";
-import SearchInput from "../../components/SearchInput";
+import TrainingSelector from "../../../components/TrainingSelector";
+import PromotionalBanner from "../../../components/PromotionalBanner";
+import PlanCardTraining from "../../../components/PlanCardsTraining";
+import TrainingBanner from "../../../components/TrainingBanner";
+import SearchInput from "../../../components/SearchInput";
 import Communities from "@components/Communities";
 import TheBestForYou from "@components/TheBestForYou";
-import ChallengesSection from "../../components/ChallengesSection";
-import Heating from "@components/Heating";
-import { AppStackParamList, AppDrawerParamList } from "../../@types/routes";
+import ChallengesSection from "../../../components/ChallengesSection";
+import HeatingScreen from "../../../components/Heating"; // Importa o componente padrão HeatingScreen
+import { AppStackParamList, AppDrawerParamList } from "../../../@types/routes";
 
 interface MenuButtonProps {
   onPress: () => void;
@@ -85,14 +85,6 @@ const exerciseData: ExerciseItem[] = [
     imageUrl: 'https://res.cloudinary.com/ditlmzgrh/image/upload/v1757229918/image_73_co9eqf.jpg', 
   },
 ];
-
-interface BestForYouItem {
-  id: string;
-  image: { uri: string };
-  title: string;
-  minutes: string;
-  level: string;
-}
 
 const HomeScreen: React.FC = () => {
   type HomeScreenNavigationProp = CompositeNavigationProp<
@@ -193,7 +185,7 @@ const HomeScreen: React.FC = () => {
         <ChallengesSection />
 
         {/* Rapid heating */}
-        <Heating />
+        <HeatingScreen /> {/* Usando o nome correto do componente: HeatingScreen */}
 
       </ScrollView>        
     </View>

@@ -4,7 +4,23 @@ import { Bell, Menu } from 'lucide-react-native';
 import { useNavigation, CompositeNavigationProp } from "@react-navigation/native";
 import { DrawerNavigationProp } from "@react-navigation/drawer";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import { AppDrawerParamList, AppStackParamList } from "../../@types/routes";
+import { AppDrawerParamList, AppStackParamList } from "../../../@types/routes";
+
+// Importações das telas de detalhes de dados
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+import CaloriesScreen from './[protected]/CaloriesScreen';
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+import CyclingScreen from './[protected]/CyclingScreen';
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+import HeartbeatsScreen from './[protected]/HeartbeatsScreen';
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+import SleepScreen from './[protected]/SleepScreen';
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+import StepsScreen from './[protected]/StepsScreen';
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+import TrainingScreen from './[protected]/TrainingScreen';
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+import WaterScreen from './[protected]/WaterScreen';
 
 const { width } = Dimensions.get('window');
 
@@ -23,7 +39,7 @@ const MenuButton: React.FC<MenuButtonProps> = ({ onPress }) => {
 const DataScreen: React.FC = () => {
     type DataScreenNavigationProp = CompositeNavigationProp<
         DrawerNavigationProp<AppDrawerParamList, 'HomeStack'>,
-        NativeStackNavigationProp<AppStackParamList, 'DataScreen'>
+        NativeStackNavigationProp<AppStackParamList>
     >;
     const navigation = useNavigation<DataScreenNavigationProp>();
 
@@ -31,7 +47,7 @@ const DataScreen: React.FC = () => {
     const [selectedDay, setSelectedDay] = useState(currentDate.getDate());
     const flatListRef = useRef<FlatList>(null);
 
-    const DAY_ITEM_WIDTH = 50 + (4 * 2); // Largura do item + margemHorizontal * 2 (50 de width + 4 de margin em cada lado)
+    const DAY_ITEM_WIDTH = 50 + (4 * 2); 
 
     const handleFlatListLayout = () => {
         if (flatListRef.current) {
@@ -115,13 +131,16 @@ const DataScreen: React.FC = () => {
                 </View>
                 <View style={styles.cardsContainer}>
                     {/* Card de Calorias Gastas */}
-                    <TouchableOpacity style={[styles.card, styles.caloriesCard]}>
+                    <TouchableOpacity
+                        style={[styles.card, styles.caloriesCard]}
+                        onPress={() => navigation.navigate({ name: 'CaloriesScreen', params: {} as never })}
+                    >
                         <Text style={styles.cardCategory}>Calorias gastas</Text>
                         <Text style={[styles.cardValue, styles.caloriesValue]}>645 Kcal</Text>
                     </TouchableOpacity>
 
                     {/* Card de Ciclismo */}
-                    <TouchableOpacity style={[styles.card, styles.cyclingCard]}>
+                    <TouchableOpacity style={[styles.card, styles.cyclingCard]} onPress={() => navigation.navigate({ name: 'CyclingScreen', params: {} as never })}>
                         <View>
                             <Text style={[styles.cardCategory, styles.cyclingCategory]}>Ciclismo</Text>
                             <View style={styles.cyclingGraphPlaceholder}></View>
@@ -129,7 +148,7 @@ const DataScreen: React.FC = () => {
                     </TouchableOpacity>
 
                     {/* Card de Tempo de Treino */}
-                    <TouchableOpacity style={[styles.card, styles.trainingTimeCard]}>
+                    <TouchableOpacity style={[styles.card, styles.trainingTimeCard]} onPress={() => navigation.navigate({ name: 'TrainingScreen', params: {} as never })}>
                         <Text style={[styles.cardCategory, styles.trainingTimeCategory]}>Tempo de treino</Text>
                         <View style={styles.circularProgressPlaceholder}>
                             <Text style={[styles.cardValue, styles.trainingTimeValue]}>80%</Text>
@@ -137,14 +156,14 @@ const DataScreen: React.FC = () => {
                     </TouchableOpacity>
 
                     {/* Card de Batimentos */}
-                    <TouchableOpacity style={[styles.card, styles.heartRateCard]}>
+                    <TouchableOpacity style={[styles.card, styles.heartRateCard]} onPress={() => navigation.navigate({ name: 'HeartbeatsScreen', params: {} as never })}>
                         <Text style={[styles.cardCategory, styles.heartRateCategory]}>Batimentos</Text>
                         <View style={styles.heartRateGraphPlaceholder}></View>
                         <Text style={[styles.cardValue, styles.heartRateValue]}>79 Bpm</Text>
                     </TouchableOpacity>
 
                     {/* Card de Passos */}
-                    <TouchableOpacity style={[styles.card, styles.stepsCard]}>
+                    <TouchableOpacity style={[styles.card, styles.stepsCard]} onPress={() => navigation.navigate({ name: 'StepsScreen', params: {} as never })}>
                         <Text style={[styles.cardCategory, styles.stepsCategory]}>Passos</Text>
                         <Text style={[styles.cardValue, styles.stepsValue]}>999/2000</Text>
                         <View style={styles.progressBarPlaceholder}>
@@ -158,13 +177,13 @@ const DataScreen: React.FC = () => {
                     </TouchableOpacity>
 
                     {/* Card de Sono */}
-                    <TouchableOpacity style={[styles.card, styles.sleepCard]}>
+                    <TouchableOpacity style={[styles.card, styles.sleepCard]} onPress={() => navigation.navigate({ name: 'SleepScreen', params: {} as never })}>
                         <Text style={[styles.cardCategory, styles.sleepCategory]}>Sono</Text>
                         <View style={styles.sleepGraphPlaceholder}></View>
                     </TouchableOpacity>
 
                     {/* Card de Água */}
-                    <TouchableOpacity style={[styles.card, styles.waterCard]}>
+                    <TouchableOpacity style={[styles.card, styles.waterCard]} onPress={() => navigation.navigate({ name: 'WaterScreen', params: {} as never })}>
                         <Text style={[styles.cardCategory, styles.waterCategory]}>Água</Text>
                         <View style={styles.waterFillPlaceholder}>
                             <Text style={[styles.cardValue, styles.waterValue]}>6/8 Copos</Text>

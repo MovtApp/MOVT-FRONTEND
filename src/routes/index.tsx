@@ -5,10 +5,10 @@ import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { RootStackParamList } from "../@types/routes"; // Corrigida a importação de RootStackParamList
 
 // Import routes
-import AuthRoutes from "./Auth.routes";
-import AppRoutes from "./App.routes";
-import VerifyRoutes from "./Verify.routes";
-import InfoRoutes from "./Info.routes";
+import { AuthRoutes } from "./Auth.routes";
+import { AppRoutes } from "./App.routes";
+import { VerifyRoutes } from "./Verify.routes";
+import { InfoRoutes } from "./Info.routes";
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 

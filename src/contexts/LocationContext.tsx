@@ -64,7 +64,7 @@ export const LocationProvider: React.FC<{ children: React.ReactNode }> = ({ chil
                     }
                 }
             )
-        } catch (_e) { // Corrigido a sintaxe do catch
+        } catch { // Erro não é usado, removemos a variável
             // noop
         }
     }
@@ -75,7 +75,7 @@ export const LocationProvider: React.FC<{ children: React.ReactNode }> = ({ chil
             if (loc?.coords?.latitude && loc?.coords?.longitude) {
                 setLocation({ latitude: loc.coords.latitude, longitude: loc.coords.longitude })
             }
-        } catch (_e) { // Corrigido a sintaxe do catch
+        } catch { // Erro não é usado, removemos a variável
             // noop
         }
     }

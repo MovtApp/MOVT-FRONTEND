@@ -5,6 +5,14 @@ export type AppStackParamList = {
   MapScreen: undefined;
   DietDetails: { meal: DietMeal };
   DataScreen: undefined;
+  ChatScreen: undefined; // Adicionando ChatScreen à lista de rotas
+  CaloriesScreen: undefined;
+  CyclingScreen: undefined;
+  HeartbeatsScreen: undefined;
+  SleepScreen: undefined;
+  StepsScreen: undefined;
+  TrainingScreen: undefined;
+  WaterScreen: undefined;
   HeightScreen: undefined;
   WeightScreen: undefined;
   AgeScreen: undefined;

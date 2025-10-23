@@ -69,7 +69,7 @@ const DietFormSheet: React.FC<DietFormSheetProps> = ({
   const isAddingNewDiet = !initialData;
   const initialFormValues = useMemo(() => mapDietMealToDietFormInputs(initialData, user), [initialData, user]);
 
-  const { control, handleSubmit, reset, setValue, watch, formState: { errors } } = useForm<DietFormInputs>({
+  const { control, handleSubmit, reset, setValue, formState: { errors } } = useForm<DietFormInputs>({
     resolver: zodResolver(dietFormSchema),
     defaultValues: initialFormValues,
   });

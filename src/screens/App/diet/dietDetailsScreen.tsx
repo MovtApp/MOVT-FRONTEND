@@ -18,19 +18,6 @@ const DietDetailsScreen: React.FC<DietDetailsScreenProps> = ({ route, navigation
         ? meal.plan
         : []
 
-    const getMacroValue = (keys: string[]): string => {
-        for (const key of keys) {
-            // @ts-ignore - dynamic access
-            const raw = meal?.[key]
-            if (raw === 0 || raw) {
-                const value = typeof raw === 'number' ? `${raw} g` : String(raw)
-                const trimmed = value.trim()
-                return /g\s*$/i.test(trimmed) ? trimmed : `${trimmed} g`
-            }
-        }
-        return '—'
-    }
-
     const goBack = () => {
         if (navigation?.goBack) navigation.goBack()
     }

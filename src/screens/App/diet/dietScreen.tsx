@@ -1,12 +1,12 @@
 import React, { useMemo, useRef, useState, useEffect, useCallback } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Image, Alert } from 'react-native';
 import { Bell, CirclePlus, Clock4, Flame, Menu, Plus, Search, SquarePen, Trash, Check } from 'lucide-react-native';
-import SearchInput from '../../components/SearchInput';
-import { api } from '../../services/api';
-import { useAuth } from '../../hooks/useAuth';
-import DietFormSheet from '../../components/DietFormSheet';
+import SearchInput from '../../../components/SearchInput';
+import { api } from '../../../services/api';
+import { useAuth } from '../../../hooks/useAuth';
+import DietFormSheet from '../../../components/DietFormSheet';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { AppStackParamList, DietMeal } from '../../@types/routes';
+import { AppStackParamList, DietMeal } from '../../../@types/routes';
 
 const DietScreen: React.FC<NativeStackScreenProps<AppStackParamList, 'DietScreen'>> = ({ navigation, route }) => {
     const [search, setSearch] = useState('');
