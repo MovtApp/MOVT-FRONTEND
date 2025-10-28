@@ -4,5 +4,3 @@
   "typescript.updateImportsOnFileMove.enabled": "always",
   "typescript.preferences.includeCompletionsForModuleExports": true
 }
-
-

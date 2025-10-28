@@ -1,12 +1,14 @@
-import { Image, ScrollView, View, StyleSheet, Text, TouchableOpacity } from "react-native";
+import {
+  Image,
+  ScrollView,
+  View,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+} from "react-native";
 
 import LogoIcon from "@assets/icon.png";
-import {
-  MapPin,
-  QrCode,
-  Network,
-  HeartPlus,
-} from "lucide-react-native";
+import { MapPin, QrCode, Network, HeartPlus } from "lucide-react-native";
 import { ContainerX } from "@components/ContainerX";
 import { H4, P } from "@components/Typography";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
@@ -14,7 +16,6 @@ import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 type Props = NativeStackScreenProps<any, "StartupScreen">;
 
 export const StartupScreen = ({ navigation }: Props) => {
-
   function handleStart() {
     navigation.navigate("SignInScreen");
   }
@@ -32,7 +33,12 @@ export const StartupScreen = ({ navigation }: Props) => {
           <View>
             <Image
               source={LogoIcon}
-              style={{ marginBottom: 24, height: 80, width: 80, alignSelf: "flex-start" }}
+              style={{
+                marginBottom: 24,
+                height: 80,
+                width: 80,
+                alignSelf: "flex-start",
+              }}
               resizeMode="contain"
             />
             <Text style={styles.title}>Boas vindas ao Movt</Text>
@@ -93,17 +99,18 @@ export const StartupScreen = ({ navigation }: Props) => {
                     Saúde e bem-estar
                   </H4>
                   <P style={{ color: "#666", fontFamily: "Rubik_400Regular" }}>
-                    Facilita o cuidado com a saúde, tornando o acompanhamento de treinos e hábitos mais prático e motivador.
+                    Facilita o cuidado com a saúde, tornando o acompanhamento de
+                    treinos e hábitos mais prático e motivador.
                   </P>
                 </View>
               </View>
             </View>
           </View>
         </ScrollView>
-       
-      <TouchableOpacity style={styles.advanceButton} onPress={handleStart}>
-        <Text style={styles.advanceButtonText}>Começar</Text>
-      </TouchableOpacity>
+
+        <TouchableOpacity style={styles.advanceButton} onPress={handleStart}>
+          <Text style={styles.advanceButtonText}>Começar</Text>
+        </TouchableOpacity>
       </View>
     </ContainerX>
   );

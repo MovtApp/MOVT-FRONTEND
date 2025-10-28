@@ -12,16 +12,17 @@ import AsyncStorage from "@react-native-async-storage/async-storage"; // Importa
 // IMPORTANTE: Substitua pelo IP da sua máquina na rede local ou 10.0.2.2 para emuladores Android
 // Exemplo: 'http://192.168.1.100:3000' para um dispositivo físico na mesma rede Wi-Fi
 // Exemplo: 'http://10.0.2.2:3000' para emuladores Android
-const API_BASE_URL = 'http://10.0.2.2:3000'; // USE O IP CORRETO AQUI (ex: 10.0.2.2 para Android Emulator)
+const API_BASE_URL = "http://10.0.2.2:3000"; // USE O IP CORRETO AQUI (ex: 10.0.2.2 para Android Emulator)
 // --- FIM DA CONFIGURAÇÃO ---
 
 // Definindo o tipo da rota para acessar os parâmetros
-type VerifyAccountScreenRouteProp = RouteProp<RootStackParamList, 'Verify'>;
+type VerifyAccountScreenRouteProp = RouteProp<RootStackParamList, "Verify">;
 
 const VerifyAccountScreen = () => {
-  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  const navigation =
+    useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const route = useRoute<VerifyAccountScreenRouteProp>();
-  
+
   // O sessionId deve ser passado como parâmetro de navegação do login/registro
   // Ex: navigation.navigate("Verify", { screen: "VerifyAccountScreen", sessionId: response.data.sessionId });
   const { sessionId: routeSessionId } = route.params?.params || {}; // Acessa params dentro de params, conforme o RootStackParamList
@@ -29,19 +30,24 @@ const VerifyAccountScreen = () => {
   const [code, setCode] = useState(""); // Estado para o código digitado
   const [loading, setLoading] = useState(false); // Estado de carregamento
   const [error, setError] = useState<string | null>(null); // Estado para mensagens de erro
-  
-  const [currentSessionId, setCurrentSessionId] = useState<string | null>(routeSessionId ?? null);
+
+  const [currentSessionId, setCurrentSessionId] = useState<string | null>(
+    routeSessionId ?? null,
+  );
 
   useEffect(() => {
     const loadAndCheckSessionId = async () => {
       if (routeSessionId) {
         setCurrentSessionId(routeSessionId);
       } else {
-        const storedSessionId = await AsyncStorage.getItem('userSessionId');
+        const storedSessionId = await AsyncStorage.getItem("userSessionId");
         if (storedSessionId) {
           setCurrentSessionId(storedSessionId);
         } else {
-          Alert.alert("Erro", "Sessão inválida. Por favor, faça login novamente.");
+          Alert.alert(
+            "Erro",
+            "Sessão inválida. Por favor, faça login novamente.",
+          );
           navigation.navigate("Auth", { screen: "SignInScreen" });
         }
       }
@@ -67,9 +73,9 @@ const VerifyAccountScreen = () => {
           headers: {
             Authorization: `Bearer ${currentSessionId}`, // Envia o sessionId para identificar o usuário
           },
-        }
+        },
       );
-      
+
       // Verifica se o e-mail já está verificado para redirecionar
       if (response.data.message === "Seu e-mail já está verificado.") {
         Alert.alert("Sucesso", response.data.message);
@@ -78,8 +84,14 @@ const VerifyAccountScreen = () => {
         Alert.alert("Sucesso", response.data.message);
       }
     } catch (err: any) {
-      console.error("Erro ao reenviar código:", err.response ? err.response.data : err.message);
-      const errorMessage = err.response?.data?.error || err.response?.data?.message || "Ocorreu um erro ao reenviar o código.";
+      console.error(
+        "Erro ao reenviar código:",
+        err.response ? err.response.data : err.message,
+      );
+      const errorMessage =
+        err.response?.data?.error ||
+        err.response?.data?.message ||
+        "Ocorreu um erro ao reenviar o código.";
       setError(errorMessage);
       Alert.alert("Erro", errorMessage);
     } finally {
@@ -99,8 +111,8 @@ const VerifyAccountScreen = () => {
       return;
     }
     if (code.length !== 6) {
-        setError("O código de verificação deve ter 6 dígitos.");
-        return;
+      setError("O código de verificação deve ter 6 dígitos.");
+      return;
     }
 
     setError(null);
@@ -113,17 +125,19 @@ const VerifyAccountScreen = () => {
           headers: {
             Authorization: `Bearer ${currentSessionId}`, // Envia o sessionId para identificar o usuário
           },
-        }
+        },
       );
       Alert.alert("Verificação Concluída", response.data.message);
-      
+
       // --- Lógica de navegação após a verificação bem-sucedida ---
       // Redireciona para uma tela principal ou dashboard
       // TODO: Substituir por navigation.navigate("App", { screen: "HomeScreen" }); ou a tela pós-verificação correta
-      navigation.navigate("App", { screen: "HomeScreen" }); 
-
+      navigation.navigate("App", { screen: "HomeScreen" });
     } catch (err: any) {
-      const errorMessage = err.response?.data?.error || err.response?.data?.message || "Ocorreu um erro ao verificar o código.";
+      const errorMessage =
+        err.response?.data?.error ||
+        err.response?.data?.message ||
+        "Ocorreu um erro ao verificar o código.";
       setError(errorMessage);
       Alert.alert("Erro", errorMessage);
     } finally {
@@ -210,12 +224,12 @@ const styles = StyleSheet.create({
     fontSize: 13,
     marginBottom: 4,
     marginLeft: 2,
-    textAlign: 'center',
+    textAlign: "center",
   },
   resendButton: {
     marginTop: 20,
     paddingVertical: 10,
-    alignItems: 'center',
+    alignItems: "center",
   },
   resendButtonText: {
     color: "#BBF246",

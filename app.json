@@ -3,7 +3,7 @@
     "name": "MOVT",
     "slug": "movt",
     "scheme": "movt",
-    
+
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./src/assets/iconBuild.png",
@@ -17,10 +17,7 @@
       "bundleIdentifier": "com.dsvmTecnology.movtapp",
       "supportsTablet": false,
       "infoPlist": {
-        "UIBackgroundModes": [
-          "background-fetch",
-          "background-processing"
-        ],
+        "UIBackgroundModes": ["background-fetch", "background-processing"],
         "NSLocationWhenInUseUsageDescription": "Este aplicativo precisa de acesso à sua localização para mostrar você no mapa."
       }
     },

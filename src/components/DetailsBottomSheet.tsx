@@ -33,7 +33,13 @@ interface DetailsBottomSheetProps {
 }
 
 // Componente para renderizar texto com truncamento inteligente
-const PersonalTrainerCard = ({ trainer, onPress }: { trainer: PersonalTrainer; onPress?: (t: PersonalTrainer) => void }) => {
+const PersonalTrainerCard = ({
+  trainer,
+  onPress,
+}: {
+  trainer: PersonalTrainer;
+  onPress?: (t: PersonalTrainer) => void;
+}) => {
   return (
     <TouchableOpacity
       style={styles.cardContainer}
@@ -49,7 +55,9 @@ const PersonalTrainerCard = ({ trainer, onPress }: { trainer: PersonalTrainer; o
         </P>
         <View style={styles.cardRatingContainer}>
           <Star size={16} color="#FFC107" fill="#FFC107" />
-          <P style={styles.cardRatingText}>{Math.round(trainer.rating)} avaliações</P>
+          <P style={styles.cardRatingText}>
+            {Math.round(trainer.rating)} avaliações
+          </P>
         </View>
       </View>
     </TouchableOpacity>
@@ -100,7 +108,11 @@ export function DetailsBottomSheet({
             </View>
           ) : Array.isArray(trainers) && trainers.length > 0 ? (
             trainers.map((trainer) => (
-              <PersonalTrainerCard key={trainer.id} trainer={trainer} onPress={onTrainerPress} />
+              <PersonalTrainerCard
+                key={trainer.id}
+                trainer={trainer}
+                onPress={onTrainerPress}
+              />
             ))
           ) : (
             <View style={styles.noDataContainer}>
@@ -141,7 +153,7 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
     fontSize: 18,
     textAlign: "left",
-    marginLeft: 10
+    marginLeft: 10,
   },
   cardContainer: {
     flexDirection: "row",

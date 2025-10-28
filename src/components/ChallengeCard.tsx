@@ -1,4 +1,4 @@
-import React from 'react';
+import React from "react";
 import {
   View,
   Text,
@@ -6,7 +6,7 @@ import {
   ImageSourcePropType,
   ImageBackground,
   TouchableOpacity,
-} from 'react-native';
+} from "react-native";
 
 interface ChallengeCardProps {
   image: ImageSourcePropType;
@@ -21,7 +21,11 @@ const ChallengeCard: React.FC<ChallengeCardProps> = ({
 }) => {
   return (
     <TouchableOpacity style={styles.cardContainer} onPress={onPress}>
-      <ImageBackground source={image} style={styles.cardImageBackground} imageStyle={{ borderRadius: 12 }}>
+      <ImageBackground
+        source={image}
+        style={styles.cardImageBackground}
+        imageStyle={{ borderRadius: 12 }}
+      >
         <View style={styles.overlay}>
           <Text style={styles.cardTitle}>{title}</Text>
         </View>
@@ -36,20 +40,20 @@ const styles = StyleSheet.create({
     height: 100,
     borderRadius: 12,
     marginRight: 10,
-    overflow: 'hidden',
+    overflow: "hidden",
   },
   cardImageBackground: {
-    width: '100%',
-    height: '100%',
-    justifyContent: 'flex-end',
+    width: "100%",
+    height: "100%",
+    justifyContent: "flex-end",
   },
   overlay: {
     padding: 8,
   },
   cardTitle: {
     fontSize: 16,
-    fontWeight: 'bold',
-    color: '#fff',
+    fontWeight: "bold",
+    color: "#fff",
   },
 });
 

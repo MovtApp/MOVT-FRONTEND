@@ -1,4 +1,4 @@
-import "./src/styles/global.css";
+import "./global.css";
 import React from "react";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
@@ -12,7 +12,7 @@ import {
   Rubik_500Medium,
   Rubik_700Bold,
 } from "@expo-google-fonts/rubik";
-import 'react-native-reanimated';
+import "react-native-reanimated";
 
 function AppContent() {
   const [fontsLoaded] = useFonts({

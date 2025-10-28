@@ -10,21 +10,24 @@ import { Eye, EyeOff } from "lucide-react-native";
 import axios from "axios";
 // import AsyncStorage from "@react-native-async-storage/async-storage"; // Removida importação não utilizada
 import { useAuth } from "@contexts/AuthContext";
-import { supabase } from '../../services/supabaseClient';
+import { supabase } from "../../services/supabaseClient";
 import * as WebBrowser from "expo-web-browser";
 import * as Google from "expo-auth-session/providers/google";
 import * as AuthSession from "expo-auth-session";
 // import { LoginManager, AccessToken } from 'react-native-fbsdk-next'; // Para Facebook (Removido)
 
 // --- CONFIGURAÇÃO DA URL DA API ---
-const API_BASE_URL = 'http://10.0.2.2:3000';
+const API_BASE_URL = "http://10.0.2.2:3000";
 // --- FIM DA CONFIGURAÇÃO ---
 
 // URL da sua Edge Function que receberá os tokens dos provedores
-const SOCIAL_SIGN_IN_EDGE_FUNCTION_URL = 'https://ukxvqhguvbyhcvpkxyky.supabase.co/functions/v1/auth/social-sign-in';
+const SOCIAL_SIGN_IN_EDGE_FUNCTION_URL =
+  "https://ukxvqhguvbyhcvpkxyky.supabase.co/functions/v1/auth/social-sign-in";
 
 // Variáveis de ambiente (usa EXPO_PUBLIC_* e faz fallback)
-const GOOGLE_WEB_CLIENT_ID = process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID || process.env.GOOGLE_WEB_CLIENT_ID;
+const GOOGLE_WEB_CLIENT_ID =
+  process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID ||
+  process.env.GOOGLE_WEB_CLIENT_ID;
 
 export const SignInScreen = () => {
   const navigation =
@@ -59,27 +62,64 @@ export const SignInScreen = () => {
     }
 
     try {
-      const response = await axios.post(`${API_BASE_URL}/login`, {
-        email,
-        senha: password,
-      });
+      // Timeout curto para evitar loading infinito em rede lenta
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 15000);
 
-      Alert.alert('Login Efetuado', response.data.message);
+      const response = await axios.post(
+        `${API_BASE_URL}/login`,
+        {
+          email,
+          senha: password,
+        },
+        { signal: controller.signal },
+      );
+      clearTimeout(timeoutId);
 
+      Alert.alert("Login Efetuado", response.data.message);
+
+      // Persiste sessão no contexto/AsyncStorage
       await signIn(response.data.sessionId, {
         id: response.data.user.id,
         name: response.data.user.nome,
         email: response.data.user.email,
         username: response.data.user.username,
-        isVerified: response.data.user.isVerified
+        isVerified: response.data.user.isVerified,
       });
 
+      // Redireciona imediatamente sem depender do initialRouteName
+      if (response.data.user.isVerified) {
+        // Vai para a Home dentro do Drawer
+        navigation.reset({
+          index: 0,
+          routes: [
+            {
+              name: "App" as never,
+              params: { screen: "HomeStack" } as never,
+            },
+          ],
+        });
+      } else {
+        // Envia para verificação de conta
+        navigation.reset({
+          index: 0,
+          routes: [
+            {
+              name: "Verify" as never,
+              params: {
+                screen: "VerifyAccountScreen",
+                params: { sessionId: response.data.sessionId },
+              } as never,
+            },
+          ],
+        });
+      }
     } catch (err: any) {
       const errorMessage = err?.response?.data?.error
         ? err.response.data.error
-        : 'Ocorreu um erro ao fazer login.';
+        : "Ocorreu um erro ao fazer login.";
       setError(errorMessage);
-      Alert.alert('Erro no Login', errorMessage);
+      Alert.alert("Erro no Login", errorMessage);
     } finally {
       setLoading(false);
     }
@@ -90,7 +130,8 @@ export const SignInScreen = () => {
   // @ts-expect-error 'useProxy' é suportado em runtime para forçar proxy do Expo
   const redirectUri = AuthSession.makeRedirectUri({ useProxy: true });
 
-  const [, response, promptAsync] = Google.useAuthRequest({ // request removido
+  const [, response, promptAsync] = Google.useAuthRequest({
+    // request removido
     clientId: GOOGLE_WEB_CLIENT_ID,
     scopes: ["profile", "email"],
     redirectUri,
@@ -100,40 +141,53 @@ export const SignInScreen = () => {
     if (response?.type === "success") {
       const idToken = response.authentication?.idToken;
       if (idToken) {
-        handleSignInWithSocialToken('google', idToken);
+        handleSignInWithSocialToken("google", idToken);
       } else if ((response as any).params?.id_token) {
-        handleSignInWithSocialToken('google', (response as any).params.id_token as string);
+        handleSignInWithSocialToken(
+          "google",
+          (response as any).params.id_token as string,
+        );
       }
     }
   }, [response]);
 
-  const handleSignInWithSocialToken = async (provider: 'google', token: string) => {
+  const handleSignInWithSocialToken = async (
+    provider: "google",
+    token: string,
+  ) => {
     try {
       const response = await fetch(SOCIAL_SIGN_IN_EDGE_FUNCTION_URL, {
-        method: 'POST',
+        method: "POST",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
         },
         body: JSON.stringify({ provider, token }),
       });
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.message || 'Erro ao autenticar via Edge Function.');
+        throw new Error(
+          errorData.message || "Erro ao autenticar via Edge Function.",
+        );
       }
 
       const { access_token, refresh_token } = await response.json();
 
       if (access_token && refresh_token) {
         await supabase.auth.setSession({ access_token, refresh_token });
-        console.log('Login social bem-sucedido via Edge Function!');
+        console.log("Login social bem-sucedido via Edge Function!");
         // navigation.navigate('AppStack');
       } else {
-        throw new Error('Tokens de sessão Supabase não recebidos da Edge Function.');
+        throw new Error(
+          "Tokens de sessão Supabase não recebidos da Edge Function.",
+        );
       }
     } catch (error: any) {
-      console.error('Erro na autenticação social via Edge Function:', error.message);
-      Alert.alert('Erro de Login', error.message);
+      console.error(
+        "Erro na autenticação social via Edge Function:",
+        error.message,
+      );
+      Alert.alert("Erro de Login", error.message);
     }
   };
 
@@ -141,7 +195,7 @@ export const SignInScreen = () => {
     try {
       await promptAsync();
     } catch (error: any) {
-      Alert.alert('Erro', `Falha no login com Google: ${error.message}`);
+      Alert.alert("Erro", `Falha no login com Google: ${error.message}`);
     }
   };
 
@@ -163,7 +217,6 @@ export const SignInScreen = () => {
   //     Alert.alert('Erro', `Falha no login com Facebook: ${error.message}`);
   //   }
   // };
-
 
   return (
     <View style={styles.container}>
@@ -188,7 +241,10 @@ export const SignInScreen = () => {
           placeholder="Digite aqui sua senha"
           secureTextEntry={!showPassword}
           rightIcon={
-            <TouchableOpacity onPress={() => setShowPassword((prev) => !prev)} style={{ marginRight: 22 }}>
+            <TouchableOpacity
+              onPress={() => setShowPassword((prev) => !prev)}
+              style={{ marginRight: 22 }}
+            >
               {showPassword ? (
                 <EyeOff size={24} color="#888" />
               ) : (
@@ -212,13 +268,15 @@ export const SignInScreen = () => {
           onPress={handleLogin}
           disabled={loading}
         >
-          <Text style={styles.loginButtonText}>{loading ? 'Entrando...' : 'Log In'}</Text>
+          <Text style={styles.loginButtonText}>
+            {loading ? "Entrando..." : "Log In"}
+          </Text>
         </TouchableOpacity>
         <View style={styles.separatorContainer}>
           <View style={styles.separatorLine} />
           <Text style={styles.separatorText}>Ou</Text>
           <View style={styles.separatorLine} />
-          </View>
+        </View>
         <View>
           <SocialButton
             type="google"
@@ -270,7 +328,7 @@ const styles = StyleSheet.create({
     fontSize: 13,
     marginBottom: 4,
     marginLeft: 2,
-    textAlign: 'center',
+    textAlign: "center",
   },
   forgot: {
     color: "#BBF246",

@@ -1,5 +1,13 @@
 import React, { useMemo } from "react";
-import { View, ScrollView, StyleSheet, TouchableOpacity, Text, Switch, TextInput } from "react-native";
+import {
+  View,
+  ScrollView,
+  StyleSheet,
+  TouchableOpacity,
+  Text,
+  Switch,
+  TextInput,
+} from "react-native";
 import BottomSheet, { BottomSheetView } from "@gorhom/bottom-sheet";
 // ProgressBar local para evitar dependências de terceiros - Removido componente não utilizado
 // function ProgressBar({ value }: { value: number }) {
@@ -19,7 +27,9 @@ interface MapSettingSheetProps {
   setSheetIndex: (idx: number) => void;
   // Novas props para controle do mapa
   mapType: "standard" | "satellite" | "hybrid" | "terrain";
-  onMapTypeChange: (type: "standard" | "satellite" | "hybrid" | "terrain") => void;
+  onMapTypeChange: (
+    type: "standard" | "satellite" | "hybrid" | "terrain",
+  ) => void;
   showsUserLocation: boolean;
   onShowsUserLocationChange: (value: boolean) => void;
   showsCompass: boolean;
@@ -70,7 +80,10 @@ export function MapSettingSheet({
       handleIndicatorStyle={styles.handleIndicator}
     >
       <BottomSheetView style={styles.bottomSheetView}>
-        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 16 }}>
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={{ paddingBottom: 16 }}
+        >
           <Text style={styles.headerTitle}>Configurações do Mapa</Text>
 
           <View style={styles.section}>
@@ -85,10 +98,20 @@ export function MapSettingSheet({
                 <TouchableOpacity
                   key={opt.key}
                   onPress={() => onMapTypeChange(opt.key as any)}
-                  style={[styles.chip, mapType === opt.key && styles.chipActive]}
+                  style={[
+                    styles.chip,
+                    mapType === opt.key && styles.chipActive,
+                  ]}
                   activeOpacity={0.8}
                 >
-                  <Text style={[styles.chipText, mapType === opt.key && styles.chipTextActive]}>{opt.label}</Text>
+                  <Text
+                    style={[
+                      styles.chipText,
+                      mapType === opt.key && styles.chipTextActive,
+                    ]}
+                  >
+                    {opt.label}
+                  </Text>
                 </TouchableOpacity>
               ))}
             </View>
@@ -98,7 +121,7 @@ export function MapSettingSheet({
             <Text style={styles.sectionTitle}>Localização do usuário</Text>
             <View style={styles.rowBetween}>
               <Text style={styles.itemLabel}>Exibir localização</Text>
-              <Switch 
+              <Switch
                 value={showsUserLocation}
                 onValueChange={onShowsUserLocationChange}
                 trackColor={{ false: "#192126", true: "#BBF246" }}
@@ -111,9 +134,9 @@ export function MapSettingSheet({
             <Text style={styles.sectionTitle}>Bússola</Text>
             <View style={styles.rowBetween}>
               <Text style={styles.itemLabel}>Exibir bússola</Text>
-              <Switch 
-                value={showsCompass} 
-                onValueChange={onShowsCompassChange} 
+              <Switch
+                value={showsCompass}
+                onValueChange={onShowsCompassChange}
                 trackColor={{ false: "#192126", true: "#BBF246" }}
                 thumbColor={showsCompass ? "#192126" : "#BBF246"}
               />
@@ -131,12 +154,15 @@ export function MapSettingSheet({
                 const num = parseFloat(text);
                 if (!isNaN(num) && num >= 0) {
                   onDisplayRadiusKmChange(num);
-                } else if (text === '') { // Permite apagar o texto
+                } else if (text === "") {
+                  // Permite apagar o texto
                   onDisplayRadiusKmChange(0);
                 }
               }}
             />
-            <Text style={styles.helperText}>Defina o raio de exibição do mapa em quilômetros.</Text>
+            <Text style={styles.helperText}>
+              Defina o raio de exibição do mapa em quilômetros.
+            </Text>
           </View>
         </ScrollView>
       </BottomSheetView>

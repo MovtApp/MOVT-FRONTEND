@@ -2,7 +2,7 @@ import React, { createContext, useState, useEffect } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import axios from "axios";
 
-const API_BASE_URL = 'http://10.0.2.2:3000'; // Certifique-se de que é o mesmo do signinScreen.tsx e App.tsx
+const API_BASE_URL = "http://10.0.2.2:3000"; // Certifique-se de que é o mesmo do signinScreen.tsx e App.tsx
 
 interface User {
   id: string;
@@ -16,7 +16,10 @@ interface User {
 
 interface AuthContextData {
   user: User | null;
-  signIn: (sessionId: string, userDetails: Omit<User, 'sessionId'>) => Promise<void>; // Assinatura atualizada
+  signIn: (
+    sessionId: string,
+    userDetails: Omit<User, "sessionId">,
+  ) => Promise<void>; // Assinatura atualizada
   signOut: () => Promise<void>;
   loading: boolean; // Indica se está carregando dados de autenticação
 }
@@ -34,8 +37,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   useEffect(() => {
     async function loadUserData() {
       try {
-        const storedSessionId = await AsyncStorage.getItem('userSessionId');
-        const storedUserDetails = await AsyncStorage.getItem('@Auth:user'); // Carrega os detalhes do usuário armazenados
+        const storedSessionId = await AsyncStorage.getItem("userSessionId");
+        const storedUserDetails = await AsyncStorage.getItem("@Auth:user"); // Carrega os detalhes do usuário armazenados
 
         if (storedSessionId && storedUserDetails) {
           const parsedUserDetails = JSON.parse(storedUserDetails);
@@ -45,24 +48,28 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
 
           // Em seguida, valida a sessão em segundo plano
           try {
-            const response = await axios.get(`${API_BASE_URL}/user/session-status`, {
-              headers: {
-                Authorization: `Bearer ${storedSessionId}`,
+            const response = await axios.get(
+              `${API_BASE_URL}/user/session-status`,
+              {
+                headers: {
+                  Authorization: `Bearer ${storedSessionId}`,
+                },
               },
-            });
+            );
 
             if (response.status === 200 && response.data.user) {
               // A sessão ainda é válida, os dados do usuário estão atualizados
               // Não é necessário chamar setUser novamente, a menos que os dados sejam diferentes
             } else {
               // Sessão inválida ou erro, limpa os dados armazenados
-              await AsyncStorage.removeItem('userSessionId');
-              await AsyncStorage.removeItem('@Auth:user');
+              await AsyncStorage.removeItem("userSessionId");
+              await AsyncStorage.removeItem("@Auth:user");
               setUser(null);
             }
-          } catch { // Erro de API não é usado, removemos a variável
-            await AsyncStorage.removeItem('userSessionId');
-            await AsyncStorage.removeItem('@Auth:user');
+          } catch {
+            // Erro de API não é usado, removemos a variável
+            await AsyncStorage.removeItem("userSessionId");
+            await AsyncStorage.removeItem("@Auth:user");
             setUser(null);
           }
         } else {
@@ -70,9 +77,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
           setUser(null);
           setLoading(false);
         }
-      } catch { // Erro de carregamento de dados não é usado, removemos a variável
-        await AsyncStorage.removeItem('userSessionId');
-        await AsyncStorage.removeItem('@Auth:user');
+      } catch {
+        // Erro de carregamento de dados não é usado, removemos a variável
+        await AsyncStorage.removeItem("userSessionId");
+        await AsyncStorage.removeItem("@Auth:user");
         setUser(null);
         setLoading(false);
       }
@@ -81,21 +89,25 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     loadUserData();
   }, []);
 
-  async function signIn(sessionId: string, userDetails: Omit<User, 'sessionId'>) {
+  async function signIn(
+    sessionId: string,
+    userDetails: Omit<User, "sessionId">,
+  ) {
     try {
       // Salva o sessionId e os detalhes do usuário no AsyncStorage
-      await AsyncStorage.setItem('userSessionId', sessionId);
-      await AsyncStorage.setItem('@Auth:user', JSON.stringify(userDetails));
+      await AsyncStorage.setItem("userSessionId", sessionId);
+      await AsyncStorage.setItem("@Auth:user", JSON.stringify(userDetails));
 
       setUser({ ...userDetails, sessionId });
-    } catch { // Erro de sign-in não é usado, removemos a variável
+    } catch {
+      // Erro de sign-in não é usado, removemos a variável
       throw new Error("Failed to sign in");
     }
   }
 
   async function signOut() {
     setUser(null);
-    await AsyncStorage.removeItem('userSessionId'); // Remove o sessionId
+    await AsyncStorage.removeItem("userSessionId"); // Remove o sessionId
     await AsyncStorage.removeItem("@Auth:user"); // Remove os dados do usuário
   }
 
@@ -111,7 +123,7 @@ export function useAuth() {
   const context = React.useContext(AuthContext);
 
   if (!context) {
-    throw new Error('useAuth must be used within an AuthProvider');
+    throw new Error("useAuth must be used within an AuthProvider");
   }
 
   return context;

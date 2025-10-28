@@ -68,7 +68,10 @@ export type InfoStackParamList = {
 export type RootStackParamList = {
   SplashScreen: undefined;
   App:
-    | { screen: keyof AppDrawerParamList; params?: AppDrawerParamList[keyof AppDrawerParamList] }
+    | {
+        screen: keyof AppDrawerParamList;
+        params?: AppDrawerParamList[keyof AppDrawerParamList];
+      }
     | undefined;
   Auth: { screen: keyof AuthStackParamList } | undefined;
   Info:
@@ -77,10 +80,12 @@ export type RootStackParamList = {
         params?: InfoStackParamList[keyof InfoStackParamList];
       }
     | undefined;
-  Verify: {
-    screen: keyof VerifyStackParamList;
-    params?: VerifyStackParamList[keyof VerifyStackParamList];
-  } | undefined;
+  Verify:
+    | {
+        screen: keyof VerifyStackParamList;
+        params?: VerifyStackParamList[keyof VerifyStackParamList];
+      }
+    | undefined;
 };
 
 export default RootStackParamList;

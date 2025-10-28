@@ -8,13 +8,11 @@ import {
   Image,
   ImageBackground,
 } from "react-native";
+import { Bell, Search, Play, Menu } from "lucide-react-native";
 import {
-  Bell,
-  Search,
-  Play,
-  Menu,
-} from "lucide-react-native";
-import { useNavigation, CompositeNavigationProp } from "@react-navigation/native";
+  useNavigation,
+  CompositeNavigationProp,
+} from "@react-navigation/native";
 import { DrawerNavigationProp } from "@react-navigation/drawer";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import TrainingSelector from "../../../components/TrainingSelector";
@@ -50,50 +48,55 @@ interface ExerciseItem {
 
 const exerciseData: ExerciseItem[] = [
   {
-    id: '1',
-    title: 'Agachamento',
-    calories: '180 - 250 Kcal',
-    minutes: '15 min',
-    imageUrl: 'https://res.cloudinary.com/ditlmzgrh/image/upload/v1757229915/image_71_jntmsv.jpg', 
+    id: "1",
+    title: "Agachamento",
+    calories: "180 - 250 Kcal",
+    minutes: "15 min",
+    imageUrl:
+      "https://res.cloudinary.com/ditlmzgrh/image/upload/v1757229915/image_71_jntmsv.jpg",
   },
   {
-    id: '2',
-    title: 'Supino',
-    calories: '150 - 200 Kcal',
-    minutes: '12 min',
-    imageUrl: 'https://res.cloudinary.com/ditlmzgrh/image/upload/v1757229915/image_txncpp.jpg', 
+    id: "2",
+    title: "Supino",
+    calories: "150 - 200 Kcal",
+    minutes: "12 min",
+    imageUrl:
+      "https://res.cloudinary.com/ditlmzgrh/image/upload/v1757229915/image_txncpp.jpg",
   },
   {
-    id: '3',
-    title: 'Remada curvada',
-    calories: '160 - 220 Kcal',
-    minutes: '12 min',
-    imageUrl: 'https://res.cloudinary.com/ditlmzgrh/image/upload/v1757229918/image_75_drh4vh.jpg', 
+    id: "3",
+    title: "Remada curvada",
+    calories: "160 - 220 Kcal",
+    minutes: "12 min",
+    imageUrl:
+      "https://res.cloudinary.com/ditlmzgrh/image/upload/v1757229918/image_75_drh4vh.jpg",
   },
   {
-    id: '4',
-    title: 'Levantamento Terra',
-    calories: '160 - 220 Kcal',
-    minutes: '15 min',
-    imageUrl: 'https://res.cloudinary.com/ditlmzgrh/image/upload/v1757229918/image111_gu6iim.jpg', 
+    id: "4",
+    title: "Levantamento Terra",
+    calories: "160 - 220 Kcal",
+    minutes: "15 min",
+    imageUrl:
+      "https://res.cloudinary.com/ditlmzgrh/image/upload/v1757229918/image111_gu6iim.jpg",
   },
   {
-    id: '5',
-    title: 'Puxada na Barra',
-    calories: '140 - 200 Kcal',
-    minutes: '12 min',
-    imageUrl: 'https://res.cloudinary.com/ditlmzgrh/image/upload/v1757229918/image_73_co9eqf.jpg', 
+    id: "5",
+    title: "Puxada na Barra",
+    calories: "140 - 200 Kcal",
+    minutes: "12 min",
+    imageUrl:
+      "https://res.cloudinary.com/ditlmzgrh/image/upload/v1757229918/image_73_co9eqf.jpg",
   },
 ];
 
 const HomeScreen: React.FC = () => {
   type HomeScreenNavigationProp = CompositeNavigationProp<
-    DrawerNavigationProp<AppDrawerParamList, 'HomeStack'>,
-    NativeStackNavigationProp<AppStackParamList, 'HomeScreen'>
+    DrawerNavigationProp<AppDrawerParamList, "HomeStack">,
+    NativeStackNavigationProp<AppStackParamList, "HomeScreen">
   >;
   const navigation = useNavigation<HomeScreenNavigationProp>();
   const [search, setSearch] = useState("");
-  const [selectedGender] = useState<'male' | 'female'>('female');
+  const [selectedGender] = useState<"male" | "female">("female");
 
   return (
     <View style={styles.container}>
@@ -102,7 +105,9 @@ const HomeScreen: React.FC = () => {
         <View style={styles.headerTop}>
           <MenuButton onPress={() => navigation.openDrawer()} />
           <Image
-            source={{ uri: "https://res.cloudinary.com/ditlmzgrh/image/upload/v1758030169/MV_pukwcn.png" }}
+            source={{
+              uri: "https://res.cloudinary.com/ditlmzgrh/image/upload/v1758030169/MV_pukwcn.png",
+            }}
             style={{ width: 80, height: 40 }}
             resizeMode="cover"
           />
@@ -120,16 +125,15 @@ const HomeScreen: React.FC = () => {
           placeholder="Pesquisar"
           icon={<Search size={24} color="#888" />}
         />
-        
         {/* Promotional Banner */}
         <PromotionalBanner gender={selectedGender} />
-
         {/* Workout Selection */}
-        <TrainingSelector title="Selecione seu treino" containerStyle={{ marginBottom: 24 }}/>
-
+        <TrainingSelector
+          title="Selecione seu treino"
+          containerStyle={{ marginBottom: 24 }}
+        />
         {/* Communities */}
         <Communities />
-
         {/* Popular Exercises */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Exercícios populares</Text>
@@ -151,10 +155,14 @@ const HomeScreen: React.FC = () => {
                     <View style={styles.exerciseInfo}>
                       <View style={styles.tagsContainer}>
                         <View style={styles.calorieTag}>
-                          <Text style={styles.calorieText}>{exercise.calories}</Text>
+                          <Text style={styles.calorieText}>
+                            {exercise.calories}
+                          </Text>
                         </View>
                         <View style={styles.MinutesTag}>
-                          <Text style={styles.MinutesText}>{exercise.minutes}</Text>
+                          <Text style={styles.MinutesText}>
+                            {exercise.minutes}
+                          </Text>
                         </View>
                       </View>
                       <TouchableOpacity style={styles.playButton}>
@@ -167,27 +175,22 @@ const HomeScreen: React.FC = () => {
             ))}
           </ScrollView>
         </View>
-
         {/* Plan today */}
         <PlanCardTraining />
-        
         {/* Banner */}
-        <TrainingBanner 
+        <TrainingBanner
           title="Melhor treino de superiores"
           imageUrl="https://img.freepik.com/free-photo/view-woman-helping-man-exercise-gym_52683-98092.jpg?t=st=1758297406~exp=1758301006~hmac=66860a69d0b54e22b28d0831392e01278764d6b6d47e956a9576e041c9e016c2&w=1480"
           onPress={() => {}}
         />
-
         {/* The best for you */}
         <TheBestForYou />
-
         {/* Challenges */}
         <ChallengesSection />
-
         {/* Rapid heating */}
-        <HeatingScreen /> {/* Usando o nome correto do componente: HeatingScreen */}
-
-      </ScrollView>        
+        <HeatingScreen />{" "}
+        {/* Usando o nome correto do componente: HeatingScreen */}
+      </ScrollView>
     </View>
   );
 };
@@ -272,7 +275,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: "#666",
     textDecorationLine: "underline",
-    marginTop: -18
+    marginTop: -18,
   },
   workoutTypes: {
     flexDirection: "row",
@@ -315,7 +318,7 @@ const styles = StyleSheet.create({
   },
   imageOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(31, 41, 55, 0.3)',
+    backgroundColor: "rgba(31, 41, 55, 0.3)",
     borderRadius: 16,
   },
   exerciseCardContent: {
@@ -330,15 +333,15 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   exerciseInfo: {
-    flexDirection: "column", 
-    justifyContent: "space-between", 
-    alignItems: "flex-start", 
+    flexDirection: "column",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
     flex: 1,
     paddingBottom: 0,
-    position: 'relative',
+    position: "relative",
   },
   tagsContainer: {
-    flexDirection: 'column',
+    flexDirection: "column",
     marginBottom: 10,
   },
   calorieTag: {
@@ -372,13 +375,13 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     alignSelf: "flex-end",
-    position: 'absolute',
+    position: "absolute",
     bottom: 0,
     right: 0,
-    marginBottom: 40
+    marginBottom: 40,
   },
   dumbbellsImage: {
-    position: 'relative',
+    position: "relative",
     bottom: 10,
     right: 10,
     width: 80,

@@ -21,7 +21,6 @@ import StepsScreen from "../screens/App/data/[protected]/StepsScreen";
 import TrainingScreen from "../screens/App/data/[protected]/TrainingScreen";
 import WaterScreen from "../screens/App/data/[protected]/WaterScreen";
 
-
 const Stack = createNativeStackNavigator<AppStackParamList>();
 const Drawer = createDrawerNavigator(); // Definir o Drawer Navigator
 
@@ -49,7 +48,8 @@ function AppLayout() {
         <Stack.Screen name="TrainingScreen" component={TrainingScreen} />
         <Stack.Screen name="WaterScreen" component={WaterScreen} />
       </Stack.Navigator>
-      <BottomNavigationBar /> {/* Renderizando BottomNavigationBar diretamente, pois isDietSheetOpen não a controla mais. */}
+      <BottomNavigationBar />
+      {/* Renderizando BottomNavigationBar diretamente, pois isDietSheetOpen não a controla mais. */}
     </View>
   );
 }
@@ -59,8 +59,8 @@ function AppDrawerNavigator() {
     <Drawer.Navigator
       screenOptions={{
         headerShown: false,
-        drawerPosition: 'left',
-        drawerStyle: { backgroundColor: '#192126' }, // Definir a cor de fundo do drawer
+        drawerPosition: "left",
+        drawerStyle: { backgroundColor: "#192126" }, // Definir a cor de fundo do drawer
       }}
       drawerContent={(props) => <CustomDrawerContent {...props} />} // Usar o CustomDrawerContent
     >

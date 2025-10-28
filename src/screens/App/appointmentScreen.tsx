@@ -1,11 +1,8 @@
-import React from 'react'
-import { Text } from 'react-native'
-
+import React from "react";
+import { Text } from "react-native";
 
 const AppointmentScreen: React.FC = () => {
-    return (
-        <Text>Appointment Screen</Text>
-    )
-}
+  return <Text>Appointment Screen</Text>;
+};
 
 export default AppointmentScreen;

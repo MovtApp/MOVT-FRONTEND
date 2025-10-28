@@ -112,13 +112,13 @@ export const Sidebar: React.FC<SidebarProps> = () => {
       >
         <View style={styles.sidebarSection}>
           <Text style={styles.sidebarSectionTitle}>Menu principal</Text>
-          
+
           {/* INÍCIO */}
           <TouchableOpacity
             style={styles.sidebarItemContent}
             onPress={() => {
               // @ts-ignore
-              navigation.navigate('HomeScreen');
+              navigation.navigate("HomeScreen");
             }}
           >
             <House size={24} color="#fff" />
@@ -130,7 +130,7 @@ export const Sidebar: React.FC<SidebarProps> = () => {
             style={styles.sidebarItemContent}
             onPress={() => {
               // @ts-ignore
-              navigation.navigate('MapScreen');
+              navigation.navigate("MapScreen");
             }}
           >
             <MapPinned size={24} color="#fff" />
@@ -142,7 +142,7 @@ export const Sidebar: React.FC<SidebarProps> = () => {
             style={styles.sidebarItemContent}
             onPress={() => {
               // @ts-ignore
-              navigation.navigate('DietScreen');
+              navigation.navigate("DietScreen");
             }}
           >
             <Soup size={24} color="#fff" />
@@ -154,7 +154,7 @@ export const Sidebar: React.FC<SidebarProps> = () => {
             style={styles.sidebarItemContent}
             onPress={() => {
               // @ts-ignore
-              navigation.navigate('DataScreen');
+              navigation.navigate("DataScreen");
             }}
           >
             <ChartColumnBig size={24} color="#fff" />
@@ -166,7 +166,7 @@ export const Sidebar: React.FC<SidebarProps> = () => {
             style={styles.sidebarItemContent}
             onPress={() => {
               // @ts-ignore
-              navigation.navigate('ChatScreen');
+              navigation.navigate("ChatScreen");
             }}
           >
             <MessageCircle size={24} color="#fff" />
@@ -179,13 +179,13 @@ export const Sidebar: React.FC<SidebarProps> = () => {
 
         <View style={styles.sidebarSection}>
           <Text style={styles.sidebarSectionTitle}>Painel</Text>
-          
+
           {/* TREINOS */}
           <TouchableOpacity
             style={styles.sidebarItemContent}
             onPress={() => {
               // @ts-ignore
-              navigation.navigate('TrainingScreen');
+              navigation.navigate("TrainingScreen");
             }}
           >
             <Dumbbell size={24} color="#fff" />
@@ -197,7 +197,7 @@ export const Sidebar: React.FC<SidebarProps> = () => {
             style={styles.sidebarItemContent}
             onPress={() => {
               // @ts-ignore
-              navigation.navigate('ScheduleScreen');
+              navigation.navigate("ScheduleScreen");
             }}
           >
             <CalendarDays size={24} color="#fff" />
@@ -209,7 +209,7 @@ export const Sidebar: React.FC<SidebarProps> = () => {
             style={styles.sidebarItemContent}
             onPress={() => {
               // @ts-ignore
-              navigation.navigate('CommunityScreen');
+              navigation.navigate("CommunityScreen");
             }}
           >
             <Globe size={24} color="#fff" />
@@ -228,7 +228,7 @@ export const Sidebar: React.FC<SidebarProps> = () => {
             style={styles.sidebarItemContent}
             onPress={() => {
               // @ts-ignore
-              navigation.navigate('ConfigScreen');
+              navigation.navigate("ConfigScreen");
             }}
           >
             <Settings size={24} color="#fff" />
@@ -242,7 +242,7 @@ export const Sidebar: React.FC<SidebarProps> = () => {
             style={styles.sidebarItemContent}
             onPress={() => {
               // @ts-ignore
-              navigation.navigate('SupportScreen');
+              navigation.navigate("SupportScreen");
             }}
           >
             <CircleHelp size={24} color="#fff" />
@@ -254,7 +254,7 @@ export const Sidebar: React.FC<SidebarProps> = () => {
             style={styles.sidebarItemContent}
             onPress={() => {
               // @ts-ignore
-              navigation.navigate('AboutScreen');
+              navigation.navigate("AboutScreen");
             }}
           >
             <Info size={24} color="#fff" />
