@@ -12,6 +12,7 @@ import {
   useRoute,
   useIsFocused,
   RouteProp,
+  useNavigationState,
 } from "@react-navigation/native";
 
 interface NavItem {
@@ -28,6 +29,7 @@ const BottomNavigationBar = () => {
   const route =
     useRoute<RouteProp<AppDrawerParamList, keyof AppDrawerParamList>>();
   const isFocused = useIsFocused();
+  const navigationState = useNavigationState((state) => state);
   const [activeTab, setActiveTab] =
     useState<keyof AppStackParamList>("HomeScreen");
 
@@ -35,6 +37,50 @@ const BottomNavigationBar = () => {
     () => ["HomeScreen", "MapScreen", "DietScreen", "DataScreen", "ChatScreen"],
     [],
   );
+
+  // Telas onde o BottomNavigationBar deve ser oculto
+  const hiddenScreens = useMemo(
+    () => [
+      "CaloriesScreen",
+      "CyclingScreen",
+      "HeartbeatsScreen",
+      "SleepScreen",
+      "StepsScreen",
+      "TrainingScreen",
+      "WaterScreen",
+    ],
+    [],
+  );
+
+  // Verifica se a tela atual deve ocultar o BottomNavigationBar
+  const shouldHide = useMemo(() => {
+    try {
+      const navState = navigation.getState();
+      if (!navState) return false;
+      
+      // Navega pela estrutura de rotas para encontrar a rota ativa
+      const findActiveRoute = (state: any): string | null => {
+        if (!state || !state.routes) return null;
+        
+        const activeRoute = state.routes[state.index];
+        if (!activeRoute) return null;
+        
+        // Se tem state aninhado, procura recursivamente
+        if (activeRoute.state) {
+          const nestedActive = findActiveRoute(activeRoute.state);
+          if (nestedActive) return nestedActive;
+        }
+        
+        return activeRoute.name;
+      };
+      
+      const activeScreenName = findActiveRoute(navState);
+      return activeScreenName ? hiddenScreens.includes(activeScreenName) : false;
+    } catch (error) {
+      console.error("Erro ao verificar navegação:", error);
+      return false;
+    }
+  }, [navigationState, hiddenScreens, navigation]);
 
   useEffect(() => {
     let currentScreenName: keyof AppStackParamList | undefined;
@@ -97,6 +143,11 @@ const BottomNavigationBar = () => {
       params: { screen: screenName },
     });
   };
+
+  // Se deve esconder, retorna null
+  if (shouldHide) {
+    return null;
+  }
 
   return (
     <View style={styles.container}>

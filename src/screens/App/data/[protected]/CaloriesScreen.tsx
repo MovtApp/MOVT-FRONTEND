@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
 import {
   View,
   Text,
@@ -8,16 +8,20 @@ import {
   ActivityIndicator,
   RefreshControl,
   ScrollView,
+  Dimensions,
 } from "react-native";
+import { InteractionManager } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { ChevronLeft, ChevronRight } from "lucide-react-native";
+import { useNavigation } from "@react-navigation/native";
+import { NativeStackNavigationProp } from "@react-navigation/native-stack";
+import { AppStackParamList } from "../../../../@types/routes";
 import BackButton from "../../../../components/BackButton";
-import { CartesianChart, Area, Line, Scatter } from "victory-native";
-import { G, Text as SvgText } from "react-native-svg";
+import TimeSelector from "../../../../components/TimeSelector";
+import { CartesianChart, Area, Line } from "victory-native";
+import { G, Text as SvgText, Circle } from "react-native-svg";
 import {
   getCaloriesData,
-  calculateChartDomain,
-  formatDateLabel,
   type TimeframeType,
   type CalorieStats,
 } from "../../../../services/caloriesService";
@@ -35,112 +39,266 @@ interface CustomLabelProps {
   datum: GraphDataItem;
 }
 
+const { width } = Dimensions.get("window");
+
 const CustomLabel: React.FC<CustomLabelProps> = ({ x, y, datum }) => {
-  if (datum.label) {
-    return (
-      <G x={x} y={y}>
-        <SvgText
-          x={0}
-          y={-15}
-          fontSize={12}
-          fill="#FF7D00"
-          textAnchor="middle"
-          fontWeight="bold"
-        >
-          {datum.label}
-        </SvgText>
-      </G>
-    );
-  }
-  return null;
+  if (!datum.label) return null;
+  if (x == null || y == null) return null;
+
+  return (
+    <SvgText
+      x={x}
+      y={y - 15}
+      fontSize={12}
+      fill="#FF7D00"
+      textAnchor="middle"
+      fontWeight="bold"
+    >
+      {String(datum.label)}
+    </SvgText>
+  );
 };
 
+// Lista ordenada das telas de dados para navegação
+const DATA_SCREENS: (keyof AppStackParamList)[] = [
+  "CaloriesScreen",
+  "CyclingScreen",
+  "HeartbeatsScreen",
+  "SleepScreen",
+  "StepsScreen",
+  "TrainingScreen",
+  "WaterScreen",
+];
+
 const CaloriesScreen: React.FC = () => {
+  const navigation =
+    useNavigation<NativeStackNavigationProp<AppStackParamList>>();
   const [selectedTimeframe, setSelectedTimeframe] =
     useState<TimeframeType>("1d");
   const [caloriesStats, setCaloriesStats] = useState<CalorieStats | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [graphData, setGraphData] = useState<GraphDataItem[]>([]);
-  const [chartDomain, setChartDomain] = useState<[number, number]>([
-    1400, 2000,
-  ]);
-  const [currentPage, setCurrentPage] = useState(0);
-
-  // Número de pontos a exibir por página
-  const POINTS_PER_PAGE = 7;
+  const [chartDomain, setChartDomain] = useState<[number, number]>([0, 2000]);
+  const isLoadingRef = useRef(false);
+  const [isChartReady, setIsChartReady] = useState(false);
 
   // Busca dados do backend
   const fetchCaloriesData = async (timeframe: TimeframeType) => {
-    try {
-      setIsLoading(true);
-      const data = await getCaloriesData(timeframe);
-      setCaloriesStats(data);
+    // Previne múltiplas chamadas simultâneas
+    if (isLoadingRef.current) {
+      return;
+    }
 
-      // Processa dados para o gráfico
+    try {
+      isLoadingRef.current = true;
+      setIsLoading(true);
+      
+      const data = await getCaloriesData(timeframe);
+      
+      // Para o gráfico, mostra os valores de calorias conforme coletados
+      // No timeframe "1d", cada ponto representa as calorias gastas até aquele momento do dia
+      // Os valores já vêm do backend como progressão acumulada ao longo do tempo
       const processedData = data.data.map((item, index) => ({
         value: item.calories,
-        label: "",
+        label: "", // Será definido depois na preparação dos dados
         index,
         rawDate: item.date,
       }));
 
+      // Domínio com base nos valores reais do eixo Y
+      const dailyGoal = data.dailyGoal || 2000;
+      const maxValue = processedData.length > 0 
+        ? Math.max(...processedData.map(d => d.value)) 
+        : dailyGoal;
+      // Define o domínio com base nos valores reais dos dados
+      const maxDomain = Math.max(dailyGoal, maxValue + 100);
+      const newDomain: [number, number] = [0, maxDomain];
+
+      // Atualiza estados de forma agrupada para evitar renderizações múltiplas
+      setCaloriesStats(data);
       setGraphData(processedData);
-
-      // Calcula domínio dinâmico
-      const domain = calculateChartDomain(data.data);
-      setChartDomain(domain);
-
-      setCurrentPage(0);
+      setChartDomain(newDomain);
+      
+      // Agenda renderização do gráfico após todas as interações/atualizações
+      InteractionManager.runAfterInteractions(() => {
+        setIsChartReady(true);
+      });
     } catch (error) {
       console.error("Erro ao buscar dados de calorias:", error);
+      setIsChartReady(false);
     } finally {
+      isLoadingRef.current = false;
       setIsLoading(false);
     }
   };
 
   // Busca inicial
   useEffect(() => {
-    fetchCaloriesData(selectedTimeframe);
+    setIsChartReady(false);
+    let isMounted = true;
+    
+    if (isMounted && !isLoadingRef.current) {
+      fetchCaloriesData(selectedTimeframe);
+    }
+
+    return () => {
+      isMounted = false;
+      setIsChartReady(false);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedTimeframe]);
 
   // Pull to refresh
   const onRefresh = async () => {
+    if (isLoadingRef.current) {
+      setIsRefreshing(false);
+      return;
+    }
     setIsRefreshing(true);
     await fetchCaloriesData(selectedTimeframe);
     setIsRefreshing(false);
   };
 
-  // Paginação do gráfico
-  const totalPages = Math.ceil(graphData.length / POINTS_PER_PAGE);
-  const startIndex = currentPage * POINTS_PER_PAGE;
-  const endIndex = Math.min(startIndex + POINTS_PER_PAGE, graphData.length);
-  const currentGraphData = graphData.slice(startIndex, endIndex);
-
-  // Adiciona labels aos pontos extremos da página atual
-  const displayGraphData = currentGraphData.map((item, index, array) => {
-    const shouldShowLabel =
-      index === 0 ||
-      index === array.length - 1 ||
-      (array.length <= 3 && index === Math.floor(array.length / 2));
-
-    return {
-      ...item,
-      label: shouldShowLabel ? item.value.toString() : "",
-      index: index,
-    };
-  });
-
-  const handlePreviousPage = () => {
-    if (currentPage > 0) {
-      setCurrentPage(currentPage - 1);
+  // Preparação dos dados do gráfico - mostra todos os pontos com labels nos principais
+  const displayGraphData = useMemo(() => {
+    if (graphData.length === 0) {
+      return [];
     }
+    
+    return graphData.map((item, index, array) => {
+      // Mostra labels nos pontos principais: primeiro, último, e alguns pontos estratégicos
+      const totalPoints = array.length;
+      
+      // Determina quais pontos devem mostrar labels
+      const shouldShowLabel =
+        index === 0 ||
+        index === totalPoints - 1 ||
+        (totalPoints > 3 && index === Math.floor(totalPoints / 2)) ||
+        (totalPoints > 6 && index === Math.floor(totalPoints / 3)) ||
+        (totalPoints > 6 && index === Math.floor((totalPoints * 2) / 3));
+
+      return {
+        ...item,
+        label: shouldShowLabel && item.value != null ? item.value.toString() : "",
+        index: index,
+      };
+    });
+  }, [graphData]);
+
+  // Componente memoizado do gráfico para evitar re-renderizações desnecessárias
+  const ChartComponent = useMemo(() => {
+    if (!isChartReady || displayGraphData.length === 0 || chartDomain[1] <= 0) {
+      return null;
+    }
+
+    return (
+      <CartesianChart
+        data={displayGraphData}
+        xKey="index"
+        yKeys={["value"]}
+        padding={{ top: 40, right: 20, bottom: 20, left: 50 }}
+        domainPadding={{
+          left: 20,
+          right: 20,
+        }}
+        axisOptions={{
+          tickCount: 5, // Define fixed number of Y-axis ticks
+          formatXLabel: (value) => {
+            // Formata os labels do eixo X conforme necessário
+            const index = Number(value);
+            if (index >= 0 && index < displayGraphData.length) {
+              return displayGraphData[index]?.rawDate || '';
+            }
+            return value.toString();
+          },
+          formatYLabel: (value) => {
+            // Formata os labels do eixo Y para exibir os valores reais
+            return Math.round(Number(value)).toString();
+          },
+        }}
+        domain={{
+          y: chartDomain,
+        }}
+      >
+        {({ points, yScale }) => {
+          if (!points || !points.value || points.value.length === 0 || !yScale) {
+            return null;
+          }
+          try {
+            const bottomY = yScale(chartDomain[0]);
+            if (typeof bottomY !== "number" || isNaN(bottomY)) {
+              return null;
+            }
+            return (
+              <G>
+                <Area
+                  points={points.value}
+                  color="rgba(255, 125, 0, 0.2)"
+                  curveType="catmullRom"
+                  y0={bottomY}
+                />
+                <Line
+                  points={points.value}
+                  color="#FF7D00"
+                  strokeWidth={4}
+                  curveType="catmullRom"
+                />
+                {/* Renderiza pontos com labels */}
+                {displayGraphData.map((datum, index) => {
+                  const point = points.value[index];
+                  if (
+                    !point ||
+                    !datum.label ||
+                    datum.label === "" ||
+                    typeof point.x !== "number" ||
+                    typeof point.y !== "number"
+                  ) {
+                    return null;
+                  }
+                  return (
+                    <G key={`label-${index}`}>
+                      <CustomLabel
+                        x={point.x}
+                        y={point.y}
+                        datum={datum}
+                      />
+                      {/* Círculo no ponto */}
+                      <Circle
+                        cx={point.x}
+                        cy={point.y}
+                        r={4}
+                        fill="#FF7D00"
+                        stroke="#fff"
+                        strokeWidth={2}
+                      />
+                    </G>
+                  );
+                })}
+              </G>
+            );
+          } catch (error) {
+            console.error("Erro ao renderizar gráfico:", error);
+            return null;
+          }
+        }}
+      </CartesianChart>
+    );
+  }, [isChartReady, displayGraphData, chartDomain]);
+
+  // Navegação entre telas de dados
+  const handlePreviousScreen = () => {
+    const currentIndex = DATA_SCREENS.indexOf("CaloriesScreen");
+    const previousIndex =
+      currentIndex === 0 ? DATA_SCREENS.length - 1 : currentIndex - 1;
+    navigation.navigate(DATA_SCREENS[previousIndex] as any);
   };
 
-  const handleNextPage = () => {
-    if (currentPage < totalPages - 1) {
-      setCurrentPage(currentPage + 1);
-    }
+  const handleNextScreen = () => {
+    const currentIndex = DATA_SCREENS.indexOf("CaloriesScreen");
+    const nextIndex =
+      currentIndex === DATA_SCREENS.length - 1 ? 0 : currentIndex + 1;
+    navigation.navigate(DATA_SCREENS[nextIndex] as any);
   };
 
   if (isLoading && !caloriesStats) {
@@ -162,9 +320,10 @@ const CaloriesScreen: React.FC = () => {
   }
 
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <SafeAreaView style={styles.safeArea} edges={["top"]}>
       <ScrollView
         style={styles.scrollView}
+        contentContainerStyle={styles.scrollContent}
         refreshControl={
           <RefreshControl refreshing={isRefreshing} onRefresh={onRefresh} />
         }
@@ -196,34 +355,13 @@ const CaloriesScreen: React.FC = () => {
           </View>
 
           {/* Time Selector */}
-          <View style={styles.timeSelectorContainer}>
-            {(["1d", "1s", "1m", "1a", "Tudo"] as TimeframeType[]).map(
-              (timeframe) => (
-                <TouchableOpacity
-                  key={timeframe}
-                  style={[
-                    styles.timeButton,
-                    selectedTimeframe === timeframe &&
-                      styles.selectedTimeButton,
-                  ]}
-                  onPress={() => setSelectedTimeframe(timeframe)}
-                  disabled={isLoading}
-                >
-                  <Text
-                    style={[
-                      styles.timeButtonText,
-                      selectedTimeframe === timeframe &&
-                        styles.selectedTimeButtonText,
-                    ]}
-                  >
-                    {timeframe}
-                  </Text>
-                </TouchableOpacity>
-              ),
-            )}
-          </View>
+          <TimeSelector
+            selectedTimeframe={selectedTimeframe}
+            onTimeframeChange={setSelectedTimeframe}
+            isLoading={isLoading}
+          />
 
-          {/* Graph Section */}
+          {/* Graph Section - Posicionado na parte inferior */}
           <View style={styles.graphSection}>
             {isLoading ? (
               <View style={styles.graphLoadingContainer}>
@@ -231,125 +369,48 @@ const CaloriesScreen: React.FC = () => {
               </View>
             ) : (
               <View style={styles.graphContainer}>
-                {/* Botão Anterior */}
-                <TouchableOpacity
-                  style={[
-                    styles.graphArrowButton,
-                    currentPage === 0 && styles.graphArrowButtonDisabled,
-                  ]}
-                  onPress={handlePreviousPage}
-                  disabled={currentPage === 0}
-                >
-                  <ChevronLeft
-                    size={24}
-                    color={currentPage === 0 ? "#ccc" : "#999"}
-                  />
-                </TouchableOpacity>
-
-                {/* Gráfico */}
-                <View style={styles.graphPlaceholder}>
-                  {displayGraphData.length > 0 ? (
-                    <CartesianChart
-                      data={displayGraphData}
-                      xKey="index"
-                      yKeys={["value"]}
-                      padding={{ top: 20, right: 20, bottom: 20, left: 20 }}
-                      domainPadding={{
-                        left: 20,
-                        right: 20,
-                      }}
-                      domain={{
-                        y: chartDomain,
-                      }}
-                    >
-                      {({ points, yScale }) => (
-                        <G>
-                          <Area
-                            points={points.value}
-                            color="rgba(255, 125, 0, 0.2)"
-                            curveType="catmullRom"
-                            y0={yScale(chartDomain[0])}
-                          />
-                          <Line
-                            points={points.value}
-                            color="#FF7D00"
-                            strokeWidth={4}
-                            curveType="catmullRom"
-                          />
-                        </G>
-                      )}
-                    </CartesianChart>
-                  ) : (
-                    <View style={styles.noDataContainer}>
-                      <Text style={styles.noDataText}>
-                        Nenhum dado disponível
-                      </Text>
-                    </View>
-                  )}
+                <View style={{ alignItems: "center", justifyContent: "center", flex: 1 }}>
+                  <View style={styles.graphPlaceholder}>
+                    {ChartComponent || (
+                      <View style={styles.noDataContainer}>
+                        <Text style={styles.noDataText}>Nenhum dado disponível</Text>
+                      </View>
+                    )}
+                  </View>
                 </View>
-
-                {/* Botão Próximo */}
-                <TouchableOpacity
-                  style={[
-                    styles.graphArrowButton,
-                    currentPage === totalPages - 1 &&
-                      styles.graphArrowButtonDisabled,
-                  ]}
-                  onPress={handleNextPage}
-                  disabled={currentPage === totalPages - 1}
-                >
-                  <ChevronRight
-                    size={24}
-                    color={currentPage === totalPages - 1 ? "#ccc" : "#999"}
-                  />
-                </TouchableOpacity>
               </View>
             )}
-
-            {/* Indicador de página */}
-            {totalPages > 1 ? (
-              <View style={styles.pageIndicatorContainer}>
-                <Text style={styles.pageIndicatorText}>
-                  {currentPage + 1} / {totalPages}
-                </Text>
-              </View>
-            ) : null}
-
-            {/* Labels de data */}
-            <View style={styles.dateLabelsContainer}>
-              {displayGraphData.map((item, index) => (
-                <Text key={index} style={styles.dateLabel}>
-                  {formatDateLabel(item.rawDate, selectedTimeframe)}
-                </Text>
-              ))}
-            </View>
-          </View>
-
-          {/* Estatísticas Adicionais */}
-          <View style={styles.statsContainer}>
-            <View style={styles.statItem}>
-              <Text style={styles.statLabel}>Meta Diária</Text>
-              <Text style={styles.statValue}>
-                {`${caloriesStats?.dailyGoal || 0} kcal`}
-              </Text>
-            </View>
-            <View style={styles.statItem}>
-              <Text style={styles.statLabel}>Progresso</Text>
-              <Text style={styles.statValue}>
-                {`${
-                  caloriesStats
-                    ? Math.round(
-                        (caloriesStats.totalCalories /
-                          caloriesStats.dailyGoal) *
-                          100,
-                      )
-                    : 0
-                }%`}
-              </Text>
-            </View>
           </View>
         </View>
       </ScrollView>
+
+      {/* Setas de navegação fixas nas laterais (pílulas) */}
+      <View style={styles.navigationArrowsContainer} pointerEvents="box-none">
+        <TouchableOpacity
+          style={styles.leftArrowPill}
+          onPress={handlePreviousScreen}
+        >
+          <Image
+            source={require("../../../../assets/chevronLeft.jpg")}
+            style={styles.arrowIcon}
+            resizeMode="contain"
+          />
+          <ChevronLeft size={20} color="#FFFFFF" style={styles.overlayIcon} />
+          <View style={styles.leftPillEdgeGlow} />
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.rightArrowPill}
+          onPress={handleNextScreen}
+        >
+          <Image
+            source={require("../../../../assets/chevronRight.jpg")}
+            style={styles.arrowIcon}
+            resizeMode="contain"
+          />
+          <ChevronRight size={20} color="#FFFFFF" style={styles.overlayIcon} />
+          <View style={styles.rightPillEdgeGlow} />
+        </TouchableOpacity>
+      </View>
     </SafeAreaView>
   );
 };
@@ -362,16 +423,21 @@ const styles = StyleSheet.create({
   scrollView: {
     flex: 1,
   },
+  scrollContent: {
+    flexGrow: 1,
+    paddingBottom: 10,
+  },
   container: {
     flex: 1,
     backgroundColor: "#fff",
     paddingHorizontal: 20,
+    paddingBottom: 20,
   },
   header: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: 30,
+    marginBottom: 20,
     paddingHorizontal: 0,
   },
   headerTitle: {
@@ -411,7 +477,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#F0F0F0",
     borderRadius: 10,
     padding: 5,
-    marginBottom: 30,
+    marginBottom: 20,
   },
   timeButton: {
     paddingVertical: 8,
@@ -429,30 +495,87 @@ const styles = StyleSheet.create({
     color: "#fff",
   },
   graphSection: {
-    minHeight: 300,
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: 10,
+    marginBottom: 10,
+  },
+  
+  graphContainer: {
+    width: "100%",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  
+  graphPlaceholder: {
+    width: width * 0.95, // 90% da largura do dispositivo
+    height: width * 1.4, // altura proporcional
+    alignSelf: "center",
+    justifyContent: "center",
+    borderRadius: 12,
+    overflow: "hidden",
+    backgroundColor: "#fff",
+    alignContent: "center",
+    marginRight: 34
+  },
+  
+  navigationArrowsContainer: {
+    position: "absolute",
+    top: "50%",
+    left: -10,
+    right: -10,
+    height: 0,
+    transform: [{ translateY: -50 }],
+    zIndex: 10,
+  },
+  leftArrowPill: {
+    position: "absolute",
+    left: 6,
+    width: 44,
+    height: 88,
+    borderTopRightRadius: 28,
+    borderBottomRightRadius: 28,
     justifyContent: "center",
     alignItems: "center",
-    marginBottom: 30,
   },
-  graphContainer: {
-    flexDirection: "row",
+  rightArrowPill: {
+    position: "absolute",
+    right: 6,
+    width: 44,
+    height: 88,
+    borderTopLeftRadius: 28,
+    borderBottomLeftRadius: 28,
+    justifyContent: "center",
     alignItems: "center",
-    width: "100%",
-    height: 250,
-    justifyContent: "space-between",
   },
-  graphPlaceholder: {
-    flex: 1,
-    backgroundColor: "#FEECE2",
-    borderRadius: 10,
-    overflow: "hidden",
+  leftPillEdgeGlow: {
+    position: "absolute",
+    right: 0,
+    width: 10,
     height: "100%",
+    borderTopRightRadius: 28,
+    borderBottomRightRadius: 28,
   },
-  graphArrowButton: {
-    padding: 10,
+  rightPillEdgeGlow: {
+    position: "absolute",
+    left: 0,
+    width: 10,
+    height: "100%",
+    borderTopLeftRadius: 28,
+    borderBottomLeftRadius: 28,
   },
-  graphArrowButtonDisabled: {
-    opacity: 0.3,
+  arrowIcon: {
+    width: 130,
+    height: 130,
+    zIndex: 11,
+  },
+  overlayIcon: {
+    position: "absolute",
+    alignSelf: "center",
+    top: "50%",
+    left: "50%",
+    transform: [{ translateX: -10 }, { translateY: -10 }],
   },
   loadingContainer: {
     flex: 1,
@@ -477,47 +600,6 @@ const styles = StyleSheet.create({
   noDataText: {
     fontSize: 16,
     color: "#999",
-  },
-  pageIndicatorContainer: {
-    marginTop: 10,
-  },
-  pageIndicatorText: {
-    fontSize: 14,
-    color: "#666",
-    textAlign: "center",
-  },
-  dateLabelsContainer: {
-    flexDirection: "row",
-    justifyContent: "space-around",
-    width: "100%",
-    marginTop: 10,
-    paddingHorizontal: 40,
-  },
-  dateLabel: {
-    fontSize: 12,
-    color: "#999",
-    textAlign: "center",
-  },
-  statsContainer: {
-    flexDirection: "row",
-    justifyContent: "space-around",
-    backgroundColor: "#F5F5F5",
-    borderRadius: 10,
-    padding: 20,
-    marginBottom: 30,
-  },
-  statItem: {
-    alignItems: "center",
-  },
-  statLabel: {
-    fontSize: 14,
-    color: "#666",
-    marginBottom: 5,
-  },
-  statValue: {
-    fontSize: 24,
-    fontWeight: "bold",
-    color: "#192126",
   },
 });
 
