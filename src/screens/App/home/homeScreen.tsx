@@ -5,16 +5,9 @@ import {
   StyleSheet,
   TouchableOpacity,
   ScrollView,
-  Image,
   ImageBackground,
 } from "react-native";
-import { Bell, Search, Play, Menu } from "lucide-react-native";
-import {
-  useNavigation,
-  CompositeNavigationProp,
-} from "@react-navigation/native";
-import { DrawerNavigationProp } from "@react-navigation/drawer";
-import { NativeStackNavigationProp } from "@react-navigation/native-stack";
+import { Search, Play } from "lucide-react-native";
 import TrainingSelector from "../../../components/TrainingSelector";
 import PromotionalBanner from "../../../components/PromotionalBanner";
 import PlanCardTraining from "../../../components/PlanCardsTraining";
@@ -23,20 +16,8 @@ import SearchInput from "../../../components/SearchInput";
 import Communities from "@components/Communities";
 import TheBestForYou from "@components/TheBestForYou";
 import ChallengesSection from "../../../components/ChallengesSection";
-import HeatingScreen from "../../../components/Heating"; // Importa o componente padrão HeatingScreen
-import { AppStackParamList, AppDrawerParamList } from "../../../@types/routes";
-
-interface MenuButtonProps {
-  onPress: () => void;
-}
-
-const MenuButton: React.FC<MenuButtonProps> = ({ onPress }) => {
-  return (
-    <TouchableOpacity style={styles.menuButton} onPress={onPress}>
-      <Menu size={24} color="#000" />
-    </TouchableOpacity>
-  );
-};
+import HeatingScreen from "../../../components/Heating";
+import Header from "@components/Header";
 
 interface ExerciseItem {
   id: string;
@@ -52,70 +33,45 @@ const exerciseData: ExerciseItem[] = [
     title: "Agachamento",
     calories: "180 - 250 Kcal",
     minutes: "15 min",
-    imageUrl:
-      "https://res.cloudinary.com/ditlmzgrh/image/upload/v1757229915/image_71_jntmsv.jpg",
+    imageUrl: "https://res.cloudinary.com/ditlmzgrh/image/upload/v1757229915/image_71_jntmsv.jpg",
   },
   {
     id: "2",
     title: "Supino",
     calories: "150 - 200 Kcal",
     minutes: "12 min",
-    imageUrl:
-      "https://res.cloudinary.com/ditlmzgrh/image/upload/v1757229915/image_txncpp.jpg",
+    imageUrl: "https://res.cloudinary.com/ditlmzgrh/image/upload/v1757229915/image_txncpp.jpg",
   },
   {
     id: "3",
     title: "Remada curvada",
     calories: "160 - 220 Kcal",
     minutes: "12 min",
-    imageUrl:
-      "https://res.cloudinary.com/ditlmzgrh/image/upload/v1757229918/image_75_drh4vh.jpg",
+    imageUrl: "https://res.cloudinary.com/ditlmzgrh/image/upload/v1757229918/image_75_drh4vh.jpg",
   },
   {
     id: "4",
     title: "Levantamento Terra",
     calories: "160 - 220 Kcal",
     minutes: "15 min",
-    imageUrl:
-      "https://res.cloudinary.com/ditlmzgrh/image/upload/v1757229918/image111_gu6iim.jpg",
+    imageUrl: "https://res.cloudinary.com/ditlmzgrh/image/upload/v1757229918/image111_gu6iim.jpg",
   },
   {
     id: "5",
     title: "Puxada na Barra",
     calories: "140 - 200 Kcal",
     minutes: "12 min",
-    imageUrl:
-      "https://res.cloudinary.com/ditlmzgrh/image/upload/v1757229918/image_73_co9eqf.jpg",
+    imageUrl: "https://res.cloudinary.com/ditlmzgrh/image/upload/v1757229918/image_73_co9eqf.jpg",
   },
 ];
 
 const HomeScreen: React.FC = () => {
-  type HomeScreenNavigationProp = CompositeNavigationProp<
-    DrawerNavigationProp<AppDrawerParamList, "HomeStack">,
-    NativeStackNavigationProp<AppStackParamList, "HomeScreen">
-  >;
-  const navigation = useNavigation<HomeScreenNavigationProp>();
   const [search, setSearch] = useState("");
   const [selectedGender] = useState<"male" | "female">("female");
 
   return (
     <View style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <View style={styles.headerTop}>
-          <MenuButton onPress={() => navigation.openDrawer()} />
-          <Image
-            source={{
-              uri: "https://res.cloudinary.com/ditlmzgrh/image/upload/v1758030169/MV_pukwcn.png",
-            }}
-            style={{ width: 80, height: 40 }}
-            resizeMode="cover"
-          />
-          <TouchableOpacity style={styles.iconButton}>
-            <Bell size={24} color="#000" />
-          </TouchableOpacity>
-        </View>
-      </View>
+      <Header />
 
       {/* Search Bar */}
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
@@ -128,10 +84,7 @@ const HomeScreen: React.FC = () => {
         {/* Promotional Banner */}
         <PromotionalBanner gender={selectedGender} />
         {/* Workout Selection */}
-        <TrainingSelector
-          title="Selecione seu treino"
-          containerStyle={{ marginBottom: 24 }}
-        />
+        <TrainingSelector title="Selecione seu treino" containerStyle={{ marginBottom: 24 }} />
         {/* Communities */}
         <Communities />
         {/* Popular Exercises */}
@@ -155,14 +108,10 @@ const HomeScreen: React.FC = () => {
                     <View style={styles.exerciseInfo}>
                       <View style={styles.tagsContainer}>
                         <View style={styles.calorieTag}>
-                          <Text style={styles.calorieText}>
-                            {exercise.calories}
-                          </Text>
+                          <Text style={styles.calorieText}>{exercise.calories}</Text>
                         </View>
                         <View style={styles.MinutesTag}>
-                          <Text style={styles.MinutesText}>
-                            {exercise.minutes}
-                          </Text>
+                          <Text style={styles.MinutesText}>{exercise.minutes}</Text>
                         </View>
                       </View>
                       <TouchableOpacity style={styles.playButton}>
@@ -188,8 +137,7 @@ const HomeScreen: React.FC = () => {
         {/* Challenges */}
         <ChallengesSection />
         {/* Rapid heating */}
-        <HeatingScreen />{" "}
-        {/* Usando o nome correto do componente: HeatingScreen */}
+        <HeatingScreen /> {/* Usando o nome correto do componente: HeatingScreen */}
       </ScrollView>
     </View>
   );

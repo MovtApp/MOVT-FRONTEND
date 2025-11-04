@@ -6,8 +6,7 @@ import { Input } from "@components/Input";
 import { RootStackParamList } from "@typings/routes"; // Corrigida a importação de RootStackParamList
 
 const LevelScreen = () => {
-  const navigation =
-    useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
 
   const handleLevel = () => {
     navigation.navigate("App", { screen: "HomeScreen" });
@@ -20,8 +19,7 @@ const LevelScreen = () => {
         <Text style={styles.title}>Nível</Text>
         <Text style={styles.question}>Qual seu nível de atividade física?</Text>
         <Text style={styles.instruction}>
-          Classifique seu nível de atividade física: Iniciante, intermediário ou
-          avançado.
+          Classifique seu nível de atividade física: Iniciante, intermediário ou avançado.
         </Text>
 
         <Input text="Iniciante" />

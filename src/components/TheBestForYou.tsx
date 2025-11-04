@@ -71,9 +71,7 @@ interface TheBestForYouProps {
   planData?: Plan[];
 }
 
-const TheBestForYou: React.FC<TheBestForYouProps> = ({
-  planData: _propPlanData,
-}) => {
+const TheBestForYou: React.FC<TheBestForYouProps> = ({ planData: _propPlanData }) => {
   return (
     <View style={styles.section}>
       {/* Plano de hoje */}
@@ -81,10 +79,7 @@ const TheBestForYou: React.FC<TheBestForYouProps> = ({
       <View style={styles.planCardsContainer}>
         {planData.map((plan) => (
           <TouchableOpacity key={plan.id} style={styles.planCard}>
-            <Image
-              source={{ uri: plan.imageUrl }}
-              style={styles.planCardImage}
-            />
+            <Image source={{ uri: plan.imageUrl }} style={styles.planCardImage} />
             <View style={styles.planCardContent}>
               <Text style={styles.planCardTitle}>{plan.title}</Text>
               <Text style={styles.planCardDescription}>{plan.description}</Text>

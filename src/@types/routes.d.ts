@@ -13,6 +13,7 @@ export type AppStackParamList = {
   StepsScreen: undefined;
   TrainingScreen: undefined;
   WaterScreen: undefined;
+  ResultsScreen: undefined;
   HeightScreen: undefined;
   WeightScreen: undefined;
   AgeScreen: undefined;

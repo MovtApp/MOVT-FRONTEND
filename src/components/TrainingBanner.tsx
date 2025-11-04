@@ -1,12 +1,6 @@
 import { ArrowRight } from "lucide-react-native";
 import React from "react";
-import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  ImageBackground,
-} from "react-native";
+import { View, Text, StyleSheet, TouchableOpacity, ImageBackground } from "react-native";
 
 interface TrainingBannerProps {
   title: string;
@@ -14,11 +8,7 @@ interface TrainingBannerProps {
   onPress: () => void;
 }
 
-const TrainingBanner: React.FC<TrainingBannerProps> = ({
-  title,
-  imageUrl,
-  onPress,
-}) => {
+const TrainingBanner: React.FC<TrainingBannerProps> = ({ title, imageUrl, onPress }) => {
   return (
     <TouchableOpacity onPress={onPress} style={styles.bannerContainer}>
       <ImageBackground

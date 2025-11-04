@@ -1,0 +1,43 @@
+{
+  "name": "SPARK AI Agent",
+  "version": "1.0.0",
+  "description": "Professional full-stack development assistant for the MOVT project",
+  "author": "Your Development Team",
+  "license": "MIT",
+  "settings": {
+    "model": "openai/gpt-4",
+    "temperature": 0.2,
+    "maxTokens": 2048,
+    "topP": 0.9,
+    "frequencyPenalty": 0.5,
+    "presencePenalty": 0.5
+  },
+  "capabilities": [
+    "code-generation",
+    "code-completion",
+    "bug-fixing",
+    "refactoring",
+    "testing",
+    "architecture",
+    "debugging"
+  ],
+  "files": {
+    "include": [
+      "**/*.{ts,tsx,js,jsx,json,css,md}",
+      "package.json",
+      "app.json",
+      "tsconfig.json",
+      "tailwind.config.js",
+      "babel.config.js",
+      "metro.config.cjs"
+    ],
+    "exclude": ["node_modules/**/*", ".expo/**/*", ".git/**/*", "dist/**/*", "build/**/*", "*.log"]
+  },
+  "context": {
+    "projectType": "react-native-expo",
+    "language": "typescript",
+    "framework": "react-native",
+    "styling": "nativewind-tailwind",
+    "target": "mobile"
+  }
+}

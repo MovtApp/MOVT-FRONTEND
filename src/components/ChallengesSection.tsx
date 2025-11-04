@@ -71,11 +71,7 @@ const ChallengesSection: React.FC = () => {
   return (
     <View style={styles.section}>
       <Text style={styles.sectionTitle}>Desafios</Text>
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        style={styles.challengesList}
-      >
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.challengesList}>
         {challengeData.map((challenge) => (
           <ChallengeCard
             key={challenge.id}

@@ -1,13 +1,10 @@
 import React from "react";
 import { View, Text, StyleSheet } from "react-native";
 
-const CyclingScreen: React.FC = () => {
+const ProfileScreen: React.FC = () => {
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Detalhes de Ciclismo</Text>
-      <Text style={styles.subtitle}>
-        Informações sobre atividades de ciclismo.
-      </Text>
+      <Text style={styles.title}>Tela de perfil</Text>
     </View>
   );
 };
@@ -24,10 +21,6 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
     marginBottom: 10,
   },
-  subtitle: {
-    fontSize: 16,
-    color: "#666",
-  },
 });
 
-export default CyclingScreen;
+export default ProfileScreen;

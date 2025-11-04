@@ -135,3 +135,11 @@ dist
 .yarn/install-state.gz
 .pnp.*
 .expo/
+.expo-shared/
+
+# .prettierignore
+metro.config.cjs
+babel.config.js
+*.config.js
+*.config.cjs
+*.config.mjs

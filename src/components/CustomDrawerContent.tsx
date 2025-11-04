@@ -1,8 +1,5 @@
 import { View, Text, TouchableOpacity, StyleSheet, Image } from "react-native";
-import {
-  DrawerContentScrollView,
-  DrawerContentComponentProps,
-} from "@react-navigation/drawer";
+import { DrawerContentScrollView, DrawerContentComponentProps } from "@react-navigation/drawer";
 import {
   X,
   Home,
@@ -54,15 +51,9 @@ export function CustomDrawerContent(props: DrawerContentComponentProps) {
   ];
 
   return (
-    <DrawerContentScrollView
-      {...props}
-      contentContainerStyle={styles.drawerContent}
-    >
+    <DrawerContentScrollView {...props} contentContainerStyle={styles.drawerContent}>
       <View style={styles.header}>
-        <TouchableOpacity
-          onPress={handleCloseDrawer}
-          style={styles.closeButton}
-        >
+        <TouchableOpacity onPress={handleCloseDrawer} style={styles.closeButton}>
           <X size={24} color="#BBF246" />
         </TouchableOpacity>
         <Text style={styles.menuTitle}>Menu</Text>
@@ -80,9 +71,7 @@ export function CustomDrawerContent(props: DrawerContentComponentProps) {
           style={styles.profileImage}
         />
         <View style={styles.profileInfo}>
-          <Text style={styles.profileName}>
-            {userWithPhoto?.name || "Visitante"}
-          </Text>
+          <Text style={styles.profileName}>{userWithPhoto?.name || "Visitante"}</Text>
         </View>
       </View>
 
@@ -99,11 +88,7 @@ export function CustomDrawerContent(props: DrawerContentComponentProps) {
               })
             } // Navegação corrigida
           >
-            <item.icon
-              size={20}
-              color="#FFFFFF"
-              style={styles.drawerItemIcon}
-            />
+            <item.icon size={20} color="#FFFFFF" style={styles.drawerItemIcon} />
             <Text style={styles.drawerItemText}>{item.name}</Text>
           </TouchableOpacity>
         ))}
@@ -122,11 +107,7 @@ export function CustomDrawerContent(props: DrawerContentComponentProps) {
               })
             } // Navegação corrigida
           >
-            <item.icon
-              size={20}
-              color="#FFFFFF"
-              style={styles.drawerItemIcon}
-            />
+            <item.icon size={20} color="#FFFFFF" style={styles.drawerItemIcon} />
             <Text style={styles.drawerItemText}>{item.name}</Text>
           </TouchableOpacity>
         ))}
@@ -145,11 +126,7 @@ export function CustomDrawerContent(props: DrawerContentComponentProps) {
               })
             } // Navegação corrigida
           >
-            <item.icon
-              size={20}
-              color="#FFFFFF"
-              style={styles.drawerItemIcon}
-            />
+            <item.icon size={20} color="#FFFFFF" style={styles.drawerItemIcon} />
             <Text style={styles.drawerItemText}>{item.name}</Text>
           </TouchableOpacity>
         ))}

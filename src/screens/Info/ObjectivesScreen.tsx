@@ -6,8 +6,7 @@ import { Input } from "@components/Input";
 import { RootStackParamList } from "@typings/routes"; // Corrigida a importação de RootStackParamList
 
 const ObjectivesScreen = () => {
-  const navigation =
-    useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
 
   const handleHeight = () => {
     navigation.navigate("Info", { screen: "LevelScreen" });
@@ -20,8 +19,8 @@ const ObjectivesScreen = () => {
         <Text style={styles.title}>Objetivos</Text>
         <Text style={styles.question}>Qual é seu objetivo?</Text>
         <Text style={styles.instruction}>
-          Escolha o objetivo que melhor representa sua meta: perder peso, ganhar
-          massa muscular ou manter o peso atual.
+          Escolha o objetivo que melhor representa sua meta: perder peso, ganhar massa muscular ou
+          manter o peso atual.
         </Text>
 
         <Input text="Perder peso" />

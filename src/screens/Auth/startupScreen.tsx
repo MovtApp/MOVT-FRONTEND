@@ -1,11 +1,4 @@
-import {
-  Image,
-  ScrollView,
-  View,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-} from "react-native";
+import { Image, ScrollView, View, StyleSheet, Text, TouchableOpacity } from "react-native";
 
 import LogoIcon from "@assets/icon.png";
 import { MapPin, QrCode, Network, HeartPlus } from "lucide-react-native";
@@ -43,8 +36,7 @@ export const StartupScreen = ({ navigation }: Props) => {
             />
             <Text style={styles.title}>Boas vindas ao Movt</Text>
             <Text style={styles.subtitle}>
-              Explore o melhor do mundo fitness com profissionais
-              especializados.
+              Explore o melhor do mundo fitness com profissionais especializados.
             </Text>
             <View>
               <Text style={styles.subtitle}>Veja como funciona:</Text>
@@ -53,12 +45,9 @@ export const StartupScreen = ({ navigation }: Props) => {
                   <MapPin size={30} color="#111" />
                 </View>
                 <View style={{ flex: 1, overflow: "hidden" }}>
-                  <H4 style={{ fontFamily: "Rubik_700Bold" }}>
-                    Encontre personal trainers
-                  </H4>
+                  <H4 style={{ fontFamily: "Rubik_700Bold" }}>Encontre personal trainers</H4>
                   <P style={{ color: "#666", fontFamily: "Rubik_400Regular" }}>
-                    Veja treinadores perto de você com base na localização de
-                    forma eficiente.
+                    Veja treinadores perto de você com base na localização de forma eficiente.
                   </P>
                 </View>
               </View>
@@ -67,12 +56,9 @@ export const StartupScreen = ({ navigation }: Props) => {
                   <QrCode size={30} color="#111" />
                 </View>
                 <View style={{ flex: 1, overflow: "hidden" }}>
-                  <H4 style={{ fontFamily: "Rubik_700Bold" }}>
-                    Integração com empresas parceiras
-                  </H4>
+                  <H4 style={{ fontFamily: "Rubik_700Bold" }}>Integração com empresas parceiras</H4>
                   <P style={{ color: "#666", fontFamily: "Rubik_400Regular" }}>
-                    Encontre academias parceiras nas proximidades que oferecem
-                    benefícios.
+                    Encontre academias parceiras nas proximidades que oferecem benefícios.
                   </P>
                 </View>
               </View>
@@ -81,12 +67,9 @@ export const StartupScreen = ({ navigation }: Props) => {
                   <Network size={30} color="#111" />
                 </View>
                 <View style={{ flex: 1, overflow: "hidden" }}>
-                  <H4 style={{ fontFamily: "Rubik_700Bold" }}>
-                    Tecnologia a favor do usuário
-                  </H4>
+                  <H4 style={{ fontFamily: "Rubik_700Bold" }}>Tecnologia a favor do usuário</H4>
                   <P style={{ color: "#666", fontFamily: "Rubik_400Regular" }}>
-                    Oferecemos soluções tecnológicas para gerenciamento de
-                    métricas e resultados.
+                    Oferecemos soluções tecnológicas para gerenciamento de métricas e resultados.
                   </P>
                 </View>
               </View>
@@ -95,12 +78,10 @@ export const StartupScreen = ({ navigation }: Props) => {
                   <HeartPlus size={30} color="#111" />
                 </View>
                 <View style={{ flex: 1, overflow: "hidden" }}>
-                  <H4 style={{ fontFamily: "Rubik_700Bold" }}>
-                    Saúde e bem-estar
-                  </H4>
+                  <H4 style={{ fontFamily: "Rubik_700Bold" }}>Saúde e bem-estar</H4>
                   <P style={{ color: "#666", fontFamily: "Rubik_400Regular" }}>
-                    Facilita o cuidado com a saúde, tornando o acompanhamento de
-                    treinos e hábitos mais prático e motivador.
+                    Facilita o cuidado com a saúde, tornando o acompanhamento de treinos e hábitos
+                    mais prático e motivador.
                   </P>
                 </View>
               </View>

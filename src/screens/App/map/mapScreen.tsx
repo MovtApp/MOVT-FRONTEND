@@ -19,9 +19,9 @@ const MapScreen: React.FC = () => {
   const mapBottomSheetRef = useRef<BottomSheet>(null);
 
   // Estados para as configurações do mapa
-  const [mapType, setMapType] = useState<
-    "standard" | "satellite" | "hybrid" | "terrain"
-  >("standard");
+  const [mapType, setMapType] = useState<"standard" | "satellite" | "hybrid" | "terrain">(
+    "standard"
+  );
   const [showsUserLocation, setShowsUserLocation] = useState(true);
   const [showsCompass, setShowsCompass] = useState(false);
   const [displayRadiusKm, setDisplayRadiusKm] = useState(5); // Valor inicial em Km
@@ -30,8 +30,7 @@ const MapScreen: React.FC = () => {
   // Verifica se location é nulo antes de acessar location.latitude
   const latitudeDelta = (displayRadiusKm * 2) / 111.32;
   const longitudeDelta = location
-    ? (displayRadiusKm * 2) /
-      (111.32 * Math.cos((location.latitude * Math.PI) / 180))
+    ? (displayRadiusKm * 2) / (111.32 * Math.cos((location.latitude * Math.PI) / 180))
     : 0.0421; // Valor padrão se location for nulo
 
   // Dados de exemplo para os personal trainers
@@ -42,8 +41,7 @@ const MapScreen: React.FC = () => {
       description:
         "Oliver Augusto personal trainer especializado em musculação, com 5 anos de experiência. Ele tem como objetivo ajudar seus alunos a alcançar resultados consistentes através de treinos personalizados, sempre respeitando os limites e necessidades de cada um.",
       rating: 1290,
-      imageUrl:
-        "https://res.cloudinary.com/ditlmzgrh/image/upload/v1757838100/image_qbpvr6.jpg",
+      imageUrl: "https://res.cloudinary.com/ditlmzgrh/image/upload/v1757838100/image_qbpvr6.jpg",
     },
     {
       id: "2",
@@ -51,8 +49,7 @@ const MapScreen: React.FC = () => {
       description:
         "Hector Oliveira é um personal trainer apaixonado pela musculação, com foco em hipertrofia e aumento de força. Com sua abordagem motivacional e desafiadora, ele ajuda seus alunos a superarem seus limites e atingirem seu máximo potencial físico.",
       rating: 911,
-      imageUrl:
-        "https://res.cloudinary.com/ditlmzgrh/image/upload/v1757838100/image_1_m2bivq.jpg",
+      imageUrl: "https://res.cloudinary.com/ditlmzgrh/image/upload/v1757838100/image_1_m2bivq.jpg",
     },
     {
       id: "3",
@@ -60,8 +57,7 @@ const MapScreen: React.FC = () => {
       description:
         "Cláudio Matias é um personal trainer especializado em musculação e treinamento de força. Com mais de 7 anos de experiência, ele desenvolve programas de treino focados no aumento de força e resistência muscular.",
       rating: 523,
-      imageUrl:
-        "https://res.cloudinary.com/ditlmzgrh/image/upload/v1757838100/image_2_kgtuno.jpg",
+      imageUrl: "https://res.cloudinary.com/ditlmzgrh/image/upload/v1757838100/image_2_kgtuno.jpg",
     },
     {
       id: "4",
@@ -69,8 +65,7 @@ const MapScreen: React.FC = () => {
       description:
         "Andressa Fontinelle é personal trainer especializada em musculação, com foco no aumento de força e resistência.",
       rating: 512,
-      imageUrl:
-        "https://res.cloudinary.com/ditlmzgrh/image/upload/v1757838100/image_3_fjkzrx.jpg",
+      imageUrl: "https://res.cloudinary.com/ditlmzgrh/image/upload/v1757838100/image_3_fjkzrx.jpg",
     },
     {
       id: "5",
@@ -78,8 +73,7 @@ const MapScreen: React.FC = () => {
       description:
         "Ela é especializada em criar treinos que desafiem seus alunos, sempre com foco na segurança e evolução gradual.",
       rating: 228,
-      imageUrl:
-        "https://res.cloudinary.com/ditlmzgrh/image/upload/v1757838100/image_4_s7pm2j.jpg",
+      imageUrl: "https://res.cloudinary.com/ditlmzgrh/image/upload/v1757838100/image_4_s7pm2j.jpg",
     },
   ];
 

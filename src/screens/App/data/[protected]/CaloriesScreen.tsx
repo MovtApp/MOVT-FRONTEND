@@ -3,21 +3,18 @@ import {
   View,
   Text,
   StyleSheet,
-  TouchableOpacity,
   Image,
   ActivityIndicator,
   RefreshControl,
   ScrollView,
   Dimensions,
+  InteractionManager,
 } from "react-native";
-import { InteractionManager } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { ChevronLeft, ChevronRight } from "lucide-react-native";
-import { useNavigation } from "@react-navigation/native";
-import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { AppStackParamList } from "../../../../@types/routes";
 import BackButton from "../../../../components/BackButton";
 import TimeSelector from "../../../../components/TimeSelector";
+import NavigationArrows from "../../../../components/data/NavigationArrows";
 import { CartesianChart, Area, Line } from "victory-native";
 import { G, Text as SvgText, Circle } from "react-native-svg";
 import {
@@ -46,14 +43,7 @@ const CustomLabel: React.FC<CustomLabelProps> = ({ x, y, datum }) => {
   if (x == null || y == null) return null;
 
   return (
-    <SvgText
-      x={x}
-      y={y - 15}
-      fontSize={12}
-      fill="#FF7D00"
-      textAnchor="middle"
-      fontWeight="bold"
-    >
+    <SvgText x={x} y={y - 15} fontSize={10} fill="#FF7D00" textAnchor="middle" fontWeight="bold">
       {String(datum.label)}
     </SvgText>
   );
@@ -71,10 +61,7 @@ const DATA_SCREENS: (keyof AppStackParamList)[] = [
 ];
 
 const CaloriesScreen: React.FC = () => {
-  const navigation =
-    useNavigation<NativeStackNavigationProp<AppStackParamList>>();
-  const [selectedTimeframe, setSelectedTimeframe] =
-    useState<TimeframeType>("1d");
+  const [selectedTimeframe, setSelectedTimeframe] = useState<TimeframeType>("1d");
   const [caloriesStats, setCaloriesStats] = useState<CalorieStats | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -93,9 +80,9 @@ const CaloriesScreen: React.FC = () => {
     try {
       isLoadingRef.current = true;
       setIsLoading(true);
-      
+
       const data = await getCaloriesData(timeframe);
-      
+
       // Para o gráfico, mostra os valores de calorias conforme coletados
       // No timeframe "1d", cada ponto representa as calorias gastas até aquele momento do dia
       // Os valores já vêm do backend como progressão acumulada ao longo do tempo
@@ -108,9 +95,8 @@ const CaloriesScreen: React.FC = () => {
 
       // Domínio com base nos valores reais do eixo Y
       const dailyGoal = data.dailyGoal || 2000;
-      const maxValue = processedData.length > 0 
-        ? Math.max(...processedData.map(d => d.value)) 
-        : dailyGoal;
+      const maxValue =
+        processedData.length > 0 ? Math.max(...processedData.map((d) => d.value)) : dailyGoal;
       // Define o domínio com base nos valores reais dos dados
       const maxDomain = Math.max(dailyGoal, maxValue + 100);
       const newDomain: [number, number] = [0, maxDomain];
@@ -119,7 +105,7 @@ const CaloriesScreen: React.FC = () => {
       setCaloriesStats(data);
       setGraphData(processedData);
       setChartDomain(newDomain);
-      
+
       // Agenda renderização do gráfico após todas as interações/atualizações
       InteractionManager.runAfterInteractions(() => {
         setIsChartReady(true);
@@ -137,7 +123,7 @@ const CaloriesScreen: React.FC = () => {
   useEffect(() => {
     setIsChartReady(false);
     let isMounted = true;
-    
+
     if (isMounted && !isLoadingRef.current) {
       fetchCaloriesData(selectedTimeframe);
     }
@@ -146,7 +132,6 @@ const CaloriesScreen: React.FC = () => {
       isMounted = false;
       setIsChartReady(false);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedTimeframe]);
 
   // Pull to refresh
@@ -165,11 +150,11 @@ const CaloriesScreen: React.FC = () => {
     if (graphData.length === 0) {
       return [];
     }
-    
+
     return graphData.map((item, index, array) => {
       // Mostra labels nos pontos principais: primeiro, último, e alguns pontos estratégicos
       const totalPoints = array.length;
-      
+
       // Determina quais pontos devem mostrar labels
       const shouldShowLabel =
         index === 0 ||
@@ -208,7 +193,7 @@ const CaloriesScreen: React.FC = () => {
             // Formata os labels do eixo X conforme necessário
             const index = Number(value);
             if (index >= 0 && index < displayGraphData.length) {
-              return displayGraphData[index]?.rawDate || '';
+              return displayGraphData[index]?.rawDate || "";
             }
             return value.toString();
           },
@@ -258,11 +243,7 @@ const CaloriesScreen: React.FC = () => {
                   }
                   return (
                     <G key={`label-${index}`}>
-                      <CustomLabel
-                        x={point.x}
-                        y={point.y}
-                        datum={datum}
-                      />
+                      <CustomLabel x={point.x} y={point.y} datum={datum} />
                       {/* Círculo no ponto */}
                       <Circle
                         cx={point.x}
@@ -285,21 +266,6 @@ const CaloriesScreen: React.FC = () => {
       </CartesianChart>
     );
   }, [isChartReady, displayGraphData, chartDomain]);
-
-  // Navegação entre telas de dados
-  const handlePreviousScreen = () => {
-    const currentIndex = DATA_SCREENS.indexOf("CaloriesScreen");
-    const previousIndex =
-      currentIndex === 0 ? DATA_SCREENS.length - 1 : currentIndex - 1;
-    navigation.navigate(DATA_SCREENS[previousIndex] as any);
-  };
-
-  const handleNextScreen = () => {
-    const currentIndex = DATA_SCREENS.indexOf("CaloriesScreen");
-    const nextIndex =
-      currentIndex === DATA_SCREENS.length - 1 ? 0 : currentIndex + 1;
-    navigation.navigate(DATA_SCREENS[nextIndex] as any);
-  };
 
   if (isLoading && !caloriesStats) {
     return (
@@ -324,9 +290,7 @@ const CaloriesScreen: React.FC = () => {
       <ScrollView
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
-        refreshControl={
-          <RefreshControl refreshing={isRefreshing} onRefresh={onRefresh} />
-        }
+        refreshControl={<RefreshControl refreshing={isRefreshing} onRefresh={onRefresh} />}
       >
         <View style={styles.container}>
           {/* Header */}
@@ -369,7 +333,13 @@ const CaloriesScreen: React.FC = () => {
               </View>
             ) : (
               <View style={styles.graphContainer}>
-                <View style={{ alignItems: "center", justifyContent: "center", flex: 1 }}>
+                <View
+                  style={{
+                    alignItems: "center",
+                    justifyContent: "center",
+                    flex: 1,
+                  }}
+                >
                   <View style={styles.graphPlaceholder}>
                     {ChartComponent || (
                       <View style={styles.noDataContainer}>
@@ -385,32 +355,7 @@ const CaloriesScreen: React.FC = () => {
       </ScrollView>
 
       {/* Setas de navegação fixas nas laterais (pílulas) */}
-      <View style={styles.navigationArrowsContainer} pointerEvents="box-none">
-        <TouchableOpacity
-          style={styles.leftArrowPill}
-          onPress={handlePreviousScreen}
-        >
-          <Image
-            source={require("../../../../assets/chevronLeft.jpg")}
-            style={styles.arrowIcon}
-            resizeMode="contain"
-          />
-          <ChevronLeft size={20} color="#FFFFFF" style={styles.overlayIcon} />
-          <View style={styles.leftPillEdgeGlow} />
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.rightArrowPill}
-          onPress={handleNextScreen}
-        >
-          <Image
-            source={require("../../../../assets/chevronRight.jpg")}
-            style={styles.arrowIcon}
-            resizeMode="contain"
-          />
-          <ChevronRight size={20} color="#FFFFFF" style={styles.overlayIcon} />
-          <View style={styles.rightPillEdgeGlow} />
-        </TouchableOpacity>
-      </View>
+      <NavigationArrows currentScreen="CaloriesScreen" screens={DATA_SCREENS} />
     </SafeAreaView>
   );
 };
@@ -501,13 +446,13 @@ const styles = StyleSheet.create({
     marginTop: 10,
     marginBottom: 10,
   },
-  
+
   graphContainer: {
     width: "100%",
     alignItems: "center",
     justifyContent: "center",
   },
-  
+
   graphPlaceholder: {
     width: width * 0.95, // 90% da largura do dispositivo
     height: width * 1.4, // altura proporcional
@@ -517,65 +462,7 @@ const styles = StyleSheet.create({
     overflow: "hidden",
     backgroundColor: "#fff",
     alignContent: "center",
-    marginRight: 34
-  },
-  
-  navigationArrowsContainer: {
-    position: "absolute",
-    top: "50%",
-    left: -10,
-    right: -10,
-    height: 0,
-    transform: [{ translateY: -50 }],
-    zIndex: 10,
-  },
-  leftArrowPill: {
-    position: "absolute",
-    left: 6,
-    width: 44,
-    height: 88,
-    borderTopRightRadius: 28,
-    borderBottomRightRadius: 28,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  rightArrowPill: {
-    position: "absolute",
-    right: 6,
-    width: 44,
-    height: 88,
-    borderTopLeftRadius: 28,
-    borderBottomLeftRadius: 28,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  leftPillEdgeGlow: {
-    position: "absolute",
-    right: 0,
-    width: 10,
-    height: "100%",
-    borderTopRightRadius: 28,
-    borderBottomRightRadius: 28,
-  },
-  rightPillEdgeGlow: {
-    position: "absolute",
-    left: 0,
-    width: 10,
-    height: "100%",
-    borderTopLeftRadius: 28,
-    borderBottomLeftRadius: 28,
-  },
-  arrowIcon: {
-    width: 130,
-    height: 130,
-    zIndex: 11,
-  },
-  overlayIcon: {
-    position: "absolute",
-    alignSelf: "center",
-    top: "50%",
-    left: "50%",
-    transform: [{ translateX: -10 }, { translateY: -10 }],
+    marginRight: 34,
   },
   loadingContainer: {
     flex: 1,

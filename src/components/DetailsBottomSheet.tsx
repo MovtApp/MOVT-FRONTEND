@@ -55,9 +55,7 @@ const PersonalTrainerCard = ({
         </P>
         <View style={styles.cardRatingContainer}>
           <Star size={16} color="#FFC107" fill="#FFC107" />
-          <P style={styles.cardRatingText}>
-            {Math.round(trainer.rating)} avaliações
-          </P>
+          <P style={styles.cardRatingText}>{Math.round(trainer.rating)} avaliações</P>
         </View>
       </View>
     </TouchableOpacity>
@@ -92,10 +90,7 @@ export function DetailsBottomSheet({
       handleIndicatorStyle={styles.handleIndicator}
     >
       <BottomSheetView style={styles.bottomSheetView}>
-        <ScrollView
-          showsVerticalScrollIndicator={false}
-          contentContainerStyle={{ flexGrow: 1 }}
-        >
+        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ flexGrow: 1 }}>
           {/* Cabeçalho */}
           <View style={styles.headerContainer}>
             <H4 style={styles.headerTitle}>{title}</H4>
@@ -108,11 +103,7 @@ export function DetailsBottomSheet({
             </View>
           ) : Array.isArray(trainers) && trainers.length > 0 ? (
             trainers.map((trainer) => (
-              <PersonalTrainerCard
-                key={trainer.id}
-                trainer={trainer}
-                onPress={onTrainerPress}
-              />
+              <PersonalTrainerCard key={trainer.id} trainer={trainer} onPress={onTrainerPress} />
             ))
           ) : (
             <View style={styles.noDataContainer}>

@@ -80,19 +80,15 @@ async function uploadImageToSupabase(imageUri: string): Promise<string | null> {
     const arrayBuffer = bytes.buffer;
 
     // 1. Obter uma URL de upload assinada do Supabase
-    const { data: signedUploadData, error: signedUploadError } =
-      await supabase.storage
-        .from("diet-images") // Certifique-se de que este é o nome correto do seu bucket
-        .createSignedUploadUrl(newFileName);
+    const { data: signedUploadData, error: signedUploadError } = await supabase.storage
+      .from("diet-images") // Certifique-se de que este é o nome correto do seu bucket
+      .createSignedUploadUrl(newFileName);
 
     if (signedUploadError) {
-      console.error(
-        "❌ Erro ao obter URL de upload assinada do Supabase:",
-        signedUploadError,
-      );
+      console.error("❌ Erro ao obter URL de upload assinada do Supabase:", signedUploadError);
       console.error(
         "Detalhes do erro do createSignedUploadUrl:",
-        JSON.stringify(signedUploadError, null, 2),
+        JSON.stringify(signedUploadError, null, 2)
       );
       throw signedUploadError; // Rejeitar a Promise
     }
@@ -112,26 +108,17 @@ async function uploadImageToSupabase(imageUri: string): Promise<string | null> {
 
     if (!uploadResponse.ok) {
       const errorText = await uploadResponse.text();
-      console.error(
-        `❌ Erro HTTP no upload direto (${uploadResponse.status}):`,
-        errorText,
-      );
-      throw new Error(
-        `Falha no upload direto da imagem: ${uploadResponse.status} - ${errorText}`,
-      );
+      console.error(`❌ Erro HTTP no upload direto (${uploadResponse.status}):`, errorText);
+      throw new Error(`Falha no upload direto da imagem: ${uploadResponse.status} - ${errorText}`);
     }
 
     console.log("✅ Upload direto concluído com sucesso para a URL assinada.");
 
     // 3. Obter a URL pública (usamos o 'path' que obtivemos da URL assinada)
-    const { data: publicUrlData } = supabase.storage
-      .from("diet-images")
-      .getPublicUrl(path); // Usar o 'path' do signedUploadData
+    const { data: publicUrlData } = supabase.storage.from("diet-images").getPublicUrl(path); // Usar o 'path' do signedUploadData
 
     if (!publicUrlData.publicUrl) {
-      console.error(
-        "❌ Não foi possível obter a URL pública da imagem após upload direto",
-      );
+      console.error("❌ Não foi possível obter a URL pública da imagem após upload direto");
       throw new Error("Falha ao obter a URL pública da imagem");
     }
 

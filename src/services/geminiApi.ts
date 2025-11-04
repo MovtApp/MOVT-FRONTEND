@@ -18,10 +18,7 @@ function safeParseJsonFromText(text: string): any {
   }
 }
 
-const getGeminiAnalysis = async (
-  imageBase64: string,
-  mimeType: string = "image/jpeg",
-) => {
+const getGeminiAnalysis = async (imageBase64: string, mimeType: string = "image/jpeg") => {
   const apiKey = process.env.EXPO_PUBLIC_GEMINI_API_KEY;
   if (!apiKey) throw new Error("API key não configurada no .env");
 

@@ -1,10 +1,4 @@
-import {
-  View,
-  Text,
-  TouchableOpacity,
-  ScrollView,
-  StyleSheet,
-} from "react-native";
+import { View, Text, TouchableOpacity, ScrollView, StyleSheet } from "react-native";
 import React, { useState } from "react";
 import { Dumbbell, BicepsFlexed, Target, Activity } from "lucide-react-native";
 
@@ -44,13 +38,8 @@ const workoutItems = [
   },
 ];
 
-const TrainingSelector: React.FC<TrainingSelectorProps> = ({
-  title,
-  containerStyle,
-}) => {
-  const [selectedWorkout, setSelectedWorkout] = useState<string | null>(
-    "Musculação",
-  );
+const TrainingSelector: React.FC<TrainingSelectorProps> = ({ title, containerStyle }) => {
+  const [selectedWorkout, setSelectedWorkout] = useState<string | null>("Musculação");
 
   const handleSelectWorkout = (workoutName: string) => {
     setSelectedWorkout(workoutName);
@@ -71,20 +60,12 @@ const TrainingSelector: React.FC<TrainingSelectorProps> = ({
               key={item.name}
               style={[
                 styles.workoutType,
-                isActive
-                  ? styles.workoutTypeActive
-                  : styles.workoutTypeInactive,
+                isActive ? styles.workoutTypeActive : styles.workoutTypeInactive,
               ]}
               onPress={() => handleSelectWorkout(item.name)}
             >
               <item.icon size={20} color={isActive ? "#fff" : "#192126"} />
-              <Text
-                style={
-                  isActive
-                    ? styles.workoutTypeTextActive
-                    : styles.workoutTypeText
-                }
-              >
+              <Text style={isActive ? styles.workoutTypeTextActive : styles.workoutTypeText}>
                 {item.name}
               </Text>
             </TouchableOpacity>

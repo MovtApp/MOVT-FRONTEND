@@ -1,25 +1,9 @@
-import React, {
-  useMemo,
-  useRef,
-  useState,
-  useEffect,
-  useCallback,
-} from "react";
+import React, { useMemo, useRef, useState, useEffect, useCallback } from "react";
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Image, Alert } from "react-native";
 import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  ScrollView,
-  Image,
-  Alert,
-} from "react-native";
-import {
-  Bell,
   CirclePlus,
   Clock4,
   Flame,
-  Menu,
   Plus,
   Search,
   SquarePen,
@@ -28,32 +12,24 @@ import {
 } from "lucide-react-native";
 import SearchInput from "../../../components/SearchInput";
 import { api } from "../../../services/api";
-import { useAuth } from "../../../hooks/useAuth";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import DietFormSheet from "../../../components/DietFormSheet";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { AppStackParamList, DietMeal } from "../../../@types/routes";
+import Header from "../../../components/Header";
 
-const DietScreen: React.FC<
-  NativeStackScreenProps<AppStackParamList, "DietScreen">
-> = ({ navigation, route }) => {
+const DietScreen: React.FC<NativeStackScreenProps<AppStackParamList, "DietScreen">> = ({
+  navigation,
+  route,
+}) => {
   const [search, setSearch] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("all");
   const [dietMeals, setDietMeals] = useState<DietMeal[]>([]);
-  const { user } = useAuth();
   const [isFormSheetOpen, setIsFormSheetOpen] = useState(false);
-  const [formInitialData, setFormInitialData] = useState<DietMeal | undefined>(
-    undefined,
-  );
+  const [formInitialData, setFormInitialData] = useState<DietMeal | undefined>(undefined);
   const dietFormSheetRef = useRef<any>(null);
   const [selectedDietIds, setSelectedDietIds] = useState<string[]>([]);
   const [sheetIndex, setSheetIndex] = useState(0);
-
-  // const { setIsDietSheetOpen } = route.params;
-
-  // useEffect(() => {
-  //     setIsDietSheetOpen(isFormSheetOpen);
-  // }, [isFormSheetOpen, setIsDietSheetOpen]);
 
   const categories = useMemo(
     () => [
@@ -62,12 +38,12 @@ const DietScreen: React.FC<
       { key: "lunch", label: "Almoço" },
       { key: "dinner", label: "Janta" },
     ],
-    [],
+    []
   );
 
   const isAllSelected = useMemo(
     () => dietMeals.length > 0 && selectedDietIds.length === dietMeals.length,
-    [dietMeals, selectedDietIds],
+    [dietMeals, selectedDietIds]
   );
 
   const toggleSelect = (dietId: string) => {
@@ -94,7 +70,7 @@ const DietScreen: React.FC<
         Alert.alert("Erro", "Sessão não encontrada. Faça login novamente.");
         return;
       }
-      
+
       const response = await api.get("/dietas", {
         headers: {
           Authorization: `Bearer ${sessionId}`,
@@ -103,55 +79,42 @@ const DietScreen: React.FC<
           categoria: selectedCategory === "all" ? undefined : selectedCategory,
         },
       });
-      const mappedMeals: DietMeal[] = response.data.data.map(
-        (backendMeal: any) => {
-          console.log(
-            "🖼️ Mapeando dieta:",
-            backendMeal.nome,
-            "ImageURL:",
-            backendMeal.imageurl,
-          );
-          return {
-            id: String(backendMeal.id_dieta),
-            id_dieta: String(backendMeal.id_dieta),
-            title: backendMeal.nome,
-            calories: `${backendMeal.calorias || 0} kcal`,
-            minutes: `${backendMeal.tempo_preparo || 0} min`,
-            imageUrl: backendMeal.imageurl || "https://via.placeholder.com/150",
-            authorName: backendMeal.nome_autor || "Desconhecido",
-            authorAvatar:
-              backendMeal.avatar_autor_url || "https://via.placeholder.com/30",
-            description: backendMeal.descricao || "",
-            fat: `${backendMeal.gordura || 0} g`,
-            protein: `${backendMeal.proteina || 0} g`,
-            carbs: `${backendMeal.carboidratos || 0} g`,
-            categoria: backendMeal.categoria || undefined,
-            calorias: backendMeal.calorias || undefined,
-            tempo_preparo: backendMeal.tempo_preparo || undefined,
-            gordura: backendMeal.gordura || undefined,
-            proteina: backendMeal.proteina || undefined,
-            carboidratos: backendMeal.carboidratos || undefined,
-          };
-        },
-      );
-      const uniqueMeals = Array.from(
-        new Map(mappedMeals.map((meal) => [meal.id, meal])).values(),
-      );
+      const mappedMeals: DietMeal[] = response.data.data.map((backendMeal: any) => {
+        console.log("🖼️ Mapeando dieta:", backendMeal.nome, "ImageURL:", backendMeal.imageurl);
+        return {
+          id: String(backendMeal.id_dieta),
+          id_dieta: String(backendMeal.id_dieta),
+          title: backendMeal.nome,
+          calories: `${backendMeal.calorias || 0} kcal`,
+          minutes: `${backendMeal.tempo_preparo || 0} min`,
+          imageUrl: backendMeal.imageurl || "https://via.placeholder.com/150",
+          authorName: backendMeal.nome_autor || "Desconhecido",
+          authorAvatar: backendMeal.avatar_autor_url || "https://via.placeholder.com/30",
+          description: backendMeal.descricao || "",
+          fat: `${backendMeal.gordura || 0} g`,
+          protein: `${backendMeal.proteina || 0} g`,
+          carbs: `${backendMeal.carboidratos || 0} g`,
+          categoria: backendMeal.categoria || undefined,
+          calorias: backendMeal.calorias || undefined,
+          tempo_preparo: backendMeal.tempo_preparo || undefined,
+          gordura: backendMeal.gordura || undefined,
+          proteina: backendMeal.proteina || undefined,
+          carboidratos: backendMeal.carboidratos || undefined,
+        };
+      });
+      const uniqueMeals = Array.from(new Map(mappedMeals.map((meal) => [meal.id, meal])).values());
       console.log("Dietas mapeadas com sucesso.");
       setDietMeals(uniqueMeals);
     } catch (error) {
       console.error("Erro ao buscar dietas:", error);
-      console.error(
-        "Detalhes do erro:",
-        (error as any).response?.data || (error as any).message,
-      );
+      console.error("Detalhes do erro:", (error as any).response?.data || (error as any).message);
       Alert.alert("Erro", "Não foi possível carregar as dietas.");
     }
-  }, [user?.sessionId, selectedCategory]);
+  }, [selectedCategory]);
 
   useEffect(() => {
     fetchMeals();
-  }, [user?.sessionId, selectedCategory, fetchMeals]);
+  }, [selectedCategory, fetchMeals]);
 
   const handleAddDiet = () => {
     setFormInitialData(undefined);
@@ -179,40 +142,36 @@ const DietScreen: React.FC<
 
   const handleBulkDelete = () => {
     if (selectedDietIds.length > 0) {
-      Alert.alert(
-        "Confirmar Exclusão",
-        "Tem certeza que deseja excluir as dietas selecionadas?",
-        [
-          { text: "Cancelar", style: "cancel" },
-          {
-            text: "Excluir",
-            onPress: async () => {
-              try {
-                const sessionId = await AsyncStorage.getItem("userSessionId");
-                if (!sessionId) {
-                  Alert.alert("Erro", "Sessão não encontrada. Faça login novamente.");
-                  return;
-                }
-                
-                await Promise.all(
-                  selectedDietIds.map((id) =>
-                    api.delete(`/dietas/${id}`, {
-                      headers: {
-                        Authorization: `Bearer ${sessionId}`,
-                      },
-                    }),
-                  ),
-                );
-                Alert.alert("Sucesso", "Dietas excluídas com sucesso!");
-                fetchMeals();
-              } catch (error) {
-                console.error("Erro ao excluir dietas:", error);
-                Alert.alert("Erro", "Não foi possível excluir as dietas.");
+      Alert.alert("Confirmar Exclusão", "Tem certeza que deseja excluir as dietas selecionadas?", [
+        { text: "Cancelar", style: "cancel" },
+        {
+          text: "Excluir",
+          onPress: async () => {
+            try {
+              const sessionId = await AsyncStorage.getItem("userSessionId");
+              if (!sessionId) {
+                Alert.alert("Erro", "Sessão não encontrada. Faça login novamente.");
+                return;
               }
-            },
+
+              await Promise.all(
+                selectedDietIds.map((id) =>
+                  api.delete(`/dietas/${id}`, {
+                    headers: {
+                      Authorization: `Bearer ${sessionId}`,
+                    },
+                  })
+                )
+              );
+              Alert.alert("Sucesso", "Dietas excluídas com sucesso!");
+              fetchMeals();
+            } catch (error) {
+              console.error("Erro ao excluir dietas:", error);
+              Alert.alert("Erro", "Não foi possível excluir as dietas.");
+            }
           },
-        ],
-      );
+        },
+      ]);
     } else {
       Alert.alert("Erro", "Selecione pelo menos 1 dieta para excluir.");
     }
@@ -226,24 +185,7 @@ const DietScreen: React.FC<
 
   return (
     <View style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity style={styles.menuButton}>
-          <Menu size={24} color="#000" />
-        </TouchableOpacity>
-
-        <Image
-          source={{
-            uri: "https://res.cloudinary.com/ditlmzgrh/image/upload/v1758030169/MV_pukwcn.png",
-          }}
-          style={{ width: 80, height: 40 }}
-          resizeMode="cover"
-        />
-
-        <TouchableOpacity style={styles.notificationButton}>
-          <Bell size={24} color="#000" />
-        </TouchableOpacity>
-      </View>
+      <Header />
 
       <ScrollView
         style={styles.content}
@@ -257,27 +199,15 @@ const DietScreen: React.FC<
           icon={<Search size={20} color="#888" />}
         />
 
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          style={styles.categoriesRow}
-        >
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.categoriesRow}>
           {categories.map((c) => (
             <TouchableOpacity
               key={c.key}
               onPress={() => setSelectedCategory(c.key)}
               activeOpacity={0.9}
-              style={[
-                styles.chip,
-                selectedCategory === c.key && styles.chipActive,
-              ]}
+              style={[styles.chip, selectedCategory === c.key && styles.chipActive]}
             >
-              <Text
-                style={[
-                  styles.chipText,
-                  selectedCategory === c.key && styles.chipTextActive,
-                ]}
-              >
+              <Text style={[styles.chipText, selectedCategory === c.key && styles.chipTextActive]}>
                 {c.label}
               </Text>
             </TouchableOpacity>
@@ -290,9 +220,7 @@ const DietScreen: React.FC<
             style={styles.selectAllButton}
             onPress={toggleSelectAll}
           >
-            <View
-              style={[styles.checkbox, isAllSelected && styles.checkboxChecked]}
-            >
+            <View style={[styles.checkbox, isAllSelected && styles.checkboxChecked]}>
               {isAllSelected && <Check size={16} color="#0F172A" />}
             </View>
             <Text style={styles.selectAllText}>
@@ -337,8 +265,7 @@ const DietScreen: React.FC<
             key={meal.id_dieta}
             style={[
               styles.mealCard,
-              selectedDietIds.includes(meal.id_dieta) &&
-                styles.mealCardSelected,
+              selectedDietIds.includes(meal.id_dieta) && styles.mealCardSelected,
             ]}
             activeOpacity={0.9}
             onPress={() => {
@@ -356,9 +283,7 @@ const DietScreen: React.FC<
               source={{ uri: meal.imageUrl }}
               style={{ width: "100%", height: 160 }}
               onLoad={() => console.log("✅ Imagem carregada:", meal.imageUrl)}
-              onError={(error) =>
-                console.log("❌ Erro ao carregar imagem:", meal.imageUrl, error)
-              }
+              onError={(error) => console.log("❌ Erro ao carregar imagem:", meal.imageUrl, error)}
             />
             <TouchableOpacity
               style={styles.selectionCheckboxContainer}
@@ -368,13 +293,10 @@ const DietScreen: React.FC<
               <View
                 style={[
                   styles.checkbox,
-                  selectedDietIds.includes(meal.id_dieta) &&
-                    styles.checkboxChecked,
+                  selectedDietIds.includes(meal.id_dieta) && styles.checkboxChecked,
                 ]}
               >
-                {selectedDietIds.includes(meal.id_dieta) && (
-                  <Check size={16} color="#0F172A" />
-                )}
+                {selectedDietIds.includes(meal.id_dieta) && <Check size={16} color="#0F172A" />}
               </View>
             </TouchableOpacity>
             <View style={styles.mealInfo}>
@@ -391,10 +313,7 @@ const DietScreen: React.FC<
                 </View>
                 <View style={styles.metaSeparator} />
                 <View style={styles.authorRow}>
-                  <Image
-                    source={{ uri: meal.authorAvatar }}
-                    style={styles.authorAvatar as any}
-                  />
+                  <Image source={{ uri: meal.authorAvatar }} style={styles.authorAvatar as any} />
                   <Text style={styles.authorName}>{meal.authorName}</Text>
                 </View>
               </View>
@@ -408,11 +327,7 @@ const DietScreen: React.FC<
         ))}
       </ScrollView>
 
-      <TouchableOpacity
-        style={styles.fab}
-        activeOpacity={0.9}
-        onPress={handleAddDiet}
-      >
+      <TouchableOpacity style={styles.fab} activeOpacity={0.9} onPress={handleAddDiet}>
         <Plus size={24} color="#0F172A" />
       </TouchableOpacity>
 
@@ -436,29 +351,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "#fff",
-  },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: 20,
-    paddingTop: 20,
-    paddingBottom: 16,
-    backgroundColor: "#fff",
-  },
-  iconBtn: {
-    padding: 10,
-    minWidth: 44,
-    minHeight: 44,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "#0B1220",
-    borderRadius: 12,
-  },
-  headerTitle: {
-    color: "#fff",
-    fontSize: 18,
-    fontWeight: "700",
   },
   content: {
     flex: 1,
@@ -657,18 +549,6 @@ const styles = StyleSheet.create({
     shadowRadius: 10,
     elevation: 10,
     marginBottom: 80,
-  },
-  notificationButton: {
-    padding: 8,
-    zIndex: 45,
-  },
-  menuButton: {
-    padding: 10,
-    zIndex: 46,
-    minWidth: 44,
-    minHeight: 44,
-    alignItems: "center",
-    justifyContent: "center",
   },
   sheetPortal: {
     ...(StyleSheet.absoluteFillObject as any),

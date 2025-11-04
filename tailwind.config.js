@@ -1,13 +1,12 @@
-const nativewindTheme = require("nativewind/theme");
+import nativewindTheme from "nativewind/theme";
+import nativewindPreset from "nativewind/preset";
+import tailwindcssAnimate from "tailwindcss-animate";
+
 /** @type {import('tailwindcss').Config} */
-module.exports = {
+export default {
   darkMode: ["class", "class"],
-  content: [
-    "./App.{js,jsx,ts,tsx}",
-    "./src/**/*.{js,jsx,ts,tsx}",
-    "./components/**/*.{ts,tsx}",
-  ],
-  presets: [require("nativewind/preset")],
+  content: ["./App.{js,jsx,ts,tsx}", "./src/**/*.{js,jsx,ts,tsx}", "./components/**/*.{ts,tsx}"],
+  presets: [nativewindPreset],
   theme: {
     extend: {
       colors: {
@@ -96,7 +95,7 @@ module.exports = {
         },
       },
       borderWidth: {
-        hairline: nativewindTheme.hairlineWidth(),
+        hairline: typeof nativewindTheme.hairlineWidth === 'function' ? nativewindTheme.hairlineWidth() : '1px',
       },
       keyframes: {
         "accordion-down": {
@@ -127,5 +126,5 @@ module.exports = {
       },
     },
   },
-  plugins: [require("tailwindcss-animate")],
+  plugins: [tailwindcssAnimate],
 };

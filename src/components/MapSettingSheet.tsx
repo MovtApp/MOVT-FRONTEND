@@ -27,9 +27,7 @@ interface MapSettingSheetProps {
   setSheetIndex: (idx: number) => void;
   // Novas props para controle do mapa
   mapType: "standard" | "satellite" | "hybrid" | "terrain";
-  onMapTypeChange: (
-    type: "standard" | "satellite" | "hybrid" | "terrain",
-  ) => void;
+  onMapTypeChange: (type: "standard" | "satellite" | "hybrid" | "terrain") => void;
   showsUserLocation: boolean;
   onShowsUserLocationChange: (value: boolean) => void;
   showsCompass: boolean;
@@ -98,18 +96,10 @@ export function MapSettingSheet({
                 <TouchableOpacity
                   key={opt.key}
                   onPress={() => onMapTypeChange(opt.key as any)}
-                  style={[
-                    styles.chip,
-                    mapType === opt.key && styles.chipActive,
-                  ]}
+                  style={[styles.chip, mapType === opt.key && styles.chipActive]}
                   activeOpacity={0.8}
                 >
-                  <Text
-                    style={[
-                      styles.chipText,
-                      mapType === opt.key && styles.chipTextActive,
-                    ]}
-                  >
+                  <Text style={[styles.chipText, mapType === opt.key && styles.chipTextActive]}>
                     {opt.label}
                   </Text>
                 </TouchableOpacity>
@@ -160,9 +150,7 @@ export function MapSettingSheet({
                 }
               }}
             />
-            <Text style={styles.helperText}>
-              Defina o raio de exibição do mapa em quilômetros.
-            </Text>
+            <Text style={styles.helperText}>Defina o raio de exibição do mapa em quilômetros.</Text>
           </View>
         </ScrollView>
       </BottomSheetView>

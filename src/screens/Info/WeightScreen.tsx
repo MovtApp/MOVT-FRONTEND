@@ -1,12 +1,5 @@
 import React, { useState, useRef, useEffect } from "react";
-import {
-  View,
-  StyleSheet,
-  TouchableOpacity,
-  Text,
-  ScrollView,
-  Dimensions,
-} from "react-native";
+import { View, StyleSheet, TouchableOpacity, Text, ScrollView, Dimensions } from "react-native";
 import BackButton from "@components/BackButton";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useNavigation } from "@react-navigation/native";
@@ -16,8 +9,7 @@ const { width: screenWidth } = Dimensions.get("window");
 const ITEM_WIDTH = 80; // Largura de cada item de peso
 
 const WeightScreen = () => {
-  const navigation =
-    useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const [selectedAge, setSelectedAge] = useState(75);
   const scrollViewRef = useRef<ScrollView>(null);
   const ages = Array.from({ length: 285 }, (_, i) => i + 16); // 16 a 300 kg
@@ -54,9 +46,7 @@ const WeightScreen = () => {
       <BackButton />
       <Text style={styles.title}>Peso</Text>
       <Text style={styles.question}>Qual o seu peso?</Text>
-      <Text style={styles.instruction}>
-        Informe seu peso em quilogramas (kg)
-      </Text>
+      <Text style={styles.instruction}>Informe seu peso em quilogramas (kg)</Text>
 
       <View style={styles.ageDisplay}>
         <View style={styles.weightContainer}>
@@ -81,12 +71,7 @@ const WeightScreen = () => {
           >
             {ages.map((age, index) => (
               <View key={age} style={styles.ageItem}>
-                <Text
-                  style={[
-                    styles.ageNumber,
-                    age === selectedAge && styles.selectedAgeNumber,
-                  ]}
-                >
+                <Text style={[styles.ageNumber, age === selectedAge && styles.selectedAgeNumber]}>
                   {age}
                 </Text>
               </View>

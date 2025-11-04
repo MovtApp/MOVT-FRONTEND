@@ -1,19 +1,9 @@
 import { View, TouchableOpacity, StyleSheet, Text } from "react-native";
 import { useState, useEffect, useMemo } from "react";
-import {
-  RootStackParamList,
-  AppStackParamList,
-  AppDrawerParamList,
-} from "../@types/routes";
+import { RootStackParamList, AppStackParamList, AppDrawerParamList } from "../@types/routes";
 import { ChartPie, House, Map, MessageCircle, Soup } from "lucide-react-native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import {
-  useNavigation,
-  useRoute,
-  useIsFocused,
-  RouteProp,
-  useNavigationState,
-} from "@react-navigation/native";
+import { useNavigation, useRoute, useIsFocused, RouteProp } from "@react-navigation/native";
 
 interface NavItem {
   name: keyof AppStackParamList;
@@ -23,19 +13,14 @@ interface NavItem {
 
 const BottomNavigationBar = () => {
   const navigation =
-    useNavigation<
-      NativeStackNavigationProp<RootStackParamList & AppDrawerParamList>
-    >();
-  const route =
-    useRoute<RouteProp<AppDrawerParamList, keyof AppDrawerParamList>>();
+    useNavigation<NativeStackNavigationProp<RootStackParamList & AppDrawerParamList>>();
+  const route = useRoute<RouteProp<AppDrawerParamList, keyof AppDrawerParamList>>();
   const isFocused = useIsFocused();
-  const navigationState = useNavigationState((state) => state);
-  const [activeTab, setActiveTab] =
-    useState<keyof AppStackParamList>("HomeScreen");
+  const [activeTab, setActiveTab] = useState<keyof AppStackParamList>("HomeScreen");
 
   const appStackScreenNames = useMemo(
     () => ["HomeScreen", "MapScreen", "DietScreen", "DataScreen", "ChatScreen"],
-    [],
+    []
   );
 
   // Telas onde o BottomNavigationBar deve ser oculto
@@ -49,55 +34,72 @@ const BottomNavigationBar = () => {
       "TrainingScreen",
       "WaterScreen",
     ],
-    [],
+    []
   );
 
   // Verifica se a tela atual deve ocultar o BottomNavigationBar
   const shouldHide = useMemo(() => {
     try {
+      // 1) Tenta usar a API moderna para obter a rota atual, se disponível
+      const getCurrentRoute = (navigation as any)?.getCurrentRoute?.();
+      const currentRouteName = getCurrentRoute?.name as string | undefined;
+      if (currentRouteName && hiddenScreens.includes(currentRouteName)) {
+        return true;
+      }
+
+      // 2) Fallback: navega pela estrutura de rotas para encontrar a rota ativa mais profunda
       const navState = navigation.getState();
       if (!navState) return false;
-      
-      // Navega pela estrutura de rotas para encontrar a rota ativa
+
       const findActiveRoute = (state: any): string | null => {
         if (!state || !state.routes) return null;
-        
+
         const activeRoute = state.routes[state.index];
         if (!activeRoute) return null;
-        
+
         // Se tem state aninhado, procura recursivamente
         if (activeRoute.state) {
           const nestedActive = findActiveRoute(activeRoute.state);
           if (nestedActive) return nestedActive;
         }
-        
-        return activeRoute.name;
+
+        // Algumas navegações passam o destino em params.screen
+        const paramsScreen = (activeRoute.params && (activeRoute.params as any).screen) as
+          | string
+          | undefined;
+        if (paramsScreen) {
+          return paramsScreen;
+        }
+
+        return activeRoute.name as string;
       };
-      
+
       const activeScreenName = findActiveRoute(navState);
       return activeScreenName ? hiddenScreens.includes(activeScreenName) : false;
     } catch (error) {
       console.error("Erro ao verificar navegação:", error);
       return false;
     }
-  }, [navigationState, hiddenScreens, navigation]);
+  }, [hiddenScreens, navigation]);
 
   useEffect(() => {
     let currentScreenName: keyof AppStackParamList | undefined;
 
     if (isFocused) {
-      if (
+      // Preferir rota atual quando disponível
+      const currentRoute = (navigation as any)?.getCurrentRoute?.();
+      const currentRouteName = currentRoute?.name as keyof AppStackParamList | undefined;
+
+      if (currentRouteName && appStackScreenNames.includes(currentRouteName)) {
+        currentScreenName = currentRouteName;
+      } else if (
         route.name === "HomeStack" &&
         route.params &&
         typeof route.params === "object" &&
         "screen" in route.params
       ) {
-        currentScreenName = (
-          route.params as { screen: keyof AppStackParamList }
-        ).screen;
-      } else if (
-        appStackScreenNames.includes(route.name as keyof AppStackParamList)
-      ) {
+        currentScreenName = (route.params as { screen: keyof AppStackParamList }).screen;
+      } else if (appStackScreenNames.includes(route.name as keyof AppStackParamList)) {
         // Fallback for direct navigation to AppStack screens (if any)
         currentScreenName = route.name as keyof AppStackParamList;
       }
@@ -106,7 +108,7 @@ const BottomNavigationBar = () => {
     if (currentScreenName) {
       setActiveTab(currentScreenName);
     }
-  }, [route.name, route.params, isFocused, appStackScreenNames]);
+  }, [route.name, route.params, isFocused, appStackScreenNames, navigation]);
 
   const navItems: NavItem[] = [
     {

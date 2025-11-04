@@ -16,21 +16,14 @@ interface User {
 
 interface AuthContextData {
   user: User | null;
-  signIn: (
-    sessionId: string,
-    userDetails: Omit<User, "sessionId">,
-  ) => Promise<void>; // Assinatura atualizada
+  signIn: (sessionId: string, userDetails: Omit<User, "sessionId">) => Promise<void>; // Assinatura atualizada
   signOut: () => Promise<void>;
   loading: boolean; // Indica se está carregando dados de autenticação
 }
 
-export const AuthContext = createContext<AuthContextData>(
-  {} as AuthContextData,
-);
+export const AuthContext = createContext<AuthContextData>({} as AuthContextData);
 
-export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
-  children,
-}) => {
+export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true); // State to track loading
 
@@ -48,14 +41,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
 
           // Em seguida, valida a sessão em segundo plano
           try {
-            const response = await axios.get(
-              `${API_BASE_URL}/user/session-status`,
-              {
-                headers: {
-                  Authorization: `Bearer ${storedSessionId}`,
-                },
+            const response = await axios.get(`${API_BASE_URL}/user/session-status`, {
+              headers: {
+                Authorization: `Bearer ${storedSessionId}`,
               },
-            );
+            });
 
             if (response.status === 200 && response.data.user) {
               // A sessão ainda é válida, os dados do usuário estão atualizados
@@ -89,10 +79,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     loadUserData();
   }, []);
 
-  async function signIn(
-    sessionId: string,
-    userDetails: Omit<User, "sessionId">,
-  ) {
+  async function signIn(sessionId: string, userDetails: Omit<User, "sessionId">) {
     try {
       // Salva o sessionId e os detalhes do usuário no AsyncStorage
       await AsyncStorage.setItem("userSessionId", sessionId);

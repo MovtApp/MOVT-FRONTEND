@@ -106,10 +106,7 @@ export const Sidebar: React.FC<SidebarProps> = () => {
       </View>
 
       {/* Conteúdo do Sidebar */}
-      <ScrollView
-        style={styles.sidebarContent}
-        showsVerticalScrollIndicator={false}
-      >
+      <ScrollView style={styles.sidebarContent} showsVerticalScrollIndicator={false}>
         <View style={styles.sidebarSection}>
           <Text style={styles.sidebarSectionTitle}>Menu principal</Text>
 
@@ -232,9 +229,7 @@ export const Sidebar: React.FC<SidebarProps> = () => {
             }}
           >
             <Settings size={24} color="#fff" />
-            <Text style={styles.sidebarItemText}>
-              Configurações e privacidades
-            </Text>
+            <Text style={styles.sidebarItemText}>Configurações e privacidades</Text>
           </TouchableOpacity>
 
           {/* AJUDA E SUPORTE */}

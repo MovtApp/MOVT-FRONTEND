@@ -18,7 +18,7 @@ const supabaseAdmin = createClient(
       autoRefreshToken: false,
       persistSession: false,
     },
-  },
+  }
 );
 
 serve(async (req) => {
@@ -49,17 +49,13 @@ serve(async (req) => {
         break;
 
       default:
-        return new Response(
-          "Invalid social provider. Only 'google' is supported.",
-          { status: 400 },
-        );
+        return new Response("Invalid social provider. Only 'google' is supported.", {
+          status: 400,
+        });
     }
 
     if (error) {
-      console.error(
-        `Erro na autenticação social (${provider}):`,
-        error.message,
-      );
+      console.error(`Erro na autenticação social (${provider}):`, error.message);
       return new Response(`Erro ao autenticar: ${error.message}`, {
         status: 500,
       });
@@ -79,13 +75,13 @@ serve(async (req) => {
       {
         headers: { "Content-Type": "application/json" },
         status: 200,
-      },
+      }
     );
   } catch (error: any) {
     console.error("Erro inesperado na Edge Function de social sign-in:", error);
-    return new Response(
-      JSON.stringify({ message: error.message || "Erro interno do servidor" }),
-      { status: 500, headers: { "Content-Type": "application/json" } },
-    );
+    return new Response(JSON.stringify({ message: error.message || "Erro interno do servidor" }), {
+      status: 500,
+      headers: { "Content-Type": "application/json" },
+    });
   }
 });

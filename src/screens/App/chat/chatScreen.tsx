@@ -1,8 +1,21 @@
+import Header from "@components/Header";
 import React from "react";
-import { Text } from "react-native";
+import { StyleSheet, Text, View } from "react-native";
 
 const ChatScreen: React.FC = () => {
-  return <Text>Chat Screen</Text>;
+  return (
+    <View style={styles.container}>
+      <Header />
+      <Text>Chat Screen</Text>
+    </View>
+  );
 };
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: "#fff",
+  },
+});
 
 export default ChatScreen;

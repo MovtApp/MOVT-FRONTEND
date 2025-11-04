@@ -1,10 +1,4 @@
-import React, {
-  createContext,
-  useContext,
-  useEffect,
-  useRef,
-  useState,
-} from "react";
+import React, { createContext, useContext, useEffect, useRef, useState } from "react";
 import * as Location from "expo-location";
 import { Linking, Platform } from "react-native";
 
@@ -16,16 +10,11 @@ interface LocationContextValue {
   refreshLocation: () => Promise<void>;
 }
 
-const LocationContext = createContext<LocationContextValue | undefined>(
-  undefined,
-);
+const LocationContext = createContext<LocationContextValue | undefined>(undefined);
 
-export const LocationProvider: React.FC<{ children: React.ReactNode }> = ({
-  children,
-}) => {
+export const LocationProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [location, setLocation] = useState<Coordinates | null>(null);
-  const [permissionStatus, setPermissionStatus] =
-    useState<Location.PermissionStatus | null>(null);
+  const [permissionStatus, setPermissionStatus] = useState<Location.PermissionStatus | null>(null);
   const watcherRef = useRef<Location.LocationSubscription | null>(null);
 
   useEffect(() => {
@@ -85,7 +74,7 @@ export const LocationProvider: React.FC<{ children: React.ReactNode }> = ({
               longitude: loc.coords.longitude,
             });
           }
-        },
+        }
       );
     } catch {
       // Erro não é usado, removemos a variável
@@ -111,9 +100,7 @@ export const LocationProvider: React.FC<{ children: React.ReactNode }> = ({
   };
 
   return (
-    <LocationContext.Provider
-      value={{ location, permissionStatus, refreshLocation }}
-    >
+    <LocationContext.Provider value={{ location, permissionStatus, refreshLocation }}>
       {children}
     </LocationContext.Provider>
   );
@@ -121,9 +108,6 @@ export const LocationProvider: React.FC<{ children: React.ReactNode }> = ({
 
 export function useLocationContext(): LocationContextValue {
   const ctx = useContext(LocationContext);
-  if (!ctx)
-    throw new Error(
-      "useLocationContext deve ser usado dentro de LocationProvider",
-    );
+  if (!ctx) throw new Error("useLocationContext deve ser usado dentro de LocationProvider");
   return ctx;
 }

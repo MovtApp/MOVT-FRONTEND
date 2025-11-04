@@ -7,8 +7,7 @@ import { useNavigation } from "@react-navigation/native";
 import SelectInput from "../../components/SelectInput";
 
 const GenderScreen = () => {
-  const navigation =
-    useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
 
   const [gender, setGender] = useState<string | null>(null);
 
@@ -29,8 +28,7 @@ const GenderScreen = () => {
         <BackButton />
         <Text style={styles.title}>Gênero</Text>
         <Text style={styles.subtitle}>
-          Por gentileza, informe sua identidade de gênero ou selecione prefiro
-          não responder.
+          Por gentileza, informe sua identidade de gênero ou selecione prefiro não responder.
         </Text>
         <View style={{ marginTop: 30 }}>
           <SelectInput

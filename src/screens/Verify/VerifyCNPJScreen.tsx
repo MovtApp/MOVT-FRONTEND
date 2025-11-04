@@ -7,8 +7,7 @@ import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { RootStackParamList } from "@typings/routes"; // Corrigida a importação de RootStackParamList
 
 const VerifyCNPJScreen = () => {
-  const navigation =
-    useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
 
   const handleVerify = () => {
     navigation.navigate("Verify", { screen: "VerifyCrefScreen" });
@@ -26,8 +25,8 @@ const VerifyCNPJScreen = () => {
         <BackButton />
         <Text style={styles.title}>Validar seu CNPJ</Text>
         <Text style={styles.subtitle}>
-          Digite o código enviado para o e-mail cadastrado no CNPJ para
-          confirmar a identidade da empresa.
+          Digite o código enviado para o e-mail cadastrado no CNPJ para confirmar a identidade da
+          empresa.
         </Text>
         <View style={{ marginTop: 30 }}>
           <Text style={styles.subtitle}>Código de verificação</Text>

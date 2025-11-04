@@ -25,13 +25,9 @@ const registerSchema = z.object({
   nome: z.string().min(2, { message: "Nome obrigatório" }),
   email: z.string().email({ message: "E-mail inválido" }),
   cpf_cnpj: z.string().min(11, { message: "Documento obrigatório" }), // Para CPF ou CNPJ
-  data_nascimento: z
-    .string()
-    .min(8, { message: "Data de nascimento obrigatória" }),
+  data_nascimento: z.string().min(8, { message: "Data de nascimento obrigatória" }),
   telefone: z.string().min(12, { message: "Telefone obrigatório" }),
-  senha: z
-    .string()
-    .min(6, { message: "Senha deve ter pelo menos 6 caracteres" }),
+  senha: z.string().min(6, { message: "Senha deve ter pelo menos 6 caracteres" }),
 });
 
 type RegisterFormData = z.infer<typeof registerSchema>;
@@ -123,16 +119,13 @@ export const SignUpScreen = ({ navigation }: Props) => {
         Alert.alert("Sucesso", response.data.message);
         navigation.navigate("SignInScreen");
       } else {
-        Alert.alert(
-          "Erro",
-          response.data.error || "Ocorreu um erro desconhecido.",
-        );
+        Alert.alert("Erro", response.data.error || "Ocorreu um erro desconhecido.");
       }
     } catch (error: any) {
       console.error("Erro ao registrar usuário:", error);
       Alert.alert(
         "Erro no Cadastro",
-        error.response?.data?.error || "Não foi possível conectar ao servidor.",
+        error.response?.data?.error || "Não foi possível conectar ao servidor."
       );
     }
   };
@@ -161,21 +154,13 @@ export const SignUpScreen = ({ navigation }: Props) => {
               style={[styles.tab, tab === "CPF" && styles.tabActive]}
               onPress={() => setTab("CPF")}
             >
-              <Text
-                style={[styles.tabText, tab === "CPF" && styles.tabTextActive]}
-              >
-                CPF
-              </Text>
+              <Text style={[styles.tabText, tab === "CPF" && styles.tabTextActive]}>CPF</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={[styles.tab, tab === "CNPJ" && styles.tabActive]}
               onPress={() => setTab("CNPJ")}
             >
-              <Text
-                style={[styles.tabText, tab === "CNPJ" && styles.tabTextActive]}
-              >
-                CNPJ
-              </Text>
+              <Text style={[styles.tabText, tab === "CNPJ" && styles.tabTextActive]}>CNPJ</Text>
             </TouchableOpacity>
           </View>
           <View style={{ marginTop: 10 }}>
@@ -183,11 +168,7 @@ export const SignUpScreen = ({ navigation }: Props) => {
             <Controller
               control={control}
               name="nome"
-              render={({
-                field,
-              }: {
-                field: ControllerRenderProps<RegisterFormData, "nome">;
-              }) => (
+              render={({ field }: { field: ControllerRenderProps<RegisterFormData, "nome"> }) => (
                 <CustomInput
                   value={field.value}
                   onChangeText={field.onChange}
@@ -197,19 +178,13 @@ export const SignUpScreen = ({ navigation }: Props) => {
                 />
               )}
             />
-            {errors.nome && (
-              <Text style={styles.error}>{errors.nome.message}</Text>
-            )}
+            {errors.nome && <Text style={styles.error}>{errors.nome.message}</Text>}
 
             <Text style={styles.label}>Email</Text>
             <Controller
               control={control}
               name="email"
-              render={({
-                field,
-              }: {
-                field: ControllerRenderProps<RegisterFormData, "email">;
-              }) => (
+              render={({ field }: { field: ControllerRenderProps<RegisterFormData, "email"> }) => (
                 <CustomInput
                   value={field.value}
                   onChangeText={field.onChange}
@@ -219,9 +194,7 @@ export const SignUpScreen = ({ navigation }: Props) => {
                 />
               )}
             />
-            {errors.email && (
-              <Text style={styles.error}>{errors.email.message}</Text>
-            )}
+            {errors.email && <Text style={styles.error}>{errors.email.message}</Text>}
 
             <Text style={styles.label}>{tab === "CPF" ? "CPF" : "CNPJ"}</Text>
             <Controller
@@ -235,20 +208,14 @@ export const SignUpScreen = ({ navigation }: Props) => {
                 <CustomInput
                   value={field.value}
                   onChangeText={(text: string) =>
-                    field.onChange(
-                      tab === "CPF" ? formatCPF(text) : formatCNPJ(text),
-                    )
+                    field.onChange(tab === "CPF" ? formatCPF(text) : formatCNPJ(text))
                   }
-                  placeholder={
-                    tab === "CPF" ? "000.000.000-00" : "00.000.000/0000-00"
-                  }
+                  placeholder={tab === "CPF" ? "000.000.000-00" : "00.000.000/0000-00"}
                   keyboardType="numeric"
                 />
               )}
             />
-            {errors.cpf_cnpj && (
-              <Text style={styles.error}>{errors.cpf_cnpj.message}</Text>
-            )}
+            {errors.cpf_cnpj && <Text style={styles.error}>{errors.cpf_cnpj.message}</Text>}
 
             <Text style={styles.label}>Data de nascimento</Text>
             <Controller
@@ -257,20 +224,14 @@ export const SignUpScreen = ({ navigation }: Props) => {
               render={({
                 field,
               }: {
-                field: ControllerRenderProps<
-                  RegisterFormData,
-                  "data_nascimento"
-                >;
+                field: ControllerRenderProps<RegisterFormData, "data_nascimento">;
               }) => {
                 const handleDateInput = (text: string) => {
                   let cleaned = text.replace(/\D/g, "");
                   if (cleaned.length > 2 && cleaned.length <= 4) {
                     cleaned = cleaned.replace(/(\d{2})(\d+)/, "$1/$2");
                   } else if (cleaned.length > 4) {
-                    cleaned = cleaned.replace(
-                      /(\d{2})(\d{2})(\d{1,4})/g,
-                      "$1/$2/$3",
-                    );
+                    cleaned = cleaned.replace(/(\d{2})(\d{2})(\d{1,4})/g, "$1/$2/$3");
                   }
                   field.onChange(cleaned);
                 };
@@ -294,9 +255,7 @@ export const SignUpScreen = ({ navigation }: Props) => {
                     <DateTimePickerModal
                       isVisible={showDatePicker}
                       mode="date"
-                      date={
-                        field.value ? stringToDate(field.value) : new Date()
-                      }
+                      date={field.value ? stringToDate(field.value) : new Date()}
                       maximumDate={new Date()}
                       onConfirm={(date: Date) => {
                         setShowDatePicker(false);
@@ -327,27 +286,19 @@ export const SignUpScreen = ({ navigation }: Props) => {
               }) => (
                 <CustomInput
                   value={field.value}
-                  onChangeText={(text: string) =>
-                    field.onChange(formatPhone(text))
-                  }
+                  onChangeText={(text: string) => field.onChange(formatPhone(text))}
                   placeholder="(+55) 11 99999-9999"
                   keyboardType="phone-pad"
                 />
               )}
             />
-            {errors.telefone && (
-              <Text style={styles.error}>{errors.telefone.message}</Text>
-            )}
+            {errors.telefone && <Text style={styles.error}>{errors.telefone.message}</Text>}
 
             <Text style={styles.label}>Definir senha</Text>
             <Controller
               control={control}
               name="senha"
-              render={({
-                field,
-              }: {
-                field: ControllerRenderProps<RegisterFormData, "senha">;
-              }) => (
+              render={({ field }: { field: ControllerRenderProps<RegisterFormData, "senha"> }) => (
                 <CustomInput
                   value={field.value}
                   onChangeText={field.onChange}
@@ -368,9 +319,7 @@ export const SignUpScreen = ({ navigation }: Props) => {
                 />
               )}
             />
-            {errors.senha && (
-              <Text style={styles.error}>{errors.senha.message}</Text>
-            )}
+            {errors.senha && <Text style={styles.error}>{errors.senha.message}</Text>}
 
             <Button
               style={styles.registerButton}

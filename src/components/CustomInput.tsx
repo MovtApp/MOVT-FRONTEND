@@ -12,12 +12,7 @@ interface CustomInputProps {
   label?: string;
   error?: string;
   secureTextEntry?: boolean;
-  keyboardType?:
-    | "default"
-    | "email-address"
-    | "numeric"
-    | "phone-pad"
-    | "decimal-pad";
+  keyboardType?: "default" | "email-address" | "numeric" | "phone-pad" | "decimal-pad";
   autoCapitalize?: "none" | "sentences" | "words" | "characters";
   autoCorrect?: boolean;
   editable?: boolean;
@@ -96,11 +91,7 @@ const CustomInput: React.FC<CustomInputProps> = ({
 
   return (
     <View style={[styles.container, containerStyle]}>
-      {label && (
-        <Text style={[styles.label, hasError && styles.labelError]}>
-          {label}
-        </Text>
-      )}
+      {label && <Text style={[styles.label, hasError && styles.labelError]}>{label}</Text>}
 
       <View
         style={[

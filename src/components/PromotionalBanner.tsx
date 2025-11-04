@@ -29,9 +29,7 @@ const PromotionalBanner: React.FC<PromotionalBannerProps> = ({ gender }) => {
       >
         <View style={styles.bannerContent}>
           <View style={styles.bannerText}>
-            <Text style={styles.bannerTitle}>
-              Comece forte e defina suas metas!
-            </Text>
+            <Text style={styles.bannerTitle}>Comece forte e defina suas metas!</Text>
             <TouchableOpacity style={styles.bannerButton}>
               <Text style={styles.bannerButtonText}>Let&apos;s go!</Text>
             </TouchableOpacity>

@@ -5,6 +5,7 @@ import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { Routes } from "@routes/index";
 import { AuthProvider, useAuth } from "@contexts/AuthContext";
 import { LocationProvider } from "@contexts/LocationContext";
+import { NotificationProvider } from "@contexts/NotificationContext";
 import { StatusBar, ActivityIndicator, View } from "react-native";
 import {
   useFonts,
@@ -42,7 +43,9 @@ function AppContent() {
 
   return (
     <LocationProvider>
-      <Routes initialRouteName={initialRouteName} />
+      <NotificationProvider>
+        <Routes initialRouteName={initialRouteName} />
+      </NotificationProvider>
     </LocationProvider>
   );
 }

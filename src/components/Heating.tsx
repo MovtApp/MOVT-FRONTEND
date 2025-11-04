@@ -56,9 +56,7 @@ interface HeatingScreenProps {
   heatingData?: Heating[];
 }
 
-const HeatingScreen: React.FC<HeatingScreenProps> = ({
-  heatingData: _propheatingData,
-}) => {
+const HeatingScreen: React.FC<HeatingScreenProps> = ({ heatingData: _propheatingData }) => {
   return (
     <View style={styles.section}>
       {/* heatingo de hoje */}
@@ -66,10 +64,7 @@ const HeatingScreen: React.FC<HeatingScreenProps> = ({
       <View style={styles.heatingCardsContainer}>
         {heatingData.map((heating) => (
           <TouchableOpacity key={heating.id} style={styles.heatingCard}>
-            <Image
-              source={{ uri: heating.imageUrl }}
-              style={styles.heatingCardImage}
-            />
+            <Image source={{ uri: heating.imageUrl }} style={styles.heatingCardImage} />
             <View style={styles.heatingCardContent}>
               <Text style={styles.heatingCardTitle}>{heating.title}</Text>
               <Text style={styles.heatingCardText}>{heating.level}</Text>

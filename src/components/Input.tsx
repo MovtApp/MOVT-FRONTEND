@@ -9,18 +9,9 @@ interface InputProps {
   textStyle?: any;
 }
 
-export const Input: React.FC<InputProps> = ({
-  text,
-  onPress,
-  style,
-  textStyle,
-}) => {
+export const Input: React.FC<InputProps> = ({ text, onPress, style, textStyle }) => {
   return (
-    <TouchableOpacity
-      style={[styles.Button, style]}
-      onPress={onPress}
-      activeOpacity={0.8}
-    >
+    <TouchableOpacity style={[styles.Button, style]} onPress={onPress} activeOpacity={0.8}>
       <Text style={[styles.ButtonText, textStyle]}>{text}</Text>
     </TouchableOpacity>
   );

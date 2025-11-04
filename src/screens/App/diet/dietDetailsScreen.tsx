@@ -1,12 +1,5 @@
 import React from "react";
-import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  Image,
-  ScrollView,
-} from "react-native";
+import { View, Text, StyleSheet, TouchableOpacity, Image, ScrollView } from "react-native";
 import { ArrowLeft, Clock4, Flame } from "lucide-react-native";
 
 interface DietDetailsScreenProps {
@@ -14,15 +7,11 @@ interface DietDetailsScreenProps {
   navigation?: any;
 }
 
-const DietDetailsScreen: React.FC<DietDetailsScreenProps> = ({
-  route,
-  navigation,
-}) => {
+const DietDetailsScreen: React.FC<DietDetailsScreenProps> = ({ route, navigation }) => {
   const meal = route?.params?.meal || {};
   const description =
-    ((meal?.description ?? meal?.details ?? meal?.desc ?? "") as string)
-      ?.toString?.()
-      .trim?.() || "";
+    ((meal?.description ?? meal?.details ?? meal?.desc ?? "") as string)?.toString?.().trim?.() ||
+    "";
   const planItems = Array.isArray(meal?.planMeals)
     ? meal.planMeals
     : Array.isArray(meal?.plan)
@@ -41,11 +30,7 @@ const DietDetailsScreen: React.FC<DietDetailsScreenProps> = ({
           <ArrowLeft size={22} color="#111827" />
         </TouchableOpacity>
         {meal?.imageUrl ? (
-          <Image
-            source={{ uri: meal.imageUrl }}
-            style={styles.heroImage}
-            resizeMode="cover"
-          />
+          <Image source={{ uri: meal.imageUrl }} style={styles.heroImage} resizeMode="cover" />
         ) : null}
         {meal?.calories || meal?.minutes ? (
           <View style={styles.statsCard}>
@@ -66,14 +51,9 @@ const DietDetailsScreen: React.FC<DietDetailsScreenProps> = ({
 
               <View style={styles.statsItem}>
                 {meal?.authorAvatar ? (
-                  <Image
-                    source={{ uri: meal.authorAvatar }}
-                    style={styles.authorAvatar as any}
-                  />
+                  <Image source={{ uri: meal.authorAvatar }} style={styles.authorAvatar as any} />
                 ) : null}
-                <Text style={styles.statsText}>
-                  {meal?.authorName || "Autor"}
-                </Text>
+                <Text style={styles.statsText}>{meal?.authorName || "Autor"}</Text>
               </View>
             </View>
           </View>
@@ -88,9 +68,7 @@ const DietDetailsScreen: React.FC<DietDetailsScreenProps> = ({
           <Text style={styles.title}>{meal?.title || "Refeição"}</Text>
 
           <Text style={styles.sectionTitle}>Descrição</Text>
-          <Text style={styles.paragraph}>
-            {description || "Descrição da refeição"}
-          </Text>
+          <Text style={styles.paragraph}>{description || "Descrição da refeição"}</Text>
 
           <View style={styles.macroCard}>
             <View style={styles.macroItem}>
@@ -139,17 +117,9 @@ const DietDetailsScreen: React.FC<DietDetailsScreenProps> = ({
                     >
                       <View style={styles.planRow}>
                         {item?.imageUrl ? (
-                          <Image
-                            source={{ uri: item.imageUrl }}
-                            style={styles.planImage}
-                          />
+                          <Image source={{ uri: item.imageUrl }} style={styles.planImage} />
                         ) : (
-                          <View
-                            style={[
-                              styles.planImage,
-                              styles.planImagePlaceholder,
-                            ]}
-                          />
+                          <View style={[styles.planImage, styles.planImagePlaceholder]} />
                         )}
                         <View style={styles.planInfo}>
                           <Text style={styles.planTitle} numberOfLines={2}>
@@ -158,32 +128,20 @@ const DietDetailsScreen: React.FC<DietDetailsScreenProps> = ({
                           <View style={styles.planMacrosRow}>
                             <View style={styles.planMacroItem}>
                               <Text style={styles.planMacroLabel}>Gordura</Text>
-                              <Text style={styles.planMacroValue}>
-                                {itemFat}
-                              </Text>
+                              <Text style={styles.planMacroValue}>{itemFat}</Text>
                             </View>
                             <View style={styles.planMacroItem}>
-                              <Text style={styles.planMacroLabel}>
-                                Proteína
-                              </Text>
-                              <Text style={styles.planMacroValue}>
-                                {itemProtein}
-                              </Text>
+                              <Text style={styles.planMacroLabel}>Proteína</Text>
+                              <Text style={styles.planMacroValue}>{itemProtein}</Text>
                             </View>
                             <View style={styles.planMacroItem}>
-                              <Text style={styles.planMacroLabel}>
-                                Carboidrato
-                              </Text>
-                              <Text style={styles.planMacroValue}>
-                                {itemCarbs}
-                              </Text>
+                              <Text style={styles.planMacroLabel}>Carboidrato</Text>
+                              <Text style={styles.planMacroValue}>{itemCarbs}</Text>
                             </View>
                           </View>
                         </View>
                       </View>
-                      {idx !== planItems.length - 1 ? (
-                        <View style={styles.planDivider} />
-                      ) : null}
+                      {idx !== planItems.length - 1 ? <View style={styles.planDivider} /> : null}
                     </TouchableOpacity>
                   );
                 })}

@@ -7,8 +7,7 @@ import CustomInput from "@components/CustomInput";
 import { RootStackParamList } from "@typings/routes"; // Corrigida a importação de RootStackParamList
 
 const RecoveryScreen = () => {
-  const navigation =
-    useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
 
   const handleVerify = () => {
     navigation.navigate("Auth", { screen: "SignInScreen" });
@@ -21,16 +20,10 @@ const RecoveryScreen = () => {
       <View style={styles.topSection}>
         <BackButton />
         <Text style={styles.title}>Redefinir senha</Text>
-        <Text style={styles.subtitle}>
-          Redefina a senha com código enviado ao seu email.
-        </Text>
+        <Text style={styles.subtitle}>Redefina a senha com código enviado ao seu email.</Text>
         <View style={{ marginTop: 30 }}>
           <Text style={styles.subtitle}>Endereço de email</Text>
-          <CustomInput
-            value={email}
-            onChangeText={setEmail}
-            placeholder="Insira seu e-mail"
-          />
+          <CustomInput value={email} onChangeText={setEmail} placeholder="Insira seu e-mail" />
         </View>
       </View>
 

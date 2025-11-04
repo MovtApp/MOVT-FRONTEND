@@ -11,11 +11,7 @@ const api = axios.create({
 
 api.interceptors.request.use(
   (config) => {
-    console.log(
-      "🚀 Requisição enviada:",
-      config.method?.toUpperCase(),
-      config.url,
-    );
+    console.log("🚀 Requisição enviada:", config.method?.toUpperCase(), config.url);
     console.log("🚀 Headers:", config.headers);
     console.log("🚀 Data:", config.data);
     return config;
@@ -23,7 +19,7 @@ api.interceptors.request.use(
   (error) => {
     console.error("❌ Erro na requisição:", error);
     return Promise.reject(error);
-  },
+  }
 );
 
 api.interceptors.response.use(
@@ -32,14 +28,10 @@ api.interceptors.response.use(
     return response;
   },
   (error) => {
-    console.error(
-      "❌ Erro na resposta:",
-      error.response?.status,
-      error.config?.url,
-    );
+    console.error("❌ Erro na resposta:", error.response?.status, error.config?.url);
     console.error("❌ Dados do erro:", error.response?.data);
     return Promise.reject(error);
-  },
+  }
 );
 
 export { api };

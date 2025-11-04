@@ -21,12 +21,7 @@ interface SelectInputProps {
   options: Option[];
 }
 
-const SelectInput: React.FC<SelectInputProps> = ({
-  value,
-  onChange,
-  placeholder,
-  options,
-}) => {
+const SelectInput: React.FC<SelectInputProps> = ({ value, onChange, placeholder, options }) => {
   const [modalVisible, setModalVisible] = useState(false);
   const selectedLabel = options.find((opt) => opt.value === value)?.label;
 

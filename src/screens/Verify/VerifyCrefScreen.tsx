@@ -7,8 +7,7 @@ import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { RootStackParamList } from "@typings/routes"; // Corrigida a importação de RootStackParamList
 
 const VerifyCrefScreen = () => {
-  const navigation =
-    useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
 
   const handleVerify = () => {
     navigation.navigate("Info", { screen: "GenderScreen" });
@@ -58,8 +57,8 @@ const VerifyCrefScreen = () => {
         <BackButton />
         <Text style={styles.title}>Validar seu cref</Text>
         <Text style={styles.subtitle}>
-          Digite o número do registro CREF para confirmar a identidade do
-          profissional de Educação Física.
+          Digite o número do registro CREF para confirmar a identidade do profissional de Educação
+          Física.
         </Text>
         <View style={{ marginTop: 30 }}>
           <Text style={styles.subtitle}>Código de verificação</Text>

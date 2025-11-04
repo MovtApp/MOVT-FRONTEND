@@ -19,9 +19,7 @@ export type TimeframeType = "1d" | "1s" | "1m" | "1a" | "Tudo";
 /**
  * Busca dados de calorias do backend com base no timeframe selecionado
  */
-export const getCaloriesData = async (
-  timeframe: TimeframeType = "1d",
-): Promise<CalorieStats> => {
+export const getCaloriesData = async (timeframe: TimeframeType = "1d"): Promise<CalorieStats> => {
   try {
     const sessionId = await AsyncStorage.getItem("userSessionId");
 
@@ -68,7 +66,7 @@ export const saveCaloriesData = async (calories: number): Promise<void> => {
         headers: {
           Authorization: `Bearer ${sessionId}`,
         },
-      },
+      }
     );
   } catch (error: any) {
     console.error("❌ Erro ao salvar dados de calorias:", error);
@@ -184,10 +182,7 @@ export const calculateChartDomain = (data: CalorieData[]): [number, number] => {
 /**
  * Formata a data com base no timeframe
  */
-export const formatDateLabel = (
-  date: string,
-  timeframe: TimeframeType,
-): string => {
+export const formatDateLabel = (date: string, timeframe: TimeframeType): string => {
   const d = new Date(date);
 
   switch (timeframe) {

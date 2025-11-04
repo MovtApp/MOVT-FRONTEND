@@ -19,8 +19,7 @@ const API_BASE_URL = "http://10.0.2.2:3000"; // USE O IP CORRETO AQUI (ex: 10.0.
 type VerifyAccountScreenRouteProp = RouteProp<RootStackParamList, "Verify">;
 
 const VerifyAccountScreen = () => {
-  const navigation =
-    useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const route = useRoute<VerifyAccountScreenRouteProp>();
 
   // O sessionId deve ser passado como parâmetro de navegação do login/registro
@@ -31,9 +30,7 @@ const VerifyAccountScreen = () => {
   const [loading, setLoading] = useState(false); // Estado de carregamento
   const [error, setError] = useState<string | null>(null); // Estado para mensagens de erro
 
-  const [currentSessionId, setCurrentSessionId] = useState<string | null>(
-    routeSessionId ?? null,
-  );
+  const [currentSessionId, setCurrentSessionId] = useState<string | null>(routeSessionId ?? null);
 
   useEffect(() => {
     const loadAndCheckSessionId = async () => {
@@ -44,10 +41,7 @@ const VerifyAccountScreen = () => {
         if (storedSessionId) {
           setCurrentSessionId(storedSessionId);
         } else {
-          Alert.alert(
-            "Erro",
-            "Sessão inválida. Por favor, faça login novamente.",
-          );
+          Alert.alert("Erro", "Sessão inválida. Por favor, faça login novamente.");
           navigation.navigate("Auth", { screen: "SignInScreen" });
         }
       }
@@ -73,7 +67,7 @@ const VerifyAccountScreen = () => {
           headers: {
             Authorization: `Bearer ${currentSessionId}`, // Envia o sessionId para identificar o usuário
           },
-        },
+        }
       );
 
       // Verifica se o e-mail já está verificado para redirecionar
@@ -84,10 +78,7 @@ const VerifyAccountScreen = () => {
         Alert.alert("Sucesso", response.data.message);
       }
     } catch (err: any) {
-      console.error(
-        "Erro ao reenviar código:",
-        err.response ? err.response.data : err.message,
-      );
+      console.error("Erro ao reenviar código:", err.response ? err.response.data : err.message);
       const errorMessage =
         err.response?.data?.error ||
         err.response?.data?.message ||
@@ -125,7 +116,7 @@ const VerifyAccountScreen = () => {
           headers: {
             Authorization: `Bearer ${currentSessionId}`, // Envia o sessionId para identificar o usuário
           },
-        },
+        }
       );
       Alert.alert("Verificação Concluída", response.data.message);
 
@@ -166,11 +157,7 @@ const VerifyAccountScreen = () => {
         />
         {error && <Text style={styles.error}>{error}</Text>}
 
-        <TouchableOpacity
-          style={styles.resendButton}
-          onPress={handleResend}
-          disabled={loading}
-        >
+        <TouchableOpacity style={styles.resendButton} onPress={handleResend} disabled={loading}>
           <Text style={styles.resendButtonText}>
             {loading ? "Reenviando..." : "Reenviar Código"}
           </Text>
@@ -181,9 +168,7 @@ const VerifyAccountScreen = () => {
           onPress={handleVerify}
           disabled={loading || !code || code.length !== 6} // Desabilita se estiver carregando ou código inválido
         >
-          <Text style={styles.verifyButtonText}>
-            {loading ? "Verificando..." : "Verificar"}
-          </Text>
+          <Text style={styles.verifyButtonText}>{loading ? "Verificando..." : "Verificar"}</Text>
         </TouchableOpacity>
       </View>
     </View>

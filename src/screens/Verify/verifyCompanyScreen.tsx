@@ -8,8 +8,7 @@ import SearchInput from "../../components/SearchInput";
 import { Search } from "lucide-react-native";
 
 const VerifyCompanyScreen = () => {
-  const navigation =
-    useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
 
   const handleVerify = () => {
     navigation.navigate("Verify", { screen: "VerifyCNPJScreen" });
@@ -27,8 +26,7 @@ const VerifyCompanyScreen = () => {
         <BackButton />
         <Text style={styles.title}>Validar sua empresa</Text>
         <Text style={styles.subtitle}>
-          Digite o número do CNPJ da empresa para validar as informações
-          cadastrais.
+          Digite o número do CNPJ da empresa para validar as informações cadastrais.
         </Text>
         <View style={{ marginTop: 30 }}>
           <Text style={styles.subtitle}>Consulta de empresa ou CNPJ</Text>

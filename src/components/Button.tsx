@@ -15,8 +15,7 @@ const buttonVariants = cva(
         outline:
           "border border-input bg-background web:hover:bg-accent web:hover:text-accent-foreground active:bg-accent",
         secondary: "bg-secondary web:hover:opacity-80 active:opacity-80",
-        ghost:
-          "web:hover:bg-accent web:hover:text-accent-foreground active:bg-accent",
+        ghost: "web:hover:bg-accent web:hover:text-accent-foreground active:bg-accent",
         link: "web:underline-offset-4 web:hover:underline web:focus:underline ",
       },
       size: {
@@ -30,7 +29,7 @@ const buttonVariants = cva(
       variant: "default",
       size: "default",
     },
-  },
+  }
 );
 
 const buttonTextVariants = cva(
@@ -41,8 +40,7 @@ const buttonTextVariants = cva(
         default: "text-primary-foreground bg-chathams_blue-1000 h-16",
         destructive: "text-destructive-foreground",
         outline: "group-active:text-accent-foreground",
-        secondary:
-          "text-secondary-foreground group-active:text-secondary-foreground",
+        secondary: "text-secondary-foreground group-active:text-secondary-foreground",
         ghost: "group-active:text-accent-foreground",
         link: "text-primary group-active:underline",
       },
@@ -57,7 +55,7 @@ const buttonTextVariants = cva(
       variant: "default",
       size: "default",
     },
-  },
+  }
 );
 
 type ButtonProps = ComponentPropsWithoutRef<typeof TouchableOpacity> &
@@ -85,7 +83,7 @@ const Button = forwardRef<ElementRef<typeof TouchableOpacity>, ButtonProps>(
             className={cn(
               props.disabled && "opacity-50 web:pointer-events-none",
               buttonVariants({ variant, size, className }),
-              "bg-[#192126]",
+              "bg-[#192126]"
             )}
             ref={ref}
             role="button"
@@ -104,7 +102,7 @@ const Button = forwardRef<ElementRef<typeof TouchableOpacity>, ButtonProps>(
         </LinearGradient>
       </TextClassContext.Provider>
     );
-  },
+  }
 );
 Button.displayName = "Button";
 

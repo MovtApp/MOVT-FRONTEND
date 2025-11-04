@@ -1,4 +1,4 @@
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect, useCallback } from "react";
 import {
   ScrollView,
   Text,
@@ -7,46 +7,23 @@ import {
   TouchableOpacity,
   FlatList,
   Dimensions,
-  Image,
 } from "react-native";
-import { Bell, Menu, Bike } from "lucide-react-native";
-import {
-  useNavigation,
-  CompositeNavigationProp,
-} from "@react-navigation/native";
+import { useNavigation, CompositeNavigationProp, useFocusEffect } from "@react-navigation/native";
 import { DrawerNavigationProp } from "@react-navigation/drawer";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { AppDrawerParamList, AppStackParamList } from "../../../@types/routes";
-
-// Importações das telas de detalhes de dados
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-import CaloriesScreen from "./[protected]/CaloriesScreen";
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-import CyclingScreen from "./[protected]/CyclingScreen";
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-import HeartbeatsScreen from "./[protected]/HeartbeatsScreen";
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-import SleepScreen from "./[protected]/SleepScreen";
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-import StepsScreen from "./[protected]/StepsScreen";
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-import TrainingScreen from "./[protected]/TrainingScreen";
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-import WaterScreen from "./[protected]/WaterScreen";
-// import { useGoogleFit } from '../../../hooks/useGoogleFit'; // Importa o hook useGoogleFit
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import Header from "../../../components/Header";
+import { Canvas, Path, vec } from "@shopify/react-native-skia";
 
 const { width } = Dimensions.get("window");
 
-interface MenuButtonProps {
-  onPress: () => void;
-}
-
-const MenuButton: React.FC<MenuButtonProps> = ({ onPress }) => {
-  return (
-    <TouchableOpacity style={styles.menuButton} onPress={onPress}>
-      <Menu size={24} color="#192126" />
-    </TouchableOpacity>
-  );
+const getTodayKey = (): string => {
+  const d = new Date();
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+  return `water:${yyyy}-${mm}-${dd}`;
 };
 
 const DataScreen: React.FC = () => {
@@ -56,24 +33,42 @@ const DataScreen: React.FC = () => {
   >;
   const navigation = useNavigation<DataScreenNavigationProp>();
 
-  // const { healthData, isAuthorized, isLoading, error, authorizeGoogleFit } = useGoogleFit(); // Usa o hook useGoogleFit
-
   const healthData = {
     calories: 645,
     steps: 999,
     heartRate: 79,
     sleep: 0,
-    cycling: 0,
+    Results: 0,
     water: 6,
   };
-  // const isAuthorized = false;
-  // const isLoading = false;
-  // const error = null;
-  // const authorizeGoogleFit = () => {};
 
-  const [currentDate] = useState(new Date(2025, 6, 1)); // Definido para Julho de 2025
+  const [currentDate] = useState(new Date()); // Data atual
   const [selectedDay, setSelectedDay] = useState(new Date().getDate()); // Seleciona automaticamente o dia atual
   const flatListRef = useRef<FlatList>(null);
+
+  const [waterConsumedMl, setWaterConsumedMl] = useState<number>(0);
+
+  const loadWaterConsumed = useCallback(async () => {
+    try {
+      const key = getTodayKey();
+      const raw = await AsyncStorage.getItem(key);
+      if (raw) {
+        const parsed = JSON.parse(raw) as { consumedMl?: number };
+        setWaterConsumedMl(typeof parsed.consumedMl === "number" ? parsed.consumedMl : 0);
+      } else {
+        setWaterConsumedMl(0);
+      }
+    } catch {
+      setWaterConsumedMl(0);
+    }
+  }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      loadWaterConsumed();
+      return () => {};
+    }, [loadWaterConsumed])
+  );
 
   const DAY_ITEM_WIDTH = 50 + 4 * 2;
 
@@ -81,9 +76,7 @@ const DataScreen: React.FC = () => {
     if (flatListRef.current) {
       const flatListVisibleWidth = width - 20 * 2;
       const offset =
-        (selectedDay - 1) * DAY_ITEM_WIDTH -
-        flatListVisibleWidth / 2 +
-        DAY_ITEM_WIDTH / 2;
+        (selectedDay - 1) * DAY_ITEM_WIDTH - flatListVisibleWidth / 2 + DAY_ITEM_WIDTH / 2;
       flatListRef.current.scrollToOffset({
         offset: Math.max(0, offset),
         animated: false,
@@ -113,65 +106,257 @@ const DataScreen: React.FC = () => {
     return days[dayIndex];
   };
 
+  // Tamanho interno do card de Resultados (width/height menos padding do card), reduzido levemente para dar respiro aos rótulos
+  const RESULTS_CARD_INNER_SIZE = Math.floor(Math.min(202 - 30, 188 - 30) * 0.9);
+
+  // Mini Radar Chart (mesma lógica do ResultsScreen, sem labels para caber no card)
+  const MiniRadar: React.FC<{ size?: number }> = ({ size = 150 }) => {
+    const center = size / 2;
+    const radius = size * 0.32;
+    const axisRadius = size * 0.38;
+    const gridRadius = size * 0.38;
+    const labelRadius = axisRadius + 8;
+    const levels = 5;
+    const RADAR_LABELS = ["Água", "Sono", "Passos", "BPM", "IMC", "Calorias"] as const;
+    const MAX_VALUE = 100;
+
+    type RadarData = {
+      water: number;
+      sleep: number;
+      steps: number;
+      bpm: number;
+      imc: number;
+      calories: number;
+    };
+
+    const forcaData: RadarData = {
+      water: 92,
+      sleep: 88,
+      steps: 93,
+      bpm: 90,
+      imc: 89,
+      calories: 94,
+    };
+    const agilidadeData: RadarData = {
+      water: 74,
+      sleep: 72,
+      steps: 78,
+      bpm: 73,
+      imc: 77,
+      calories: 75,
+    };
+    const resistenciaData: RadarData = {
+      water: 62,
+      sleep: 58,
+      steps: 65,
+      bpm: 64,
+      imc: 68,
+      calories: 61,
+    };
+
+    const getValues = (data: RadarData) => {
+      return RADAR_LABELS.map((_, i) => {
+        const key = Object.keys(data)[i] as keyof RadarData;
+        return (data[key] / MAX_VALUE) * radius;
+      });
+    };
+
+    const getPolygonPoints = (values: number[]) => {
+      return RADAR_LABELS.map((_, i) => {
+        const angle = (Math.PI * 2 * i) / RADAR_LABELS.length - Math.PI / 2;
+        const r = values[i];
+        const x = center + r * Math.cos(angle);
+        const y = center + r * Math.sin(angle);
+        return vec(x, y);
+      });
+    };
+
+    const createRoundedPolygonPath = (
+      points: ReturnType<typeof vec>[],
+      cornerRadius: number = 14
+    ) => {
+      if (points.length < 3) return "";
+      const numPoints = points.length;
+      const pathSegments: string[] = [];
+      const controlPoints: {
+        before: { x: number; y: number };
+        after: { x: number; y: number };
+      }[] = [];
+      for (let i = 0; i < numPoints; i++) {
+        const prevIndex = (i - 1 + numPoints) % numPoints;
+        const nextIndex = (i + 1) % numPoints;
+        const p0 = points[prevIndex];
+        const p1 = points[i];
+        const p2 = points[nextIndex];
+        const v1x = p1.x - p0.x;
+        const v1y = p1.y - p0.y;
+        const v2x = p2.x - p1.x;
+        const v2y = p2.y - p1.y;
+        const len1 = Math.sqrt(v1x * v1x + v1y * v1y);
+        const len2 = Math.sqrt(v2x * v2x + v2y * v2y);
+        const nv1x = len1 > 0 ? v1x / len1 : 0;
+        const nv1y = len1 > 0 ? v1y / len1 : 0;
+        const nv2x = len2 > 0 ? v2x / len2 : 0;
+        const nv2y = len2 > 0 ? v2y / len2 : 0;
+        const maxRadius = Math.min(len1, len2) / 2;
+        const effectiveRadius = Math.min(cornerRadius, maxRadius * 0.8);
+        controlPoints.push({
+          before: {
+            x: p1.x - nv1x * effectiveRadius,
+            y: p1.y - nv1y * effectiveRadius,
+          },
+          after: {
+            x: p1.x + nv2x * effectiveRadius,
+            y: p1.y + nv2y * effectiveRadius,
+          },
+        });
+      }
+      const firstControl = controlPoints[0];
+      pathSegments.push(`M ${firstControl.before.x} ${firstControl.before.y}`);
+      for (let i = 0; i < numPoints; i++) {
+        const control = controlPoints[i];
+        const p1 = points[i];
+        pathSegments.push(`Q ${p1.x} ${p1.y} ${control.after.x} ${control.after.y}`);
+      }
+      return pathSegments.join(" ") + " Z";
+    };
+
+    const forcaPath = createRoundedPolygonPath(getPolygonPoints(getValues(forcaData)), 16);
+    const agilidadePath = createRoundedPolygonPath(getPolygonPoints(getValues(agilidadeData)), 16);
+    const resistenciaPath = createRoundedPolygonPath(
+      getPolygonPoints(getValues(resistenciaData)),
+      16
+    );
+
+    return (
+      <View style={{ width: size, height: size, position: "relative" }}>
+        <Canvas style={{ width: size, height: size }}>
+          {[...Array(levels)].map((_, i) => {
+            const r = (gridRadius / levels) * (i + 1);
+            const levelPoints = [0, 1, 2, 3, 4, 5].map((j) => {
+              const angle = (Math.PI * 2 * j) / 6 - Math.PI / 2;
+              const x = center + r * Math.cos(angle);
+              const y = center + r * Math.sin(angle);
+              return vec(x, y);
+            });
+            const path =
+              levelPoints.reduce(
+                (p, pt, idx) => (idx === 0 ? `M ${pt.x} ${pt.y}` : `${p} L ${pt.x} ${pt.y}`),
+                ""
+              ) + " Z";
+            return <Path key={i} path={path} color="#E5E7EB" style="stroke" strokeWidth={1} />;
+          })}
+          {[0, 1, 2, 3, 4, 5].map((i) => {
+            const angle = (Math.PI * 2 * i) / 6 - Math.PI / 2;
+            const x = center + axisRadius * Math.cos(angle);
+            const y = center + axisRadius * Math.sin(angle);
+            return (
+              <Path
+                key={i}
+                path={`M ${center} ${center} L ${x} ${y}`}
+                color="#F1F5F9"
+                style="stroke"
+                strokeWidth={2}
+              />
+            );
+          })}
+          <Path path={forcaPath} style="fill" color="rgba(209, 161, 122, 0.5)" />
+          <Path
+            path={forcaPath}
+            color="#F97316"
+            style="stroke"
+            strokeWidth={3}
+            strokeJoin="round"
+            strokeCap="round"
+          />
+          <Path path={agilidadePath} style="fill" color="rgba(69, 69, 77, 0.4)" />
+          <Path
+            path={agilidadePath}
+            color="#192126"
+            style="stroke"
+            strokeWidth={3}
+            strokeJoin="round"
+            strokeCap="round"
+          />
+          <Path path={resistenciaPath} style="fill" color="rgba(118, 118, 150, 0.4)" />
+          <Path
+            path={resistenciaPath}
+            color="#3F5EBC"
+            style="stroke"
+            strokeWidth={3}
+            strokeJoin="round"
+            strokeCap="round"
+          />
+        </Canvas>
+
+        {RADAR_LABELS.map((label, i) => {
+          const angle = (Math.PI * 2 * i) / RADAR_LABELS.length - Math.PI / 2;
+          const lx = center + labelRadius * Math.cos(angle);
+          const ly = center + labelRadius * Math.sin(angle);
+          let textAlign: "left" | "center" | "right" = "center";
+          const isSide = Math.abs(Math.cos(angle)) > 0.7;
+          if (isSide) {
+            textAlign = Math.cos(angle) > 0 ? "left" : "right";
+          } else {
+            textAlign = "center";
+          }
+          const lateralSpacing = 16;
+          const horizontalNudge = isSide
+            ? Math.cos(angle) > 0
+              ? lateralSpacing
+              : -lateralSpacing
+            : 0;
+          const verticalNudge = label === "BPM" ? 6 : 0;
+          return (
+            <Text
+              key={i}
+              style={[
+                styles.resultsAxisLabel,
+                {
+                  position: "absolute",
+                  left: lx - 20 + horizontalNudge,
+                  top: ly - 8 + verticalNudge,
+                  textAlign,
+                },
+              ]}
+            >
+              {label}
+            </Text>
+          );
+        })}
+      </View>
+    );
+  };
+
   const monthNameAndYear = getMonthAndYear(currentDate);
   const totalDaysInMonth = getDaysInMonth(currentDate);
-  const daysInMonthArray = Array.from(
-    { length: totalDaysInMonth },
-    (_, i) => i + 1,
-  );
+  const daysInMonthArray = Array.from({ length: totalDaysInMonth }, (_, i) => i + 1);
   const currentMonth = currentDate.getMonth();
   const currentYear = currentDate.getFullYear();
 
   const renderDay = ({ item }: { item: number }) => (
     <TouchableOpacity
-      style={[
-        styles.dayContainer,
-        item === selectedDay && styles.selectedDayContainer,
-      ]}
+      style={[styles.dayContainer, item === selectedDay && styles.selectedDayContainer]}
       onPress={() => setSelectedDay(item)}
     >
-      <Text
-        style={[
-          styles.dayOfWeek,
-          item === selectedDay && styles.selectedDayOfWeek,
-        ]}
-      >
+      <Text style={[styles.dayOfWeek, item === selectedDay && styles.selectedDayOfWeek]}>
         {getDayOfWeek(currentYear, currentMonth, item)}
       </Text>
-      <Text
-        style={[
-          styles.dayOfMonth,
-          item === selectedDay && styles.selectedDayOfMonth,
-        ]}
-      >
+      <Text style={[styles.dayOfMonth, item === selectedDay && styles.selectedDayOfMonth]}>
         {item}
       </Text>
     </TouchableOpacity>
   );
 
-  const getItemLayout = (
-    data: ArrayLike<any> | null | undefined,
-    index: number,
-  ) => ({ length: DAY_ITEM_WIDTH, offset: DAY_ITEM_WIDTH * index, index });
+  const getItemLayout = (data: ArrayLike<any> | null | undefined, index: number) => ({
+    length: DAY_ITEM_WIDTH,
+    offset: DAY_ITEM_WIDTH * index,
+    index,
+  });
 
   return (
     <View style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <View style={styles.headerTop}>
-          <MenuButton onPress={() => navigation.openDrawer()} />
-          <Image
-            source={{
-              uri: "https://res.cloudinary.com/ditlmzgrh/image/upload/v1758030169/MV_pukwcn.png",
-            }}
-            style={{ width: 80, height: 40 }}
-            resizeMode="cover"
-          />
-          <TouchableOpacity style={styles.iconButton}>
-            <Bell size={24} color="#192126" />
-          </TouchableOpacity>
-        </View>
-      </View>
+      <Header />
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         <Text style={styles.monthText}>{monthNameAndYear}</Text>
@@ -189,13 +374,6 @@ const DataScreen: React.FC = () => {
             onLayout={handleFlatListLayout}
           />
           <Text style={styles.reportTitle}>Relatório de hoje</Text>
-
-          {/* {error && <Text style={styles.errorText}>Erro: {error}</Text>} */}
-          {/* {!isAuthorized && !isLoading && !error && (
-                            <TouchableOpacity onPress={authorizeGoogleFit} style={styles.authorizeButton}>
-                                <Text style={styles.authorizeButtonText}>Autorizar Google Fit</Text>
-                            </TouchableOpacity>
-                        )} */}
 
           <View style={styles.cardsContainer}>
             <View style={styles.topRowCardsContainer}>
@@ -227,44 +405,34 @@ const DataScreen: React.FC = () => {
                     })
                   }
                 >
-                  <Text
-                    style={[styles.cardCategory, styles.trainingTimeCategory]}
-                  >
+                  <Text style={[styles.cardCategory, styles.trainingTimeCategory]}>
                     Tempo de treino
                   </Text>
                   <View style={{ width: "100%", alignItems: "center" }}>
                     <View style={styles.circularProgressPlaceholder}>
-                      <Text
-                        style={[styles.cardValue, styles.trainingTimeValue]}
-                      >
-                        80%
-                      </Text>
+                      <Text style={[styles.cardValue, styles.trainingTimeValue]}>80%</Text>
                     </View>
                   </View>
                 </TouchableOpacity>
               </View>
 
-              {/* Coluna Direita Superior: Ciclismo */}
+              {/* Coluna Direita Superior: Resultados (mesma estilização do Ciclismo) */}
               <TouchableOpacity
-                style={[styles.card, styles.cyclingCard]}
+                style={[styles.card, styles.ResultsCard]}
                 onPress={() =>
                   navigation.navigate({
-                    name: "CyclingScreen",
+                    name: "ResultsScreen",
                     params: {} as never,
                   })
                 }
               >
-                <View style={styles.cyclingContent}>
-                  <View style={styles.cyclingHeader}>
-                    <Bike size={18} color="#ccc" />
-                    <Text style={styles.cyclingCategory}>Ciclismo</Text>
+                <View style={styles.ResultsContent}>
+                  <View style={styles.ResultsHeader}>
+                    <Text style={styles.ResultsCategory}>Resultados</Text>
                   </View>
-                  <View style={styles.cyclingGraphPlaceholder}>
-                    <View style={styles.cyclingGraphLine}></View>
+                  <View style={styles.ResultsGraphPlaceholder}>
+                    <MiniRadar size={RESULTS_CARD_INNER_SIZE} />
                   </View>
-                  <Text style={[styles.cardValue, styles.cyclingValue]}>
-                    {healthData.cycling} km
-                  </Text>
                 </View>
               </TouchableOpacity>
             </View>
@@ -281,9 +449,7 @@ const DataScreen: React.FC = () => {
                   })
                 }
               >
-                <Text style={[styles.cardCategory, styles.heartRateCategory]}>
-                  Batimentos
-                </Text>
+                <Text style={[styles.cardCategory, styles.heartRateCategory]}>Batimentos</Text>
                 <View style={styles.heartRateGraphPlaceholder}></View>
                 <Text style={[styles.cardValue, styles.heartRateValue]}>
                   {healthData.heartRate} Bpm
@@ -300,12 +466,8 @@ const DataScreen: React.FC = () => {
                   })
                 }
               >
-                <Text style={[styles.cardCategory, styles.stepsCategory]}>
-                  Passos
-                </Text>
-                <Text style={[styles.cardValue, styles.stepsValue]}>
-                  {healthData.steps}/2000
-                </Text>
+                <Text style={[styles.cardCategory, styles.stepsCategory]}>Passos</Text>
+                <Text style={[styles.cardValue, styles.stepsValue]}>{healthData.steps}/2000</Text>
                 <View style={styles.progressBarPlaceholder}>
                   <View
                     style={[
@@ -331,9 +493,7 @@ const DataScreen: React.FC = () => {
                   })
                 }
               >
-                <Text style={[styles.cardCategory, styles.sleepCategory]}>
-                  Sono
-                </Text>
+                <Text style={[styles.cardCategory, styles.sleepCategory]}>Sono</Text>
                 <View style={styles.sleepGraphPlaceholder}></View>
                 <Text style={[styles.cardValue, styles.sleepValue]}>0h 0m</Text>
               </TouchableOpacity>
@@ -348,12 +508,10 @@ const DataScreen: React.FC = () => {
                   })
                 }
               >
-                <Text style={[styles.cardCategory, styles.waterCategory]}>
-                  Água
-                </Text>
+                <Text style={[styles.cardCategory, styles.waterCategory]}>Água</Text>
                 <View style={styles.waterFillPlaceholder}>
                   <Text style={[styles.cardValue, styles.waterValue]}>
-                    {healthData.water}/8 Copos
+                    {waterConsumedMl} ml
                   </Text>
                 </View>
               </TouchableOpacity>
@@ -487,12 +645,12 @@ const styles = StyleSheet.create({
   },
   cardCategory: {
     color: "#192126",
-    fontSize: 10,
+    fontSize: 12,
     marginBottom: 5,
   },
   cardValue: {
     color: "#fff",
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: "bold",
   },
   caloriesCard: {
@@ -511,41 +669,48 @@ const styles = StyleSheet.create({
     color: "#333",
     fontSize: 16,
   },
-  cyclingCard: {
-    backgroundColor: "#1E1E1E",
+  ResultsCard: {
+    backgroundColor: "#ffffff",
     height: 188,
     width: 202,
     flexDirection: "column",
-    justifyContent: "space-between",
-    alignItems: "flex-start",
+    justifyContent: "center",
+    alignItems: "center",
     marginBottom: 15,
+    borderColor: "#192126",
+    borderWidth: 1,
   },
-  cyclingContent: {
+  ResultsContent: {
     flexDirection: "column",
-    alignItems: "flex-start",
-    justifyContent: "space-between",
+    alignItems: "center",
+    justifyContent: "center",
     height: "100%",
+    width: "100%",
   },
-  cyclingHeader: {
+  ResultsHeader: {
     flexDirection: "row",
     alignItems: "center",
+    justifyContent: "flex-start",
+    alignSelf: "stretch",
+    width: "100%",
     marginBottom: 5,
   },
-  cyclingCategory: {
-    color: "#ccc",
+  ResultsCategory: {
+    color: "#192126",
     fontSize: 12,
-    marginLeft: 5,
+    marginTop: 20,
+    textAlign: "left",
+    alignSelf: "flex-start",
   },
-  cyclingGraphPlaceholder: {
+  ResultsGraphPlaceholder: {
     width: "100%",
-    height: 80,
-    backgroundColor: "#282828",
+    height: "100%",
+    backgroundColor: "transparent",
     borderRadius: 10,
-    marginTop: 10,
     justifyContent: "center",
     alignItems: "center",
   },
-  cyclingGraphLine: {
+  ResultsGraphLine: {
     backgroundColor: "#BBF246",
     height: 2,
     width: "80%",
@@ -593,7 +758,7 @@ const styles = StyleSheet.create({
   },
   heartRateCategory: {
     color: "#888",
-    fontSize: 10,
+    fontSize: 12,
     marginBottom: 5,
   },
   heartRateGraphPlaceholder: {
@@ -606,7 +771,7 @@ const styles = StyleSheet.create({
     color: "#FF69B4",
     fontSize: 18,
   },
-  cyclingValue: {
+  ResultsValue: {
     color: "#00C0FF",
     fontSize: 18,
     fontWeight: "bold",
@@ -687,7 +852,6 @@ const styles = StyleSheet.create({
   waterFillPlaceholder: {
     width: "100%",
     height: 60,
-    backgroundColor: "#BBDEFB",
     borderRadius: 10,
     justifyContent: "flex-end",
   },
@@ -695,6 +859,25 @@ const styles = StyleSheet.create({
     color: "#4682B4",
     paddingBottom: 5,
     paddingLeft: 5,
+    fontSize: 18,
+  },
+  resultsCard: {
+    backgroundColor: "#F3E8FF",
+    width: "100%",
+    height: 120,
+    padding: 15,
+    borderRadius: 8,
+    marginBottom: 15,
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+  },
+  resultsCategory: {
+    color: "#888",
+    fontSize: 12,
+    marginBottom: 5,
+  },
+  resultsValue: {
+    color: "#7E22CE",
     fontSize: 18,
   },
   bottomNavigationBar: {
@@ -762,6 +945,14 @@ const styles = StyleSheet.create({
     fontSize: 16,
     marginVertical: 20,
     color: "#FF0000",
+  },
+  resultsAxisLabel: {
+    color: "#192126",
+    fontSize: 8,
+    lineHeight: 10,
+    fontWeight: "bold",
+    width: 40,
+    textAlign: "center",
   },
 });
 

@@ -7,8 +7,7 @@ import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { RootStackParamList } from "@typings/routes"; // Corrigida a importação de RootStackParamList
 
 const VerifyPhoneScreen = () => {
-  const navigation =
-    useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
 
   const handleVerify = () => {
     navigation.navigate("Verify", { screen: "VerifyCompanyScreen" });
@@ -26,8 +25,7 @@ const VerifyPhoneScreen = () => {
         <BackButton />
         <Text style={styles.title}>Validar telefone</Text>
         <Text style={styles.subtitle}>
-          Digite o código de 6 dígitos enviado por SMS para validar seu
-          telefone.
+          Digite o código de 6 dígitos enviado por SMS para validar seu telefone.
         </Text>
         <View style={{ marginTop: 30 }}>
           <Text style={styles.subtitle}>Código de verificação</Text>

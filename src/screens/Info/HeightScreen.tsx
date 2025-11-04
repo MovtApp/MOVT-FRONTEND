@@ -1,12 +1,5 @@
 import React, { useState, useRef, useEffect } from "react";
-import {
-  View,
-  StyleSheet,
-  TouchableOpacity,
-  Text,
-  ScrollView,
-  Dimensions,
-} from "react-native";
+import { View, StyleSheet, TouchableOpacity, Text, ScrollView, Dimensions } from "react-native";
 import BackButton from "@components/BackButton";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useNavigation } from "@react-navigation/native";
@@ -16,8 +9,7 @@ const { height: screenHeight } = Dimensions.get("window");
 const ITEM_HEIGHT = 60; // Altura de cada item de altura
 
 const HeightScreen = () => {
-  const navigation =
-    useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const [selectedHeight, setSelectedHeight] = useState(165);
   const scrollViewRef = useRef<ScrollView>(null);
   const heights = Array.from({ length: 151 }, (_, i) => i + 100); // 100 a 250 cm

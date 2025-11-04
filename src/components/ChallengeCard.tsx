@@ -14,11 +14,7 @@ interface ChallengeCardProps {
   onPress: () => void;
 }
 
-const ChallengeCard: React.FC<ChallengeCardProps> = ({
-  image,
-  title,
-  onPress,
-}) => {
+const ChallengeCard: React.FC<ChallengeCardProps> = ({ image, title, onPress }) => {
   return (
     <TouchableOpacity style={styles.cardContainer} onPress={onPress}>
       <ImageBackground

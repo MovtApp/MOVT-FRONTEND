@@ -26,12 +26,10 @@ const SOCIAL_SIGN_IN_EDGE_FUNCTION_URL =
 
 // Variáveis de ambiente (usa EXPO_PUBLIC_* e faz fallback)
 const GOOGLE_WEB_CLIENT_ID =
-  process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID ||
-  process.env.GOOGLE_WEB_CLIENT_ID;
+  process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID || process.env.GOOGLE_WEB_CLIENT_ID;
 
 export const SignInScreen = () => {
-  const navigation =
-    useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const { signIn } = useAuth();
 
   const [email, setEmail] = useState("");
@@ -72,7 +70,7 @@ export const SignInScreen = () => {
           email,
           senha: password,
         },
-        { signal: controller.signal },
+        { signal: controller.signal }
       );
       clearTimeout(timeoutId);
 
@@ -143,18 +141,12 @@ export const SignInScreen = () => {
       if (idToken) {
         handleSignInWithSocialToken("google", idToken);
       } else if ((response as any).params?.id_token) {
-        handleSignInWithSocialToken(
-          "google",
-          (response as any).params.id_token as string,
-        );
+        handleSignInWithSocialToken("google", (response as any).params.id_token as string);
       }
     }
   }, [response]);
 
-  const handleSignInWithSocialToken = async (
-    provider: "google",
-    token: string,
-  ) => {
+  const handleSignInWithSocialToken = async (provider: "google", token: string) => {
     try {
       const response = await fetch(SOCIAL_SIGN_IN_EDGE_FUNCTION_URL, {
         method: "POST",
@@ -166,9 +158,7 @@ export const SignInScreen = () => {
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(
-          errorData.message || "Erro ao autenticar via Edge Function.",
-        );
+        throw new Error(errorData.message || "Erro ao autenticar via Edge Function.");
       }
 
       const { access_token, refresh_token } = await response.json();
@@ -178,15 +168,10 @@ export const SignInScreen = () => {
         console.log("Login social bem-sucedido via Edge Function!");
         // navigation.navigate('AppStack');
       } else {
-        throw new Error(
-          "Tokens de sessão Supabase não recebidos da Edge Function.",
-        );
+        throw new Error("Tokens de sessão Supabase não recebidos da Edge Function.");
       }
     } catch (error: any) {
-      console.error(
-        "Erro na autenticação social via Edge Function:",
-        error.message,
-      );
+      console.error("Erro na autenticação social via Edge Function:", error.message);
       Alert.alert("Erro de Login", error.message);
     }
   };
@@ -222,9 +207,7 @@ export const SignInScreen = () => {
     <View style={styles.container}>
       <BackButton />
       <Text style={styles.title}>Entre na sua conta</Text>
-      <Text style={styles.subtitle}>
-        Digite seu e-mail e senha para fazer login
-      </Text>
+      <Text style={styles.subtitle}>Digite seu e-mail e senha para fazer login</Text>
       <View style={{ marginTop: 30 }}>
         <Text style={styles.subtitle}>E-mail</Text>
         <CustomInput
@@ -245,11 +228,7 @@ export const SignInScreen = () => {
               onPress={() => setShowPassword((prev) => !prev)}
               style={{ marginRight: 22 }}
             >
-              {showPassword ? (
-                <EyeOff size={24} color="#888" />
-              ) : (
-                <Eye size={24} color="#888" />
-              )}
+              {showPassword ? <EyeOff size={24} color="#888" /> : <Eye size={24} color="#888" />}
             </TouchableOpacity>
           }
         />
@@ -263,14 +242,8 @@ export const SignInScreen = () => {
         {/* Exibe o erro se houver */}
         {error && <Text style={styles.error}>{error}</Text>}
 
-        <TouchableOpacity
-          style={styles.loginButton}
-          onPress={handleLogin}
-          disabled={loading}
-        >
-          <Text style={styles.loginButtonText}>
-            {loading ? "Entrando..." : "Log In"}
-          </Text>
+        <TouchableOpacity style={styles.loginButton} onPress={handleLogin} disabled={loading}>
+          <Text style={styles.loginButtonText}>{loading ? "Entrando..." : "Log In"}</Text>
         </TouchableOpacity>
         <View style={styles.separatorContainer}>
           <View style={styles.separatorLine} />
@@ -278,11 +251,7 @@ export const SignInScreen = () => {
           <View style={styles.separatorLine} />
         </View>
         <View>
-          <SocialButton
-            type="google"
-            text="Continue com Google"
-            onPress={signInWithGoogle}
-          />
+          <SocialButton type="google" text="Continue com Google" onPress={signInWithGoogle} />
         </View>
         <View
           style={{

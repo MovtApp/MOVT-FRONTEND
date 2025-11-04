@@ -1,11 +1,5 @@
 import React from "react";
-import {
-  View,
-  Text,
-  TouchableOpacity,
-  ScrollView,
-  StyleSheet,
-} from "react-native";
+import { View, Text, TouchableOpacity, ScrollView, StyleSheet } from "react-native";
 import { Users, Dumbbell, Activity } from "lucide-react-native";
 
 interface CommunityItem {
@@ -51,11 +45,7 @@ const Communities: React.FC = () => {
           <Text style={styles.seeAllText}>Ver todas</Text>
         </TouchableOpacity>
       </View>
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        style={styles.communitiesList}
-      >
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.communitiesList}>
         {communityData.map((community) => (
           <View key={community.id} style={styles.communityItem}>
             <View style={styles.communityAvatar}>

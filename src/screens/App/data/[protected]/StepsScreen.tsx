@@ -5,9 +5,7 @@ const StepsScreen: React.FC = () => {
   return (
     <View style={styles.container}>
       <Text style={styles.title}>Detalhes de Passos</Text>
-      <Text style={styles.subtitle}>
-        Informações sobre seus passos diários.
-      </Text>
+      <Text style={styles.subtitle}>Informações sobre seus passos diários.</Text>
     </View>
   );
 };

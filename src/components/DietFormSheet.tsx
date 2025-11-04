@@ -1,13 +1,5 @@
 import React, { useState, useEffect, useMemo } from "react";
-import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  TextInput,
-  Image,
-  Alert,
-} from "react-native";
+import { View, Text, StyleSheet, TouchableOpacity, TextInput, Image, Alert } from "react-native";
 import BottomSheet, { BottomSheetScrollView } from "@gorhom/bottom-sheet";
 import { Image as ImageIcon } from "lucide-react-native";
 import * as ImagePicker from "expo-image-picker";
@@ -45,10 +37,7 @@ interface DietFormSheetProps {
   onSuccess?: () => void;
 }
 
-const mapDietMealToDietFormInputs = (
-  meal: DietMeal | undefined,
-  user: any,
-): DietFormInputs => {
+const mapDietMealToDietFormInputs = (meal: DietMeal | undefined, user: any): DietFormInputs => {
   return {
     id_dieta: meal?.id_dieta || undefined,
     nome: meal?.title || "",
@@ -80,7 +69,7 @@ const DietFormSheet: React.FC<DietFormSheetProps> = ({
   const isAddingNewDiet = !initialData;
   const initialFormValues = useMemo(
     () => mapDietMealToDietFormInputs(initialData, user),
-    [initialData, user],
+    [initialData, user]
   );
 
   const {
@@ -95,9 +84,7 @@ const DietFormSheet: React.FC<DietFormSheetProps> = ({
   });
   // const selectedCategory = watch('categoria'); // Variável não utilizada removida
 
-  const [imageUri, setImageUri] = useState<string | null>(
-    initialFormValues.imageurl || null,
-  );
+  const [imageUri, setImageUri] = useState<string | null>(initialFormValues.imageurl || null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const categoryOptions = [
@@ -142,12 +129,11 @@ const DietFormSheet: React.FC<DietFormSheetProps> = ({
         {
           text: "Tirar Foto",
           onPress: async () => {
-            const { status } =
-              await ImagePicker.requestCameraPermissionsAsync();
+            const { status } = await ImagePicker.requestCameraPermissionsAsync();
             if (status !== "granted") {
               Alert.alert(
                 "Permissão Necessária",
-                "Precisamos da sua permissão para acessar a câmera.",
+                "Precisamos da sua permissão para acessar a câmera."
               );
               return;
             }
@@ -166,12 +152,11 @@ const DietFormSheet: React.FC<DietFormSheetProps> = ({
         {
           text: "Selecionar da Galeria",
           onPress: async () => {
-            const { status } =
-              await ImagePicker.requestMediaLibraryPermissionsAsync();
+            const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
             if (status !== "granted") {
               Alert.alert(
                 "Permissão Necessária",
-                "Precisamos da sua permissão para acessar a galeria de imagens.",
+                "Precisamos da sua permissão para acessar a galeria de imagens."
               );
               return;
             }
@@ -188,7 +173,7 @@ const DietFormSheet: React.FC<DietFormSheetProps> = ({
           },
         },
       ],
-      { cancelable: true },
+      { cancelable: true }
     );
   };
 
@@ -201,10 +186,7 @@ const DietFormSheet: React.FC<DietFormSheetProps> = ({
     }
 
     if (!user || !user.sessionId) {
-      Alert.alert(
-        "Erro",
-        "Usuário não autenticado. Por favor, faça login novamente.",
-      );
+      Alert.alert("Erro", "Usuário não autenticado. Por favor, faça login novamente.");
       return;
     }
 
@@ -212,7 +194,7 @@ const DietFormSheet: React.FC<DietFormSheetProps> = ({
     if (!data.nome || !data.descricao || !data.imageurl || !data.categoria) {
       Alert.alert(
         "Erro",
-        "Por favor, preencha todos os campos obrigatórios: Nome, Descrição, Imagem e Categoria.",
+        "Por favor, preencha todos os campos obrigatórios: Nome, Descrição, Imagem e Categoria."
       );
       return;
     }
@@ -242,10 +224,7 @@ const DietFormSheet: React.FC<DietFormSheetProps> = ({
         }
       } catch (uploadError: any) {
         console.error("❌ Erro no upload:", uploadError.message);
-        Alert.alert(
-          "Erro",
-          `Falha ao fazer upload da imagem: ${uploadError.message}`,
-        );
+        Alert.alert("Erro", `Falha ao fazer upload da imagem: ${uploadError.message}`);
         setIsSubmitting(false);
         clearTimeout(fallbackTimeout);
         return;
@@ -276,15 +255,11 @@ const DietFormSheet: React.FC<DietFormSheetProps> = ({
       if (initialData?.id_dieta) {
         // Editar dieta existente
         console.log("Editando dieta existente:", initialData.id_dieta);
-        const response = await api.put(
-          `/dietas/${initialData.id_dieta}`,
-          payload,
-          {
-            headers: {
-              Authorization: `Bearer ${user.sessionId}`,
-            },
+        const response = await api.put(`/dietas/${initialData.id_dieta}`, payload, {
+          headers: {
+            Authorization: `Bearer ${user.sessionId}`,
           },
-        );
+        });
         console.log("✅ Resposta da API (editar):", response.data);
         Alert.alert("Sucesso", "Dieta atualizada com sucesso!");
       } else {
@@ -375,9 +350,7 @@ const DietFormSheet: React.FC<DietFormSheetProps> = ({
             />
           )}
         />
-        {errors.nome && (
-          <Text style={styles.errorText}>{errors.nome.message}</Text>
-        )}
+        {errors.nome && <Text style={styles.errorText}>{errors.nome.message}</Text>}
 
         <Text style={styles.label}>Descrição:</Text>
         <Controller
@@ -395,9 +368,7 @@ const DietFormSheet: React.FC<DietFormSheetProps> = ({
             />
           )}
         />
-        {errors.descricao && (
-          <Text style={styles.errorText}>{errors.descricao.message}</Text>
-        )}
+        {errors.descricao && <Text style={styles.errorText}>{errors.descricao.message}</Text>}
 
         <Text style={styles.label}>Categoria:</Text>
         <Controller
@@ -412,9 +383,7 @@ const DietFormSheet: React.FC<DietFormSheetProps> = ({
             />
           )}
         />
-        {errors.categoria && (
-          <Text style={styles.errorText}>{errors.categoria.message}</Text>
-        )}
+        {errors.categoria && <Text style={styles.errorText}>{errors.categoria.message}</Text>}
 
         <Text style={styles.label}>Calorias (kcal):</Text>
         <Controller
@@ -425,17 +394,13 @@ const DietFormSheet: React.FC<DietFormSheetProps> = ({
               style={styles.input}
               placeholder="Ex: 300"
               onBlur={onBlur}
-              onChangeText={(text) =>
-                onChange(text === "" ? undefined : Number(text))
-              }
+              onChangeText={(text) => onChange(text === "" ? undefined : Number(text))}
               value={value?.toString() || ""}
               keyboardType="numeric"
             />
           )}
         />
-        {errors.calorias && (
-          <Text style={styles.errorText}>{errors.calorias.message}</Text>
-        )}
+        {errors.calorias && <Text style={styles.errorText}>{errors.calorias.message}</Text>}
 
         <Text style={styles.label}>Tempo de Preparo (minutos):</Text>
         <Controller
@@ -446,9 +411,7 @@ const DietFormSheet: React.FC<DietFormSheetProps> = ({
               style={styles.input}
               placeholder="Ex: 30"
               onBlur={onBlur}
-              onChangeText={(text) =>
-                onChange(text === "" ? undefined : Number(text))
-              }
+              onChangeText={(text) => onChange(text === "" ? undefined : Number(text))}
               value={value?.toString() || ""}
               keyboardType="numeric"
             />
@@ -467,17 +430,13 @@ const DietFormSheet: React.FC<DietFormSheetProps> = ({
               style={styles.input}
               placeholder="Ex: 40"
               onBlur={onBlur}
-              onChangeText={(text) =>
-                onChange(text === "" ? undefined : Number(text))
-              }
+              onChangeText={(text) => onChange(text === "" ? undefined : Number(text))}
               value={value?.toString() || ""}
               keyboardType="numeric"
             />
           )}
         />
-        {errors.carboidratos && (
-          <Text style={styles.errorText}>{errors.carboidratos.message}</Text>
-        )}
+        {errors.carboidratos && <Text style={styles.errorText}>{errors.carboidratos.message}</Text>}
 
         <Text style={styles.label}>Gordura (g):</Text>
         <Controller
@@ -488,17 +447,13 @@ const DietFormSheet: React.FC<DietFormSheetProps> = ({
               style={styles.input}
               placeholder="Ex: 15"
               onBlur={onBlur}
-              onChangeText={(text) =>
-                onChange(text === "" ? undefined : Number(text))
-              }
+              onChangeText={(text) => onChange(text === "" ? undefined : Number(text))}
               value={value?.toString() || ""}
               keyboardType="numeric"
             />
           )}
         />
-        {errors.gordura && (
-          <Text style={styles.errorText}>{errors.gordura.message}</Text>
-        )}
+        {errors.gordura && <Text style={styles.errorText}>{errors.gordura.message}</Text>}
 
         <Text style={styles.label}>Proteína (g):</Text>
         <Controller
@@ -509,17 +464,13 @@ const DietFormSheet: React.FC<DietFormSheetProps> = ({
               style={styles.input}
               placeholder="Ex: 25"
               onBlur={onBlur}
-              onChangeText={(text) =>
-                onChange(text === "" ? undefined : Number(text))
-              }
+              onChangeText={(text) => onChange(text === "" ? undefined : Number(text))}
               value={value?.toString() || ""}
               keyboardType="numeric"
             />
           )}
         />
-        {errors.proteina && (
-          <Text style={styles.errorText}>{errors.proteina.message}</Text>
-        )}
+        {errors.proteina && <Text style={styles.errorText}>{errors.proteina.message}</Text>}
 
         <Text style={styles.label}>Imagem da Dieta:</Text>
         <View style={styles.imagePickerContainer}>
@@ -531,38 +482,25 @@ const DietFormSheet: React.FC<DietFormSheetProps> = ({
             <TouchableOpacity onPress={handleImageSelection}>
               <View style={styles.imagePlaceholder}>
                 <ImageIcon size={40} color="#ccc" />
-                <Text
-                  style={[styles.imagePlaceholderText, { textAlign: "center" }]}
-                >
-                  Tire uma foto{"\n"} ou selecione uma imagem {"\n"}da sua
-                  galeria.
+                <Text style={[styles.imagePlaceholderText, { textAlign: "center" }]}>
+                  Tire uma foto{"\n"} ou selecione uma imagem {"\n"}da sua galeria.
                 </Text>
               </View>
             </TouchableOpacity>
           )}
         </View>
-        {errors.imageurl && (
-          <Text style={styles.errorText}>{errors.imageurl.message}</Text>
-        )}
+        {errors.imageurl && <Text style={styles.errorText}>{errors.imageurl.message}</Text>}
 
         <View style={styles.bottomButtonsContainer}>
-          <TouchableOpacity
-            style={[styles.submitButton, styles.cancelButton]}
-            onPress={onClose}
-          >
+          <TouchableOpacity style={[styles.submitButton, styles.cancelButton]} onPress={onClose}>
             <Text style={styles.submitButtonText}>Cancelar</Text>
           </TouchableOpacity>
           <TouchableOpacity
-            style={[
-              styles.submitButton,
-              isSubmitting && styles.submitButtonDisabled,
-            ]}
+            style={[styles.submitButton, isSubmitting && styles.submitButtonDisabled]}
             onPress={handleSubmit(onSubmitForm)}
             disabled={isSubmitting}
           >
-            <Text style={styles.submitButtonText}>
-              {isSubmitting ? "Salvando..." : "Salvar"}
-            </Text>
+            <Text style={styles.submitButtonText}>{isSubmitting ? "Salvando..." : "Salvar"}</Text>
           </TouchableOpacity>
         </View>
 

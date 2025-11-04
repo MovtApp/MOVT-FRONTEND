@@ -12,19 +12,10 @@ const Stack = createNativeStackNavigator<VerifyStackParamList>();
 
 export function VerifyRoutes() {
   return (
-    <Stack.Navigator
-      initialRouteName="VerifyAccountScreen"
-      screenOptions={{ headerShown: false }}
-    >
-      <Stack.Screen
-        name="VerifyAccountScreen"
-        component={VerifyAccountScreen}
-      />
+    <Stack.Navigator initialRouteName="VerifyAccountScreen" screenOptions={{ headerShown: false }}>
+      <Stack.Screen name="VerifyAccountScreen" component={VerifyAccountScreen} />
       <Stack.Screen name="VerifyPhoneScreen" component={VerifyPhoneScreen} />
-      <Stack.Screen
-        name="VerifyCompanyScreen"
-        component={VerifyCompanyScreen}
-      />
+      <Stack.Screen name="VerifyCompanyScreen" component={VerifyCompanyScreen} />
       <Stack.Screen name="VerifyCNPJScreen" component={VerifyCNPJScreen} />
       <Stack.Screen name="VerifyCrefScreen" component={VerifyCrefScreen} />
       <Stack.Screen name="RecoveryScreen" component={RecoveryScreen} />
