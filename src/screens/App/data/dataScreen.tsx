@@ -26,6 +26,65 @@ const getTodayKey = (): string => {
   return `water:${yyyy}-${mm}-${dd}`;
 };
 
+// Componente isolado da onda para evitar re-render do DataScreen
+const WaterWave: React.FC<{ progress: number; height?: number }> = React.memo(({ progress, height = 60 }) => {
+  const [phase, setPhase] = useState<number>(0);
+  const [size, setSize] = useState<{ width: number; height: number }>({ width: 0, height });
+
+  const buildWavePath = useCallback(
+    (w: number, h: number, phaseValue: number, amplitude: number, prog: number): string => {
+      if (w <= 0 || h <= 0) return "";
+      const baseY = h * (1 - Math.max(0, Math.min(1, prog)));
+      const wavelength = Math.max(60, w / 1.5);
+      const k = (2 * Math.PI) / wavelength;
+      const step = Math.max(1, Math.floor(w / 120));
+      let d = `M 0 ${h} L 0 ${baseY}`;
+      for (let x = 0; x <= w; x += step) {
+        const y = baseY - amplitude * Math.sin(k * x + phaseValue);
+        d += ` L ${x} ${y}`;
+      }
+      d += ` L ${w} ${h} Z`;
+      return d;
+    },
+    []
+  );
+
+  useEffect(() => {
+    let rafId: number;
+    let last = performance.now();
+    const speed = 1.4; // rad/s (mais lento)
+    const loop = (now: number) => {
+      const dt = Math.min(32, now - last) / 1000;
+      last = now;
+      setPhase((prev) => (prev + speed * dt) % (Math.PI * 2));
+      rafId = requestAnimationFrame(loop);
+    };
+    rafId = requestAnimationFrame(loop);
+    return () => cancelAnimationFrame(rafId);
+  }, []);
+
+  return (
+    <View
+      style={{ position: "absolute", inset: 0 }}
+      onLayout={(e) => setSize({ width: e.nativeEvent.layout.width, height: e.nativeEvent.layout.height })}
+      pointerEvents="none"
+    >
+      <Canvas style={{ position: "absolute", left: 0, top: 0, right: 0, bottom: 0 }}>
+        <Path
+          path={buildWavePath(size.width, size.height, phase, 11, progress)}
+          color="#9ED0F5"
+          style="fill"
+        />
+        <Path
+          path={buildWavePath(size.width, size.height, phase + Math.PI / 2, 8, Math.max(0, Math.min(1, progress * 0.98)))}
+          color="#79BDEB"
+          style="fill"
+        />
+      </Canvas>
+    </View>
+  );
+});
+
 const DataScreen: React.FC = () => {
   type DataScreenNavigationProp = CompositeNavigationProp<
     DrawerNavigationProp<AppDrawerParamList, "HomeStack">,
@@ -69,6 +128,10 @@ const DataScreen: React.FC = () => {
       return () => {};
     }, [loadWaterConsumed])
   );
+
+  // Água - progresso relativo à meta
+  const waterGoalMl = 2000; // fallback para 8 copos de 250ml
+  const waterProgress = Math.max(0, Math.min(1, waterConsumedMl / waterGoalMl));
 
   const DAY_ITEM_WIDTH = 50 + 4 * 2;
 
@@ -509,11 +572,12 @@ const DataScreen: React.FC = () => {
                 }
               >
                 <Text style={[styles.cardCategory, styles.waterCategory]}>Água</Text>
-                <View style={styles.waterFillPlaceholder}>
-                  <Text style={[styles.cardValue, styles.waterValue]}>
-                    {waterConsumedMl} ml
-                  </Text>
-                </View>
+                  <View style={styles.waterFillPlaceholder}>
+                   <WaterWave progress={waterProgress} />
+                   <Text style={[styles.cardValue, styles.waterValue]}>
+                     {waterConsumedMl} ml
+                   </Text>
+                 </View>
               </TouchableOpacity>
             </View>
           </View>
@@ -853,10 +917,14 @@ const styles = StyleSheet.create({
     width: "100%",
     height: 60,
     borderRadius: 10,
-    justifyContent: "flex-end",
+    justifyContent: "center",
+    alignItems: "center",
+    position: "relative",
+    overflow: "hidden",
+    backgroundColor: "#FFFFFF",
   },
   waterValue: {
-    color: "#4682B4",
+    color: "#192126",
     paddingBottom: 5,
     paddingLeft: 5,
     fontSize: 18,

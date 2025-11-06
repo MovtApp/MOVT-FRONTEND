@@ -19,7 +19,7 @@ import BackButton from "../../../../components/BackButton";
 import NavigationArrows from "../../../../components/data/NavigationArrows";
 import { AppStackParamList } from "../../../../@types/routes";
 import ConfettiCannon from "react-native-confetti-cannon";
-import { CirclePlus, SquarePen, RotateCcw } from "lucide-react-native";
+import { CirclePlus, SquarePen, RotateCcw, Plus } from "lucide-react-native";
 
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
@@ -213,17 +213,17 @@ const WaterScreen: React.FC = () => {
 
           {/* Azul dinâmico ancorado no bottom */}
           <Animated.View style={[styles.metricBlueFill, { height: animatedBlueHeight }]}>
-            <Text style={styles.metricBlueTopRight}>
-              Até agora{"\n"}
-              {consumedMl}ml
-            </Text>
+            <View style={styles.metricTopRightGroup}>
+              <Text style={styles.metricBlueTopRight}>Até agora</Text>
+              <Text style={styles.metricMl}>{consumedMl} ml</Text>
+            </View>
             <TouchableOpacity
               onPress={handleAddCup}
               accessibilityRole="button"
               accessibilityLabel={`Adicionar ${cupMl} ml`}
               style={styles.plusButton}
             >
-              <Text style={styles.plusText}>+</Text>
+              <Plus size={20} color="#192126"/>
             </TouchableOpacity>
           </Animated.View>
         </View>
@@ -362,7 +362,7 @@ const styles = StyleSheet.create({
   },
   metricGreyBackground: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: "#f5f5f5",
+    backgroundColor: "#F1F1F1",
     borderRadius: 16,
     paddingHorizontal: 20,
     paddingTop: 16,
@@ -376,9 +376,14 @@ const styles = StyleSheet.create({
   },
   metricGreyValue: {
     marginTop: 4,
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: "bold",
     color: "#0F172A",
+  },
+  metricMl: {
+    fontSize: 14,
+    fontWeight: "bold",
+    color: "#fff",
   },
   metricBlueFill: {
     position: "absolute",
@@ -394,26 +399,28 @@ const styles = StyleSheet.create({
     justifyContent: "flex-start",
     paddingTop: 16,
   },
-  metricBlueTopRight: {
+  metricTopRightGroup: {
     position: "absolute",
-    right: 12,
+    right: 20,
     top: 20,
+    alignItems: "flex-end",
+  },
+  metricBlueTopRight: {
     color: "#fff",
     fontSize: 12,
     fontWeight: "bold",
     textAlign: "right",
+    marginBottom: 4
   },
   plusButton: {
     backgroundColor: "#fff",
     borderRadius: 20,
-    width: 40,
-    height: 40,
+    width: 80,
+    height: 80,
     justifyContent: "center",
     alignItems: "center",
-  },
-  plusText: {
-    fontSize: 24,
-    color: "#1976d2",
+    borderWidth: 6,
+    borderColor: "#8099DA",
   },
   actionsCard: {
     backgroundColor: "#fff",
@@ -492,7 +499,6 @@ const styles = StyleSheet.create({
     textAlign: "center",
     marginTop: 10,
   },
-  // Modal styles
   modalOverlay: {
     flex: 1,
     backgroundColor: "rgba(0, 0, 0, 0.5)",
