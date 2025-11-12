@@ -734,7 +734,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
   ResultsCard: {
-    backgroundColor: "#ffffff",
+    backgroundColor: "#192126",
     height: 188,
     width: 202,
     flexDirection: "column",
@@ -757,12 +757,12 @@ const styles = StyleSheet.create({
     justifyContent: "flex-start",
     alignSelf: "stretch",
     width: "100%",
-    marginBottom: 5,
   },
   ResultsCategory: {
-    color: "#192126",
-    fontSize: 12,
-    marginTop: 20,
+    color: "#fff",
+    fontSize: 14,
+    fontWeight: "bold",
+    marginTop: 34,
     textAlign: "left",
     alignSelf: "flex-start",
   },
@@ -773,6 +773,7 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     justifyContent: "center",
     alignItems: "center",
+    marginBottom: 20,
   },
   ResultsGraphLine: {
     backgroundColor: "#BBF246",
@@ -1015,7 +1016,7 @@ const styles = StyleSheet.create({
     color: "#FF0000",
   },
   resultsAxisLabel: {
-    color: "#192126",
+    color: "#FFFFFF",
     fontSize: 8,
     lineHeight: 10,
     fontWeight: "bold",

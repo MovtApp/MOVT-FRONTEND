@@ -5,15 +5,21 @@ import {
   StyleSheet,
   ScrollView,
   Dimensions,
-  Animated,
+  Alert,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { AppStackParamList } from "../../../../@types/routes";
 import BackButton from "../../../../components/BackButton";
 import NavigationArrows from "../../../../components/data/NavigationArrows";
-import { Heart, Activity, Wind } from "lucide-react-native";
+import { Heart, Activity, Wind, Watch, Wifi, AlertTriangle } from "lucide-react-native";
 import { SvgXml } from "react-native-svg";
 import { Asset } from "expo-asset";
+import { useAuth } from "../../../../contexts/AuthContext";
+import {
+  getLatestWearOsHealthData,
+  pollWearOsHealthData,
+  getLatestWearOsHealthDataFromAllDevices,
+} from "../../../../services/wearOsHealthService";
 
 
 // Dimensões originais do SVG (do arquivo running.svg)
@@ -50,11 +56,20 @@ const DATA_SCREENS: (keyof AppStackParamList)[] = [
 ];
 
 const HeartbeatsScreen: React.FC = () => {
-  const heartRate = 112;
-  const pressure = 112;
-  const oxygen = 95;
+  const { user } = useAuth();
+  
+  // Estados para dados de saúde do Wear OS em tempo real
+  const [heartRate, setHeartRate] = React.useState<number | null>(null);
+  const [pressure, setPressure] = React.useState<number | null>(null);
+  const [oxygen, setOxygen] = React.useState<number | null>(null);
+  const [isLoading, setIsLoading] = React.useState(true);
+  
+  // Estados para status de conexão do Wear OS
+  const [connectionStatus, setConnectionStatus] = React.useState<'disconnected' | 'connecting' | 'connected' | 'error'>('disconnected');
+  const [connectionMessage, setConnectionMessage] = React.useState<string>('Aguardando conexão...');
+  const [lastUpdate, setLastUpdate] = React.useState<string | null>(null);
+  
   const [svgContent, setSvgContent] = React.useState<string | null>(null);
-  const fadeAnim = React.useRef(new Animated.Value(0)).current;
   
   // Estado para dimensões dinâmicas do dispositivo
   const [dimensions, setDimensions] = React.useState(() => {
@@ -84,23 +99,11 @@ const HeartbeatsScreen: React.FC = () => {
           const response = await fetch(asset.localUri);
           const text = await response.text();
           setSvgContent(text);
-          // Animar quando o SVG carregar
-          Animated.timing(fadeAnim, {
-            toValue: 1,
-            duration: 800,
-            useNativeDriver: true,
-          }).start();
         } else if (asset.uri) {
           // Se não tiver localUri, tentar usar uri diretamente
           const response = await fetch(asset.uri);
           const text = await response.text();
           setSvgContent(text);
-          // Animar quando o SVG carregar
-          Animated.timing(fadeAnim, {
-            toValue: 1,
-            duration: 800,
-            useNativeDriver: true,
-          }).start();
         }
       } catch (error) {
         console.error("Erro ao carregar SVG:", error);
@@ -111,18 +114,299 @@ const HeartbeatsScreen: React.FC = () => {
           );
           const text = await response.text();
           setSvgContent(text);
-          // Animar quando o SVG carregar
-          Animated.timing(fadeAnim, {
-            toValue: 1,
-            duration: 800,
-            useNativeDriver: true,
-          }).start();
         } catch (fallbackError) {
           console.error("Erro no fallback:", fallbackError);
         }
       }
     };
     loadSvg();
+  }, []);
+
+  // Função para registrar automaticamente o dispositivo Wear OS se não estiver registrado
+  const registerWearOsDeviceIfNeeded = async (userId: number) => {
+    try {
+      setConnectionMessage('Verificando dispositivo Wear OS...');
+      
+      // Verificar se já existe um dispositivo Wear OS registrado para o usuário via API
+      const response = await fetch(`${process.env.EXPO_PUBLIC_API_URL}/api/wearos/devicesON`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${user?.sessionId || ''}`,
+        },
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        console.error('Erro ao verificar dispositivos Wear OS:', errorData);
+        setConnectionMessage(`Erro na verificação: ${errorData.error || 'Erro desconhecido'}`);
+        return false;
+      }
+
+      const result = await response.json();
+      
+      if (!result.hasDevices) {
+        setConnectionMessage('Nenhum dispositivo Wear OS encontrado, registrando novo dispositivo...');
+        
+        // Informações padrão para o dispositivo Wear OS
+        const deviceInfo = {
+          deviceName: 'Dispositivo Wear OS',
+          deviceModel: 'Wear OS Generic',
+          deviceType: 'Wear OS',
+          deviceVersion: '3.0', // Versão padrão
+        };
+
+        // Usar a API para registrar o dispositivo
+        const registerResponse = await fetch(`${process.env.EXPO_PUBLIC_API_URL}/api/wearos/register`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${user?.sessionId || ''}`,
+          },
+          body: JSON.stringify(deviceInfo),
+        });
+
+        if (!registerResponse.ok) {
+          const errorData = await registerResponse.json();
+          console.error('Erro ao registrar dispositivo:', errorData);
+          setConnectionMessage(`Erro ao registrar: ${errorData.error || 'Erro desconhecido'}`);
+          return false;
+        }
+
+        const registerResult = await registerResponse.json();
+        console.log('Dispositivo Wear OS registrado com sucesso:', registerResult);
+        setConnectionMessage('Dispositivo Wear OS registrado com sucesso');
+        return true;
+      } else {
+        console.log('Dispositivo Wear OS já registrado:', result.deviceCount, 'dispositivo(s)');
+        setConnectionMessage('Dispositivo Wear OS encontrado e registrado');
+        return true;
+      }
+    } catch (error) {
+      console.error('Erro durante o registro do dispositivo Wear OS:', error);
+      setConnectionMessage(`Erro ao verificar/registrar dispositivo: ${error instanceof Error ? error.message : 'Erro desconhecido'}`);
+      return false;
+    }
+  };
+
+  // Função para enviar dados de saúde do Wear OS para o banco de dados via API
+  const sendWearOsHealthDataToDatabase = async (
+    userId: number, 
+    healthData: { 
+      heartRate?: number | null; 
+      bloodPressure?: number | null; 
+      oxygenSaturation?: number | null; 
+      timestamp?: Date;
+    }
+  ) => {
+    try {
+      // Verificar se o dispositivo está registrado para obter o ID
+      const response = await fetch(`${process.env.EXPO_PUBLIC_API_URL}/api/wearos/devices`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${user?.sessionId || ''}`,
+        },
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        console.error('Erro ao obter dispositivos Wear OS:', errorData);
+        return false;
+      }
+
+      const result = await response.json();
+      if (!result.devices || result.devices.length === 0) {
+        console.error("Nenhum dispositivo Wear OS registrado para enviar dados");
+        return false;
+      }
+
+      // Pegar o primeiro dispositivo ativo (ou implementar lógica para selecionar o apropriado)
+      const device = result.devices[0];
+      
+      // Preparar payload para enviar dados para o backend
+      const payload = {
+        deviceId: device.id_disp,
+        heartRate: healthData.heartRate || null,
+        bloodPressure: healthData.bloodPressure || null,
+        oxygenSaturation: healthData.oxygenSaturation || null,
+        timestamp: healthData.timestamp || new Date(),
+      };
+
+      // Enviar dados via API
+      const apiResponse = await fetch(`${process.env.EXPO_PUBLIC_API_URL}/api/wearos/health`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${user?.sessionId || ''}`,
+        },
+        body: JSON.stringify(payload),
+      });
+
+      if (!apiResponse.ok) {
+        const errorData = await apiResponse.json();
+        console.error("Erro ao enviar dados de saúde:", errorData);
+        return false;
+      }
+
+      const resultData = await apiResponse.json();
+      console.log("Dados de saúde enviados com sucesso:", resultData);
+      return true;
+    } catch (error) {
+      console.error("Erro ao enviar dados de saúde para o banco:", error);
+      return false;
+    }
+  };
+
+  // Buscar e atualizar dados de saúde do Wear OS em tempo real
+  React.useEffect(() => {
+    if (!user?.id) {
+      setIsLoading(false);
+      setConnectionStatus('disconnected');
+      setConnectionMessage('Nenhum usuário autenticado');
+      return;
+    }
+
+    // Converter ID do usuário para número (se necessário)
+    const userId = parseInt(user.id, 10);
+    if (isNaN(userId)) {
+      console.error("ID do usuário inválido:", user.id);
+      setIsLoading(false);
+      setConnectionStatus('error');
+      setConnectionMessage('ID do usuário inválido');
+      return;
+    }
+
+    // Atualizar status de conexão
+    setConnectionStatus('connecting');
+    setConnectionMessage('Conectando ao dispositivo Wear OS...');
+
+    // Função assíncrona para carregar dados iniciais
+    const loadInitialData = async () => {
+      try {
+        // Primeiro, verificar e registrar o dispositivo se necessário
+        const registrationSuccess = await registerWearOsDeviceIfNeeded(userId);
+        
+        if (!registrationSuccess) {
+          setIsLoading(false);
+          setConnectionStatus('error');
+          return;
+        }
+
+        setConnectionMessage('Buscando dados do dispositivo...');
+        const data = await getLatestWearOsHealthData(userId);
+        if (data) {
+          setHeartRate(data.heartRate);
+          setPressure(data.pressure);
+          setOxygen(data.oxygen);
+          
+          // Verificar se há múltiplos dispositivos para atualizar a mensagem
+          const multiDeviceData = await getLatestWearOsHealthDataFromAllDevices(userId);
+          if (multiDeviceData && multiDeviceData.deviceData.length > 1) {
+            setConnectionMessage(`Conectado a ${multiDeviceData.deviceData.length} dispositivos Wear OS`);
+          } else {
+            setConnectionMessage('Conectado ao dispositivo Wear OS');
+          }
+          
+          setLastUpdate(new Date().toLocaleTimeString());
+          setConnectionStatus('connected');
+        } else {
+          setConnectionStatus('disconnected');
+          setConnectionMessage('Nenhum dado de saúde disponível do dispositivo Wear OS');
+        }
+        setIsLoading(false);
+      } catch (error) {
+        console.error("Erro ao carregar dados iniciais:", error);
+        setIsLoading(false);
+        setConnectionStatus('error');
+        setConnectionMessage(`Erro ao conectar: ${error instanceof Error ? error.message : 'Erro desconhecido'}`);
+        Alert.alert('Erro', `Falha ao conectar ao dispositivo Wear OS: ${error instanceof Error ? error.message : 'Erro desconhecido'}`);
+      }
+    };
+
+    loadInitialData();
+
+    // Configurar atualização em tempo real usando polling (a cada 5 segundos)
+    const cancelPolling = pollWearOsHealthData(
+      userId,
+      5000, // 5 segundos
+      async (data) => {
+        setHeartRate(data.heartRate);
+        setPressure(data.pressure);
+        setOxygen(data.oxygen);
+        
+        // Verificar se há atualizações de múltiplos dispositivos
+        const multiDeviceData = await getLatestWearOsHealthDataFromAllDevices(userId);
+        if (multiDeviceData && multiDeviceData.deviceData.length > 1) {
+          setConnectionMessage(`Conectado a ${multiDeviceData.deviceData.length} dispositivos Wear OS`);
+        } else {
+          setConnectionMessage('Conectado ao dispositivo Wear OS');
+        }
+        
+        setLastUpdate(new Date().toLocaleTimeString());
+        setIsLoading(false);
+      }
+    );
+
+    // Alternativa: usar realtime do Supabase (descomente se preferir)
+    // const cancelRealtime = subscribeToWearOsHealthRealtime(userId, (data) => {
+    //   setHeartRate(data.heartRate);
+    //   setPressure(data.pressure);
+    //   setOxygen(data.oxygen);
+    //   setConnectionStatus('connected');
+    //   setConnectionMessage('Conectado ao dispositivo Wear OS (realtime)');
+    //   setLastUpdate(new Date().toLocaleTimeString());
+    //   setIsLoading(false);
+    // });
+
+    return () => {
+      cancelPolling();
+      // cancelRealtime();
+    };
+  }, [user?.id]);
+
+  // Função para lidar com dados recebidos do dispositivo Wear OS
+  // Esta função pode ser chamada quando o dispositivo enviar dados
+  const handleWearOsDataReceived = async (healthData: {
+    heartRate?: number | null;
+    bloodPressure?: number | null;
+    oxygenSaturation?: number | null;
+  }) => {
+    if (!user?.id) return;
+    
+    const userId = parseInt(user.id, 10);
+    if (isNaN(userId)) return;
+
+    // Enviar os dados recebidos para o banco de dados
+    const success = await sendWearOsHealthDataToDatabase(userId, healthData);
+    
+    if (success) {
+      console.log("Dados do Wear OS recebidos e armazenados com sucesso:", healthData);
+      // Atualizar os dados locais
+      if (healthData.heartRate !== undefined && healthData.heartRate !== null) {
+        setHeartRate(healthData.heartRate);
+      }
+      if (healthData.bloodPressure !== undefined && healthData.bloodPressure !== null) {
+        setPressure(healthData.bloodPressure);
+      }
+      if (healthData.oxygenSaturation !== undefined && healthData.oxygenSaturation !== null) {
+        setOxygen(healthData.oxygenSaturation);
+      }
+      setLastUpdate(new Date().toLocaleTimeString());
+    } else {
+      console.error("Falha ao armazenar dados do Wear OS");
+    }
+  };
+
+  // Listener para detectar mudanças nas dimensões do dispositivo
+  React.useEffect(() => {
+    const subscription = Dimensions.addEventListener("change", ({ window }) => {
+      setDimensions({ width: window.width, height: window.height });
+    });
+
+    return () => {
+      subscription?.remove();
+    };
   }, []);
 
   // Listener para detectar mudanças nas dimensões do dispositivo
@@ -141,7 +425,7 @@ const HeartbeatsScreen: React.FC = () => {
       <View style={styles.container}>
         {/* === BACKGROUND SVG === */}
         <View pointerEvents="none" style={styles.background}>
-          <Animated.View
+          <View
             style={[
               styles.svgContainer,
               {
@@ -149,15 +433,6 @@ const HeartbeatsScreen: React.FC = () => {
                 left: (dimensions.width - svgDimensions.width) / 2,
                 width: svgDimensions.width,
                 height: svgDimensions.height,
-                opacity: fadeAnim,
-                transform: [
-                  {
-                    scale: fadeAnim.interpolate({
-                      inputRange: [0, 3],
-                      outputRange: [1, 5],
-                    }),
-                  },
-                ],
               },
             ]}
           >
@@ -169,7 +444,7 @@ const HeartbeatsScreen: React.FC = () => {
                 preserveAspectRatio="xMidYMid meet"
               />
             ) : null}
-          </Animated.View>
+          </View>
         </View>
 
         {/* === CONTEÚDO POR CIMA DA IMAGEM === */}
@@ -186,14 +461,33 @@ const HeartbeatsScreen: React.FC = () => {
               <View style={{ width: 46 }} />
             </View>
 
+            {/* Status de Conexão do Wear OS */}
+            <View style={[styles.connectionStatusContainer, styles[`connectionStatus${connectionStatus}`]]}>
+              {connectionStatus === 'connected' && <Wifi size={16} color="#10B981" style={{ marginRight: 8 }} />}
+              {connectionStatus === 'connecting' && <Watch size={16} color="#F59E0B" style={{ marginRight: 8 }} />}
+              {connectionStatus === 'disconnected' && <Watch size={16} color="#EF4444" style={{ marginRight: 8 }} />}
+              {connectionStatus === 'error' && <AlertTriangle size={16} color="#EF4444" style={{ marginRight: 8 }} />}
+              
+              <View>
+                <Text style={styles.connectionStatusText}>{connectionMessage}</Text>
+                {lastUpdate && (
+                  <Text style={styles.lastUpdateText}>Última atualização: {lastUpdate}</Text>
+                )}
+              </View>
+            </View>
+
             {/* Frequência Cardíaca */}
             <View style={styles.heartRateContainer}>
               <View style={styles.heartRatePrimaryInfo}>
                 <Heart size={44} color="#FF0000" fill="#FF0000" style={{ marginRight: 16 }} />
-                <Text style={styles.heartRateValue}>
-                  {heartRate}
-                  <Text style={styles.heartRateUnit}> bpm</Text>
-                </Text>
+                {isLoading ? (
+                  <Text style={styles.heartRateValue}>--</Text>
+                ) : (
+                  <Text style={styles.heartRateValue}>
+                    {heartRate !== null ? Math.round(heartRate) : "--"}
+                    <Text style={styles.heartRateUnit}> bpm</Text>
+                  </Text>
+                )}
               </View>
             </View>
 
@@ -208,33 +502,37 @@ const HeartbeatsScreen: React.FC = () => {
 
         {/* Cards fixos no final */}
         <View style={styles.fixedCardsContainer} pointerEvents="box-none">
-          {/* Pressão */}
-          <View style={styles.card}>
-            <View style={styles.cardInner}>
-              <Text style={styles.cardTitle}>Pressão</Text>
-              <View style={styles.cardContent}>
-                <Activity size={26} color="#FF8C00" style={{ marginRight: 12 }} />
-                <View style={styles.cardValueContainer}>
-                  <Text style={styles.cardValue}>{pressure}</Text>
-                  <Text style={styles.cardUnit}>mmHg</Text>
+              {/* Pressão */}
+              <View style={styles.card}>
+                <View style={styles.cardInner}>
+                  <Text style={styles.cardTitle}>Pressão</Text>
+                  <View style={styles.cardContent}>
+                    <Activity size={26} color="#FF8C00" style={{ marginRight: 12 }} />
+                    <View style={styles.cardValueContainer}>
+                      <Text style={styles.cardValue}>
+                        {isLoading ? "--" : pressure !== null ? Math.round(pressure) : "--"}
+                      </Text>
+                      <Text style={styles.cardUnit}>mmHg</Text>
+                    </View>
+                  </View>
                 </View>
               </View>
-            </View>
-          </View>
 
-          {/* Oxigênio */}
-          <View style={styles.card}>
-            <View style={styles.cardInner}>
-              <Text style={styles.cardTitle}>Oxigênio</Text>
-              <View style={styles.cardContent}>
-                <Wind size={26} color="#00BFFF" style={{ marginRight: 12 }} />
-                <View style={styles.cardValueContainer}>
-                  <Text style={styles.cardValue}>{oxygen}</Text>
-                  <Text style={styles.cardUnit}>SpO2</Text>
+              {/* Oxigênio */}
+              <View style={styles.card}>
+                <View style={styles.cardInner}>
+                  <Text style={styles.cardTitle}>Oxigênio</Text>
+                  <View style={styles.cardContent}>
+                    <Wind size={26} color="#00BFFF" style={{ marginRight: 12 }} />
+                    <View style={styles.cardValueContainer}>
+                      <Text style={styles.cardValue}>
+                        {isLoading ? "--" : oxygen !== null ? Math.round(oxygen) : "--"}
+                      </Text>
+                      <Text style={styles.cardUnit}>SpO2</Text>
+                    </View>
+                  </View>
                 </View>
               </View>
-            </View>
-          </View>
         </View>
 
         {/* Setas de navegação */}
@@ -367,6 +665,42 @@ const styles = StyleSheet.create({
     fontSize: 15,
     color: "#797E86",
     marginTop: -4,
+  },
+
+  // === STATUS DE CONEXÃO ===
+  connectionStatusContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: 12,
+    borderRadius: 12,
+    marginBottom: 20,
+    borderWidth: 1,
+  },
+  connectionStatusconnected: {
+    backgroundColor: "rgba(16, 185, 129, 0.1)",
+    borderColor: "#10B981",
+  },
+  connectionStatusconnecting: {
+    backgroundColor: "rgba(245, 158, 11, 0.1)",
+    borderColor: "#F59E0B",
+  },
+  connectionStatusdisconnected: {
+    backgroundColor: "rgba(239, 68, 68, 0.1)",
+    borderColor: "#EF4444",
+  },
+  connectionStatuserror: {
+    backgroundColor: "rgba(239, 68, 68, 0.1)",
+    borderColor: "#EF4444",
+  },
+  connectionStatusText: {
+    fontSize: 14,
+    fontWeight: "500",
+    color: "#192126",
+  },
+  lastUpdateText: {
+    fontSize: 12,
+    color: "#797E86",
+    marginTop: 2,
   },
 });
 

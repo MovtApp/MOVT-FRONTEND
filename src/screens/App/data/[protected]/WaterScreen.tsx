@@ -312,7 +312,6 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
   },
   summaryCard: {
-    backgroundColor: "#fff",
     borderRadius: 10,
     padding: 20,
     marginHorizontal: 20,
