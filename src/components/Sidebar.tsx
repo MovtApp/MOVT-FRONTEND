@@ -177,17 +177,7 @@ export const Sidebar: React.FC<SidebarProps> = () => {
         <View style={styles.sidebarSection}>
           <Text style={styles.sidebarSectionTitle}>Painel</Text>
 
-          {/* TREINOS */}
-          <TouchableOpacity
-            style={styles.sidebarItemContent}
-            onPress={() => {
-              // @ts-ignore
-              navigation.navigate("TrainingScreen");
-            }}
-          >
-            <Dumbbell size={24} color="#fff" />
-            <Text style={styles.sidebarItemText}>Treinos</Text>
-          </TouchableOpacity>
+
 
           {/* AGENDAMENTOS */}
           <TouchableOpacity

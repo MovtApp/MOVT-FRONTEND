@@ -51,7 +51,6 @@ const DATA_SCREENS: (keyof AppStackParamList)[] = [
   "HeartbeatsScreen",
   "SleepScreen",
   "StepsScreen",
-  "TrainingScreen",
   "WaterScreen",
 ];
 

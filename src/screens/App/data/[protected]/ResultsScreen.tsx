@@ -116,7 +116,6 @@ const ResultsScreen: React.FC = () => {
     "HeartbeatsScreen",
     "SleepScreen",
     "StepsScreen",
-    "TrainingScreen",
     "WaterScreen",
     "ResultsScreen",
   ];

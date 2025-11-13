@@ -31,7 +31,6 @@ const BottomNavigationBar = () => {
       "HeartbeatsScreen",
       "SleepScreen",
       "StepsScreen",
-      "TrainingScreen",
       "WaterScreen",
     ],
     []

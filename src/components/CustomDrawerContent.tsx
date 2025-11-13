@@ -7,7 +7,6 @@ import {
   Utensils,
   Activity,
   MessageCircle,
-  Dumbbell,
   Calendar,
   Users,
   Settings,
@@ -35,7 +34,6 @@ export function CustomDrawerContent(props: DrawerContentComponentProps) {
   ];
 
   const panelItems = [
-    { name: "Treinos", icon: Dumbbell, route: "TrainingScreen" }, // Substituir 'TreinosScreen' pela rota real
     { name: "Agendamentos", icon: Calendar, route: "AppointmentsScreen" }, // Substituir pela rota real
     { name: "Comunidades", icon: Users, route: "CommunityScreen" }, // Substituir pela rota real
   ];

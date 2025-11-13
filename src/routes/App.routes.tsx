@@ -18,7 +18,6 @@ import CyclingScreen from "../screens/App/data/[protected]/CyclingScreen";
 import HeartbeatsScreen from "../screens/App/data/[protected]/HeartbeatsScreen";
 import SleepScreen from "../screens/App/data/[protected]/SleepScreen";
 import StepsScreen from "../screens/App/data/[protected]/StepsScreen";
-import TrainingScreen from "../screens/App/data/[protected]/TrainingScreen";
 import WaterScreen from "../screens/App/data/[protected]/WaterScreen";
 import ResultsScreen from "../screens/App/data/[protected]/ResultsScreen";
 
@@ -46,7 +45,6 @@ function AppLayout() {
         <Stack.Screen name="HeartbeatsScreen" component={HeartbeatsScreen} />
         <Stack.Screen name="SleepScreen" component={SleepScreen} />
         <Stack.Screen name="StepsScreen" component={StepsScreen} />
-        <Stack.Screen name="TrainingScreen" component={TrainingScreen} />
         <Stack.Screen name="WaterScreen" component={WaterScreen} />
         <Stack.Screen name="ResultsScreen" component={ResultsScreen} />
       </Stack.Navigator>

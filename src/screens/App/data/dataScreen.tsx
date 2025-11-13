@@ -458,25 +458,7 @@ const DataScreen: React.FC = () => {
                   </Text>
                 </TouchableOpacity>
 
-                {/* Card de Tempo de Treino */}
-                <TouchableOpacity
-                  style={[styles.card, styles.trainingTimeCard]}
-                  onPress={() =>
-                    navigation.navigate({
-                      name: "TrainingScreen",
-                      params: {} as never,
-                    })
-                  }
-                >
-                  <Text style={[styles.cardCategory, styles.trainingTimeCategory]}>
-                    Tempo de treino
-                  </Text>
-                  <View style={{ width: "100%", alignItems: "center" }}>
-                    <View style={styles.circularProgressPlaceholder}>
-                      <Text style={[styles.cardValue, styles.trainingTimeValue]}>80%</Text>
-                    </View>
-                  </View>
-                </TouchableOpacity>
+
               </View>
 
               {/* Coluna Direita Superior: Resultados (mesma estilização do Ciclismo) */}
