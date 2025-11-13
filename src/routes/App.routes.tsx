@@ -20,6 +20,7 @@ import SleepScreen from "../screens/App/data/[protected]/SleepScreen";
 import StepsScreen from "../screens/App/data/[protected]/StepsScreen";
 import WaterScreen from "../screens/App/data/[protected]/WaterScreen";
 import ResultsScreen from "../screens/App/data/[protected]/ResultsScreen";
+import TestWearScreen from "../screens/TestWearScreen";
 
 const Stack = createNativeStackNavigator<AppStackParamList>();
 const Drawer = createDrawerNavigator(); // Definir o Drawer Navigator
@@ -47,7 +48,8 @@ function AppLayout() {
         <Stack.Screen name="StepsScreen" component={StepsScreen} />
         <Stack.Screen name="WaterScreen" component={WaterScreen} />
         <Stack.Screen name="ResultsScreen" component={ResultsScreen} />
-      </Stack.Navigator>
+        <Stack.Screen name="TestWearScreen" component={TestWearScreen} />
+        </Stack.Navigator>
       <BottomNavigationBar />
       {/* Renderizando BottomNavigationBar diretamente, pois isDietSheetOpen não a controla mais. */}
     </View>
