@@ -15,8 +15,45 @@ import { AppDrawerParamList, AppStackParamList } from "../../../@types/routes";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import Header from "../../../components/Header";
 import { Canvas, Path, vec } from "@shopify/react-native-skia";
+import MapView, { LatLng, MapStyleElement, Polyline, Region } from "react-native-maps";
+import * as Location from "expo-location";
+import { Bike } from "lucide-react-native";
 
 const { width } = Dimensions.get("window");
+
+const cyclingMapStyle: MapStyleElement[] = [
+  {
+    elementType: "geometry",
+    stylers: [{ color: "#f3f4f6" }],
+  },
+  {
+    elementType: "labels",
+    stylers: [{ visibility: "off" }],
+  },
+  {
+    featureType: "road",
+    elementType: "geometry",
+    stylers: [{ color: "#d1d5db" }],
+  },
+  {
+    featureType: "road",
+    elementType: "geometry.stroke",
+    stylers: [{ color: "#e5e7eb" }],
+  },
+  {
+    featureType: "poi",
+    stylers: [{ visibility: "off" }],
+  },
+  {
+    featureType: "transit",
+    stylers: [{ visibility: "off" }],
+  },
+  {
+    featureType: "water",
+    elementType: "geometry",
+    stylers: [{ color: "#e2e8f0" }],
+  },
+];
 
 const getTodayKey = (): string => {
   const d = new Date();
@@ -106,6 +143,10 @@ const DataScreen: React.FC = () => {
   const flatListRef = useRef<FlatList>(null);
 
   const [waterConsumedMl, setWaterConsumedMl] = useState<number>(0);
+  const [cyclingRoute, setCyclingRoute] = useState<LatLng[]>([]);
+  const [cyclingRegion, setCyclingRegion] = useState<Region | null>(null);
+  const [locationError, setLocationError] = useState<string | null>(null);
+  const cyclingWatcherRef = useRef<Location.LocationSubscription | null>(null);
 
   const loadWaterConsumed = useCallback(async () => {
     try {
@@ -127,6 +168,111 @@ const DataScreen: React.FC = () => {
       loadWaterConsumed();
       return () => {};
     }, [loadWaterConsumed])
+  );
+
+  useFocusEffect(
+    useCallback(() => {
+      let isActive = true;
+
+      const startCyclingTracking = async () => {
+        try {
+          if (cyclingWatcherRef.current) {
+            cyclingWatcherRef.current.remove();
+            cyclingWatcherRef.current = null;
+          }
+
+          const { status } = await Location.requestForegroundPermissionsAsync();
+          if (!isActive) {
+            return;
+          }
+
+          if (status !== Location.PermissionStatus.GRANTED) {
+            setLocationError("Permissão de localização negada.");
+            setCyclingRoute([]);
+            setCyclingRegion(null);
+            return;
+          }
+
+          const initialPosition = await Location.getCurrentPositionAsync({
+            accuracy: Location.Accuracy.Balanced,
+          });
+
+          if (!isActive) {
+            return;
+          }
+
+          const initialPoint: LatLng = {
+            latitude: initialPosition.coords.latitude,
+            longitude: initialPosition.coords.longitude,
+          };
+
+          setCyclingRoute([initialPoint]);
+          setCyclingRegion({
+            latitude: initialPoint.latitude,
+            longitude: initialPoint.longitude,
+            latitudeDelta: 0.005,
+            longitudeDelta: 0.005,
+          });
+          setLocationError(null);
+
+          cyclingWatcherRef.current = await Location.watchPositionAsync(
+            {
+              accuracy: Location.Accuracy.BestForNavigation,
+              timeInterval: 5000,
+              distanceInterval: 5,
+            },
+            (update) => {
+              if (!isActive) {
+                return;
+              }
+
+              const newPoint: LatLng = {
+                latitude: update.coords.latitude,
+                longitude: update.coords.longitude,
+              };
+
+              setCyclingRoute((prev) => {
+                const next = [...prev, newPoint];
+                return next.length > 60 ? next.slice(next.length - 60) : next;
+              });
+
+              setCyclingRegion((prev) => {
+                if (!prev) {
+                  return {
+                    latitude: newPoint.latitude,
+                    longitude: newPoint.longitude,
+                    latitudeDelta: 0.005,
+                    longitudeDelta: 0.005,
+                  };
+                }
+
+                return {
+                  ...prev,
+                  latitude: newPoint.latitude,
+                  longitude: newPoint.longitude,
+                };
+              });
+            }
+          );
+        } catch (error) {
+          if (isActive) {
+            setLocationError("Não foi possível iniciar o rastreamento de ciclismo.");
+          }
+        }
+      };
+
+      startCyclingTracking();
+
+      return () => {
+        isActive = false;
+        if (cyclingWatcherRef.current) {
+          cyclingWatcherRef.current.remove();
+          cyclingWatcherRef.current = null;
+        }
+        setCyclingRoute([]);
+        setCyclingRegion(null);
+      };
+    }, [])
   );
 
   // Água - progresso relativo à meta
@@ -421,7 +567,11 @@ const DataScreen: React.FC = () => {
     <View style={styles.container}>
       <Header />
 
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        style={styles.content}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
         <Text style={styles.monthText}>{monthNameAndYear}</Text>
         <View>
           <FlatList
@@ -458,7 +608,21 @@ const DataScreen: React.FC = () => {
                   </Text>
                 </TouchableOpacity>
 
-
+                {/* Card de Tempo de Treino */}
+                <TouchableOpacity
+                  style={[styles.card, styles.trainingTimeCard]}
+                  onPress={() =>
+                    navigation.navigate({
+                      name: "TrainingScreen",
+                      params: {} as never,
+                    })
+                  }
+                >
+                  <Text style={[styles.cardCategory, styles.trainingTimeCategory]}>Tempo de treino</Text>
+                  <View style={styles.circularProgressPlaceholder}>
+                    <Text style={styles.trainingTimeValue}>32m</Text>
+                  </View>
+                </TouchableOpacity>
               </View>
 
               {/* Coluna Direita Superior: Resultados (mesma estilização do Ciclismo) */}
@@ -562,6 +726,50 @@ const DataScreen: React.FC = () => {
                  </View>
               </TouchableOpacity>
             </View>
+            <TouchableOpacity style={styles.cyclingCard} activeOpacity={0.9}>
+              <View style={styles.cyclingHeader}>
+                <View style={styles.cyclingIcon}>
+                  <Bike size={20} color="#192126"/>
+                </View>
+                <Text style={styles.cyclingTitle}>Ciclismo</Text>
+              </View>
+              <View style={styles.cyclingMapWrapper}>
+                {cyclingRegion ? (
+                  <MapView
+                    pointerEvents="none"
+                    style={styles.cyclingMap}
+                    region={cyclingRegion}
+                    customMapStyle={cyclingMapStyle}
+                    scrollEnabled={false}
+                    zoomEnabled={false}
+                    rotateEnabled={false}
+                    pitchEnabled={false}
+                    toolbarEnabled={false}
+                    showsCompass={false}
+                    showsBuildings={false}
+                    showsTraffic={false}
+                    showsIndoors={false}
+                    showsIndoorLevelPicker={false}
+                  >
+                    {cyclingRoute.length > 1 && (
+                      <Polyline
+                        coordinates={cyclingRoute}
+                        strokeColor="#BBF246"
+                        strokeWidth={4}
+                        lineCap="round"
+                        lineJoin="round"
+                      />
+                    )}
+                  </MapView>
+                ) : (
+                  <View style={styles.cyclingMapPlaceholder}>
+                    <Text style={styles.cyclingPlaceholderText}>
+                      {locationError ?? "Iniciando rastreamento..."}
+                    </Text>
+                  </View>
+                )}
+              </View>
+            </TouchableOpacity>
           </View>
         </View>
       </ScrollView>
@@ -613,6 +821,9 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingHorizontal: 20,
     paddingTop: 20,
+  },
+  scrollContent: {
+    paddingBottom: 100,
   },
   monthText: {
     color: "#192126",
@@ -667,7 +878,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     width: "100%",
-    marginBottom: 15,
+    marginBottom: 10,
   },
   leftColumn: {
     width: 112,
@@ -679,14 +890,14 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     flexWrap: "wrap",
     justifyContent: "space-between",
-    marginBottom: 15,
+    marginBottom: 10,
   },
   card: {
     width: "48%",
     backgroundColor: "#3A3A3A",
     borderRadius: 8,
     padding: 15,
-    marginBottom: 15,
+    marginBottom: 10,
     justifyContent: "center",
   },
   cardCategory: {
@@ -722,7 +933,7 @@ const styles = StyleSheet.create({
     flexDirection: "column",
     justifyContent: "center",
     alignItems: "center",
-    marginBottom: 15,
+    marginBottom: 10,
     borderColor: "#192126",
     borderWidth: 1,
   },
@@ -769,7 +980,7 @@ const styles = StyleSheet.create({
     height: 108,
     padding: 15,
     borderRadius: 8,
-    marginBottom: 15,
+    marginBottom: 10,
     justifyContent: "space-between",
     alignItems: "flex-start",
   },
@@ -799,7 +1010,7 @@ const styles = StyleSheet.create({
     height: 120,
     padding: 15,
     borderRadius: 8,
-    marginBottom: 15,
+    marginBottom: 10,
     justifyContent: "space-between",
     alignItems: "flex-start",
   },
@@ -829,7 +1040,7 @@ const styles = StyleSheet.create({
     height: 120,
     padding: 15,
     borderRadius: 8,
-    marginBottom: 15,
+    marginBottom: 10,
     justifyContent: "space-between",
     alignItems: "flex-start",
   },
@@ -861,7 +1072,7 @@ const styles = StyleSheet.create({
     height: 120,
     padding: 15,
     borderRadius: 8,
-    marginBottom: 15,
+    marginBottom: 10,
     justifyContent: "space-between",
     alignItems: "flex-start",
   },
@@ -887,7 +1098,7 @@ const styles = StyleSheet.create({
     height: 120,
     padding: 15,
     borderRadius: 8,
-    marginBottom: 15,
+    marginBottom: 10,
     justifyContent: "space-between",
     alignItems: "flex-start",
   },
@@ -930,6 +1141,67 @@ const styles = StyleSheet.create({
   resultsValue: {
     color: "#7E22CE",
     fontSize: 18,
+  },
+  cyclingCard: {
+    backgroundColor: "#192126",
+    borderRadius: 12,
+    padding: 16,
+    width: "100%",
+    maxWidth: 202,
+    height: 188,
+    alignSelf: "center",
+    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: "#192126",
+    justifyContent: "flex-start",
+  },
+  cyclingHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 12,
+  },
+  cyclingIcon: {
+    width: 30,
+    height: 30,
+    borderRadius: 8,
+    backgroundColor: "#fff",
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: 10,
+  },
+  cyclingIconText: {
+    color: "#BBF246",
+    fontSize: 12,
+    fontWeight: "bold",
+  },
+  cyclingTitle: {
+    color: "#FFFFFF",
+    fontSize: 16,
+    fontWeight: "600",
+  },
+  cyclingMapWrapper: {
+    flex: 1,
+    width: "100%",
+    borderRadius: 12,
+    overflow: "hidden",
+    backgroundColor: "#111827",
+  },
+  cyclingMap: {
+    width: "100%",
+    height: "100%",
+  },
+  cyclingMapPlaceholder: {
+    flex: 1,
+    width: "100%",
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "#111827",
+    paddingHorizontal: 12,
+  },
+  cyclingPlaceholderText: {
+    color: "#94A3B8",
+    fontSize: 12,
+    textAlign: "center",
   },
   bottomNavigationBar: {
     flexDirection: "row",
