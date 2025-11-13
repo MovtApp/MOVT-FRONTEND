@@ -73,7 +73,7 @@ const VerifyAccountScreen = () => {
       // Verifica se o e-mail já está verificado para redirecionar
       if (response.data.message === "Seu e-mail já está verificado.") {
         Alert.alert("Sucesso", response.data.message);
-        navigation.navigate("App", { screen: "HomeScreen" });
+        navigation.navigate("App", { screen: "HomeStack" });
       } else {
         Alert.alert("Sucesso", response.data.message);
       }
@@ -122,8 +122,8 @@ const VerifyAccountScreen = () => {
 
       // --- Lógica de navegação após a verificação bem-sucedida ---
       // Redireciona para uma tela principal ou dashboard
-      // TODO: Substituir por navigation.navigate("App", { screen: "HomeScreen" }); ou a tela pós-verificação correta
-      navigation.navigate("App", { screen: "HomeScreen" });
+      // TODO: Substituir por navigation.navigate("App", { screen: "HomeStack" }); ou a tela pós-verificação correta
+      navigation.navigate("App", { screen: "HomeStack" });
     } catch (err: any) {
       const errorMessage =
         err.response?.data?.error ||
