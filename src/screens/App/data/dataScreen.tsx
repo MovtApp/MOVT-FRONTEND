@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useCallback } from "react";
+import React, { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import {
   ScrollView,
   Text,
@@ -17,7 +17,22 @@ import Header from "../../../components/Header";
 import { Canvas, Path, vec } from "@shopify/react-native-skia";
 import MapView, { LatLng, MapStyleElement, Polyline, Region } from "react-native-maps";
 import * as Location from "expo-location";
-import { Bike } from "lucide-react-native";
+import { Bike, Footprints } from "lucide-react-native";
+import Svg, { Circle, Defs, LinearGradient, Stop } from "react-native-svg";
+import Animated, {
+  useSharedValue,
+  useAnimatedProps,
+  withTiming,
+  Easing,
+  withRepeat,
+  cancelAnimation,
+  useAnimatedStyle,
+} from "react-native-reanimated";
+import {
+  ensureGoogleFitPermissions,
+  fetchTodayStepCount,
+  subscribeToStepUpdates,
+} from "../../../services/googleFitService";
 
 const { width } = Dimensions.get("window");
 
@@ -54,6 +69,10 @@ const cyclingMapStyle: MapStyleElement[] = [
     stylers: [{ color: "#e2e8f0" }],
   },
 ];
+const AnimatedSvgCircle = Animated.createAnimatedComponent(Circle);
+const FOOTPRINT_SPACING = 26;
+const STEPS_INACTIVITY_TIMEOUT = 6000;
+const DEFAULT_STEPS_GOAL = 10000;
 
 const getTodayKey = (): string => {
   const d = new Date();
@@ -122,6 +141,101 @@ const WaterWave: React.FC<{ progress: number; height?: number }> = React.memo(({
   );
 });
 
+const StepProgressRing: React.FC<{ progress: number; size?: number }> = ({ progress, size = 78 }) => {
+  const radius = size / 2 - 8;
+  const circumference = 2 * Math.PI * radius;
+  const clamped = Math.max(0, Math.min(1, progress));
+  const animatedProgress = useSharedValue(0);
+
+  useEffect(() => {
+    animatedProgress.value = withTiming(clamped, {
+      duration: 800,
+      easing: Easing.out(Easing.cubic),
+    });
+  }, [clamped, animatedProgress]);
+
+  const animatedProps = useAnimatedProps(() => ({
+    strokeDashoffset: circumference * (1 - animatedProgress.value),
+  }));
+
+  return (
+    <Svg width={size} height={size}>
+      <Defs>
+        <LinearGradient id="stepsGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+          <Stop offset="0%" stopColor="#FFE0B2" />
+          <Stop offset="100%" stopColor="#FF8C00" />
+        </LinearGradient>
+      </Defs>
+      <Circle
+        cx={size / 2}
+        cy={size / 2}
+        r={radius}
+        stroke="#FFE0B2"
+        strokeWidth={10}
+        fill="none"
+      />
+      <AnimatedSvgCircle
+        cx={size / 2}
+        cy={size / 2}
+        r={radius}
+        stroke="url(#stepsGradient)"
+        strokeWidth={10}
+        fill="none"
+        strokeDasharray={circumference}
+        animatedProps={animatedProps}
+        strokeLinecap="round"
+      />
+    </Svg>
+  );
+};
+
+const StepsFootprintsTrail: React.FC<{ isWalking: boolean }> = ({ isWalking }) => {
+  const translateX = useSharedValue(0);
+  const opacity = useSharedValue(0.3);
+
+  useEffect(() => {
+    if (isWalking) {
+      opacity.value = withTiming(1, { duration: 300 });
+      translateX.value = 0;
+      translateX.value = withRepeat(
+        withTiming(-FOOTPRINT_SPACING, {
+          duration: 720,
+          easing: Easing.linear,
+        }),
+        -1,
+        false
+      );
+    } else {
+      opacity.value = withTiming(0.3, { duration: 400 });
+      cancelAnimation(translateX);
+      translateX.value = withTiming(0, {
+        duration: 500,
+        easing: Easing.out(Easing.cubic),
+      });
+    }
+  }, [isWalking, opacity, translateX]);
+
+  const animatedStyle = useAnimatedStyle(() => ({
+    transform: [{ translateX: translateX.value }],
+    opacity: opacity.value,
+  }));
+
+  const footprintItems = useMemo(() => Array.from({ length: 6 }), []);
+
+  return (
+    <View style={styles.stepsTrailContainer}>
+      <Animated.View style={[styles.stepsTrailAnimatedRow, animatedStyle]}>
+        {footprintItems.map((_, index) => (
+          <Footprints key={`trail-a-${index}`} size={18} color="#FF8C00" style={styles.stepsFootprintIcon} />
+        ))}
+        {footprintItems.map((_, index) => (
+          <Footprints key={`trail-b-${index}`} size={18} color="#FF8C00" style={styles.stepsFootprintIcon} />
+        ))}
+      </Animated.View>
+    </View>
+  );
+};
+
 const DataScreen: React.FC = () => {
   type DataScreenNavigationProp = CompositeNavigationProp<
     DrawerNavigationProp<AppDrawerParamList, "HomeStack">,
@@ -143,6 +257,24 @@ const DataScreen: React.FC = () => {
   const flatListRef = useRef<FlatList>(null);
 
   const [waterConsumedMl, setWaterConsumedMl] = useState<number>(0);
+  const [stepsToday, setStepsToday] = useState<number>(0);
+  const [stepsLoading, setStepsLoading] = useState<boolean>(false);
+  const [stepsError, setStepsError] = useState<string | null>(null);
+  const [isWalking, setIsWalking] = useState<boolean>(false);
+  const lastStepCountRef = useRef<number>(0);
+  const stepsInactivityTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const stepsGoal = DEFAULT_STEPS_GOAL;
+
+  const scheduleWalkingTimeout = useCallback(() => {
+    if (stepsInactivityTimeoutRef.current) {
+      clearTimeout(stepsInactivityTimeoutRef.current);
+    }
+    stepsInactivityTimeoutRef.current = setTimeout(() => {
+      setIsWalking(false);
+      stepsInactivityTimeoutRef.current = null;
+    }, STEPS_INACTIVITY_TIMEOUT);
+  }, []);
+
   const [cyclingRoute, setCyclingRoute] = useState<LatLng[]>([]);
   const [cyclingRegion, setCyclingRegion] = useState<Region | null>(null);
   const [locationError, setLocationError] = useState<string | null>(null);
@@ -168,6 +300,76 @@ const DataScreen: React.FC = () => {
       loadWaterConsumed();
       return () => {};
     }, [loadWaterConsumed])
+  );
+
+  useFocusEffect(
+    useCallback(() => {
+      let isMounted = true;
+      let unsubscribeSteps: (() => void) | null = null;
+
+      const start = async () => {
+        setStepsLoading(true);
+        const authorized = await ensureGoogleFitPermissions();
+        if (!authorized) {
+          if (isMounted) {
+            setStepsError("Permissão do Google Fit negada.");
+            setStepsLoading(false);
+          }
+          return;
+        }
+
+        try {
+          const initialSteps = await fetchTodayStepCount();
+          if (!isMounted) {
+            return;
+          }
+          lastStepCountRef.current = initialSteps;
+          setStepsToday(initialSteps);
+          setStepsError(null);
+        } catch (error) {
+          if (isMounted) {
+            setStepsError("Não foi possível carregar os passos de hoje.");
+          }
+        } finally {
+          if (isMounted) {
+            setStepsLoading(false);
+          }
+        }
+
+        unsubscribeSteps = subscribeToStepUpdates((value) => {
+          if (!isMounted) {
+            return;
+          }
+          const numericValue = Number(value);
+          if (!Number.isFinite(numericValue)) {
+            return;
+          }
+
+          if (numericValue > lastStepCountRef.current) {
+            setIsWalking(true);
+            scheduleWalkingTimeout();
+          }
+
+          lastStepCountRef.current = numericValue;
+          setStepsToday(numericValue);
+          setStepsError(null);
+        });
+      };
+
+      start();
+
+      return () => {
+        isMounted = false;
+        if (unsubscribeSteps) {
+          unsubscribeSteps();
+        }
+        if (stepsInactivityTimeoutRef.current) {
+          clearTimeout(stepsInactivityTimeoutRef.current);
+          stepsInactivityTimeoutRef.current = null;
+        }
+        setIsWalking(false);
+      };
+    }, [scheduleWalkingTimeout])
   );
 
   useFocusEffect(
@@ -278,6 +480,19 @@ const DataScreen: React.FC = () => {
   // Água - progresso relativo à meta
   const waterGoalMl = 2000; // fallback para 8 copos de 250ml
   const waterProgress = Math.max(0, Math.min(1, waterConsumedMl / waterGoalMl));
+
+  const stepsProgress = stepsGoal > 0 ? Math.min(1, stepsToday / stepsGoal) : 0;
+  const stepsProgressPercent = Math.round(Math.max(0, Math.min(1, stepsProgress)) * 100);
+  const formattedSteps = useMemo(
+    () => (stepsLoading ? "--" : stepsToday.toLocaleString("pt-BR")),
+    [stepsLoading, stepsToday]
+  );
+  const stepsStatusText = useMemo(() => {
+    if (stepsError) return stepsError;
+    if (stepsLoading) return "Sincronizando...";
+    return isWalking ? "Contando agora" : "Sincronizado";
+  }, [stepsError, stepsLoading, isWalking]);
+  const stepsStatusStyle = stepsError ? styles.stepsStatusError : styles.stepsStatusText;
 
   const DAY_ITEM_WIDTH = 50 + 4 * 2;
 
@@ -675,18 +890,27 @@ const DataScreen: React.FC = () => {
                   })
                 }
               >
-                <Text style={[styles.cardCategory, styles.stepsCategory]}>Passos</Text>
-                <Text style={[styles.cardValue, styles.stepsValue]}>{healthData.steps}/2000</Text>
-                <View style={styles.progressBarPlaceholder}>
-                  <View
-                    style={[
-                      styles.progressBarFill,
-                      {
-                        width: `${Math.min(100, (healthData.steps / 2000) * 100)}%`,
-                      },
-                    ]}
-                  ></View>
+                <View style={styles.stepsCardHeader}>
+                  <Text style={[styles.cardCategory, styles.stepsCategory]}>Passos</Text>
+                  <Text style={styles.stepsGoalText}>{stepsGoal.toLocaleString("pt-BR")} meta</Text>
                 </View>
+                <View style={styles.stepsCardBody}>
+                  <View style={styles.stepsRingContainer}>
+                    <StepProgressRing progress={stepsProgress} size={72} />
+                    <View style={styles.stepsRingOverlay}>
+                      <Footprints size={18} color="#FF8C00" />
+                      <Text style={styles.stepsRingPercent}>{stepsProgressPercent}%</Text>
+                    </View>
+                  </View>
+                  <View style={styles.stepsInfoContainer}>
+                    <Text style={styles.stepsCountText}>{formattedSteps}</Text>
+                    <Text style={styles.stepsMetaText}>
+                      de {stepsGoal.toLocaleString("pt-BR")} passos
+                    </Text>
+                    <Text style={stepsStatusStyle}>{stepsStatusText}</Text>
+                  </View>
+                </View>
+                <StepsFootprintsTrail isWalking={isWalking} />
               </TouchableOpacity>
             </View>
 
@@ -1037,12 +1261,91 @@ const styles = StyleSheet.create({
   stepsCard: {
     backgroundColor: "#FFF3E0",
     width: "48%",
-    height: 120,
+    minHeight: 132,
     padding: 15,
     borderRadius: 8,
     marginBottom: 10,
+    justifyContent: "flex-start",
+    alignItems: "stretch",
+  },
+  stepsCardHeader: {
+    flexDirection: "row",
+    alignItems: "center",
     justifyContent: "space-between",
-    alignItems: "flex-start",
+    width: "100%",
+    marginBottom: 8,
+  },
+  stepsGoalText: {
+    color: "#C2410C",
+    fontSize: 12,
+    fontWeight: "600",
+  },
+  stepsCardBody: {
+    flexDirection: "row",
+    alignItems: "center",
+    width: "100%",
+  },
+  stepsRingContainer: {
+    width: 72,
+    height: 72,
+    justifyContent: "center",
+    alignItems: "center",
+    marginRight: 12,
+  },
+  stepsRingOverlay: {
+    position: "absolute",
+    top: 0,
+    bottom: 0,
+    left: 0,
+    right: 0,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  stepsRingPercent: {
+    marginTop: 2,
+    color: "#FF8C00",
+    fontSize: 12,
+    fontWeight: "700",
+  },
+  stepsInfoContainer: {
+    flex: 1,
+  },
+  stepsCountText: {
+    color: "#FF8C00",
+    fontSize: 20,
+    fontWeight: "700",
+  },
+  stepsMetaText: {
+    color: "#B45309",
+    fontSize: 12,
+    marginTop: 2,
+  },
+  stepsStatusText: {
+    color: "#4D7C0F",
+    fontSize: 12,
+    marginTop: 6,
+  },
+  stepsStatusError: {
+    color: "#EF4444",
+    fontSize: 12,
+    marginTop: 6,
+  },
+  stepsTrailContainer: {
+    marginTop: 12,
+    width: "100%",
+    height: 26,
+    borderRadius: 14,
+    backgroundColor: "#FFE8CC",
+    overflow: "hidden",
+    justifyContent: "center",
+    paddingHorizontal: 8,
+  },
+  stepsTrailAnimatedRow: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  stepsFootprintIcon: {
+    marginHorizontal: 6,
   },
   stepsCategory: {
     color: "#888",
