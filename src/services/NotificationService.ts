@@ -5,6 +5,8 @@ export interface NotificationData {
   title: string;
   message: string;
   type?: "info" | "success" | "warning" | "error";
+  userImage?: string;
+  username?: string;
 }
 
 class NotificationService {
@@ -45,6 +47,8 @@ class NotificationService {
         type: "info",
         timestamp: new Date(Date.now() - 3600000), // 1 hour ago
         read: false,
+        userImage: "https://example.com/avatar1.jpg",
+        username: "João Silva",
       },
       {
         id: "2",
@@ -53,6 +57,8 @@ class NotificationService {
         type: "success",
         timestamp: new Date(Date.now() - 86400000), // 1 day ago
         read: false,
+        userImage: "https://example.com/avatar2.jpg",
+        username: "Sistema MOVT",
       },
       {
         id: "3",
@@ -61,6 +67,8 @@ class NotificationService {
         type: "warning",
         timestamp: new Date(Date.now() - 172800000), // 2 days ago
         read: true,
+        userImage: "https://example.com/avatar3.jpg",
+        username: "Seu Treinador",
       },
       {
         id: "4",
@@ -69,6 +77,8 @@ class NotificationService {
         type: "error",
         timestamp: new Date(Date.now() - 259200000), // 3 days ago
         read: true,
+        userImage: "https://example.com/avatar4.jpg",
+        username: "Sistema MOVT",
       },
     ];
   }

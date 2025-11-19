@@ -25,10 +25,7 @@ export function CustomDrawerContent(props: DrawerContentComponentProps) {
   };
 
   const handleProfilePress = () => {
-    props.navigation.navigate("App", {
-      screen: "HomeStack",
-      params: { screen: "ProfileScreen" as keyof AppStackParamList },
-    });
+    props.navigation.navigate("HomeStack", { screen: "ProfileScreen" } as any);
     handleCloseDrawer();
   };
 

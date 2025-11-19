@@ -8,6 +8,8 @@ export interface Notification {
   type?: "info" | "success" | "warning" | "error";
   timestamp: Date;
   read: boolean;
+  userImage?: string;
+  username?: string;
 }
 
 // Define the shape of our context state

@@ -22,14 +22,16 @@ const { width } = Dimensions.get("window");
 
 interface HeaderProps {
   showNotifications?: boolean;
+  notificationSheetHeight?: number | string;
 }
 
 interface NotificationModalProps {
   isVisible: boolean;
   onClose: () => void;
+  sheetHeight?: number | string;
 }
 
-const NotificationModal: React.FC<NotificationModalProps> = ({ isVisible, onClose }) => {
+const NotificationModal: React.FC<NotificationModalProps> = ({ isVisible, onClose, sheetHeight = "100%" }) => {
   type HeaderNavigationProp = CompositeNavigationProp<
     DrawerNavigationProp<AppDrawerParamList, "HomeStack">,
     NavigationProp<AppStackParamList>
@@ -59,7 +61,7 @@ const NotificationModal: React.FC<NotificationModalProps> = ({ isVisible, onClos
         useNativeDriver: true,
       }).start();
     }
-  }, [isVisible, slideAnimation]);
+  }, [isVisible, slideAnimation, sheetHeight]);
 
   const renderNotificationIcon = (type?: string) => {
     switch (type) {
@@ -95,32 +97,17 @@ const NotificationModal: React.FC<NotificationModalProps> = ({ isVisible, onClos
           <TouchableWithoutFeedback onPress={() => {}}>
             <Animated.View
               style={[
-                modalStyles.modalContainer,
                 {
                   transform: [{ translateX: slideAnimation }],
+                  width: "85%",
+                  height: sheetHeight as any,
+                  backgroundColor: "#FFFFFF",
+                  borderTopLeftRadius: 20,
+                  borderBottomLeftRadius: 20,
                 },
               ]}
             >
-              {/* Profile Section */}
-              <TouchableOpacity
-                style={modalStyles.profileSection}
-                onPress={handleProfilePress}
-                activeOpacity={0.7}
-              >
-                <Image
-                  source={
-                    user?.photo
-                      ? { uri: user.photo }
-                      : {
-                          uri: "https://img.freepik.com/vetores-gratis/circulo-azul-com-usuario-branco_78370-4707.jpg?t=st=1760290901~exp=1760294501~hmac=54c484fcb1eb3bfdc377aeeaa901c951421c366a6a55921cf0ce792c078fe4df&w=1480",
-                        }
-                  }
-                  style={modalStyles.profileImage}
-                />
-                <View style={modalStyles.profileInfo}>
-                  <Text style={modalStyles.profileName}>{user?.name || "Visitante"}</Text>
-                </View>
-              </TouchableOpacity>
+
 
               <View style={modalStyles.header}>
                 <View style={modalStyles.headerLeft}>
@@ -188,7 +175,7 @@ const NotificationModal: React.FC<NotificationModalProps> = ({ isVisible, onClos
   );
 };
 
-const Header: React.FC<HeaderProps> = ({ showNotifications = true }) => {
+const Header: React.FC<HeaderProps> = ({ showNotifications = true, notificationSheetHeight = "100%" }) => {
   type HeaderNavigationProp = CompositeNavigationProp<
     DrawerNavigationProp<AppDrawerParamList, "HomeStack">,
     NavigationProp<AppStackParamList>
@@ -233,6 +220,7 @@ const Header: React.FC<HeaderProps> = ({ showNotifications = true }) => {
         <NotificationModal
           isVisible={isNotificationModalVisible}
           onClose={toggleNotificationModal}
+          sheetHeight={notificationSheetHeight}
         />
       )}
     </View>
@@ -282,8 +270,7 @@ const modalStyles = StyleSheet.create({
     alignItems: "flex-end",
   },
   modalContainer: {
-    width: "85%",
-    height: "100%",
+    width: "60%",
     backgroundColor: "#FFFFFF",
     borderTopLeftRadius: 20,
     borderBottomLeftRadius: 20,

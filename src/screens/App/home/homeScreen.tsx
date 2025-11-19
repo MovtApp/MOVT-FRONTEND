@@ -68,10 +68,15 @@ const exerciseData: ExerciseItem[] = [
 const HomeScreen: React.FC = () => {
   const [search, setSearch] = useState("");
   const [selectedGender] = useState<"male" | "female">("female");
+  const [notificationSheetHeight, setNotificationSheetHeight] = useState<number | string>("100%");
+
+  const handleNotificationSheetHeightChange = (height: number | string) => {
+    setNotificationSheetHeight(height);
+  };
 
   return (
     <View style={styles.container}>
-      <Header />
+      <Header notificationSheetHeight={notificationSheetHeight} />
 
       {/* Search Bar */}
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
@@ -138,10 +143,38 @@ const HomeScreen: React.FC = () => {
         <ChallengesSection />
         {/* Rapid heating */}
         <HeatingScreen /> {/* Usando o nome correto do componente: HeatingScreen */}
-      </ScrollView>
-    </View>
-  );
-};
+        </ScrollView>
+
+        {/* Notification Sheet Height Controls */}
+        <View style={styles.heightControlsContainer}>
+        <TouchableOpacity
+         style={[styles.heightButton, notificationSheetHeight === "40%" && styles.heightButtonActive]}
+         onPress={() => handleNotificationSheetHeightChange("40%")}
+        >
+         <Text style={[styles.heightButtonText, notificationSheetHeight === "40%" && styles.heightButtonTextActive]}>40%</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+         style={[styles.heightButton, notificationSheetHeight === "60%" && styles.heightButtonActive]}
+         onPress={() => handleNotificationSheetHeightChange("60%")}
+        >
+         <Text style={[styles.heightButtonText, notificationSheetHeight === "60%" && styles.heightButtonTextActive]}>60%</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+         style={[styles.heightButton, notificationSheetHeight === "80%" && styles.heightButtonActive]}
+         onPress={() => handleNotificationSheetHeightChange("80%")}
+        >
+         <Text style={[styles.heightButtonText, notificationSheetHeight === "80%" && styles.heightButtonTextActive]}>80%</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+         style={[styles.heightButton, notificationSheetHeight === "100%" && styles.heightButtonActive]}
+         onPress={() => handleNotificationSheetHeightChange("100%")}
+        >
+         <Text style={[styles.heightButtonText, notificationSheetHeight === "100%" && styles.heightButtonTextActive]}>100%</Text>
+        </TouchableOpacity>
+        </View>
+        </View>
+        );
+        };
 
 const styles = StyleSheet.create({
   container: {
@@ -335,6 +368,36 @@ const styles = StyleSheet.create({
     width: 80,
     height: 80,
     zIndex: 4,
+  },
+  heightControlsContainer: {
+    flexDirection: "row",
+    justifyContent: "space-around",
+    alignItems: "center",
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    backgroundColor: "#f5f5f5",
+    borderTopWidth: 1,
+    borderTopColor: "#e5e5e5",
+  },
+  heightButton: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "#BBF246",
+    backgroundColor: "#fff",
+  },
+  heightButtonActive: {
+    backgroundColor: "#BBF246",
+    borderColor: "#BBF246",
+  },
+  heightButtonText: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: "#192126",
+  },
+  heightButtonTextActive: {
+    color: "#192126",
   },
 });
 
