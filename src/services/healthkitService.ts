@@ -63,7 +63,7 @@ export const getLatestHealthKitData = async (
         .order("createdAt", { ascending: false })
         .limit(1)
         .maybeSingle(),
-      
+
       // Pressão arterial
       supabase
         .from("healthkit")
@@ -73,7 +73,7 @@ export const getLatestHealthKitData = async (
         .order("createdAt", { ascending: false })
         .limit(1)
         .maybeSingle(),
-      
+
       // Oxigênio (SpO2)
       supabase
         .from("healthkit")
@@ -196,4 +196,3 @@ export const pollHealthKitData = (
     isPolling = false;
   };
 };
-

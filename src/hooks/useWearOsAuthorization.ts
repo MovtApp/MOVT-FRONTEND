@@ -15,8 +15,9 @@ export const useWearOsAuthorization = () => {
   const [isAuthorized, setIsAuthorized] = useState<boolean>(false);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
-  const [authorizationResult, setAuthorizationResult] =
-    useState<WearOsAuthorizationResult | null>(null);
+  const [authorizationResult, setAuthorizationResult] = useState<WearOsAuthorizationResult | null>(
+    null
+  );
 
   // Verificar permissões ao iniciar
   useEffect(() => {

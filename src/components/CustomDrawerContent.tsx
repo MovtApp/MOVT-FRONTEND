@@ -19,10 +19,17 @@ import { useAuth } from "../hooks/useAuth";
 
 export function CustomDrawerContent(props: DrawerContentComponentProps) {
   const { user, signOut } = useAuth();
-  const userWithPhoto = user as typeof user & { photo?: string | null };
 
   const handleCloseDrawer = () => {
     props.navigation.closeDrawer();
+  };
+
+  const handleProfilePress = () => {
+    props.navigation.navigate("App", {
+      screen: "HomeStack",
+      params: { screen: "ProfileScreen" as keyof AppStackParamList },
+    });
+    handleCloseDrawer();
   };
 
   const menuItems = [
@@ -57,21 +64,25 @@ export function CustomDrawerContent(props: DrawerContentComponentProps) {
         <Text style={styles.menuTitle}>Menu</Text>
       </View>
 
-      <View style={styles.profileSection}>
+      <TouchableOpacity
+        style={styles.profileSection}
+        activeOpacity={0.7}
+        onPress={handleProfilePress}
+      >
         <Image
           source={
-            userWithPhoto?.photo
-              ? { uri: userWithPhoto.photo }
+            user?.photo
+              ? { uri: user.photo }
               : {
                   uri: "https://img.freepik.com/vetores-gratis/circulo-azul-com-usuario-branco_78370-4707.jpg?t=st=1760290901~exp=1760294501~hmac=54c484fcb1eb3bfdc377aeeaa901c951421c366a6a55921cf0ce792c078fe4df&w=1480",
                 }
-          } // Usar foto do usuário ou imagem padrão online
+          }
           style={styles.profileImage}
         />
         <View style={styles.profileInfo}>
-          <Text style={styles.profileName}>{userWithPhoto?.name || "Visitante"}</Text>
+          <Text style={styles.profileName}>{user?.name || "Visitante"}</Text>
         </View>
-      </View>
+      </TouchableOpacity>
 
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Menu principal</Text>
@@ -169,12 +180,11 @@ const styles = StyleSheet.create({
     height: 50,
     borderRadius: 25,
     marginRight: 15,
+    borderWidth: 2,
+    borderColor: "#BBF246",
   },
   profileInfo: {
     flex: 1,
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
   },
   profileName: {
     fontSize: 16,

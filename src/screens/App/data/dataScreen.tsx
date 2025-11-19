@@ -24,15 +24,18 @@ import Animated, {
   useAnimatedProps,
   withTiming,
   Easing,
-  withRepeat,
-  cancelAnimation,
-  useAnimatedStyle,
 } from "react-native-reanimated";
 import {
   ensureGoogleFitPermissions,
   fetchTodayStepCount,
   subscribeToStepUpdates,
 } from "../../../services/googleFitService";
+import {
+  getLatestWearOsHealthDataFromAllDevices,
+  pollWearOsHealthData,
+} from "../../../services/wearOsHealthService";
+import { useAuth } from "../../../contexts/AuthContext";
+import ECGDisplay from "../../../components/ECGDisplay";
 
 const { width } = Dimensions.get("window");
 
@@ -70,7 +73,6 @@ const cyclingMapStyle: MapStyleElement[] = [
   },
 ];
 const AnimatedSvgCircle = Animated.createAnimatedComponent(Circle);
-const FOOTPRINT_SPACING = 26;
 const STEPS_INACTIVITY_TIMEOUT = 6000;
 const DEFAULT_STEPS_GOAL = 10000;
 
@@ -83,7 +85,10 @@ const getTodayKey = (): string => {
 };
 
 // Componente isolado da onda para evitar re-render do DataScreen
-const WaterWave: React.FC<{ progress: number; height?: number }> = React.memo(({ progress, height = 60 }) => {
+const WaterWave: React.FC<{ progress: number; height?: number }> = React.memo(function WaterWave({
+  progress,
+  height = 60,
+}) {
   const [phase, setPhase] = useState<number>(0);
   const [size, setSize] = useState<{ width: number; height: number }>({ width: 0, height });
 
@@ -122,7 +127,9 @@ const WaterWave: React.FC<{ progress: number; height?: number }> = React.memo(({
   return (
     <View
       style={{ position: "absolute", inset: 0 }}
-      onLayout={(e) => setSize({ width: e.nativeEvent.layout.width, height: e.nativeEvent.layout.height })}
+      onLayout={(e) =>
+        setSize({ width: e.nativeEvent.layout.width, height: e.nativeEvent.layout.height })
+      }
       pointerEvents="none"
     >
       <Canvas style={{ position: "absolute", left: 0, top: 0, right: 0, bottom: 0 }}>
@@ -132,7 +139,13 @@ const WaterWave: React.FC<{ progress: number; height?: number }> = React.memo(({
           style="fill"
         />
         <Path
-          path={buildWavePath(size.width, size.height, phase + Math.PI / 2, 8, Math.max(0, Math.min(1, progress * 0.98)))}
+          path={buildWavePath(
+            size.width,
+            size.height,
+            phase + Math.PI / 2,
+            8,
+            Math.max(0, Math.min(1, progress * 0.98))
+          )}
           color="#79BDEB"
           style="fill"
         />
@@ -141,7 +154,10 @@ const WaterWave: React.FC<{ progress: number; height?: number }> = React.memo(({
   );
 });
 
-const StepProgressRing: React.FC<{ progress: number; size?: number }> = ({ progress, size = 78 }) => {
+const StepProgressRing: React.FC<{ progress: number; size?: number }> = ({
+  progress,
+  size = 78,
+}) => {
   const radius = size / 2 - 8;
   const circumference = 2 * Math.PI * radius;
   const clamped = Math.max(0, Math.min(1, progress));
@@ -189,64 +205,49 @@ const StepProgressRing: React.FC<{ progress: number; size?: number }> = ({ progr
   );
 };
 
-const StepsFootprintsTrail: React.FC<{ isWalking: boolean }> = ({ isWalking }) => {
-  const translateX = useSharedValue(0);
-  const opacity = useSharedValue(0.3);
-
-  useEffect(() => {
-    if (isWalking) {
-      opacity.value = withTiming(1, { duration: 300 });
-      translateX.value = 0;
-      translateX.value = withRepeat(
-        withTiming(-FOOTPRINT_SPACING, {
-          duration: 720,
-          easing: Easing.linear,
-        }),
-        -1,
-        false
-      );
-    } else {
-      opacity.value = withTiming(0.3, { duration: 400 });
-      cancelAnimation(translateX);
-      translateX.value = withTiming(0, {
-        duration: 500,
-        easing: Easing.out(Easing.cubic),
-      });
-    }
-  }, [isWalking, opacity, translateX]);
-
-  const animatedStyle = useAnimatedStyle(() => ({
-    transform: [{ translateX: translateX.value }],
-    opacity: opacity.value,
-  }));
-
-  const footprintItems = useMemo(() => Array.from({ length: 6 }), []);
-
-  return (
-    <View style={styles.stepsTrailContainer}>
-      <Animated.View style={[styles.stepsTrailAnimatedRow, animatedStyle]}>
-        {footprintItems.map((_, index) => (
-          <Footprints key={`trail-a-${index}`} size={18} color="#FF8C00" style={styles.stepsFootprintIcon} />
-        ))}
-        {footprintItems.map((_, index) => (
-          <Footprints key={`trail-b-${index}`} size={18} color="#FF8C00" style={styles.stepsFootprintIcon} />
-        ))}
-      </Animated.View>
-    </View>
-  );
-};
-
 const DataScreen: React.FC = () => {
   type DataScreenNavigationProp = CompositeNavigationProp<
     DrawerNavigationProp<AppDrawerParamList, "HomeStack">,
     NativeStackNavigationProp<AppStackParamList>
   >;
   const navigation = useNavigation<DataScreenNavigationProp>();
+  const { user } = useAuth();
+
+  // Estados para dados de saúde em tempo real do Wear OS
+  const [heartRate, setHeartRate] = useState<number | null>(null);
+  const [isWearOsConnected, setIsWearOsConnected] = useState(false);
+
+  // Estado para tempo de treino
+  const [trainingTime, setTrainingTime] = useState<number>(0); // em segundos
+  const trainingIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // Estado para calorias diárias
+  const [dailyCalories, setDailyCalories] = useState<number>(0);
+
+  // Estado para sono diário
+  const [sleepHours, setSleepHours] = useState<number>(0);
+  const [sleepMinutes, setSleepMinutes] = useState<number>(0);
+
+  const getTodaySleepKey = (): string => {
+    const d = new Date();
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, "0");
+    const dd = String(d.getDate()).padStart(2, "0");
+    return `sleep:${yyyy}-${mm}-${dd}`;
+  };
+
+  const getTodayCaloriesKey = (): string => {
+    const d = new Date();
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, "0");
+    const dd = String(d.getDate()).padStart(2, "0");
+    return `calories:${yyyy}-${mm}-${dd}`;
+  };
 
   const healthData = {
-    calories: 645,
+    calories: dailyCalories,
     steps: 999,
-    heartRate: 79,
+    heartRate: heartRate ?? 0, // Zera o valor até conectar com o relógio
     sleep: 0,
     Results: 0,
     water: 6,
@@ -259,7 +260,6 @@ const DataScreen: React.FC = () => {
   const [waterConsumedMl, setWaterConsumedMl] = useState<number>(0);
   const [stepsToday, setStepsToday] = useState<number>(0);
   const [stepsLoading, setStepsLoading] = useState<boolean>(false);
-  const [stepsError, setStepsError] = useState<string | null>(null);
   const [isWalking, setIsWalking] = useState<boolean>(false);
   const lastStepCountRef = useRef<number>(0);
   const stepsInactivityTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -295,11 +295,165 @@ const DataScreen: React.FC = () => {
     }
   }, []);
 
+  const calculateAndSaveCalories = useCallback(async () => {
+    try {
+      // Fórmula de gasto calórico baseada em:
+      // 1. Passos: ~0.05 kcal por passo
+      // 2. Frequência cardíaca: intensidade extra
+      // 3. Tempo de treino: 5 kcal por minuto de atividade
+
+      let calories = 0;
+
+      // Calorias por passos (0.05 kcal por passo)
+      calories += stepsToday * 0.05;
+
+      // Calorias por frequência cardíaca elevada
+      // Se BPM > 60 (repouso), adiciona calorias extras por intensidade
+      if (heartRate && heartRate > 60) {
+        const excessBpm = heartRate - 60;
+        calories += excessBpm * 0.15; // 0.15 kcal por BPM acima do repouso
+      }
+
+      // Calorias por tempo de treino (5 kcal por minuto)
+      if (trainingTime > 0) {
+        const minutesOfTraining = trainingTime / 60;
+        calories += minutesOfTraining * 5;
+      }
+
+      // Arredondar para 2 casas decimais
+      const roundedCalories = Math.round(calories * 100) / 100;
+      setDailyCalories(roundedCalories);
+
+      // Salvar no AsyncStorage
+      const key = getTodayCaloriesKey();
+      await AsyncStorage.setItem(key, JSON.stringify({ calories: roundedCalories }));
+    } catch (error) {
+      console.error("Erro ao calcular/salvar calorias:", error);
+    }
+  }, [stepsToday, heartRate, trainingTime]);
+
+  const loadDailyCalories = useCallback(async () => {
+    try {
+      const key = getTodayCaloriesKey();
+      const raw = await AsyncStorage.getItem(key);
+      if (raw) {
+        const parsed = JSON.parse(raw) as { calories?: number };
+        setDailyCalories(typeof parsed.calories === "number" ? parsed.calories : 0);
+      } else {
+        setDailyCalories(0);
+      }
+    } catch {
+      setDailyCalories(0);
+    }
+  }, []);
+
+  const loadDailySleep = useCallback(async () => {
+    try {
+      const key = getTodaySleepKey();
+      const raw = await AsyncStorage.getItem(key);
+      if (raw) {
+        const parsed = JSON.parse(raw) as { hours?: number; minutes?: number };
+        setSleepHours(typeof parsed.hours === "number" ? parsed.hours : 0);
+        setSleepMinutes(typeof parsed.minutes === "number" ? parsed.minutes : 0);
+      } else {
+        setSleepHours(0);
+        setSleepMinutes(0);
+      }
+    } catch {
+      setSleepHours(0);
+      setSleepMinutes(0);
+    }
+  }, []);
+
   useFocusEffect(
     useCallback(() => {
       loadWaterConsumed();
+      loadDailyCalories();
+      loadDailySleep();
       return () => {};
-    }, [loadWaterConsumed])
+    }, [loadWaterConsumed, loadDailyCalories, loadDailySleep])
+  );
+
+  // Atualizar calorias quando houver mudanças nos dados (passos, BPM, tempo de treino)
+  useEffect(() => {
+    calculateAndSaveCalories();
+  }, [stepsToday, heartRate, trainingTime, calculateAndSaveCalories]);
+
+  // Controlar timer de treino baseado em movimento
+  useEffect(() => {
+    if (isWalking) {
+      // Iniciar timer quando começar a caminhar
+      if (!trainingIntervalRef.current) {
+        trainingIntervalRef.current = setInterval(() => {
+          setTrainingTime((prev) => prev + 1);
+        }, 1000); // Incrementar a cada 1 segundo
+      }
+    } else {
+      // Parar timer quando parar de caminhar
+      if (trainingIntervalRef.current) {
+        clearInterval(trainingIntervalRef.current);
+        trainingIntervalRef.current = null;
+      }
+    }
+
+    return () => {
+      if (trainingIntervalRef.current) {
+        clearInterval(trainingIntervalRef.current);
+        trainingIntervalRef.current = null;
+      }
+    };
+  }, [isWalking]);
+
+  // Carregar dados de batimento cardíaco do Wear OS em tempo real
+  useFocusEffect(
+    useCallback(() => {
+      let isMounted = true;
+
+      const loadWearOsData = async () => {
+        if (!user?.id) return;
+
+        try {
+          // Obter dados iniciais
+          const data = await getLatestWearOsHealthDataFromAllDevices(parseInt(user.id, 10));
+          if (isMounted && data) {
+            if (data.heartRate) {
+              setHeartRate(data.heartRate);
+              setIsWearOsConnected(true);
+            }
+          }
+
+          // Configurar polling para atualizações em tempo real
+          const unsubscribe = pollWearOsHealthData(
+            parseInt(user.id, 10),
+            5000,
+            (newData: {
+              heartRate: number | null;
+              pressure: number | null;
+              oxygen: number | null;
+            }) => {
+              if (isMounted && newData.heartRate) {
+                setHeartRate(newData.heartRate);
+                setIsWearOsConnected(true);
+              }
+            }
+          );
+
+          return () => {
+            if (unsubscribe) unsubscribe();
+          };
+        } catch (error) {
+          console.error("Erro ao carregar dados do Wear OS:", error);
+          setIsWearOsConnected(false);
+        }
+      };
+
+      const cleanup = loadWearOsData();
+
+      return () => {
+        isMounted = false;
+        cleanup?.then((cb) => cb?.());
+      };
+    }, [user?.id])
   );
 
   useFocusEffect(
@@ -312,7 +466,6 @@ const DataScreen: React.FC = () => {
         const authorized = await ensureGoogleFitPermissions();
         if (!authorized) {
           if (isMounted) {
-            setStepsError("Permissão do Google Fit negada.");
             setStepsLoading(false);
           }
           return;
@@ -325,11 +478,8 @@ const DataScreen: React.FC = () => {
           }
           lastStepCountRef.current = initialSteps;
           setStepsToday(initialSteps);
-          setStepsError(null);
-        } catch (error) {
-          if (isMounted) {
-            setStepsError("Não foi possível carregar os passos de hoje.");
-          }
+        } catch {
+          // Error handled silently
         } finally {
           if (isMounted) {
             setStepsLoading(false);
@@ -352,7 +502,6 @@ const DataScreen: React.FC = () => {
 
           lastStepCountRef.current = numericValue;
           setStepsToday(numericValue);
-          setStepsError(null);
         });
       };
 
@@ -456,7 +605,7 @@ const DataScreen: React.FC = () => {
               });
             }
           );
-        } catch (error) {
+        } catch {
           if (isActive) {
             setLocationError("Não foi possível iniciar o rastreamento de ciclismo.");
           }
@@ -488,11 +637,25 @@ const DataScreen: React.FC = () => {
     [stepsLoading, stepsToday]
   );
   const stepsStatusText = useMemo(() => {
-    if (stepsError) return stepsError;
     if (stepsLoading) return "Sincronizando...";
-    return isWalking ? "Contando agora" : "Sincronizado";
-  }, [stepsError, stepsLoading, isWalking]);
-  const stepsStatusStyle = stepsError ? styles.stepsStatusError : styles.stepsStatusText;
+    return isWalking ? "Contando agora" : "";
+  }, [stepsLoading, isWalking]);
+  const stepsStatusStyle = styles.stepsStatusText;
+
+  // Formatar tempo de treino para exibição (mm:ss ou h:mm:ss)
+  const formattedTrainingTime = useMemo(() => {
+    const hours = Math.floor(trainingTime / 3600);
+    const minutes = Math.floor((trainingTime % 3600) / 60);
+    const seconds = trainingTime % 60;
+
+    if (hours > 0) {
+      return `${hours}h ${minutes}m`;
+    } else if (minutes > 0) {
+      return `${minutes}m ${seconds}s`;
+    } else {
+      return `${seconds}s`;
+    }
+  }, [trainingTime]);
 
   const DAY_ITEM_WIDTH = 50 + 4 * 2;
 
@@ -833,9 +996,11 @@ const DataScreen: React.FC = () => {
                     })
                   }
                 >
-                  <Text style={[styles.cardCategory, styles.trainingTimeCategory]}>Tempo de treino</Text>
-                  <View style={styles.circularProgressPlaceholder}>
-                    <Text style={styles.trainingTimeValue}>32m</Text>
+                  <Text style={[styles.cardCategory, styles.trainingTimeCategory]}>
+                    Tempo de treino
+                  </Text>
+                  <View style={styles.trainingTimeValueContainer}>
+                    <Text style={styles.trainingTimeValue}>{formattedTrainingTime}</Text>
                   </View>
                 </TouchableOpacity>
               </View>
@@ -873,10 +1038,26 @@ const DataScreen: React.FC = () => {
                   })
                 }
               >
-                <Text style={[styles.cardCategory, styles.heartRateCategory]}>Batimentos</Text>
-                <View style={styles.heartRateGraphPlaceholder}></View>
+                <View style={styles.heartRateHeader}>
+                  <Text style={[styles.cardCategory, styles.heartRateCategory]}>Batimentos</Text>
+                  {isWearOsConnected && (
+                    <View style={styles.connectionIndicator}>
+                      <View style={styles.connectionDot} />
+                      <Text style={styles.connectionText}>Conectado</Text>
+                    </View>
+                  )}
+                </View>
+                <ECGDisplay
+                  bpm={healthData.heartRate}
+                  width={140}
+                  height={45}
+                  responsive={false}
+                  isConnected={isWearOsConnected && healthData.heartRate > 0}
+                />
                 <Text style={[styles.cardValue, styles.heartRateValue]}>
-                  {healthData.heartRate} Bpm
+                  {isWearOsConnected && healthData.heartRate > 0
+                    ? `${healthData.heartRate} Bpm`
+                    : "--"}
                 </Text>
               </TouchableOpacity>
 
@@ -910,7 +1091,6 @@ const DataScreen: React.FC = () => {
                     <Text style={stepsStatusStyle}>{stepsStatusText}</Text>
                   </View>
                 </View>
-                <StepsFootprintsTrail isWalking={isWalking} />
               </TouchableOpacity>
             </View>
 
@@ -927,8 +1107,11 @@ const DataScreen: React.FC = () => {
                 }
               >
                 <Text style={[styles.cardCategory, styles.sleepCategory]}>Sono</Text>
-                <View style={styles.sleepGraphPlaceholder}></View>
-                <Text style={[styles.cardValue, styles.sleepValue]}>0h 0m</Text>
+                <View style={styles.sleepStatusContainer}>
+                  <Text style={[styles.cardValue, styles.sleepValue]}>
+                    {sleepHours}h {String(sleepMinutes).padStart(2, "0")}m
+                  </Text>
+                </View>
               </TouchableOpacity>
 
               {/* Card de Água */}
@@ -942,18 +1125,16 @@ const DataScreen: React.FC = () => {
                 }
               >
                 <Text style={[styles.cardCategory, styles.waterCategory]}>Água</Text>
-                  <View style={styles.waterFillPlaceholder}>
-                   <WaterWave progress={waterProgress} />
-                   <Text style={[styles.cardValue, styles.waterValue]}>
-                     {waterConsumedMl} ml
-                   </Text>
-                 </View>
+                <View style={styles.waterFillPlaceholder}>
+                  <WaterWave progress={waterProgress} />
+                  <Text style={[styles.cardValue, styles.waterValue]}>{waterConsumedMl} ml</Text>
+                </View>
               </TouchableOpacity>
             </View>
             <TouchableOpacity style={styles.cyclingCard} activeOpacity={0.9}>
               <View style={styles.cyclingHeader}>
                 <View style={styles.cyclingIcon}>
-                  <Bike size={20} color="#192126"/>
+                  <Bike size={20} color="#192126" />
                 </View>
                 <Text style={styles.cyclingTitle}>Ciclismo</Text>
               </View>
@@ -1125,9 +1306,11 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   cardCategory: {
-    color: "#192126",
-    fontSize: 12,
+    color: "#FFF",
+    fontSize: 14,
+    marginTop: -4,
     marginBottom: 5,
+    fontWeight: "bold",
   },
   cardValue: {
     color: "#fff",
@@ -1135,20 +1318,18 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
   },
   caloriesCard: {
-    backgroundColor: "#FFFFFF",
+    backgroundColor: "#192126",
     height: 70,
     width: 150,
     padding: 15,
     borderRadius: 8,
-    borderColor: "#192126",
-    borderWidth: 1,
     marginBottom: 10,
     justifyContent: "space-between",
     alignItems: "flex-start",
   },
   caloriesValue: {
-    color: "#333",
-    fontSize: 16,
+    color: "#FFF",
+    fontSize: 14,
   },
   ResultsCard: {
     backgroundColor: "#192126",
@@ -1206,16 +1387,17 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     marginBottom: 10,
     justifyContent: "space-between",
-    alignItems: "flex-start",
+    alignItems: "center",
   },
   trainingTimeCategory: {
-    color: "#888",
-    fontSize: 10,
+    color: "#8A2BE2",
+    fontSize: 14,
     marginBottom: 5,
     textAlign: "left",
     width: "100%",
+    fontWeight: "bold",
   },
-  circularProgressPlaceholder: {
+  trainingTimeValueContainer: {
     width: 54,
     height: 54,
     borderRadius: 35,
@@ -1226,32 +1408,59 @@ const styles = StyleSheet.create({
   },
   trainingTimeValue: {
     color: "#8A2BE2",
-    fontSize: 14,
+    fontSize: 16,
+    fontWeight: "bold",
   },
   heartRateCard: {
     backgroundColor: "#FCE7F3",
     width: "48%",
-    height: 120,
-    padding: 15,
+    height: 130,
+    padding: 12,
     borderRadius: 8,
     marginBottom: 10,
     justifyContent: "space-between",
     alignItems: "flex-start",
   },
+  heartRateHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    width: "100%",
+    marginBottom: 3,
+  },
   heartRateCategory: {
-    color: "#888",
-    fontSize: 12,
-    marginBottom: 5,
+    color: "red",
+    fontSize: 14,
+    fontWeight: "bold",
+    marginTop: 2,
+  },
+  connectionIndicator: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+  },
+  connectionDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: "#22C55E",
+  },
+  connectionText: {
+    color: "#22C55E",
+    fontSize: 9,
+    fontWeight: "600",
   },
   heartRateGraphPlaceholder: {
     width: "100%",
-    height: 40,
-    backgroundColor: "#FFDDEE",
-    borderRadius: 5,
+    height: 50,
+    justifyContent: "center",
+    alignItems: "center",
+    marginVertical: 4,
   },
   heartRateValue: {
     color: "#FF69B4",
-    fontSize: 18,
+    fontSize: 16,
+    marginTop: 2,
   },
   ResultsValue: {
     color: "#00C0FF",
@@ -1348,9 +1557,10 @@ const styles = StyleSheet.create({
     marginHorizontal: 6,
   },
   stepsCategory: {
-    color: "#888",
-    fontSize: 12,
+    color: "#FF8C00",
+    fontSize: 14,
     marginBottom: 5,
+    fontWeight: "bold",
   },
   stepsValue: {
     color: "#FF8C00",
@@ -1380,19 +1590,30 @@ const styles = StyleSheet.create({
     alignItems: "flex-start",
   },
   sleepCategory: {
-    color: "#888",
-    fontSize: 12,
-    marginBottom: 5,
+    color: "#1F2937",
+    fontSize: 14,
+    marginBottom: 8,
+    fontWeight: "bold",
   },
-  sleepGraphPlaceholder: {
-    width: "100%",
-    height: 40,
-    backgroundColor: "#CCEEFF",
-    borderRadius: 5,
+  sleepStatusContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "flex-start",
+    gap: 8,
   },
   sleepValue: {
-    color: "#00BFFF",
-    fontSize: 18,
+    color: "#1F2937",
+    fontSize: 24,
+    fontWeight: "bold",
+  },
+  sleepStatusBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  sleepStatusText: {
+    color: "#FFFFFF",
+    fontSize: 11,
     fontWeight: "bold",
   },
   waterCard: {
@@ -1406,9 +1627,10 @@ const styles = StyleSheet.create({
     alignItems: "flex-start",
   },
   waterCategory: {
-    color: "#888",
-    fontSize: 12,
+    color: "#192126",
+    fontSize: 14,
     marginBottom: 5,
+    fontWeight: "bold",
   },
   waterFillPlaceholder: {
     width: "100%",

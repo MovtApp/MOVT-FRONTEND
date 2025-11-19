@@ -95,7 +95,7 @@ export default {
         },
       },
       borderWidth: {
-        hairline: typeof nativewindTheme.hairlineWidth === 'function' ? nativewindTheme.hairlineWidth() : '1px',
+        hairline: '1px',
       },
       keyframes: {
         "accordion-down": {

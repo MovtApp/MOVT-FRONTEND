@@ -260,12 +260,9 @@ export default function TestWearScreen() {
           <View style={styles.healthBox}>
             <Text style={styles.resultTitle}>❤️ Dados de Saúde:</Text>
             <Text style={styles.healthText}>
-              Frequência Cardíaca:{" "}
-              {healthData.heartRate ? `${healthData.heartRate} bpm` : "N/A"}
-              {"\n"}Pressão Arterial:{" "}
-              {healthData.pressure ? `${healthData.pressure} mmHg` : "N/A"}
-              {"\n"}Saturação O2:{" "}
-              {healthData.oxygen ? `${healthData.oxygen}%` : "N/A"}
+              Frequência Cardíaca: {healthData.heartRate ? `${healthData.heartRate} bpm` : "N/A"}
+              {"\n"}Pressão Arterial: {healthData.pressure ? `${healthData.pressure} mmHg` : "N/A"}
+              {"\n"}Saturação O2: {healthData.oxygen ? `${healthData.oxygen}%` : "N/A"}
             </Text>
           </View>
         )}
@@ -274,9 +271,9 @@ export default function TestWearScreen() {
         <View style={styles.instructionsBox}>
           <Text style={styles.instructionTitle}>📋 Passo a Passo:</Text>
           <Text style={styles.instructionText}>
-            1. Clique em "Verificar Permissões" para ver o status{"\n"}
+            1. Clique em &quot;Verificar Permissões&quot; para ver o status{"\n"}
             {"\n"}
-            2. Clique em "Solicitar Autorização" para ativar sensores{"\n"}
+            2. Clique em &quot;Solicitar Autorização&quot; para ativar sensores{"\n"}
             {"\n"}
             3. Aceite as permissões no diálogo que aparecer{"\n"}
             {"\n"}

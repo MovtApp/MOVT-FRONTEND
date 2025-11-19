@@ -59,9 +59,7 @@ export const requestWearOsAuthorization = async (
     onProgress?.("Solicitando permissões de sensores...");
 
     // Solicitar permissões de sensores
-    const permissionResults = await PermissionsAndroid.requestMultiple(
-      WEAR_OS_PERMISSIONS
-    );
+    const permissionResults = await PermissionsAndroid.requestMultiple(WEAR_OS_PERMISSIONS);
 
     const allPermissionsGranted = Object.values(permissionResults).every(
       (permission) => permission === PermissionsAndroid.RESULTS.GRANTED
@@ -154,9 +152,7 @@ export const requestWearOsAuthorizationWithUI = async (
  * Mostra alertas de status baseado no resultado da autorização
  * @param result Resultado da autorização
  */
-export const showWearOsAuthorizationAlert = (
-  result: WearOsAuthorizationResult
-): void => {
+export const showWearOsAuthorizationAlert = (result: WearOsAuthorizationResult): void => {
   const title = result.success ? "Sucesso" : "Erro";
   Alert.alert(title, result.message);
 };
@@ -214,8 +210,7 @@ export const initializeWearOsAuthorization = async (
                 {
                   text: "Tentar novamente",
                   onPress: async () => {
-                    const retryResult =
-                      await initializeWearOsAuthorization(userId);
+                    const retryResult = await initializeWearOsAuthorization(userId);
                     resolve(retryResult);
                   },
                 },
@@ -245,9 +240,7 @@ export const checkWearOsPermissions = async (): Promise<boolean> => {
 
   try {
     const results = await PermissionsAndroid.checkMultiple(WEAR_OS_PERMISSIONS);
-    return Object.values(results).every(
-      (result) => result === PermissionsAndroid.RESULTS.GRANTED
-    );
+    return Object.values(results).every((result) => result === PermissionsAndroid.RESULTS.GRANTED);
   } catch (error) {
     console.error("Erro ao verificar permissões Wear OS:", error);
     return false;

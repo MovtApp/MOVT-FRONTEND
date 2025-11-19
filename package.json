@@ -1,6 +1,7 @@
 {
   "name": "movt",
   "version": "1.0.0",
+  "type": "module",
   "main": "index.js",
   "scripts": {
     "start": "set EXPO_TUNNEL_TIMEOUT=120000000 && expo start",

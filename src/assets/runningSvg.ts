@@ -1,4 +1,4 @@
-﻿export const runningSvg = `<svg width="390" height="796" viewBox="0 0 390 796" fill="none" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+export const runningSvg = `<svg width="390" height="796" viewBox="0 0 390 796" fill="none" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
 <rect x="-93" y="-255" width="564" height="1051" fill="url(#pattern0_2343_1255)"/>
 <defs>
 <pattern id="pattern0_2343_1255" patternContentUnits="objectBoundingBox" width="1" height="1">

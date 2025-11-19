@@ -18,6 +18,7 @@ interface AuthContextData {
   user: User | null;
   signIn: (sessionId: string, userDetails: Omit<User, "sessionId">) => Promise<void>; // Assinatura atualizada
   signOut: () => Promise<void>;
+  updateUser: (newUserData: Partial<User>) => Promise<void>;
   loading: boolean; // Indica se está carregando dados de autenticação
 }
 
@@ -98,8 +99,28 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     await AsyncStorage.removeItem("@Auth:user"); // Remove os dados do usuário
   }
 
+  async function updateUser(newUserData: Partial<User>) {
+    if (!user) return;
+
+    const updatedUser = { ...user, ...newUserData };
+    setUser(updatedUser);
+
+    // Atualiza os dados no AsyncStorage
+    await AsyncStorage.setItem(
+      "@Auth:user",
+      JSON.stringify({
+        name: updatedUser.name,
+        email: updatedUser.email,
+        username: updatedUser.username,
+        isVerified: updatedUser.isVerified,
+        photo: updatedUser.photo,
+        id: updatedUser.id,
+      })
+    );
+  }
+
   return (
-    <AuthContext.Provider value={{ user, signIn, signOut, loading }}>
+    <AuthContext.Provider value={{ user, signIn, signOut, updateUser, loading }}>
       {children}
     </AuthContext.Provider>
   );

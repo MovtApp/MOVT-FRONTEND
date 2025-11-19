@@ -79,7 +79,8 @@ export const fetchTodayStepCount = async (): Promise<number> => {
       "com.google.android.gms",
     ]);
 
-    const today = results.find((sample: StepsResponse) => preferredSources.has(sample.source)) ?? results[0];
+    const today =
+      results.find((sample: StepsResponse) => preferredSources.has(sample.source)) ?? results[0];
 
     if (!today || !Array.isArray(today.steps) || today.steps.length === 0) {
       return 0;
@@ -93,9 +94,7 @@ export const fetchTodayStepCount = async (): Promise<number> => {
   }
 };
 
-export const subscribeToStepUpdates = (
-  listener: (steps: number) => void
-): (() => void) => {
+export const subscribeToStepUpdates = (listener: (steps: number) => void): (() => void) => {
   try {
     GoogleFit.startRecording(() => {
       // Apenas garante que o Google Fit está gravando dados de atividade

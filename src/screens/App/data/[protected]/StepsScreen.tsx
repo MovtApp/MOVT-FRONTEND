@@ -1,18 +1,17 @@
 import React, { useState, useEffect } from "react";
-import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  useWindowDimensions,
-} from "react-native";
+import { View, Text, StyleSheet, ScrollView, useWindowDimensions } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { AppStackParamList } from "../../../../@types/routes";
 import BackButton from "../../../../components/BackButton";
 import NavigationArrows from "../../../../components/data/NavigationArrows";
 import { Flame, MapPin, Clock, Footprints } from "lucide-react-native";
-import Svg, { Circle, Defs, LinearGradient, Stop, G, Text as SvgText } from "react-native-svg";
-import Animated, { useSharedValue, withTiming, useAnimatedProps, Easing } from "react-native-reanimated";
+import Svg, { Circle, Defs, LinearGradient, Stop, G } from "react-native-svg";
+import Animated, {
+  useSharedValue,
+  withTiming,
+  useAnimatedProps,
+  Easing,
+} from "react-native-reanimated";
 
 const DATA_SCREENS: (keyof AppStackParamList)[] = [
   "CaloriesScreen",
@@ -25,7 +24,7 @@ const DATA_SCREENS: (keyof AppStackParamList)[] = [
 
 const AnimatedCircle = Animated.createAnimatedComponent(Circle);
 
-const StepsProgressChart: React.FC<{ 
+const StepsProgressChart: React.FC<{
   progress: number;
   steps: number;
 }> = ({ progress, steps }) => {
@@ -42,15 +41,15 @@ const StepsProgressChart: React.FC<{
   const orangeAnim = useSharedValue(0);
 
   useEffect(() => {
-    innerAnim.value = withTiming(clampedProgress, { 
-      duration: 1200, 
-      easing: Easing.out(Easing.cubic) 
+    innerAnim.value = withTiming(clampedProgress, {
+      duration: 1200,
+      easing: Easing.out(Easing.cubic),
     });
-    orangeAnim.value = withTiming(orangeProgress, { 
-      duration: 1200, 
-      easing: Easing.out(Easing.cubic) 
+    orangeAnim.value = withTiming(orangeProgress, {
+      duration: 1200,
+      easing: Easing.out(Easing.cubic),
     });
-  }, [clampedProgress]);
+  }, [clampedProgress, innerAnim, orangeAnim]);
 
   const innerProps = useAnimatedProps(() => ({
     strokeDashoffset: circumference * (1 - innerAnim.value),
@@ -135,7 +134,7 @@ const StepsProgressChart: React.FC<{
             fontSize: 16,
             color: "#666666",
             marginTop: 2,
-            fontWeight: "bold"
+            fontWeight: "bold",
           }}
         >
           Total de passos
@@ -180,9 +179,7 @@ const StepsScreen: React.FC = () => {
 
           {/* Contador de Passos */}
           <View style={styles.stepsCounterContainer}>
-            <Text style={styles.stepsValue}>
-              {stepsData.steps.toLocaleString("pt-BR")}
-            </Text>
+            <Text style={styles.stepsValue}>{stepsData.steps.toLocaleString("pt-BR")}</Text>
             <Text style={styles.stepsLabel}>Total de passos</Text>
           </View>
 
@@ -274,7 +271,7 @@ const styles = StyleSheet.create({
   stepsLabel: {
     fontSize: 22,
     color: "#797E86",
-    fontWeight: "bold"
+    fontWeight: "bold",
   },
   metricsContainer: {
     flexDirection: "row",
@@ -334,7 +331,7 @@ const styles = StyleSheet.create({
     color: "#797E86",
     marginTop: 2,
     textAlign: "center",
-    fontWeight: "bold"
+    fontWeight: "bold",
   },
 });
 

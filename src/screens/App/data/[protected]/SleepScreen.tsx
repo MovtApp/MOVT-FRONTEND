@@ -1,18 +1,17 @@
 import React, { useState, useEffect } from "react";
-import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  useWindowDimensions,
-} from "react-native";
+import { View, Text, StyleSheet, ScrollView, useWindowDimensions } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { AppStackParamList } from "../../../../@types/routes";
 import BackButton from "../../../../components/BackButton";
 import NavigationArrows from "../../../../components/data/NavigationArrows";
 import { Moon, Clock } from "lucide-react-native";
 import Svg, { Circle, Defs, LinearGradient, Stop, G } from "react-native-svg";
-import Animated, { useSharedValue, withTiming, useAnimatedProps, Easing } from "react-native-reanimated";
+import Animated, {
+  useSharedValue,
+  withTiming,
+  useAnimatedProps,
+  Easing,
+} from "react-native-reanimated";
 
 const DATA_SCREENS: (keyof AppStackParamList)[] = [
   "CaloriesScreen",
@@ -53,7 +52,7 @@ const SleepProgressChart: React.FC<{
       duration: 1200,
       easing: Easing.out(Easing.cubic),
     });
-  }, [progress]);
+  }, [progress, progressAnim]);
 
   const animatedProps = useAnimatedProps(() => ({
     strokeDashoffset: circumference * (1 - progressAnim.value),
@@ -211,7 +210,7 @@ const SleepProgressChart: React.FC<{
             fontSize: 16,
             color: "#6B7280",
             marginTop: 4,
-            fontWeight: "bold"
+            fontWeight: "bold",
           }}
         >
           Duração do sono
@@ -224,12 +223,12 @@ const SleepProgressChart: React.FC<{
 const SleepHeatmap: React.FC<{ weeklyData: SleepDay[] }> = ({ weeklyData }) => {
   const days = ["S", "T", "Q", "Q", "S", "S", "D"];
   const { width } = useWindowDimensions();
-  
+
   const horizontalPadding = 20;
-  const availableWidth = width - (horizontalPadding * 2);
+  const availableWidth = width - horizontalPadding * 2;
   const maxWidth = 300;
   const containerWidth = Math.min(availableWidth, maxWidth);
-  
+
   const gap = 6;
   const totalGaps = (7 - 1) * gap;
   const cellSize = Math.floor((containerWidth - totalGaps) / 7);
@@ -239,22 +238,19 @@ const SleepHeatmap: React.FC<{ weeklyData: SleepDay[] }> = ({ weeklyData }) => {
       <View style={{ width: containerWidth }}>
         <View style={[styles.daysHeader, { justifyContent: "space-around" }]}>
           {days.map((d, i) => (
-            <Text 
-              key={i} 
-              style={[styles.dayText, { width: cellSize }]}
-            >
+            <Text key={i} style={[styles.dayText, { width: cellSize }]}>
               {d}
             </Text>
           ))}
         </View>
 
-        <View 
+        <View
           style={[
             styles.heatmapGrid,
-            { 
+            {
               gap,
               justifyContent: "flex-start",
-            }
+            },
           ]}
         >
           {weeklyData.map((day, i) => {
@@ -267,8 +263,8 @@ const SleepHeatmap: React.FC<{ weeklyData: SleepDay[] }> = ({ weeklyData }) => {
                 key={i}
                 style={[
                   styles.heatmapCell,
-                  { 
-                    backgroundColor, 
+                  {
+                    backgroundColor,
                     opacity: day.duration > 0 ? 1 : 0.3,
                     width: cellSize,
                     height: cellSize,
@@ -312,10 +308,7 @@ const SleepScreen: React.FC = () => {
           </View>
 
           <View style={styles.chartContainer}>
-            <SleepProgressChart
-              totalSleep={sleepData.totalSleep}
-              goalHours={sleepData.goalHours}
-            />
+            <SleepProgressChart totalSleep={sleepData.totalSleep} goalHours={sleepData.goalHours} />
           </View>
 
           <View style={styles.legendContainer}>

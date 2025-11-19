@@ -11,6 +11,7 @@ import { View, StyleSheet } from "react-native";
 import DietDetailsScreen from "../screens/App/diet/dietDetailsScreen";
 import { CustomDrawerContent } from "../components/CustomDrawerContent"; // Importar CustomDrawerContent
 import { AppStackParamList } from "../@types/routes";
+import ProfileScreen from "../screens/App/profile/profileScreen";
 
 // Importações das telas de detalhes de dados
 import CaloriesScreen from "../screens/App/data/[protected]/CaloriesScreen";
@@ -41,6 +42,7 @@ function AppLayout() {
         <Stack.Screen name="DietDetails" component={DietDetailsScreen} />
         <Stack.Screen name="DataScreen" component={DataScreen} />
         <Stack.Screen name="ChatScreen" component={ChatScreen} />
+        <Stack.Screen name="ProfileScreen" component={ProfileScreen} />
         <Stack.Screen name="CaloriesScreen" component={CaloriesScreen} />
         <Stack.Screen name="CyclingScreen" component={CyclingScreen} />
         <Stack.Screen name="HeartbeatsScreen" component={HeartbeatsScreen} />
@@ -49,7 +51,7 @@ function AppLayout() {
         <Stack.Screen name="WaterScreen" component={WaterScreen} />
         <Stack.Screen name="ResultsScreen" component={ResultsScreen} />
         <Stack.Screen name="TestWearScreen" component={TestWearScreen} />
-        </Stack.Navigator>
+      </Stack.Navigator>
       <BottomNavigationBar />
       {/* Renderizando BottomNavigationBar diretamente, pois isDietSheetOpen não a controla mais. */}
     </View>

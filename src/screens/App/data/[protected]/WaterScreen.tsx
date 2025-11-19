@@ -21,7 +21,6 @@ import { AppStackParamList } from "../../../../@types/routes";
 import ConfettiCannon from "react-native-confetti-cannon";
 import { CirclePlus, SquarePen, RotateCcw, Plus } from "lucide-react-native";
 
-
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 
 const getTodayKey = (): string => {
@@ -222,7 +221,7 @@ const WaterScreen: React.FC = () => {
               accessibilityLabel={`Adicionar ${cupMl} ml`}
               style={styles.plusButton}
             >
-              <Plus size={20} color="#192126"/>
+              <Plus size={20} color="#192126" />
             </TouchableOpacity>
           </Animated.View>
         </View>
@@ -408,7 +407,7 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: "bold",
     textAlign: "right",
-    marginBottom: 4
+    marginBottom: 4,
   },
   plusButton: {
     backgroundColor: "#fff",

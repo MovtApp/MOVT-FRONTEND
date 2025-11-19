@@ -6,6 +6,7 @@ export type AppStackParamList = {
   DietDetails: { meal: DietMeal };
   DataScreen: undefined;
   ChatScreen: undefined; // Adicionando ChatScreen à lista de rotas
+  ProfileScreen: undefined;
   CaloriesScreen: undefined;
   CyclingScreen: undefined;
   HeartbeatsScreen: undefined;

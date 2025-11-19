@@ -16,6 +16,7 @@ import { useNavigation, NavigationProp, CompositeNavigationProp } from "@react-n
 import { DrawerNavigationProp } from "@react-navigation/drawer";
 import { AppStackParamList, AppDrawerParamList } from "../@types/routes";
 import { useNotifications } from "../contexts/NotificationContext";
+import { useAuth } from "../contexts/AuthContext";
 
 const { width } = Dimensions.get("window");
 
@@ -29,8 +30,20 @@ interface NotificationModalProps {
 }
 
 const NotificationModal: React.FC<NotificationModalProps> = ({ isVisible, onClose }) => {
+  type HeaderNavigationProp = CompositeNavigationProp<
+    DrawerNavigationProp<AppDrawerParamList, "HomeStack">,
+    NavigationProp<AppStackParamList>
+  >;
+  const navigation = useNavigation<HeaderNavigationProp>();
+  const { user } = useAuth();
   const { notifications, markAsRead, markAllAsRead } = useNotifications();
   const [slideAnimation] = useState(new Animated.Value(width));
+
+  const handleProfilePress = () => {
+    // @ts-ignore
+    navigation.navigate("ProfileScreen");
+    onClose();
+  };
 
   useEffect(() => {
     if (isVisible) {
@@ -88,6 +101,27 @@ const NotificationModal: React.FC<NotificationModalProps> = ({ isVisible, onClos
                 },
               ]}
             >
+              {/* Profile Section */}
+              <TouchableOpacity
+                style={modalStyles.profileSection}
+                onPress={handleProfilePress}
+                activeOpacity={0.7}
+              >
+                <Image
+                  source={
+                    user?.photo
+                      ? { uri: user.photo }
+                      : {
+                          uri: "https://img.freepik.com/vetores-gratis/circulo-azul-com-usuario-branco_78370-4707.jpg?t=st=1760290901~exp=1760294501~hmac=54c484fcb1eb3bfdc377aeeaa901c951421c366a6a55921cf0ce792c078fe4df&w=1480",
+                        }
+                  }
+                  style={modalStyles.profileImage}
+                />
+                <View style={modalStyles.profileInfo}>
+                  <Text style={modalStyles.profileName}>{user?.name || "Visitante"}</Text>
+                </View>
+              </TouchableOpacity>
+
               <View style={modalStyles.header}>
                 <View style={modalStyles.headerLeft}>
                   <Text style={modalStyles.title}>Notificações</Text>
@@ -161,6 +195,7 @@ const Header: React.FC<HeaderProps> = ({ showNotifications = true }) => {
   >;
   const navigation = useNavigation<HeaderNavigationProp>();
   const [isNotificationModalVisible, setIsNotificationModalVisible] = useState(false);
+  useAuth();
 
   const toggleNotificationModal = () => {
     setIsNotificationModalVisible(!isNotificationModalVisible);
@@ -253,12 +288,58 @@ const modalStyles = StyleSheet.create({
     borderTopLeftRadius: 20,
     borderBottomLeftRadius: 20,
   },
+  profileSection: {
+    paddingHorizontal: 20,
+    paddingTop: 20,
+    paddingBottom: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: "#E5E7EB",
+  },
+  profileContent: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: 12,
+    backgroundColor: "#F9FAFB",
+    borderRadius: 12,
+  },
+  profileImage: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    marginRight: 12,
+    borderWidth: 2,
+    borderColor: "#BBF246",
+  },
+  profileIconContainer: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: "#192126",
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: 12,
+    borderWidth: 2,
+    borderColor: "#BBF246",
+  },
+  profileInfo: {
+    flex: 1,
+  },
+  profileName: {
+    fontSize: 14,
+    fontWeight: "bold",
+    color: "#192126",
+    marginBottom: 2,
+  },
+  profileUsername: {
+    fontSize: 12,
+    color: "#6B7280",
+  },
   header: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
     padding: 20,
-    paddingTop: 50,
+    paddingTop: 10,
     borderBottomWidth: 1,
     borderBottomColor: "#E5E7EB",
   },

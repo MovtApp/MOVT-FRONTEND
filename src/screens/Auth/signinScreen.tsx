@@ -275,7 +275,7 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: "#fff",
     paddingHorizontal: 20,
-    paddingTop: 110,
+    paddingTop: 30,
   },
   title: {
     fontFamily: "Rubik_700Bold",

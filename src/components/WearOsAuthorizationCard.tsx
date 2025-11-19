@@ -8,8 +8,7 @@ import { useWearOsAuthorization } from "../hooks/useWearOsAuthorization";
  * Exibe status e botão para solicitar autorização
  */
 export const WearOsAuthorizationCard: React.FC = () => {
-  const { isAuthorized, isLoading, error, requestAuthorization } =
-    useWearOsAuthorization();
+  const { isAuthorized, isLoading, error, requestAuthorization } = useWearOsAuthorization();
 
   const handleRequestAuthorization = async () => {
     const success = await requestAuthorization();
