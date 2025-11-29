@@ -302,7 +302,7 @@ const SleepScreen: React.FC = () => {
           showsVerticalScrollIndicator={false}
         >
           <View style={styles.header}>
-            <BackButton />
+            <BackButton to={{ name: "DataScreen" }} />
             <Text style={styles.headerTitle}>Sono</Text>
             <View style={{ width: 46 }} />
           </View>

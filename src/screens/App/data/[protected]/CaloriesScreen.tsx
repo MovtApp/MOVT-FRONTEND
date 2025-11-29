@@ -271,7 +271,7 @@ const CaloriesScreen: React.FC = () => {
       <SafeAreaView style={styles.safeArea}>
         <View style={styles.container}>
           <View style={styles.header}>
-            <BackButton />
+            <BackButton to={{ name: "DataScreen" }} />
             <Text style={styles.headerTitle}>Calorias (Kcal)</Text>
             <View style={{ width: 46 }} />
           </View>
@@ -294,7 +294,7 @@ const CaloriesScreen: React.FC = () => {
         <View style={styles.container}>
           {/* Header */}
           <View style={styles.header}>
-            <BackButton />
+            <BackButton to={{ name: "DataScreen" }} />
             <Text style={styles.headerTitle}>Calorias (Kcal)</Text>
             <View style={{ width: 46 }} />
           </View>

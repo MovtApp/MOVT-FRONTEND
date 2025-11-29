@@ -7,6 +7,7 @@ import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { RootStackParamList } from "@typings/routes"; // Já corrigido para @typings/routes
 import axios from "axios"; // Adicionado axios
 import AsyncStorage from "@react-native-async-storage/async-storage"; // Importar AsyncStorage
+import { useAuth } from "@contexts/AuthContext";
 
 // --- CONFIGURAÇÃO DA URL DA API ---
 // IMPORTANTE: Substitua pelo IP da sua máquina na rede local ou 10.0.2.2 para emuladores Android
@@ -21,6 +22,7 @@ type VerifyAccountScreenRouteProp = RouteProp<RootStackParamList, "Verify">;
 const VerifyAccountScreen = () => {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const route = useRoute<VerifyAccountScreenRouteProp>();
+  const { updateUser } = useAuth();
 
   // O sessionId deve ser passado como parâmetro de navegação do login/registro
   // Ex: navigation.navigate("Verify", { screen: "VerifyAccountScreen", sessionId: response.data.sessionId });
@@ -119,11 +121,15 @@ const VerifyAccountScreen = () => {
         }
       );
       Alert.alert("Verificação Concluída", response.data.message);
+      await updateUser({ isVerified: true });
 
       // --- Lógica de navegação após a verificação bem-sucedida ---
       // Redireciona para uma tela principal ou dashboard
       // TODO: Substituir por navigation.navigate("App", { screen: "HomeStack" }); ou a tela pós-verificação correta
-      navigation.navigate("App", { screen: "HomeStack" });
+      navigation.reset({
+        index: 0,
+        routes: [{ name: "App", params: { screen: "HomeStack" } as never }],
+      });
     } catch (err: any) {
       const errorMessage =
         err.response?.data?.error ||

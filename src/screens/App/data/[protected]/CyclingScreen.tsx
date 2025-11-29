@@ -21,7 +21,7 @@ const CyclingScreen: React.FC = () => {
       <ScrollView contentContainerStyle={styles.scrollContent} style={styles.scrollView}>
         <View style={styles.container}>
           <View style={styles.header}>
-            <BackButton />
+            <BackButton to={{ name: "DataScreen" }} />
             <Text style={styles.headerTitle}>Ciclismo</Text>
             <View style={{ width: 46 }} />
           </View>

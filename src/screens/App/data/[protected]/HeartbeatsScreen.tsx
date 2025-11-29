@@ -1,4 +1,4 @@
-import React, { useCallback } from "react";
+import React from "react";
 import { View, Text, StyleSheet, ScrollView, Dimensions, Alert } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { AppStackParamList } from "../../../../@types/routes";
@@ -13,6 +13,7 @@ import {
   getLatestWearOsHealthData,
   pollWearOsHealthData,
   getLatestWearOsHealthDataFromAllDevices,
+  checkWearOsDeviceRegistered,
 } from "../../../../services/wearOsHealthService";
 
 // Dimensões originais do SVG (do arquivo running.svg)
@@ -60,6 +61,7 @@ const HeartbeatsScreen: React.FC = () => {
   >("disconnected");
   const [connectionMessage, setConnectionMessage] = React.useState<string>("Aguardando conexão...");
   const [lastUpdate, setLastUpdate] = React.useState<string | null>(null);
+  const [hasWearOsDevice, setHasWearOsDevice] = React.useState<boolean | null>(null);
 
   const [svgContent, setSvgContent] = React.useState<string | null>(null);
 
@@ -112,83 +114,6 @@ const HeartbeatsScreen: React.FC = () => {
     loadSvg();
   }, []);
 
-  // Função para registrar automaticamente o dispositivo Wear OS se não estiver registrado
-  const registerWearOsDeviceIfNeeded = useCallback(
-    async (userId: number) => {
-      try {
-        setConnectionMessage("Verificando dispositivo Wear OS...");
-
-        // Verificar se já existe um dispositivo Wear OS registrado para o usuário via API
-        const response = await fetch(`${process.env.EXPO_PUBLIC_API_URL}/api/wearos/devicesON`, {
-          method: "GET",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${user?.sessionId || ""}`,
-          },
-        });
-
-        if (!response.ok) {
-          const errorData = await response.json();
-          console.error("Erro ao verificar dispositivos Wear OS:", errorData);
-          setConnectionMessage(`Erro na verificação: ${errorData.error || "Erro desconhecido"}`);
-          return false;
-        }
-
-        const result = await response.json();
-
-        if (!result.hasDevices) {
-          setConnectionMessage(
-            "Nenhum dispositivo Wear OS encontrado, registrando novo dispositivo..."
-          );
-
-          // Informações padrão para o dispositivo Wear OS
-          const deviceInfo = {
-            deviceName: "Dispositivo Wear OS",
-            deviceModel: "Wear OS Generic",
-            deviceType: "Wear OS",
-            deviceVersion: "3.0", // Versão padrão
-          };
-
-          // Usar a API para registrar o dispositivo
-          const registerResponse = await fetch(
-            `${process.env.EXPO_PUBLIC_API_URL}/api/wearos/register`,
-            {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-                Authorization: `Bearer ${user?.sessionId || ""}`,
-              },
-              body: JSON.stringify(deviceInfo),
-            }
-          );
-
-          if (!registerResponse.ok) {
-            const errorData = await registerResponse.json();
-            console.error("Erro ao registrar dispositivo:", errorData);
-            setConnectionMessage(`Erro ao registrar: ${errorData.error || "Erro desconhecido"}`);
-            return false;
-          }
-
-          const registerResult = await registerResponse.json();
-          console.log("Dispositivo Wear OS registrado com sucesso:", registerResult);
-          setConnectionMessage("Dispositivo Wear OS registrado com sucesso");
-          return true;
-        } else {
-          console.log("Dispositivo Wear OS já registrado:", result.deviceCount, "dispositivo(s)");
-          setConnectionMessage("Dispositivo Wear OS encontrado e registrado");
-          return true;
-        }
-      } catch (error) {
-        console.error("Erro durante o registro do dispositivo Wear OS:", error);
-        setConnectionMessage(
-          `Erro ao verificar/registrar dispositivo: ${error instanceof Error ? error.message : "Erro desconhecido"}`
-        );
-        return false;
-      }
-    },
-    [user?.sessionId]
-  );
-
   // Buscar e atualizar dados de saúde do Wear OS em tempo real
   React.useEffect(() => {
     if (!user?.id) {
@@ -208,6 +133,22 @@ const HeartbeatsScreen: React.FC = () => {
       return;
     }
 
+    if (hasWearOsDevice === null) {
+      setConnectionStatus("connecting");
+      setConnectionMessage("Verificando dispositivo Wear OS...");
+      return;
+    }
+
+    if (hasWearOsDevice === false) {
+      setIsLoading(false);
+      setConnectionStatus("disconnected");
+      setConnectionMessage("Nenhum dispositivo Wear OS conectado");
+      setHeartRate(null);
+      setPressure(null);
+      setOxygen(null);
+      return;
+    }
+
     // Atualizar status de conexão
     setConnectionStatus("connecting");
     setConnectionMessage("Conectando ao dispositivo Wear OS...");
@@ -215,15 +156,6 @@ const HeartbeatsScreen: React.FC = () => {
     // Função assíncrona para carregar dados iniciais
     const loadInitialData = async () => {
       try {
-        // Primeiro, verificar e registrar o dispositivo se necessário
-        const registrationSuccess = await registerWearOsDeviceIfNeeded(userId);
-
-        if (!registrationSuccess) {
-          setIsLoading(false);
-          setConnectionStatus("error");
-          return;
-        }
-
         setConnectionMessage("Buscando dados do dispositivo...");
         const data = await getLatestWearOsHealthData(userId);
         if (data) {
@@ -303,7 +235,45 @@ const HeartbeatsScreen: React.FC = () => {
       cancelPolling();
       // cancelRealtime();
     };
-  }, [user?.id, registerWearOsDeviceIfNeeded, user?.sessionId]);
+  }, [user?.id, hasWearOsDevice]);
+
+  React.useEffect(() => {
+    let isActive = true;
+
+    const verifyDevice = async () => {
+      if (!user?.id) {
+        if (isActive) {
+          setHasWearOsDevice(false);
+        }
+        return;
+      }
+
+      const userId = parseInt(user.id, 10);
+      if (Number.isNaN(userId)) {
+        if (isActive) {
+          setHasWearOsDevice(false);
+        }
+        return;
+      }
+
+      try {
+        const device = await checkWearOsDeviceRegistered(userId);
+        if (isActive) {
+          setHasWearOsDevice(Boolean(device));
+        }
+      } catch {
+        if (isActive) {
+          setHasWearOsDevice(false);
+        }
+      }
+    };
+
+    verifyDevice();
+
+    return () => {
+      isActive = false;
+    };
+  }, [user?.id]);
 
   // Função para lidar com dados recebidos do dispositivo Wear OS
   // Esta função pode ser chamada quando o dispositivo enviar dados
@@ -396,7 +366,7 @@ const HeartbeatsScreen: React.FC = () => {
           <View style={styles.overlayContent}>
             {/* Header */}
             <View style={styles.header}>
-              <BackButton />
+              <BackButton to={{ name: "DataScreen" }} />
               <Text style={styles.headerTitle}>Frequência cardíaca</Text>
               <View style={{ width: 46 }} />
             </View>

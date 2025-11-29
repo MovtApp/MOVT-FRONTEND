@@ -507,7 +507,7 @@ const ResultsScreen: React.FC = () => {
       >
         <View style={styles.container}>
           <View style={styles.header}>
-            <BackButton />
+            <BackButton to={{ name: "DataScreen" }} />
             <Text style={styles.headerTitle}>Resultados</Text>
             <View style={{ width: 46 }} />
           </View>

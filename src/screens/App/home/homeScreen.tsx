@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
 import {
   View,
   Text,
@@ -6,6 +6,7 @@ import {
   TouchableOpacity,
   ScrollView,
   ImageBackground,
+  Alert,
 } from "react-native";
 import { Search, Play } from "lucide-react-native";
 import TrainingSelector from "../../../components/TrainingSelector";
@@ -18,6 +19,10 @@ import TheBestForYou from "@components/TheBestForYou";
 import ChallengesSection from "../../../components/ChallengesSection";
 import HeatingScreen from "../../../components/Heating";
 import Header from "@components/Header";
+import { useNavigation } from "@react-navigation/native";
+import { NativeStackNavigationProp } from "@react-navigation/native-stack";
+import { AppStackParamList } from "../../../@types/routes";
+import { useAuth } from "@contexts/AuthContext";
 
 interface ExerciseItem {
   id: string;
@@ -65,13 +70,175 @@ const exerciseData: ExerciseItem[] = [
   },
 ];
 
+interface SearchEntry {
+  id: string;
+  title: string;
+  description?: string;
+  keywords: string[];
+  targetScreen?: keyof AppStackParamList;
+  extraAction?: () => void;
+}
+
 const HomeScreen: React.FC = () => {
   const [search, setSearch] = useState("");
   const [selectedGender] = useState<"male" | "female">("female");
   const [notificationSheetHeight, setNotificationSheetHeight] = useState<number | string>("100%");
+  const navigation = useNavigation<NativeStackNavigationProp<AppStackParamList>>();
+  const { user } = useAuth();
 
   const handleNotificationSheetHeightChange = (height: number | string) => {
     setNotificationSheetHeight(height);
+  };
+
+  const normalizeText = (value?: string) =>
+    (value || "")
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toLowerCase();
+
+  const searchEntries = useMemo<SearchEntry[]>(() => {
+    const entries: SearchEntry[] = [
+      ...(user
+        ? [
+            {
+              id: "profile",
+              title: user.name || "Seu perfil",
+              description: user.username ? `@${user.username}` : "Gerencie sua conta",
+              keywords: [
+                user.name || "",
+                user.username || "",
+                user.email || "",
+                "perfil",
+                "conta",
+                "usuario",
+                "account",
+              ],
+              targetScreen: "ProfileScreen" as keyof AppStackParamList,
+            },
+          ]
+        : []),
+      {
+        id: "data-dashboard",
+        title: "Painel de dados",
+        description: "Passos, batimentos, água, sono",
+        keywords: [
+          "dados",
+          "dashboard",
+          "relatorio",
+          "estatisticas",
+          "passos",
+          "batimentos",
+          "agua",
+          "sono",
+        ],
+        targetScreen: "DataScreen" as keyof AppStackParamList,
+      },
+      {
+        id: "calories",
+        title: "Calorias e nutrição",
+        description: "Resumo nutricional diário",
+        keywords: ["calorias", "nutricao", "dieta", "alimentacao", "consumo"],
+        targetScreen: "CaloriesScreen" as keyof AppStackParamList,
+      },
+      {
+        id: "steps",
+        title: "Monitor de passos",
+        description: "Metas e progresso diário",
+        keywords: ["passos", "steps", "caminhada", "andamento", "distancia"],
+        targetScreen: "StepsScreen" as keyof AppStackParamList,
+      },
+      {
+        id: "sleep",
+        title: "Sono e descanso",
+        description: "Qualidade do sono",
+        keywords: ["sono", "sleep", "descanso", "noturno", "qualidade", "horas"],
+        targetScreen: "SleepScreen" as keyof AppStackParamList,
+      },
+      {
+        id: "water",
+        title: "Hidratação",
+        description: "Controle de água ingerida",
+        keywords: ["agua", "hidratacao", "hidratação", "water", "líquidos"],
+        targetScreen: "WaterScreen" as keyof AppStackParamList,
+      },
+      {
+        id: "results",
+        title: "Resultados gerais",
+        description: "Radar de performance",
+        keywords: ["resultados", "performance", "radar", "comparativo"],
+        targetScreen: "ResultsScreen" as keyof AppStackParamList,
+      },
+      {
+        id: "cycling",
+        title: "Ciclismo",
+        description: "Mapeamento das rotas",
+        keywords: ["ciclismo", "bike", "rotas", "trajetos", "gps"],
+        targetScreen: "CyclingScreen" as keyof AppStackParamList,
+      },
+      {
+        id: "map",
+        title: "Mapa e rotas",
+        description: "Visualizar mapa e rotas",
+        keywords: ["mapa", "rotas", "trajetos", "localizacao", "explorar"],
+        targetScreen: "MapScreen" as keyof AppStackParamList,
+      },
+      {
+        id: "diet",
+        title: "Planos de dieta",
+        description: "Sugestões de refeições",
+        keywords: ["dieta", "refeicoes", "nutricao", "meal", "alimentacao"],
+        targetScreen: "DietScreen" as keyof AppStackParamList,
+      },
+      {
+        id: "chat",
+        title: "Chat e mensagens",
+        description: "Converse com especialistas",
+        keywords: ["chat", "mensagens", "comunicar", "ajuda", "suporte"],
+        targetScreen: "ChatScreen" as keyof AppStackParamList,
+      },
+    ];
+
+    const exerciseEntries = exerciseData.map<SearchEntry>((exercise) => ({
+      id: `exercise-${exercise.id}`,
+      title: exercise.title,
+      description: `${exercise.minutes} · ${exercise.calories}`,
+      keywords: [
+        exercise.title,
+        "exercicio",
+        "treino",
+        "popular",
+        exercise.calories,
+        exercise.minutes,
+      ],
+      extraAction: () =>
+        Alert.alert(
+          exercise.title,
+          "Localize este exercício na seção “Exercícios populares” para saber mais."
+        ),
+    }));
+
+    return [...entries, ...exerciseEntries];
+  }, [user?.name, user?.username, user?.email]);
+
+  const filteredResults = useMemo(() => {
+    const term = normalizeText(search.trim());
+    if (!term) {
+      return [];
+    }
+
+    return searchEntries.filter((entry) =>
+      entry.keywords.some((keyword) => normalizeText(keyword).includes(term))
+    );
+  }, [search, searchEntries]);
+
+  const handleResultPress = (item: SearchEntry) => {
+    if (item.targetScreen) {
+      navigation.navigate(item.targetScreen as never);
+    }
+    if (item.extraAction) {
+      item.extraAction();
+    }
+    setSearch("");
   };
 
   return (
@@ -86,6 +253,26 @@ const HomeScreen: React.FC = () => {
           placeholder="Pesquisar"
           icon={<Search size={24} color="#888" />}
         />
+        {search.trim().length > 0 && (
+          <View style={styles.searchResultsContainer}>
+            {filteredResults.length > 0 ? (
+              filteredResults.map((result) => (
+                <TouchableOpacity
+                  key={result.id}
+                  style={styles.searchResultItem}
+                  onPress={() => handleResultPress(result)}
+                >
+                  <Text style={styles.searchResultTitle}>{result.title}</Text>
+                  {result.description ? (
+                    <Text style={styles.searchResultSubtitle}>{result.description}</Text>
+                  ) : null}
+                </TouchableOpacity>
+              ))
+            ) : (
+              <Text style={styles.noSearchResultsText}>Nenhuma referência encontrada.</Text>
+            )}
+          </View>
+        )}
         {/* Promotional Banner */}
         <PromotionalBanner gender={selectedGender} />
         {/* Workout Selection */}
@@ -143,38 +330,78 @@ const HomeScreen: React.FC = () => {
         <ChallengesSection />
         {/* Rapid heating */}
         <HeatingScreen /> {/* Usando o nome correto do componente: HeatingScreen */}
-        </ScrollView>
+      </ScrollView>
 
-        {/* Notification Sheet Height Controls */}
-        <View style={styles.heightControlsContainer}>
+      {/* Notification Sheet Height Controls */}
+      <View style={styles.heightControlsContainer}>
         <TouchableOpacity
-         style={[styles.heightButton, notificationSheetHeight === "40%" && styles.heightButtonActive]}
-         onPress={() => handleNotificationSheetHeightChange("40%")}
+          style={[
+            styles.heightButton,
+            notificationSheetHeight === "40%" && styles.heightButtonActive,
+          ]}
+          onPress={() => handleNotificationSheetHeightChange("40%")}
         >
-         <Text style={[styles.heightButtonText, notificationSheetHeight === "40%" && styles.heightButtonTextActive]}>40%</Text>
+          <Text
+            style={[
+              styles.heightButtonText,
+              notificationSheetHeight === "40%" && styles.heightButtonTextActive,
+            ]}
+          >
+            40%
+          </Text>
         </TouchableOpacity>
         <TouchableOpacity
-         style={[styles.heightButton, notificationSheetHeight === "60%" && styles.heightButtonActive]}
-         onPress={() => handleNotificationSheetHeightChange("60%")}
+          style={[
+            styles.heightButton,
+            notificationSheetHeight === "60%" && styles.heightButtonActive,
+          ]}
+          onPress={() => handleNotificationSheetHeightChange("60%")}
         >
-         <Text style={[styles.heightButtonText, notificationSheetHeight === "60%" && styles.heightButtonTextActive]}>60%</Text>
+          <Text
+            style={[
+              styles.heightButtonText,
+              notificationSheetHeight === "60%" && styles.heightButtonTextActive,
+            ]}
+          >
+            60%
+          </Text>
         </TouchableOpacity>
         <TouchableOpacity
-         style={[styles.heightButton, notificationSheetHeight === "80%" && styles.heightButtonActive]}
-         onPress={() => handleNotificationSheetHeightChange("80%")}
+          style={[
+            styles.heightButton,
+            notificationSheetHeight === "80%" && styles.heightButtonActive,
+          ]}
+          onPress={() => handleNotificationSheetHeightChange("80%")}
         >
-         <Text style={[styles.heightButtonText, notificationSheetHeight === "80%" && styles.heightButtonTextActive]}>80%</Text>
+          <Text
+            style={[
+              styles.heightButtonText,
+              notificationSheetHeight === "80%" && styles.heightButtonTextActive,
+            ]}
+          >
+            80%
+          </Text>
         </TouchableOpacity>
         <TouchableOpacity
-         style={[styles.heightButton, notificationSheetHeight === "100%" && styles.heightButtonActive]}
-         onPress={() => handleNotificationSheetHeightChange("100%")}
+          style={[
+            styles.heightButton,
+            notificationSheetHeight === "100%" && styles.heightButtonActive,
+          ]}
+          onPress={() => handleNotificationSheetHeightChange("100%")}
         >
-         <Text style={[styles.heightButtonText, notificationSheetHeight === "100%" && styles.heightButtonTextActive]}>100%</Text>
+          <Text
+            style={[
+              styles.heightButtonText,
+              notificationSheetHeight === "100%" && styles.heightButtonTextActive,
+            ]}
+          >
+            100%
+          </Text>
         </TouchableOpacity>
-        </View>
-        </View>
-        );
-        };
+      </View>
+    </View>
+  );
+};
 
 const styles = StyleSheet.create({
   container: {
@@ -220,6 +447,35 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingHorizontal: 20,
     paddingTop: 20,
+  },
+  searchResultsContainer: {
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+    borderRadius: 12,
+    backgroundColor: "#FFFFFF",
+  },
+  searchResultItem: {
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: "#F1F5F9",
+  },
+  searchResultTitle: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#111827",
+  },
+  searchResultSubtitle: {
+    fontSize: 12,
+    color: "#6B7280",
+    marginTop: 2,
+  },
+  noSearchResultsText: {
+    padding: 16,
+    fontSize: 12,
+    color: "#6B7280",
+    textAlign: "center",
   },
   searchInput: {
     marginBottom: 20,

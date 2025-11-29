@@ -12,6 +12,7 @@ import DietDetailsScreen from "../screens/App/diet/dietDetailsScreen";
 import { CustomDrawerContent } from "../components/CustomDrawerContent"; // Importar CustomDrawerContent
 import { AppStackParamList } from "../@types/routes";
 import ProfileScreen from "../screens/App/profile/profileScreen";
+import ProfilePJ from "../screens/App/profile/ProfilePJScreen";
 
 // Importações das telas de detalhes de dados
 import CaloriesScreen from "../screens/App/data/[protected]/CaloriesScreen";
@@ -43,6 +44,7 @@ function AppLayout() {
         <Stack.Screen name="DataScreen" component={DataScreen} />
         <Stack.Screen name="ChatScreen" component={ChatScreen} />
         <Stack.Screen name="ProfileScreen" component={ProfileScreen} />
+        <Stack.Screen name="ProfilePJ" component={ProfilePJ} />
         <Stack.Screen name="CaloriesScreen" component={CaloriesScreen} />
         <Stack.Screen name="CyclingScreen" component={CyclingScreen} />
         <Stack.Screen name="HeartbeatsScreen" component={HeartbeatsScreen} />

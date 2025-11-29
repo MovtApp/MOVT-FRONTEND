@@ -12,6 +12,8 @@ interface User {
   isVerified: boolean; // Adicionado o status de verificação do e-mail
   sessionId?: string; // Adicionado o sessionId
   photo?: string | null; // Adicionado para o avatar do usuário
+  documentId?: string | null;
+  documentType?: "CPF" | "CNPJ" | null;
 }
 
 interface AuthContextData {
@@ -49,8 +51,25 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             });
 
             if (response.status === 200 && response.data.user) {
-              // A sessão ainda é válida, os dados do usuário estão atualizados
-              // Não é necessário chamar setUser novamente, a menos que os dados sejam diferentes
+              const refreshedUser = {
+                ...parsedUserDetails,
+                ...response.data.user,
+                sessionId: storedSessionId,
+              };
+
+              setUser(refreshedUser);
+
+              await AsyncStorage.setItem(
+                "@Auth:user",
+                JSON.stringify({
+                  id: refreshedUser.id,
+                  name: refreshedUser.name,
+                  email: refreshedUser.email,
+                  username: refreshedUser.username,
+                  isVerified: refreshedUser.isVerified,
+                  photo: refreshedUser.photo,
+                })
+              );
             } else {
               // Sessão inválida ou erro, limpa os dados armazenados
               await AsyncStorage.removeItem("userSessionId");
@@ -115,6 +134,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         isVerified: updatedUser.isVerified,
         photo: updatedUser.photo,
         id: updatedUser.id,
+        documentId: updatedUser.documentId,
+        documentType: updatedUser.documentType,
       })
     );
   }

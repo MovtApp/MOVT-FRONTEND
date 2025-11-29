@@ -167,7 +167,7 @@ const StepsScreen: React.FC = () => {
         >
           {/* Header */}
           <View style={styles.header}>
-            <BackButton />
+            <BackButton to={{ name: "DataScreen" }} />
             <Text style={styles.headerTitle}>Passos</Text>
             <View style={{ width: 46 }} />
           </View>

@@ -142,7 +142,7 @@ const WaterScreen: React.FC = () => {
     <SafeAreaView style={styles.safeArea}>
       <ScrollView contentContainerStyle={styles.scrollContent}>
         <View style={styles.header}>
-          <BackButton />
+          <BackButton to={{ name: "DataScreen" }} />
           <Text style={styles.headerTitle}>Hidratação</Text>
           <View style={{ width: 46 }} />
         </View>

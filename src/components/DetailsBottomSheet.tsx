@@ -55,7 +55,7 @@ const PersonalTrainerCard = ({
         </P>
         <View style={styles.cardRatingContainer}>
           <Star size={16} color="#FFC107" fill="#FFC107" />
-          <P style={styles.cardRatingText}>{Math.round(trainer.rating)} avaliações</P>
+          <P style={styles.cardRatingText}>{trainer.rating} avaliações</P>
         </View>
       </View>
     </TouchableOpacity>

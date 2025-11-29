@@ -1,11 +1,35 @@
 import { TouchableOpacity, StyleSheet } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
+import type { NavigationProp } from "@react-navigation/native";
 
-const BackButton = () => {
-  const navigation = useNavigation();
+type BackButtonProps = {
+  to?: {
+    name: string;
+    params?: Record<string, unknown>;
+  };
+  onPress?: () => void;
+};
+
+const BackButton: React.FC<BackButtonProps> = ({ to, onPress }) => {
+  const navigation = useNavigation<NavigationProp<Record<string, object | undefined>>>();
+
+  const handlePress = () => {
+    if (onPress) {
+      onPress();
+      return;
+    }
+
+    if (to?.name) {
+      navigation.navigate(to.name as never, (to.params || {}) as never);
+      return;
+    }
+
+    navigation.goBack();
+  };
+
   return (
-    <TouchableOpacity style={styles.button} onPress={() => navigation.goBack()}>
+    <TouchableOpacity style={styles.button} onPress={handlePress}>
       <Ionicons name="arrow-back" size={20} color="#fff" />
     </TouchableOpacity>
   );

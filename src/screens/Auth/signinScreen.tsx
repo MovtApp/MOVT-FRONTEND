@@ -76,6 +76,31 @@ export const SignInScreen = () => {
 
       Alert.alert("Login Efetuado", response.data.message);
 
+      const documentId =
+        response.data.user?.cpf_cnpj ||
+        response.data.user?.documento ||
+        response.data.user?.documentId ||
+        null;
+
+      const resolvedDocumentType = (() => {
+        const typeFromApi: string | undefined =
+          response.data.user?.tipo_documento || response.data.user?.documentType;
+        if (typeFromApi) {
+          const normalized = typeFromApi.toUpperCase();
+          if (normalized === "CPF" || normalized === "CNPJ") {
+            return normalized;
+          }
+        }
+
+        if (documentId) {
+          const digits = documentId.replace(/\D/g, "");
+          if (digits.length > 11) return "CNPJ";
+          if (digits.length === 11) return "CPF";
+        }
+
+        return null;
+      })();
+
       // Persiste sessão no contexto/AsyncStorage
       await signIn(response.data.sessionId, {
         id: response.data.user.id,
@@ -83,6 +108,8 @@ export const SignInScreen = () => {
         email: response.data.user.email,
         username: response.data.user.username,
         isVerified: response.data.user.isVerified,
+        documentId,
+        documentType: resolvedDocumentType,
       });
 
       // Redireciona imediatamente sem depender do initialRouteName

@@ -7,6 +7,17 @@ export type AppStackParamList = {
   DataScreen: undefined;
   ChatScreen: undefined; // Adicionando ChatScreen à lista de rotas
   ProfileScreen: undefined;
+  ProfilePJ:
+    | {
+        trainer?: {
+          id: string;
+          name: string;
+          description: string;
+          rating: number;
+          imageUrl: string;
+        };
+      }
+    | undefined;
   CaloriesScreen: undefined;
   CyclingScreen: undefined;
   HeartbeatsScreen: undefined;

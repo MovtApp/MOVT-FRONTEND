@@ -33,6 +33,7 @@ import {
 import {
   getLatestWearOsHealthDataFromAllDevices,
   pollWearOsHealthData,
+  checkWearOsDeviceRegistered,
 } from "../../../services/wearOsHealthService";
 import { useAuth } from "../../../contexts/AuthContext";
 import ECGDisplay from "../../../components/ECGDisplay";
@@ -216,6 +217,7 @@ const DataScreen: React.FC = () => {
   // Estados para dados de saúde em tempo real do Wear OS
   const [heartRate, setHeartRate] = useState<number | null>(null);
   const [isWearOsConnected, setIsWearOsConnected] = useState(false);
+  const [hasWearOsDevice, setHasWearOsDevice] = useState<boolean | null>(null);
 
   // Estado para tempo de treino
   const [trainingTime, setTrainingTime] = useState<number>(0); // em segundos
@@ -404,56 +406,114 @@ const DataScreen: React.FC = () => {
     };
   }, [isWalking]);
 
+  // Verificar se existe dispositivo Wear OS antes de tentar conectar
+  useFocusEffect(
+    useCallback(() => {
+      let isActive = true;
+
+      const verifyWearDevice = async () => {
+        if (!user?.id) {
+          if (isActive) {
+            setHasWearOsDevice(false);
+          }
+          return;
+        }
+
+        const parsedId = parseInt(user.id, 10);
+        if (Number.isNaN(parsedId)) {
+          if (isActive) {
+            setHasWearOsDevice(false);
+          }
+          return;
+        }
+
+        try {
+          const device = await checkWearOsDeviceRegistered(parsedId);
+          if (isActive) {
+            setHasWearOsDevice(Boolean(device));
+          }
+        } catch {
+          if (isActive) {
+            setHasWearOsDevice(false);
+          }
+        }
+      };
+
+      verifyWearDevice();
+
+      return () => {
+        isActive = false;
+      };
+    }, [user?.id])
+  );
+
   // Carregar dados de batimento cardíaco do Wear OS em tempo real
   useFocusEffect(
     useCallback(() => {
+      if (!user?.id || hasWearOsDevice !== true) {
+        setIsWearOsConnected(false);
+        setHeartRate(null);
+        return;
+      }
+
+      const userId = parseInt(user.id, 10);
+      if (Number.isNaN(userId)) {
+        setIsWearOsConnected(false);
+        return;
+      }
+
       let isMounted = true;
+      let unsubscribe: (() => void) | undefined;
 
       const loadWearOsData = async () => {
-        if (!user?.id) return;
-
         try {
           // Obter dados iniciais
-          const data = await getLatestWearOsHealthDataFromAllDevices(parseInt(user.id, 10));
-          if (isMounted && data) {
-            if (data.heartRate) {
+          const data = await getLatestWearOsHealthDataFromAllDevices(userId);
+          if (isMounted) {
+            if (data && data.heartRate) {
               setHeartRate(data.heartRate);
               setIsWearOsConnected(true);
+            } else {
+              setIsWearOsConnected(false);
             }
           }
 
           // Configurar polling para atualizações em tempo real
-          const unsubscribe = pollWearOsHealthData(
-            parseInt(user.id, 10),
+          unsubscribe = pollWearOsHealthData(
+            userId,
             5000,
             (newData: {
               heartRate: number | null;
               pressure: number | null;
               oxygen: number | null;
             }) => {
-              if (isMounted && newData.heartRate) {
+              if (!isMounted) {
+                return;
+              }
+
+              if (newData.heartRate) {
                 setHeartRate(newData.heartRate);
                 setIsWearOsConnected(true);
               }
             }
           );
-
-          return () => {
-            if (unsubscribe) unsubscribe();
-          };
         } catch (error) {
-          console.error("Erro ao carregar dados do Wear OS:", error);
-          setIsWearOsConnected(false);
+          if (isMounted) {
+            console.error("Erro ao carregar dados do Wear OS:", error);
+            setIsWearOsConnected(false);
+          }
         }
       };
 
-      const cleanup = loadWearOsData();
+      loadWearOsData();
 
       return () => {
         isMounted = false;
-        cleanup?.then((cb) => cb?.());
+        if (unsubscribe) {
+          unsubscribe();
+        }
       };
-    }, [user?.id])
+    }, [user?.id, hasWearOsDevice])
   );
 
   useFocusEffect(

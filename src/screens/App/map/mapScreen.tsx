@@ -2,17 +2,27 @@ import React, { useRef, useState } from "react";
 import { Text, View, TouchableOpacity } from "react-native";
 import MapView, { Marker } from "react-native-maps";
 import TrainingSelector from "@components/TrainingSelector";
-import { DetailsBottomSheet } from "@components/DetailsBottomSheet";
+import { DetailsBottomSheet, PersonalTrainer } from "@components/DetailsBottomSheet";
 import { MapSettingSheet } from "@components/MapSettingSheet";
 import BottomSheet from "@gorhom/bottom-sheet";
 import { Globe, Settings2 } from "lucide-react-native";
 import { useLocationContext } from "@contexts/LocationContext";
+import { useNavigation } from "@react-navigation/native";
+import { NativeStackNavigationProp } from "@react-navigation/native-stack";
+import { AppStackParamList } from "../../../@types/routes";
 
 const MapScreen: React.FC = () => {
   const { location } = useLocationContext();
   const [isSheetOpen, setIsSheetOpen] = useState(false);
   const [sheetIndex, setSheetIndex] = useState(1);
   const bottomSheetRef = useRef<BottomSheet>(null);
+
+  const navigation = useNavigation<NativeStackNavigationProp<AppStackParamList>>();
+
+  const handleTrainerPress = (trainer: PersonalTrainer) => {
+    // Navigate to the ProfilePJScreen with the trainer data
+    navigation.navigate("ProfilePJ", { trainer });
+  };
 
   const [isMapSheetOpen, setIsMapSheetOpen] = useState(false);
   const [mapSheetIndex, setMapSheetIndex] = useState(0);
@@ -177,6 +187,7 @@ const MapScreen: React.FC = () => {
         isLoading={false}
         sheetIndex={sheetIndex}
         setSheetIndex={setSheetIndex}
+        onTrainerPress={handleTrainerPress}
       />
       <MapSettingSheet
         isOpen={isMapSheetOpen}

@@ -31,7 +31,11 @@ interface NotificationModalProps {
   sheetHeight?: number | string;
 }
 
-const NotificationModal: React.FC<NotificationModalProps> = ({ isVisible, onClose, sheetHeight = "100%" }) => {
+const NotificationModal: React.FC<NotificationModalProps> = ({
+  isVisible,
+  onClose,
+  sheetHeight = "100%",
+}) => {
   type HeaderNavigationProp = CompositeNavigationProp<
     DrawerNavigationProp<AppDrawerParamList, "HomeStack">,
     NavigationProp<AppStackParamList>
@@ -107,8 +111,6 @@ const NotificationModal: React.FC<NotificationModalProps> = ({ isVisible, onClos
                 },
               ]}
             >
-
-
               <View style={modalStyles.header}>
                 <View style={modalStyles.headerLeft}>
                   <Text style={modalStyles.title}>Notificações</Text>
@@ -175,7 +177,10 @@ const NotificationModal: React.FC<NotificationModalProps> = ({ isVisible, onClos
   );
 };
 
-const Header: React.FC<HeaderProps> = ({ showNotifications = true, notificationSheetHeight = "100%" }) => {
+const Header: React.FC<HeaderProps> = ({
+  showNotifications = true,
+  notificationSheetHeight = "100%",
+}) => {
   type HeaderNavigationProp = CompositeNavigationProp<
     DrawerNavigationProp<AppDrawerParamList, "HomeStack">,
     NavigationProp<AppStackParamList>
