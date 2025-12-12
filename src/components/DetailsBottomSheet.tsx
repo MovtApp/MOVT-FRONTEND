@@ -8,10 +8,11 @@ import {
   TouchableOpacity,
 } from "react-native";
 import BottomSheet, { BottomSheetView } from "@gorhom/bottom-sheet";
+import { api } from "../services/api";
 import { H4, P } from "./Typography";
 import { Star } from "lucide-react-native";
 
-interface PersonalTrainer {
+export interface PersonalTrainer {
   id: string;
   name: string;
   description: string;
@@ -30,6 +31,7 @@ interface DetailsBottomSheetProps {
   sheetIndex: number;
   setSheetIndex: (idx: number) => void;
   onTrainerPress?: (trainer: PersonalTrainer) => void;
+  onViewSelected?: (trainers: PersonalTrainer[]) => void;
 }
 
 // Componente para renderizar texto com truncamento inteligente
@@ -73,10 +75,66 @@ export function DetailsBottomSheet({
   sheetIndex,
   setSheetIndex,
   onTrainerPress,
+  onViewSelected,
 }: DetailsBottomSheetProps) {
+  const [selectedIds, setSelectedIds] = React.useState<string[]>([]);
+  const [fetchedTrainers, setFetchedTrainers] = React.useState<PersonalTrainer[] | null>(null);
+  const [localLoading, setLocalLoading] = React.useState(false);
+
+  // Fetch personals from backend when sheet opens (falls back to `trainers` prop if provided)
+  React.useEffect(() => {
+    if (!isOpen) return;
+    let mounted = true;
+    const fetchPersonals = async () => {
+      setLocalLoading(true);
+      try {
+        const res = await api.get("/personals?limit=50&offset=0");
+        const data = res?.data?.data || [];
+        if (!mounted) return;
+        const mapped: PersonalTrainer[] = data.map((t: any) => ({
+          id: String(t.id),
+          name: t.name || t.nome || t.username || "Sem nome",
+          description: t.description || t.descricao || "",
+          rating: typeof t.rating === "number" ? t.rating : 0,
+          imageUrl: t.avatarUrl || t.avatar_url || t.avatar || "",
+        }));
+        setFetchedTrainers(mapped);
+      } catch (err) {
+        console.error("Erro ao buscar personals:", err);
+        setFetchedTrainers([]);
+      } finally {
+        setLocalLoading(false);
+      }
+    };
+
+    fetchPersonals();
+    return () => {
+      mounted = false;
+    };
+  }, [isOpen]);
+
   if (!isOpen) {
     return null;
   }
+
+  const toggleSelect = (t: PersonalTrainer) => {
+    setSelectedIds((prev) =>
+      prev.includes(t.id) ? prev.filter((id) => id !== t.id) : [...prev, t.id]
+    );
+  };
+
+  const handleViewSelected = () => {
+    const selected = trainers.filter((t) => selectedIds.includes(t.id));
+    onViewSelected?.(selected);
+  };
+
+  const trainersToRender: PersonalTrainer[] =
+    fetchedTrainers && fetchedTrainers.length > 0
+      ? fetchedTrainers
+      : Array.isArray(trainers)
+        ? trainers
+        : [];
+  const loadingToShow = localLoading || isLoading;
 
   return (
     <BottomSheet
@@ -97,17 +155,28 @@ export function DetailsBottomSheet({
           </View>
 
           {/* Lista de Personal Trainers */}
-          {isLoading ? (
+          {loadingToShow ? (
             <View style={styles.loaderContainer}>
               <ActivityIndicator size="large" color="#1e3a8a" />
             </View>
-          ) : Array.isArray(trainers) && trainers.length > 0 ? (
-            trainers.map((trainer) => (
-              <PersonalTrainerCard key={trainer.id} trainer={trainer} onPress={onTrainerPress} />
+          ) : trainersToRender.length > 0 ? (
+            trainersToRender.map((trainer) => (
+              <PersonalTrainerCard
+                key={trainer.id}
+                trainer={trainer}
+                onPress={onTrainerPress ? onTrainerPress : toggleSelect}
+              />
             ))
           ) : (
             <View style={styles.noDataContainer}>
               <P style={styles.noDataText}>{noDataMessage}</P>
+            </View>
+          )}
+          {selectedIds.length > 0 && (
+            <View style={styles.footerActions}>
+              <TouchableOpacity style={styles.viewSelectedButton} onPress={handleViewSelected}>
+                <P style={styles.viewSelectedText}>Ver selecionados ({selectedIds.length})</P>
+              </TouchableOpacity>
             </View>
           )}
         </ScrollView>
@@ -158,7 +227,7 @@ const styles = StyleSheet.create({
   cardImage: {
     width: 116,
     height: 104,
-    borderRadius: 8, // Círculo
+    borderRadius: 8,
     marginRight: 16,
   },
   cardContent: {
@@ -197,4 +266,18 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
   },
   noDataText: { color: "#6b7280", fontSize: 14, textAlign: "center" },
+  footerActions: {
+    paddingVertical: 12,
+    alignItems: "center",
+  },
+  viewSelectedButton: {
+    backgroundColor: "#10B981",
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+  },
+  viewSelectedText: {
+    color: "#fff",
+    fontWeight: "bold",
+  },
 });

@@ -13,6 +13,9 @@ import { CustomDrawerContent } from "../components/CustomDrawerContent"; // Impo
 import { AppStackParamList } from "../@types/routes";
 import ProfileScreen from "../screens/App/profile/profileScreen";
 import ProfilePJ from "../screens/App/profile/ProfilePJScreen";
+import { TrainerProfileScreen } from "../screens/App/profile/TrainerProfileScreen";
+import { AppointmentScreen } from "../screens/App/appointments/appointmentScreen";
+import SelectedTrainersScreen from "../screens/App/profile/SelectedTrainersScreen";
 
 // Importações das telas de detalhes de dados
 import CaloriesScreen from "../screens/App/data/[protected]/CaloriesScreen";
@@ -45,6 +48,9 @@ function AppLayout() {
         <Stack.Screen name="ChatScreen" component={ChatScreen} />
         <Stack.Screen name="ProfileScreen" component={ProfileScreen} />
         <Stack.Screen name="ProfilePJ" component={ProfilePJ} />
+        <Stack.Screen name="TrainerProfile" component={TrainerProfileScreen} />
+        <Stack.Screen name="Appointments" component={AppointmentScreen} />
+        <Stack.Screen name="SelectedTrainers" component={SelectedTrainersScreen} />
         <Stack.Screen name="CaloriesScreen" component={CaloriesScreen} />
         <Stack.Screen name="CyclingScreen" component={CyclingScreen} />
         <Stack.Screen name="HeartbeatsScreen" component={HeartbeatsScreen} />

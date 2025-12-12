@@ -10,19 +10,28 @@ const buttonVariants = cva(
   {
     variants: {
       variant: {
-        default: "bg-system h-14",
+        default: "bg-primary h-14",
         destructive: "bg-destructive web:hover:opacity-90 active:opacity-90",
         outline:
           "border border-input bg-background web:hover:bg-accent web:hover:text-accent-foreground active:bg-accent",
         secondary: "bg-secondary web:hover:opacity-80 active:opacity-80",
         ghost: "web:hover:bg-accent web:hover:text-accent-foreground active:bg-accent",
         link: "web:underline-offset-4 web:hover:underline web:focus:underline ",
+        // Fitness app variants
+        follow: "bg-primary rounded-full h-10",
+        following:
+          "bg-secondary rounded-full border border-border web:hover:opacity-80 active:opacity-80",
+        iconCircle:
+          "rounded-full bg-secondary/80 backdrop-blur-sm border border-border/50 h-10 w-10",
+        tab: "text-muted-foreground bg-transparent border-b-2 border-transparent data-[active=true]:text-foreground data-[active=true]:border-primary rounded-none h-12",
       },
       size: {
         default: "h-14",
         sm: "h-6 rounded-md px-3",
         lg: "h-16 rounded-2xl",
         icon: "h-10 w-10",
+        follow: "h-10 px-6",
+        tab: "h-12 px-4",
       },
     },
     defaultVariants: {
@@ -37,18 +46,24 @@ const buttonTextVariants = cva(
   {
     variants: {
       variant: {
-        default: "text-primary-foreground bg-chathams_blue-1000 h-16",
+        default: "text-primary-foreground h-16",
         destructive: "text-destructive-foreground",
         outline: "group-active:text-accent-foreground",
         secondary: "text-secondary-foreground group-active:text-secondary-foreground",
         ghost: "group-active:text-accent-foreground",
         link: "text-primary group-active:underline",
+        follow: "text-primary-foreground font-semibold",
+        following: "text-foreground font-semibold",
+        iconCircle: "text-foreground",
+        tab: "text-muted-foreground data-[active=true]:text-foreground",
       },
       size: {
         default: "",
         sm: "",
         lg: "h-16",
         icon: "",
+        follow: "",
+        tab: "",
       },
     },
     defaultVariants: {
@@ -83,7 +98,13 @@ const Button = forwardRef<ElementRef<typeof TouchableOpacity>, ButtonProps>(
             className={cn(
               props.disabled && "opacity-50 web:pointer-events-none",
               buttonVariants({ variant, size, className }),
-              "bg-[#192126]"
+              variant === "default"
+                ? "bg-primary"
+                : variant === "follow"
+                  ? "bg-primary"
+                  : variant === "following"
+                    ? "border border-border bg-secondary"
+                    : "bg-[#192126]"
             )}
             ref={ref}
             role="button"

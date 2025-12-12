@@ -1,4 +1,4 @@
-import React, { useRef, useState } from "react";
+import React, { useRef, useState, useEffect } from "react";
 import { Text, View, TouchableOpacity } from "react-native";
 import MapView, { Marker } from "react-native-maps";
 import TrainingSelector from "@components/TrainingSelector";
@@ -12,7 +12,7 @@ import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { AppStackParamList } from "../../../@types/routes";
 
 const MapScreen: React.FC = () => {
-  const { location } = useLocationContext();
+  const { location, refreshLocation } = useLocationContext();
   const [isSheetOpen, setIsSheetOpen] = useState(false);
   const [sheetIndex, setSheetIndex] = useState(1);
   const bottomSheetRef = useRef<BottomSheet>(null);
@@ -22,6 +22,10 @@ const MapScreen: React.FC = () => {
   const handleTrainerPress = (trainer: PersonalTrainer) => {
     // Navigate to the ProfilePJScreen with the trainer data
     navigation.navigate("ProfilePJ", { trainer });
+  };
+  const handleViewSelected = (trainers: PersonalTrainer[]) => {
+    if (!trainers || trainers.length === 0) return;
+    navigation.navigate("SelectedTrainers", { trainers });
   };
 
   const [isMapSheetOpen, setIsMapSheetOpen] = useState(false);
@@ -35,10 +39,19 @@ const MapScreen: React.FC = () => {
   const [showsUserLocation, setShowsUserLocation] = useState(true);
   const [showsCompass, setShowsCompass] = useState(false);
   const [displayRadiusKm, setDisplayRadiusKm] = useState(5); // Valor inicial em Km
+  const [loadingTimeout, setLoadingTimeout] = useState(false);
+
+  // Timeout para evitar tempo de carregamento infinito
+  useEffect(() => {
+    const timeout = setTimeout(() => {
+      setLoadingTimeout(true);
+    }, 5000); // 5 segundos de timeout
+
+    return () => clearTimeout(timeout);
+  }, []);
 
   // Calcula os deltas com base no raio de exibição
-  // Verifica se location é nulo antes de acessar location.latitude
-  const latitudeDelta = (displayRadiusKm * 2) / 111.32;
+  const latitudeDelta = location ? (displayRadiusKm * 2) / 111.32 : 0.0421; // Valor padrão se location for nulo
   const longitudeDelta = location
     ? (displayRadiusKm * 2) / (111.32 * Math.cos((location.latitude * Math.PI) / 180))
     : 0.0421; // Valor padrão se location for nulo
@@ -99,40 +112,78 @@ const MapScreen: React.FC = () => {
     mapBottomSheetRef.current?.expand();
   };
 
-  if (!location) {
-    return (
-      <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
-        <Text>Carregando localização...</Text>
-      </View>
-    );
-  }
+  // Tenta obter a localização novamente se estiver demorando
+  const handleRetryLocation = () => {
+    setLoadingTimeout(false);
+    refreshLocation();
+  };
+
+  // Usa uma localização padrão se demorar muito para carregar
+  const defaultLocation = {
+    latitude: -3.7184,
+    longitude: -38.5434,
+  };
+
+  // Mostra o carregamento apenas se não tiver timeout e não tiver localização
+  const shouldShowLoading = !loadingTimeout && !location;
+
+  // Efeito para tentar carregar a localização quando o componente montar
+  useEffect(() => {
+    if (!location) {
+      // Apenas tenta obter a localização se ainda não tiver
+      const loadLocation = async () => {
+        // Espera um pouco e depois tenta obter a localização novamente
+        setTimeout(() => {
+          if (!location && !loadingTimeout) {
+            refreshLocation();
+          }
+        }, 1000);
+      };
+      loadLocation();
+    }
+  }, [location, loadingTimeout, refreshLocation]);
 
   return (
     <View style={{ flex: 1 }}>
-      <MapView
-        style={{ flex: 1 }}
-        initialRegion={{
-          latitude: location.latitude,
-          longitude: location.longitude,
-          latitudeDelta: latitudeDelta,
-          longitudeDelta: longitudeDelta,
-        }}
-        showsUserLocation={showsUserLocation}
-        followsUserLocation={true}
-        showsCompass={showsCompass}
-        toolbarEnabled={false}
-        zoomControlEnabled={false}
-        mapType={mapType}
-      >
-        <Marker
-          coordinate={{
-            latitude: location.latitude,
-            longitude: location.longitude,
+      {shouldShowLoading ? (
+        <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
+          <Text>Carregando localização...</Text>
+          <TouchableOpacity onPress={handleRetryLocation} style={{ marginTop: 10 }}>
+            <Text style={{ color: "#007AFF" }}>Tentar novamente</Text>
+          </TouchableOpacity>
+        </View>
+      ) : (
+        <MapView
+          style={{ flex: 1 }}
+          initialRegion={{
+            latitude: location?.latitude || defaultLocation.latitude,
+            longitude: location?.longitude || defaultLocation.longitude,
+            latitudeDelta: latitudeDelta,
+            longitudeDelta: longitudeDelta,
           }}
-          title="Sua Localização"
-          description="Você está aqui"
-        />
-      </MapView>
+          showsUserLocation={showsUserLocation}
+          followsUserLocation={true}
+          showsCompass={showsCompass}
+          toolbarEnabled={false}
+          zoomControlEnabled={false}
+          mapType={mapType}
+          loadingEnabled={true} // Mostra indicador de carregamento do mapa enquanto renderiza
+          loadingBackgroundColor="#FFFFFF"
+          loadingIndicatorColor="#666666"
+        >
+          {location && (
+            <Marker
+              coordinate={{
+                latitude: location.latitude,
+                longitude: location.longitude,
+              }}
+              title="Sua Localização"
+              description="Você está aqui"
+            />
+          )}
+        </MapView>
+      )}
+
       <View
         style={{
           position: "absolute",
@@ -188,6 +239,7 @@ const MapScreen: React.FC = () => {
         sheetIndex={sheetIndex}
         setSheetIndex={setSheetIndex}
         onTrainerPress={handleTrainerPress}
+        onViewSelected={handleViewSelected}
       />
       <MapSettingSheet
         isOpen={isMapSheetOpen}

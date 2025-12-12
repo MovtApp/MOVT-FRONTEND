@@ -218,7 +218,7 @@ const HomeScreen: React.FC = () => {
     }));
 
     return [...entries, ...exerciseEntries];
-  }, [user?.name, user?.username, user?.email]);
+  }, [user]);
 
   const filteredResults = useMemo(() => {
     const term = normalizeText(search.trim());

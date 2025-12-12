@@ -39,10 +39,10 @@ const CardContent: React.FC<CardContentProps> = ({ children, style }) => {
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: "#ffffff", // background
+    backgroundColor: "hsl(240 4.8% 95.9%)", // card
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: "#e5e7eb", // border
+    borderColor: "hsl(240 5.9% 90%)", // border
     overflow: "hidden",
     shadowColor: "#000",
     shadowOffset: {
@@ -56,12 +56,12 @@ const styles = StyleSheet.create({
   cardHeader: {
     padding: 16,
     borderBottomWidth: 1,
-    borderBottomColor: "#e5e7eb", // border
+    borderBottomColor: "hsl(240 5.9% 90%)", // border
   },
   cardTitle: {
     fontSize: 18,
     fontWeight: "600",
-    color: "#000000", // foreground
+    color: "hsl(0 0% 98%)", // foreground
   },
   cardContent: {
     padding: 16,

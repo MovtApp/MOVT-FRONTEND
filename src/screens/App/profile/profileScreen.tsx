@@ -24,7 +24,7 @@ import ProfilePJ from "./ProfilePJScreen";
 const CACHED_AVATAR_KEY = "@Profile:cachedAvatar";
 
 const ProfileScreen: React.FC = () => {
-  const { user, signOut, updateUser } = useAuth(); // Assumindo que o contexto tem uma função updateUser
+  const { user, updateUser } = useAuth(); // Assumindo que o contexto tem uma função updateUser
   const [isLoading, setIsLoading] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [editModalVisible, setEditModalVisible] = useState(false);
@@ -299,28 +299,7 @@ const ProfileScreen: React.FC = () => {
     }
   };
 
-  const handleSignOut = () => {
-    Alert.alert("Sair", "Tem certeza que deseja sair da aplicação?", [
-      {
-        text: "Cancelar",
-        onPress: () => {},
-        style: "cancel",
-      },
-      {
-        text: "Sair",
-        onPress: async () => {
-          setIsLoading(true);
-          try {
-            await signOut();
-          } catch {
-            Alert.alert("Erro", "Erro ao tentar sair");
-            setIsLoading(false);
-          }
-        },
-        style: "destructive",
-      },
-    ]);
-  };
+  // Sign out handled elsewhere; removed unused handler to satisfy linter
 
   if (!user) {
     return (

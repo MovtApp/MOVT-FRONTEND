@@ -25,17 +25,20 @@ const Badge: React.FC<BadgeProps> = ({ children, variant = "default", style }) =
     }
   };
 
+  const getTextStyles = () => {
+    switch (variant) {
+      case "outline":
+        return styles.outlineBadgeText;
+      case "verified":
+        return styles.verifiedBadgeText;
+      default:
+        return styles.defaultBadgeText;
+    }
+  };
+
   return (
     <View style={[styles.badge, getVariantStyles(), style]}>
-      <Text
-        style={[
-          styles.badgeText,
-          variant === "outline" && styles.outlineBadgeText,
-          variant === "verified" && styles.verifiedBadgeText,
-        ]}
-      >
-        {children}
-      </Text>
+      <Text style={[styles.badgeText, getTextStyles()]}>{children}</Text>
     </View>
   );
 };
@@ -52,35 +55,37 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   defaultBadge: {
-    backgroundColor: "#000000", // foreground
+    backgroundColor: "hsl(221.2 83.2% 53.3%)", // primary
   },
   secondaryBadge: {
-    backgroundColor: "#f3f4f6", // secondary
+    backgroundColor: "hsl(240 4.8% 95.9%)", // secondary
   },
   destructiveBadge: {
-    backgroundColor: "#dc2626", // destructive
+    backgroundColor: "hsl(0 84.2% 60.2%)", // destructive
   },
   outlineBadge: {
     backgroundColor: "transparent",
     borderWidth: 1,
-    borderColor: "#000000", // border
+    borderColor: "hsl(240 5.9% 90%)", // border
   },
   successBadge: {
-    backgroundColor: "#10b981", // success
+    backgroundColor: "hsl(142 71% 45%)", // primary (green)
   },
   verifiedBadge: {
-    backgroundColor: "#22c55e", // verified
+    backgroundColor: "hsl(142 71% 45%)", // primary (green)
   },
   badgeText: {
-    color: "#ffffff", // background
     fontSize: 12,
     fontWeight: "500",
   },
+  defaultBadgeText: {
+    color: "hsl(0 0% 98%)", // primary-foreground
+  },
   outlineBadgeText: {
-    color: "#000000", // foreground
+    color: "hsl(221.2 83.2% 53.3%)", // primary
   },
   verifiedBadgeText: {
-    color: "#ffffff", // background
+    color: "hsl(0 0% 98%)", // primary-foreground
   },
 });
 

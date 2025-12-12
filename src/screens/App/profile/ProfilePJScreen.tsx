@@ -26,6 +26,8 @@ import {
   BadgeCheck,
 } from "lucide-react-native";
 import { RouteProp, useRoute, useNavigation } from "@react-navigation/native";
+import { NativeStackNavigationProp } from "@react-navigation/native-stack";
+import { AppStackParamList } from "../../../@types/routes";
 import { useNotifications } from "../../../contexts/NotificationContext";
 
 const { width } = Dimensions.get("window");
@@ -188,7 +190,7 @@ const NotificationModal: React.FC<NotificationModalProps> = ({
 const ProfilePJScreen = () => {
   const route = useRoute<ProfilePJRouteProp>();
   const { trainer } = route.params || {};
-  const navigation = useNavigation();
+  const navigation = useNavigation<NativeStackNavigationProp<AppStackParamList>>();
   const [isNotificationModalVisible, setIsNotificationModalVisible] = useState(false);
   const { notifications } = useNotifications();
 
@@ -208,6 +210,23 @@ const ProfilePJScreen = () => {
 
   const toggleNotificationModal = () => {
     setIsNotificationModalVisible(!isNotificationModalVisible);
+  };
+
+  const handleViewProfile = () => {
+    // Navigate to the TrainerProfileScreen with the trainer data
+    navigation.navigate("TrainerProfile", {
+      trainer: {
+        id: trainer?.id || "",
+        name: trainer?.name || "Personal Trainer",
+        username: (trainer?.name || "").toLowerCase().replace(/\s+/g, "_"),
+        avatarUrl: trainer?.imageUrl || "",
+        coverUrl:
+          "https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?w=800&h=400&fit=crop",
+        isOnline: true,
+        location: "São Paulo", // Default location
+        hasCurriculum: true,
+      },
+    });
   };
 
   return (
@@ -273,7 +292,7 @@ const ProfilePJScreen = () => {
 
             {/* Informações */}
             <View style={styles.singleCardSection}>
-            <View style={styles.sectionHeader}>
+              <View style={styles.sectionHeader}>
                 <Text style={styles.sectionTitle}>Informações</Text>
               </View>
               <View style={styles.infoGrid}>
@@ -293,7 +312,7 @@ const ProfilePJScreen = () => {
                     <Text style={styles.infoText}>{trainerRating} avaliações</Text>
                   </View>
                   <View style={styles.infoRow}>
-                  <BadgeCheck size={20} color="#fff" fill="#192126" style={{ marginRight: 8 }} />
+                    <BadgeCheck size={20} color="#fff" fill="#192126" style={{ marginRight: 8 }} />
                     <Text style={styles.infoText}>Conta verificada</Text>
                   </View>
                 </View>
@@ -304,7 +323,7 @@ const ProfilePJScreen = () => {
 
             {/* Contato */}
             <View style={styles.singleCardSection}>
-            <View style={styles.sectionHeader}>
+              <View style={styles.sectionHeader}>
                 <Text style={styles.sectionTitle}>Dados para contato</Text>
               </View>
               <View style={styles.contactRow}>
@@ -316,10 +335,23 @@ const ProfilePJScreen = () => {
             {/* Botões */}
             <View style={styles.buttonRowContainer}>
               <View style={styles.buttonRow}>
-                <Button variant="outline" size="icon" style={styles.outlineButton}>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  style={styles.outlineButton}
+                  onPress={() =>
+                    navigation.navigate("Appointments", {
+                      trainerId: trainer?.id || undefined,
+                      trainer: {
+                        id: trainer?.id || undefined,
+                        name: trainer?.name || trainerName,
+                      },
+                    } as any)
+                  }
+                >
                   <Calendar size={24} color="#fff" />
                 </Button>
-                <Button size="default" style={styles.mainButton}>
+                <Button size="default" style={styles.mainButton} onPress={handleViewProfile}>
                   <Text style={styles.buttonText}>Ver perfil</Text>
                 </Button>
               </View>
@@ -337,7 +369,7 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "#ffffff",
-    zIndex: 1,                          // ← Define z-index no container principal
+    zIndex: 1, // ← Define z-index no container principal
   },
   header: {
     flexDirection: "row",
@@ -388,7 +420,7 @@ const styles = StyleSheet.create({
   imageSection: {
     width: "100%",
     height: 192,
-    position: "relative",                // ← Altera para relative pois agora está no conteúdo
+    position: "relative", // ← Altera para relative pois agora está no conteúdo
   },
   topImage: {
     width: "100%",
@@ -399,19 +431,19 @@ const styles = StyleSheet.create({
   },
   profileCardSeparated: {
     backgroundColor: "#ffffff",
-    borderTopLeftRadius: 30,            // ← Arredondamento apenas no topo
-    borderTopRightRadius: 30,           // ← Arredondamento apenas no topo
-    borderBottomLeftRadius: 0,           // ← Sem arredondamento na parte inferior
-    borderBottomRightRadius: 0,          // ← Sem arredondamento na parte inferior
-    paddingTop: 30,                      // ← Ajusta o padding superior para sobreposição adequada
-    overflow: "hidden",                  // ← Garante que o conteúdo respeite o borderRadius
+    borderTopLeftRadius: 30, // ← Arredondamento apenas no topo
+    borderTopRightRadius: 30, // ← Arredondamento apenas no topo
+    borderBottomLeftRadius: 0, // ← Sem arredondamento na parte inferior
+    borderBottomRightRadius: 0, // ← Sem arredondamento na parte inferior
+    paddingTop: 30, // ← Ajusta o padding superior para sobreposição adequada
+    overflow: "hidden", // ← Garante que o conteúdo respeite o borderRadius
     flex: 1,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.08,
     shadowRadius: 10,
     elevation: 5,
-    marginTop: 0,                // ← Levanta o card para sobrepor com a imagem
+    marginTop: 0, // ← Levanta o card para sobrepor com a imagem
   },
   mainContent: {
     paddingHorizontal: 16,
@@ -434,11 +466,11 @@ const styles = StyleSheet.create({
   centerRow: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "flex-start",       // ← Alinha o conteúdo com flex-start conforme solicitado
+    justifyContent: "flex-start", // ← Alinha o conteúdo com flex-start conforme solicitado
     backgroundColor: "#BBF246",
     height: 50,
     width: 340,
-    borderRadius: 8,                   // ← Adiciona bordas arredondadas para melhor aparência
+    borderRadius: 8, // ← Adiciona bordas arredondadas para melhor aparência
   },
   textBold: {
     fontWeight: "bold",
@@ -460,8 +492,8 @@ const styles = StyleSheet.create({
   },
   credentialItem: {
     flexDirection: "row",
-    alignItems: "center",               // ← Centraliza verticalmente o ícone e texto
-    gap: 8,                           // ← Adiciona espaço entre o ícone e o texto
+    alignItems: "center", // ← Centraliza verticalmente o ícone e texto
+    gap: 8, // ← Adiciona espaço entre o ícone e o texto
   },
   credentialText: {
     color: "#192126",
@@ -476,7 +508,7 @@ const styles = StyleSheet.create({
   infoRow: {
     flexDirection: "row",
     alignItems: "center",
-    marginBottom: 12,                   // ← Adiciona espaçamento vertical entre os itens
+    marginBottom: 12, // ← Adiciona espaçamento vertical entre os itens
   },
   infoText: {
     fontWeight: "500",
@@ -486,7 +518,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "flex-start",
   },
-  contactText: { 
+  contactText: {
     color: "#192126",
   },
   buttonRow: {

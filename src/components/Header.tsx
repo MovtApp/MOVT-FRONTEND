@@ -16,7 +16,6 @@ import { useNavigation, NavigationProp, CompositeNavigationProp } from "@react-n
 import { DrawerNavigationProp } from "@react-navigation/drawer";
 import { AppStackParamList, AppDrawerParamList } from "../@types/routes";
 import { useNotifications } from "../contexts/NotificationContext";
-import { useAuth } from "../contexts/AuthContext";
 
 const { width } = Dimensions.get("window");
 
@@ -36,20 +35,9 @@ const NotificationModal: React.FC<NotificationModalProps> = ({
   onClose,
   sheetHeight = "100%",
 }) => {
-  type HeaderNavigationProp = CompositeNavigationProp<
-    DrawerNavigationProp<AppDrawerParamList, "HomeStack">,
-    NavigationProp<AppStackParamList>
-  >;
-  const navigation = useNavigation<HeaderNavigationProp>();
-  const { user } = useAuth();
+  // no-op: NotificationModal doesn't use navigation directly
   const { notifications, markAsRead, markAllAsRead } = useNotifications();
   const [slideAnimation] = useState(new Animated.Value(width));
-
-  const handleProfilePress = () => {
-    // @ts-ignore
-    navigation.navigate("ProfileScreen");
-    onClose();
-  };
 
   useEffect(() => {
     if (isVisible) {
@@ -187,7 +175,7 @@ const Header: React.FC<HeaderProps> = ({
   >;
   const navigation = useNavigation<HeaderNavigationProp>();
   const [isNotificationModalVisible, setIsNotificationModalVisible] = useState(false);
-  useAuth();
+  // intentionally not consuming auth here; Header doesn't need user directly
 
   const toggleNotificationModal = () => {
     setIsNotificationModalVisible(!isNotificationModalVisible);

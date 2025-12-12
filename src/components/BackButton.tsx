@@ -21,7 +21,7 @@ const BackButton: React.FC<BackButtonProps> = ({ to, onPress }) => {
     }
 
     if (to?.name) {
-      navigation.navigate(to.name as never, (to.params || {}) as never);
+      navigation.navigate(to.name, to.params || {});
       return;
     }
 
