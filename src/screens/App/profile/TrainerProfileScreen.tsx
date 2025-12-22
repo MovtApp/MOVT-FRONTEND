@@ -13,12 +13,14 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { RouteProp, useRoute, useNavigation } from "@react-navigation/native";
+import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useAuth } from "../../../contexts/AuthContext";
 import * as ImagePicker from "expo-image-picker";
 import { Grid3X3, Heart, Bookmark, MapPin, FileText, Calendar } from "lucide-react-native";
 import { API_BASE_URL } from "../../../config/api";
 import BackButton from "../../../components/BackButton";
 import { followTrainer, unfollowTrainer } from "../../../services/followService";
+import { AppStackParamList } from "../../../@types/routes";
 
 type TrainerRouteProp = RouteProp<
   {
@@ -40,7 +42,7 @@ type TrainerRouteProp = RouteProp<
 
 export function TrainerProfileScreen() {
   const route = useRoute<TrainerRouteProp>();
-  const navigation = useNavigation();
+  const navigation = useNavigation<NativeStackNavigationProp<AppStackParamList>>();
   const trainer = route.params?.trainer;
   const { user } = useAuth();
 
@@ -280,14 +282,13 @@ export function TrainerProfileScreen() {
               <TouchableOpacity
                 style={{ marginRight: 12 }}
                 onPress={() => {
-                  try {
-                    (navigation as any).navigate("Appointments", {
-                      trainerId: trainerId,
-                      trainer: data,
-                    });
-                  } catch (e) {
-                    console.warn("Navegação para Appointments não disponível", e);
-                  }
+                  navigation.navigate("Appointments", {
+                    trainerId: trainerId || undefined,
+                    trainer: {
+                      id: data.id,
+                      name: data.name,
+                    },
+                  });
                 }}
               >
                 <Calendar size={20} color="#6B7280" />

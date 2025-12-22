@@ -38,7 +38,7 @@ export function CustomDrawerContent(props: DrawerContentComponentProps) {
   ];
 
   const panelItems = [
-    { name: "Agendamentos", icon: Calendar, route: "AppointmentsScreen" }, // Substituir pela rota real
+    { name: "Agendamentos", icon: Calendar, route: "Appointments" }, // Rota atualizada para o novo componente
     { name: "Comunidades", icon: Users, route: "CommunityScreen" }, // Substituir pela rota real
   ];
 

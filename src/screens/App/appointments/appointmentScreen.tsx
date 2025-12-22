@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback } from "react";
 import {
   View,
   Text,
@@ -10,10 +10,11 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRoute, useNavigation } from "@react-navigation/native";
-import { ChevronLeft, ChevronRight, Clock, CheckCircle, AlertCircle } from "lucide-react-native";
+import { Clock, CheckCircle, AlertCircle } from "lucide-react-native";
 import { useAuth } from "../../../contexts/AuthContext";
 import { getAvailability, createAppointment } from "../../../services/appointmentService";
 import BackButton from "../../../components/BackButton";
+import CalendarComponent from "../../../components/CalendarComponent";
 
 interface AvailableSlot {
   startTime: string;
@@ -37,11 +38,18 @@ export function AppointmentScreen() {
   const trainerId = (route.params as any)?.trainerId;
 
   const [selectedDate, setSelectedDate] = useState<string>(new Date().toISOString().split("T")[0]);
+  const [currentMonth, setCurrentMonth] = useState(new Date()); // Mês atual
+  const [showMonthSelector, setShowMonthSelector] = useState(false); // Controlar exibição do seletor de mês
+
+  // Função para verificar se uma data é anterior à data atual
+  const isPastDate = (dateStr: string) => {
+    const currentDate = new Date();
+    const currentDateString = currentDate.toISOString().split("T")[0];
+
+    // Comparar datas no formato YYYY-MM-DD
+    return dateStr < currentDateString;
+  };
   const [monthAvailability, setMonthAvailability] = useState<any[]>([]);
-  const [visibleMonth, setVisibleMonth] = useState<{ year: number; month: number }>(() => {
-    const d = new Date();
-    return { year: d.getFullYear(), month: d.getMonth() + 1 };
-  });
   const [availableSlots, setAvailableSlots] = useState<AvailableSlot[]>([]);
   const [bookedSlots, setBookedSlots] = useState<BookedSlot[]>([]);
   const [selectedSlot, setSelectedSlot] = useState<{ startTime: string; endTime: string } | null>(
@@ -56,7 +64,6 @@ export function AppointmentScreen() {
     try {
       setLoading(true);
       setError(null);
-      console.log("[AppointmentScreen] Buscando disponibilidade para:", selectedDate);
 
       const response = await getAvailability(trainerId, selectedDate, user?.sessionId);
 
@@ -66,8 +73,6 @@ export function AppointmentScreen() {
       if (response.bookedSlots) {
         setBookedSlots(response.bookedSlots);
       }
-
-      console.log("[AppointmentScreen] Disponibilidade carregada:", response);
     } catch (error: any) {
       console.error("[AppointmentScreen] Erro ao buscar disponibilidade:", error);
       const errorMsg =
@@ -80,14 +85,115 @@ export function AppointmentScreen() {
     }
   }, [trainerId, selectedDate, user?.sessionId]);
 
-  // Buscar disponibilidade quando a data muda
+  const fetchWeeklyAvailability = useCallback(async () => {
+    try {
+      const resp = await getAvailability(trainerId, undefined, user?.sessionId);
+      if (resp && resp.availability) {
+        setMonthAvailability(resp.availability);
+      }
+    } catch (err) {
+      console.warn("[AppointmentScreen] Erro ao buscar disponibilidade semanal", err);
+    }
+  }, [trainerId, user?.sessionId]);
+
   useEffect(() => {
     if (trainerId) {
       fetchWeeklyAvailability();
       fetchAvailability();
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [fetchAvailability, trainerId, selectedDate]);
+  }, [trainerId, selectedDate, fetchAvailability, fetchWeeklyAvailability]);
+
+  // Obter dias da semana
+  const weekDays = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
+
+  // Gerar datas para o mês atual
+  const generateMonthDates = () => {
+    const dates = [];
+    const year = currentMonth.getFullYear();
+    const month = currentMonth.getMonth();
+
+    const firstDayOfMonth = new Date(year, month, 1);
+    const startDay = firstDayOfMonth.getDay(); // Dia da semana do primeiro dia
+
+    const daysInMonth = new Date(year, month + 1, 0).getDate(); // Total de dias no mês
+
+    // Adicionar dias vazios antes do primeiro dia do mês
+    for (let i = 0; i < startDay; i++) {
+      dates.push(null);
+    }
+
+    // Adicionar dias do mês atual
+    for (let day = 1; day <= daysInMonth; day++) {
+      const dateStr = `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+      dates.push({ day, isCurrentMonth: true, date: dateStr });
+    }
+
+    // Adicionar dias do próximo mês para completar as 6 semanas (42 células)
+    const remainingCells = 42 - dates.length; // 6 linhas x 7 colunas
+    for (let day = 1; day <= remainingCells; day++) {
+      dates.push({
+        day,
+        isCurrentMonth: false,
+        date: `${year}-${String(month + 2).padStart(2, "0")}-${String(day).padStart(2, "0")}`,
+      });
+    }
+
+    return dates;
+  };
+
+  const monthDates = generateMonthDates();
+
+  // Verificar se uma data tem agendamentos (para o indicador visual)
+  const hasAppointments = (dateStr: string) => {
+    // Para este caso específico, verificamos se a data tem disponibilidade
+    // Nesse contexto, indicamos se a data tem agendamentos (slots disponíveis)
+    const date = new Date(dateStr);
+    const dayOfWeek = date.getDay();
+
+    // Verificar se há slots disponíveis ou agendados para esta data
+    return monthAvailability.some((a: any) => a.dia_semana === dayOfWeek && a.ativo);
+  };
+
+  // Navegar para o mês anterior
+  const goToPreviousMonth = () => {
+    setCurrentMonth((prev) => new Date(prev.getFullYear(), prev.getMonth() - 1, 1));
+  };
+
+  // Navegar para o próximo mês
+  const goToNextMonth = () => {
+    setCurrentMonth((prev) => new Date(prev.getFullYear(), prev.getMonth() + 1, 1));
+  };
+
+  // Formatar o nome do mês e ano
+  const formatMonthYear = (date: Date) => {
+    return date.toLocaleString("pt-BR", { month: "long", year: "numeric" });
+  };
+
+  // Função para buscar disponibilidade para uma data específica
+  const fetchAvailabilityForDate = async (date: string) => {
+    try {
+      setLoading(true);
+      setError(null);
+
+      const response = await getAvailability(trainerId, date, user?.sessionId);
+
+      if (response.availableSlots) {
+        setAvailableSlots(response.availableSlots);
+      }
+      if (response.bookedSlots) {
+        setBookedSlots(response.bookedSlots);
+      }
+    } catch (error: any) {
+      console.error("[AppointmentScreen] Erro ao buscar disponibilidade:", error);
+      const errorMsg =
+        error?.response?.data?.error ||
+        "Não foi possível carregar a disponibilidade. Tente novamente.";
+      setError(errorMsg);
+      Alert.alert("Erro", errorMsg);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleBook = async () => {
     if (!selectedSlot) {
@@ -96,37 +202,29 @@ export function AppointmentScreen() {
     }
 
     try {
-      setIsBooking(true);
-      console.log("[AppointmentScreen] Agendando appointment:", {
-        trainerId,
-        date: selectedDate,
-        startTime: selectedSlot.startTime,
-        endTime: selectedSlot.endTime,
-        notes,
-      });
+      if (!user?.sessionId) {
+        Alert.alert(
+          "Erro",
+          "Você precisa estar logado para agendar um horário com o personal trainer."
+        );
+        return;
+      }
 
-      const response = await createAppointment(
+      setIsBooking(true);
+
+      await createAppointment(
         trainerId,
         selectedDate,
         selectedSlot.startTime,
         selectedSlot.endTime,
         notes,
-        user?.sessionId || ""
+        user.sessionId
       );
-
-      console.log("[AppointmentScreen] Agendamento criado:", response);
 
       Alert.alert(
         "Sucesso!",
         `Agendamento confirmado para ${selectedDate} de ${selectedSlot.startTime} a ${selectedSlot.endTime}`,
-        [
-          {
-            text: "OK",
-            onPress: () => {
-              navigation.goBack();
-            },
-          },
-        ]
+        [{ text: "OK", onPress: () => navigation.goBack() }]
       );
 
       setSelectedSlot(null);
@@ -142,105 +240,30 @@ export function AppointmentScreen() {
     }
   };
 
-  const fetchWeeklyAvailability = async () => {
-    try {
-      const resp = await getAvailability(trainerId, undefined, user?.sessionId);
-      if (resp && resp.availability) {
-        setMonthAvailability(resp.availability);
-      }
-    } catch (err) {
-      console.warn("[AppointmentScreen] Erro ao buscar disponibilidade semanal", err);
+  const getStatusColor = (status: string) => {
+    switch (status?.toLowerCase()) {
+      case "confirmado":
+        return "#BBF246";
+      case "pendente":
+        return "#f59e0b";
+      case "cancelado":
+        return "#ef4444";
+      case "concluido":
+        return "#6366f1";
+      default:
+        return "#f59e0b";
     }
-  };
-
-  const getDaysInMonth = (year: number, month: number) => new Date(year, month, 0).getDate();
-
-  const getFirstDayOfMonth = (year: number, month: number) => new Date(year, month - 1, 1).getDay();
-
-  const renderCalendarGrid = () => {
-    const daysInMonth = getDaysInMonth(visibleMonth.year, visibleMonth.month);
-    const firstDay = getFirstDayOfMonth(visibleMonth.year, visibleMonth.month);
-    const days = ["dom", "seg", "ter", "qua", "qui", "sex", "sab"];
-
-    // Build rows of 7 days each
-    const rows = [];
-
-    // Add header row
-    rows.push(
-      <View key="header" style={styles.calendarWeekHeaderRow}>
-        {days.map((d) => (
-          <Text key={d} style={styles.calendarWeekDay}>
-            {d}
-          </Text>
-        ))}
-      </View>
-    );
-
-    // Build day rows
-    let dayCounter = 1;
-    while (dayCounter <= daysInMonth) {
-      const week = [];
-
-      // Add empty cells for days before first day
-      for (let i = 0; i < 7; i++) {
-        if (dayCounter === 1 && i < firstDay) {
-          week.push(<View key={`empty-${i}`} style={styles.calendarDay} />);
-        } else if (dayCounter <= daysInMonth) {
-          const date = new Date(visibleMonth.year, visibleMonth.month - 1, dayCounter);
-          const iso = date.toISOString().split("T")[0];
-          const dayOfWeek = date.getDay();
-          const isSelected = iso === selectedDate;
-          const hasAvailability = monthAvailability.some(
-            (a: any) => a.dia_semana === dayOfWeek && a.ativo
-          );
-
-          week.push(
-            <TouchableOpacity
-              key={dayCounter}
-              style={[
-                styles.calendarDay,
-                isSelected && styles.calendarDaySelected,
-                hasAvailability && !isSelected && styles.calendarDayAvailable,
-                !hasAvailability && !isSelected && styles.calendarDayUnavailable, // Style for unavailable dates
-              ]}
-              onPress={() => {
-                // If clicking the already selected date, deselect it by resetting to today's date
-                if (selectedDate === iso) {
-                  const today = new Date().toISOString().split("T")[0];
-                  setSelectedDate(today);
-                } else {
-                  setSelectedDate(iso);
-                }
-              }}
-              disabled={!hasAvailability} // Disable interaction for unavailable dates
-            >
-              <Text style={[
-                styles.calendarDayText,
-                isSelected && styles.calendarDayTextSelected,
-                !hasAvailability && styles.calendarDayTextUnavailable // Style for unavailable dates
-              ]}>
-                {dayCounter}
-              </Text>
-            </TouchableOpacity>
-          );
-          dayCounter += 1;
-        }
-      }
-
-      rows.push(
-        <View key={`week-${rows.length}`} style={styles.calendarWeekRow}>
-          {week}
-        </View>
-      );
-    }
-
-    return rows;
   };
 
   const renderSlot = (slot: AvailableSlot, index: number) => {
     const isSelected =
       selectedSlot?.startTime === slot.startTime && selectedSlot?.endTime === slot.endTime;
-    const isAvailable = slot.available;
+
+    const isBooked = bookedSlots.some(
+      (booked) => booked.hora_inicio === slot.startTime && booked.hora_fim === slot.endTime
+    );
+
+    const isAvailable = slot.available && !isBooked;
 
     return (
       <TouchableOpacity
@@ -253,18 +276,22 @@ export function AppointmentScreen() {
         disabled={!isAvailable}
         onPress={() => {
           if (isAvailable) {
-            // If clicking on an already selected slot, deselect it
             if (isSelected) {
               setSelectedSlot(null);
             } else {
-              // Otherwise select the new slot
               setSelectedSlot(slot);
             }
           }
         }}
       >
         <Clock size={16} color={isSelected ? "#192126" : isAvailable ? "#3b82f6" : "#d1d5db"} />
-        <Text style={[styles.slotTime, isSelected && styles.slotTimeSelected]}>
+        <Text
+          style={[
+            styles.slotTime,
+            isSelected && styles.slotTimeSelected,
+            !isAvailable && { textDecorationLine: "line-through" },
+          ]}
+        >
           {slot.startTime} - {slot.endTime}
         </Text>
       </TouchableOpacity>
@@ -273,35 +300,19 @@ export function AppointmentScreen() {
 
   const renderBookedSlot = (slot: BookedSlot) => {
     return (
-      <View key={`${slot.hora_inicio}`} style={styles.bookedSlotContainer}>
-        <View style={styles.bookedSlotInfo}>
+      <View key={`${slot.hora_inicio}-${slot.hora_fim}`} style={styles.bookedSlotContainer}>
+        <View style={styles.bookedSlotRow}>
           <View style={[styles.statusBadge, { backgroundColor: getStatusColor(slot.status) }]}>
-            <Text style={styles.statusText}>{slot.status.toUpperCase()}</Text>
-          </View>
-          <View>
-            <Text style={styles.bookedSlotTime}>
-              {slot.hora_inicio} - {slot.hora_fim}
+            <Text style={styles.statusText}>
+              {slot.status ? slot.status.toUpperCase() : "PENDENTE"}
             </Text>
-            <Text style={styles.bookedSlotUser}>{slot.user_name}</Text>
           </View>
+          <Text style={styles.bookedSlotTime}>
+            {slot.hora_inicio} - {slot.hora_fim}
+          </Text>
         </View>
       </View>
     );
-  };
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case "confirmado":
-        return "#BBF246";
-      case "pendente":
-        return "#f59e0b";
-      case "cancelado":
-        return "#ef4444";
-      case "concluido":
-        return "#6366f1";
-      default:
-        return "#9ca3af";
-    }
   };
 
   return (
@@ -310,11 +321,16 @@ export function AppointmentScreen() {
         <View style={styles.headerTop}>
           <BackButton />
         </View>
-          <Text style={styles.title}>Agendamentos</Text>
       </View>
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        {/* Mensagem de Erro */}
+        <View style={{ marginBottom: 16 }}>
+          <Text style={styles.title}>Agendamentos</Text>
+          <Text style={styles.subtitle}>
+            Selecione uma data e horário para agendar com seu treinador.
+          </Text>
+        </View>
+
         {error && (
           <View style={styles.errorContainer}>
             <AlertCircle size={24} color="#ef4444" />
@@ -322,47 +338,26 @@ export function AppointmentScreen() {
           </View>
         )}
 
-        {/* Seleção de Data */}
-        <View style={styles.section}>
-          <View style={styles.calendarHeaderRow}>
-            <TouchableOpacity
-              onPress={() => {
-                const prev =
-                  visibleMonth.month === 1
-                    ? { year: visibleMonth.year - 1, month: 12 }
-                    : { year: visibleMonth.year, month: visibleMonth.month - 1 };
-                setVisibleMonth(prev);
-              }}
-            >
-              <ChevronLeft size={24} color="#111827" />
-            </TouchableOpacity>
-            <Text style={styles.calendarMonth}>
-              {new Date(visibleMonth.year, visibleMonth.month - 1).toLocaleDateString("pt-BR", {
-                month: "long",
-                year: "numeric",
-              })}
-            </Text>
-            <TouchableOpacity
-              onPress={() => {
-                const next =
-                  visibleMonth.month === 12
-                    ? { year: visibleMonth.year + 1, month: 1 }
-                    : { year: visibleMonth.year, month: visibleMonth.month + 1 };
-                setVisibleMonth(next);
-              }}
-            >
-              <ChevronRight size={24} color="#111827" />
-            </TouchableOpacity>
-          </View>
-          <View style={styles.calendarGrid}>{renderCalendarGrid()}</View>
-        </View>
+        <CalendarComponent
+          currentMonth={currentMonth}
+          setCurrentMonth={setCurrentMonth}
+          selectedDate={selectedDate}
+          setSelectedDate={setSelectedDate}
+          hasAppointments={hasAppointments}
+          fetchAvailabilityForDate={fetchAvailabilityForDate}
+          isPastDate={isPastDate}
+        />
 
-        {/* Disponibilidade */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>🕐 Horários Disponíveis</Text>
 
           {loading ? (
-            <ActivityIndicator size="large" color="#3b82f6" />
+            <ActivityIndicator size="large" color="#192126" />
+          ) : isPastDate(selectedDate) ? (
+            <View style={styles.emptyState}>
+              <AlertCircle size={32} color="#d1d5db" />
+              <Text style={styles.emptyStateText}>Não é possível agendar horários em datas anteriores</Text>
+            </View>
           ) : availableSlots.length > 0 ? (
             <View style={styles.slotsContainer}>{availableSlots.map(renderSlot)}</View>
           ) : (
@@ -374,21 +369,19 @@ export function AppointmentScreen() {
           <Text style={styles.toleranceText}>A tolerância para atrasos é de 15 minutos.</Text>
         </View>
 
-        {/* Reservas já feitas */}
         {bookedSlots.length > 0 && (
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>📋 Agendamentos Neste Dia</Text>
+            <Text style={styles.sectionTitle}>📋 Agendamentos neste dia</Text>
             {bookedSlots.map(renderBookedSlot)}
           </View>
         )}
 
-        {/* Horário Selecionado */}
         {selectedSlot && (
           <View style={styles.selectedSlotContainer}>
             <View style={styles.selectedSlotContent}>
-              <CheckCircle size={24} color="#10b981" />
+              <CheckCircle size={24} color="#192126" />
               <View>
-                <Text style={styles.selectedSlotTitle}>Horário Selecionado</Text>
+                <Text style={styles.selectedSlotTitle}>Horário selecionado</Text>
                 <Text style={styles.selectedSlotTime}>
                   {selectedDate} de {selectedSlot.startTime} a {selectedSlot.endTime}
                 </Text>
@@ -397,7 +390,7 @@ export function AppointmentScreen() {
           </View>
         )}
 
-        {/* Notas */}
+
         {selectedSlot && (
           <View style={styles.notesSection}>
             <Text style={styles.notesTitle}>Adicione uma nota (opcional)</Text>
@@ -409,17 +402,20 @@ export function AppointmentScreen() {
           </View>
         )}
 
-        {/* Botão Confirmar */}
         {selectedSlot && (
           <TouchableOpacity
-            style={[styles.confirmButtonAdjusted, isBooking && styles.confirmButtonDisabled]}
+            style={[
+              styles.confirmButtonAdjusted,
+              isBooking && styles.confirmButtonDisabled,
+              isPastDate(selectedDate) && styles.confirmButtonDisabled
+            ]}
             onPress={handleBook}
-            disabled={isBooking}
+            disabled={isBooking || isPastDate(selectedDate)}
           >
             {isBooking ? (
               <ActivityIndicator size="small" color="#fff" />
             ) : (
-              <Text style={styles.confirmButtonText}>Confirmar Agendamento</Text>
+              <Text style={styles.confirmButtonText}>Confirmar agendamento</Text>
             )}
           </TouchableOpacity>
         )}
@@ -433,14 +429,12 @@ export default AppointmentScreen;
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#f3f4f6",
+    backgroundColor: "#ffffff",
   },
   headerContainer: {
     backgroundColor: "#fff",
     paddingHorizontal: 16,
     paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: "#e5e7eb",
   },
   headerTop: {
     flexDirection: "row",
@@ -492,37 +486,17 @@ const styles = StyleSheet.create({
     color: "#111827",
     marginBottom: 12,
   },
-  datesScroll: {
-    marginHorizontal: -16,
-    paddingHorizontal: 16,
-  },
-  dateButton: {
-    width: 60,
-    height: 80,
-    marginRight: 8,
-    backgroundColor: "#f3f4f6",
-    borderRadius: 8,
-    justifyContent: "center",
+  calendarHeaderRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
     alignItems: "center",
-    borderWidth: 1,
-    borderColor: "#e5e7eb",
+    marginBottom: 16,
   },
-  dateButtonSelected: {
-    backgroundColor: "#3b82f6",
-    borderColor: "#3b82f6",
-  },
-  dateButtonDay: {
-    fontSize: 18,
-    fontWeight: "700",
+  calendarMonth: {
+    fontSize: 16,
+    fontWeight: "600",
     color: "#111827",
-  },
-  dateButtonMonth: {
-    fontSize: 12,
-    color: "#6b7280",
-    marginTop: 4,
-  },
-  dateButtonTextSelected: {
-    color: "#fff",
+    textTransform: "capitalize",
   },
   slotsContainer: {
     flexDirection: "row",
@@ -558,38 +532,35 @@ const styles = StyleSheet.create({
     color: "#192126",
   },
   bookedSlotContainer: {
-    paddingVertical: 12,
-    paddingHorizontal: 12,
-    marginBottom: 8,
-    backgroundColor: "#f3f4f6",
-    borderRadius: 8,
-    borderLeftWidth: 4,
+    backgroundColor: "#f9fafb",
+    borderRadius: 12,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    marginBottom: 12,
+    borderLeftWidth: 5,
     borderLeftColor: "#f59e0b",
   },
-  bookedSlotInfo: {
+  bookedSlotRow: {
     flexDirection: "row",
     alignItems: "center",
+    justifyContent: "flex-start",
   },
   statusBadge: {
-    paddingVertical: 4,
-    paddingHorizontal: 8,
-    borderRadius: 4,
-    marginRight: 12,
+    backgroundColor: "#f59e0b",
+    paddingVertical: 6,
+    paddingHorizontal: 14,
+    borderRadius: 20,
+    marginRight: 16,
   },
   statusText: {
-    fontSize: 10,
+    color: "#ffffff",
+    fontSize: 12,
     fontWeight: "700",
-    color: "#fff",
   },
   bookedSlotTime: {
-    fontSize: 14,
+    fontSize: 16,
     fontWeight: "600",
     color: "#111827",
-  },
-  bookedSlotUser: {
-    fontSize: 12,
-    color: "#6b7280",
-    marginTop: 2,
   },
   emptyState: {
     alignItems: "center",
@@ -602,7 +573,7 @@ const styles = StyleSheet.create({
   },
   selectedSlotContainer: {
     marginBottom: 24,
-    backgroundColor: "#ecfdf5",
+    backgroundColor: "#BBF246",
     borderRadius: 12,
     padding: 16,
     borderWidth: 1,
@@ -616,12 +587,12 @@ const styles = StyleSheet.create({
     marginLeft: 12,
     fontSize: 14,
     fontWeight: "600",
-    color: "#10b981",
+    color: "#192126",
   },
   selectedSlotTime: {
     marginLeft: 12,
     fontSize: 12,
-    color: "#059669",
+    color: "#192126",
     marginTop: 2,
   },
   notesSection: {
@@ -648,14 +619,6 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: "#9ca3af",
   },
-  confirmButton: {
-    paddingVertical: 14,
-    paddingHorizontal: 16,
-    marginBottom: 100,
-    backgroundColor: "#3b82f6",
-    borderRadius: 8,
-    alignItems: "center",
-  },
   confirmButtonAdjusted: {
     paddingVertical: 14,
     paddingHorizontal: 16,
@@ -672,76 +635,90 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     color: "#fff",
   },
-  calendarHeaderRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 16,
-  },
-  calendarMonth: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: "#111827",
-    textTransform: "capitalize",
-  },
-  calendarGrid: {
-    borderWidth: 1,
-    borderColor: "#e5e7eb",
-    borderRadius: 8,
-    padding: 8,
-    backgroundColor: "#fff",
-  },
-  calendarWeekHeaderRow: {
-    flexDirection: "row",
-    marginBottom: 8,
-    justifyContent: "space-between",
-  },
-  calendarWeekRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    marginBottom: 4,
-  },
-  calendarWeekDay: {
-    width: "14.2%",
-    textAlign: "center",
-    fontSize: 11,
-    fontWeight: "600",
-    color: "#6b7280",
-    paddingVertical: 4,
-  },
-  calendarDay: {
-    width: "14.2%",
-    aspectRatio: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    borderRadius: 6,
-  },
-  calendarDayAvailable: {
-    backgroundColor: "#BBF246",
-  },
-  calendarDayUnavailable: {
-    opacity: 0.5, // Make unavailable dates appear faded
-  },
-  calendarDayTextUnavailable: {
-    color: "#9ca3af", // Muted color for unavailable dates
-  },
-  calendarDaySelected: {
-    backgroundColor: "#192126",
-  },
-  calendarDayText: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: "#111827",
-  },
-  calendarDayTextSelected: {
-    color: "#fff",
-    fontWeight: "700",
-  },
   toleranceText: {
     fontSize: 12,
     color: "#6b7280",
     marginTop: 12,
     fontStyle: "italic",
     textAlign: "center",
+  },
+
+  // Estilos para o modal de seleção de mês/ano
+  modalOverlay: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: "transparent", // Removed background
+    justifyContent: "center",
+    alignItems: "center",
+    zIndex: 100,
+  },
+  monthYearSelector: {
+    backgroundColor: "#fff",
+    borderRadius: 12,
+    padding: 20,
+    width: "80%",
+    maxWidth: 350,
+    alignItems: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3, // Increased shadow opacity for better visibility
+    shadowRadius: 12,   // Increased radius for more spread
+    elevation: 12,      // Increased elevation for better shadow
+  },
+  modalHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    width: "100%",
+    marginBottom: 20,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: "600",
+    color: "#111827",
+  },
+  yearSelector: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    width: "100%",
+    marginBottom: 20,
+    paddingHorizontal: 20,
+  },
+  yearText: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#111827",
+    marginHorizontal: 15,
+  },
+  monthGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "space-around",
+    width: "100%",
+    maxWidth: 300,
+  },
+  monthButton: {
+    padding: 10,
+    margin: 5,
+    borderRadius: 8,
+    backgroundColor: "#f3f4f6",
+    minWidth: 60,
+    alignItems: "center",
+  },
+  selectedMonthButton: {
+    backgroundColor: "#BBF246",
+  },
+  monthButtonText: {
+    fontSize: 14,
+    color: "#111827",
+    fontWeight: "500",
+  },
+  selectedMonthButtonText: {
+    color: "#192126",
+    fontWeight: "600",
   },
 });

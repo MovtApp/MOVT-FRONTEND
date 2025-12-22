@@ -67,6 +67,15 @@ export type AppStackParamList = {
   WeightScreen: undefined;
   AgeScreen: undefined;
   WelcomeScreen: undefined;
+  AppointmentScreen:
+    | {
+        trainerId?: string;
+        trainer?: {
+          id?: string;
+          name?: string;
+        };
+      }
+    | undefined;
 };
 
 export interface DietMeal {

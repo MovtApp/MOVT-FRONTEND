@@ -68,6 +68,13 @@ export const createAppointment = async (
       throw new Error("Token de autenticação é obrigatório");
     }
 
+    // Verificar se todos os campos obrigatórios estão presentes
+    if (!trainerId || !date || !startTime || !endTime) {
+      throw new Error(
+        "Todos os campos obrigatórios devem ser fornecidos para criar um agendamento"
+      );
+    }
+
     const response = await fetch(`${API_BASE_URL}/appointments`, {
       method: "POST",
       headers: {
@@ -75,7 +82,7 @@ export const createAppointment = async (
         Authorization: `Bearer ${sessionToken}`,
       },
       body: JSON.stringify({
-        trainerId: parseInt(trainerId, 10),
+        trainerId,
         date,
         startTime,
         endTime,
@@ -84,7 +91,21 @@ export const createAppointment = async (
     });
 
     if (!response.ok) {
-      const errorData = await response.json();
+      let errorData;
+      try {
+        errorData = await response.json();
+        console.log("[createAppointment] Erro detalhado do servidor:", errorData);
+      } catch (parseError) {
+        // Se não for possível parsear o JSON, usar o status como fallback
+        errorData = {
+          error: `Erro ao criar agendamento: ${response.status} - ${response.statusText}`,
+        };
+        console.log(
+          "[createAppointment] Erro de resposta do servidor (não JSON):",
+          response.status,
+          response.statusText
+        );
+      }
       throw new Error(errorData.error || `Erro ao criar agendamento: ${response.status}`);
     }
 

@@ -340,7 +340,7 @@ const ProfilePJScreen = () => {
                   size="icon"
                   style={styles.outlineButton}
                   onPress={() =>
-                    navigation.navigate("Appointments", {
+                    navigation.navigate("AppointmentScreen", {
                       trainerId: trainer?.id || undefined,
                       trainer: {
                         id: trainer?.id || undefined,
@@ -539,6 +539,7 @@ const styles = StyleSheet.create({
     height: 56,
     justifyContent: "center",
     alignItems: "center",
+    borderColor: "#192126",
     backgroundColor: "#192126",
   },
   buttonText: {
