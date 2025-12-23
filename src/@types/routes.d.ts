@@ -67,6 +67,7 @@ export type AppStackParamList = {
   WeightScreen: undefined;
   AgeScreen: undefined;
   WelcomeScreen: undefined;
+  CommunityScreen: undefined;
   AppointmentScreen:
     | {
         trainerId?: string;

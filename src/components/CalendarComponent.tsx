@@ -291,7 +291,7 @@ const styles = StyleSheet.create({
     borderRadius: 18,
   },
   todayButton: {
-    backgroundColor: "#E0F7E0",
+    backgroundColor: "#BBF246",
   },
   selectedDayButton: {
     backgroundColor: "#192126",
@@ -305,7 +305,7 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
   todayText: {
-    color: "#FFFFFF",
+    color: "#192126",
     fontWeight: "700",
   },
   selectedDayText: {
@@ -335,7 +335,6 @@ const styles = StyleSheet.create({
   pastDayText: {
     color: "#9CA3AF", // Gray color for past dates
   },
-  // Estilos para o modal de seleção de mês/ano
   modalOverlay: {
     position: "absolute",
     top: 0,

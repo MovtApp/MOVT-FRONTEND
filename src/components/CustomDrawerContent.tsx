@@ -38,18 +38,15 @@ export function CustomDrawerContent(props: DrawerContentComponentProps) {
   ];
 
   const panelItems = [
-    { name: "Agendamentos", icon: Calendar, route: "Appointments" }, // Rota atualizada para o novo componente
-    { name: "Comunidades", icon: Users, route: "CommunityScreen" }, // Substituir pela rota real
+    { name: "Treinos", icon: Calendar, route: "TrainingScreen" }, 
+    { name: "Agendamentos", icon: Calendar, route: "Appointments" }, 
+    { name: "Comunidades", icon: Users, route: "CommunityScreen" }, 
   ];
 
   const accountItems = [
-    {
-      name: "Configurações e privacidades",
-      icon: Settings,
-      route: "ConfigScreen",
-    }, // Substituir pela rota real
-    { name: "Ajuda e suporte", icon: HelpCircle, route: "SupportScreen" }, // Substituir pela rota real
-    { name: "Sobre", icon: Info, route: "AboutScreen" }, // Substituir pela rota real
+    { name: "Configurações e privacidades", icon: Settings, route: "ConfigScreen"}, 
+    { name: "Ajuda e suporte", icon: HelpCircle, route: "SupportScreen" }, 
+    { name: "Sobre", icon: Info, route: "AboutScreen" }, 
   ];
 
   return (
@@ -106,12 +103,12 @@ export function CustomDrawerContent(props: DrawerContentComponentProps) {
           <TouchableOpacity
             key={index}
             style={styles.drawerItem}
-            onPress={() =>
+            onPress={() => {
               props.navigation.navigate("App", {
                 screen: "HomeStack",
                 params: { screen: item.route as keyof AppStackParamList },
-              })
-            } // Navegação corrigida
+              });
+            }} // Navegação corrigida
           >
             <item.icon size={20} color="#FFFFFF" style={styles.drawerItemIcon} />
             <Text style={styles.drawerItemText}>{item.name}</Text>

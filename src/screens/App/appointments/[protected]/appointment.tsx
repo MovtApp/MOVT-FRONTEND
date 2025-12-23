@@ -10,25 +10,11 @@ import {
   Alert,
 } from "react-native";
 import { useAuth } from "@contexts/AuthContext";
-import { useRoute, useNavigation } from "@react-navigation/native";
 import { listAppointments, cancelAppointment } from "@services/appointmentService";
-import { getAvailability, createAppointment } from "@services/appointmentService";
 import Header from "@components/Header";
 import CalendarComponent from "@components/CalendarComponent";
 import AppointmentCard from "@components/AppointmentCard";
-import { Calendar, Flame } from "lucide-react-native";
-interface AvailableSlot {
-  startTime: string;
-  endTime: string;
-  available: boolean;
-}
-interface BookedSlot {
-  id_usuario: number;
-  hora_inicio: string;
-  hora_fim: string;
-  user_name: string;
-  status: string;
-}
+import { Flame } from "lucide-react-native";
 interface Appointment {
   id: string;
   time: string;
@@ -47,14 +33,7 @@ interface Appointment {
 }
 
 export function Appointment() {
-  const route = useRoute();
-  const navigation = useNavigation();
   const { user } = useAuth();
-  // Pegar parâmetros passados pela navegação
-  const trainerId = (route.params as any)?.trainerId;
-  const trainer = (route.params as any)?.trainer;
-  const [availableSlots, setAvailableSlots] = useState<AvailableSlot[]>([]);
-  const [bookedSlots, setBookedSlots] = useState<BookedSlot[]>([]);
   // Função para verificar se uma data é anterior à data atual
   const isPastDate = (dateStr: string) => {
     const currentDate = new Date();
@@ -184,29 +163,6 @@ export function Appointment() {
     }
     return dates;
   };
-  // Função para buscar disponibilidade para uma data específica
-  const fetchAvailabilityForDate = async (date: string) => {
-    try {
-      setLoading(true);
-      setError(null);
-      const response = await getAvailability(trainerId, date, user?.sessionId);
-      if (response.availableSlots) {
-        setAvailableSlots(response.availableSlots);
-      }
-      if (response.bookedSlots) {
-        setBookedSlots(response.bookedSlots);
-      }
-    } catch (error: any) {
-      console.error("[AppointmentScreen] Erro ao buscar disponibilidade:", error);
-      const errorMsg =
-        error?.response?.data?.error ||
-        "Não foi possível carregar a disponibilidade. Tente novamente.";
-      setError(errorMsg);
-      Alert.alert("Erro", errorMsg);
-    } finally {
-      setLoading(false);
-    }
-  };
   const monthDates = generateMonthDates();
   // Verificar se uma data tem agendamentos
   const hasAppointments = (dateStr: string) => {
@@ -215,6 +171,13 @@ export function Appointment() {
       (apt) => apt.appointment_date.split("T")[0] === dateStr
     );
   };
+
+  // Dummy function to prevent errors in CalendarComponent
+  const fetchAvailabilityForDate = async (date: string) => {
+    // Do nothing - this screen doesn't need to fetch availability for booking
+    console.log("Availability fetch disabled on this screen");
+  };
+
   // Navegar para o mês anterior
   const goToPreviousMonth = () => {
     setCurrentMonth((prev) => new Date(prev.getFullYear(), prev.getMonth() - 1, 1));
@@ -283,7 +246,7 @@ export function Appointment() {
         <View style={styles.contentHeader}>
           <Text style={styles.headerTitle}>Meus agendamentos</Text>
         </View>
-       
+
         <CalendarComponent
           currentMonth={currentMonth}
           setCurrentMonth={setCurrentMonth}
@@ -615,7 +578,7 @@ const styles = StyleSheet.create({
     borderRadius: 18,
   },
   todayButton: {
-    backgroundColor: "#E0F7E0",
+    backgroundColor: "#BBF246",
   },
   dayText: {
     fontSize: 14,
@@ -623,7 +586,7 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
   todayText: {
-    color: "#FFFFFF",
+    color: "#192126",
     fontWeight: "700",
   },
   outsideMonthText: {
