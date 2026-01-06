@@ -77,12 +77,16 @@ export function Appointment() {
             id: apt.id_agendamento.toString(), // converter para string
             time: formatTime(apt.hora_inicio),
             title: role === "trainer" ? "Musculação" : apt.trainer_name || "Treinador",
-            subtitle: role === "trainer" ? `${apt.client_name || "Cliente"}, 25 anos` : getStatusSubtitle(apt.status),
+            subtitle:
+              role === "trainer"
+                ? `${apt.client_name || "Cliente"}, 25 anos`
+                : getStatusSubtitle(apt.status),
             value: `Ø 0,00`, // valor não está disponível na resposta do backend
             status: apt.status,
             appointment_date: apt.data_agendamento,
             type: "Musculação",
-            userWhoBooked: role === "trainer" ? apt.client_name || "Cliente" : apt.trainer_name || "Treinador",
+            userWhoBooked:
+              role === "trainer" ? apt.client_name || "Cliente" : apt.trainer_name || "Treinador",
             statusText: getStatusSubtitle(apt.status),
             weekday: getWeekday(appointmentDate),
             absoluteDate: getAbsoluteDate(appointmentDate),
@@ -239,7 +243,7 @@ export function Appointment() {
   }
   return (
     <SafeAreaView style={styles.container}>
-      <View style={{ marginTop: 20}}>
+      <View style={{ marginTop: 20 }}>
         <Header showNotifications={true} />
       </View>
       <ScrollView style={styles.scrollContent} showsVerticalScrollIndicator={false}>
@@ -397,11 +401,11 @@ const styles = StyleSheet.create({
     padding: 8,
   },
   headerTitle: {
-   fontSize: 24,
+    fontSize: 24,
     fontWeight: "700",
     color: "#111827",
     flex: 1,
-    marginBottom: 20
+    marginBottom: 20,
   },
   contentHeader: {
     paddingHorizontal: 16,

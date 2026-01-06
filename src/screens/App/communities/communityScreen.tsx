@@ -11,26 +11,21 @@ import {
   SafeAreaView,
   ActivityIndicator,
   Alert,
-  FlatList,
+
   NativeSyntheticEvent,
   NativeScrollEvent,
   Animated,
 } from "react-native";
 import {
   Users,
-  Infinity,
-  Timer,
-  HeartPulse,
-  Dumbbell,
-  Flower,
-  Activity,
-  Flame,
-  Music,
-  Swords,
 } from "lucide-react-native";
+
 import Header from "@components/Header";
 import { useAuth } from "@contexts/AuthContext";
 import { listCommunities } from "@services/communityService";
+import Communities from "@components/Communities";
+
+
 
 const { width } = Dimensions.get("window");
 const ITEM_WIDTH = 270;
@@ -43,17 +38,8 @@ const heroImages = [
   "https://img.freepik.com/free-photo/yoga-group-enjoying-outdoor-workout_1262-20499.jpg?t=st=1766512380~exp=1766515980~hmac=27576ac5ad65441c2d80f61fd4f2841ba71fc535f4014c71c26bac1f15514fa5&w=1480",
 ];
 
-const categories = [
-  { id: "1", name: "Todas", icon: Infinity },
-  { id: "2", name: "Corrida", icon: Timer },
-  { id: "3", name: "Fisioterapia", icon: HeartPulse },
-  { id: "4", name: "Musculação", icon: Dumbbell },
-  { id: "5", name: "Yoga", icon: Flower },
-  { id: "6", name: "Pilates", icon: Activity },
-  { id: "7", name: "Funcional", icon: Flame },
-  { id: "8", name: "Dança", icon: Music },
-  { id: "9", name: "Lutas", icon: Swords },
-];
+
+
 
 interface Community {
   id_comunidade: number;
@@ -112,7 +98,7 @@ const CommunityScreen: React.FC = () => {
 
   const filteredCommunities = communities.filter((item) => {
     if (selectedCategory === "Todas") return true;
-    
+
     // Proteção contra valores nulos/undefined
     const nome = item.nome || "";
     const categoria = item.categoria || "";
@@ -123,11 +109,7 @@ const CommunityScreen: React.FC = () => {
   });
 
   const renderHeroItem = ({ item, index }: { item: string; index: number }) => {
-    const inputRange = [
-      (index - 1) * ITEM_WIDTH,
-      index * ITEM_WIDTH,
-      (index + 1) * ITEM_WIDTH,
-    ];
+    const inputRange = [(index - 1) * ITEM_WIDTH, index * ITEM_WIDTH, (index + 1) * ITEM_WIDTH];
 
     const scale = scrollX.interpolate({
       inputRange,
@@ -189,10 +171,10 @@ const CommunityScreen: React.FC = () => {
             decelerationRate="fast"
             contentContainerStyle={{ paddingHorizontal: SPACING }}
             keyExtractor={(_, index) => index.toString()}
-            onScroll={Animated.event(
-              [{ nativeEvent: { contentOffset: { x: scrollX } } }],
-              { useNativeDriver: true, listener: handleScroll }
-            )}
+            onScroll={Animated.event([{ nativeEvent: { contentOffset: { x: scrollX } } }], {
+              useNativeDriver: true,
+              listener: handleScroll,
+            })}
             scrollEventThrottle={16}
             renderItem={renderHeroItem}
             CellRendererComponent={CellRenderer}
@@ -210,38 +192,13 @@ const CommunityScreen: React.FC = () => {
           </View>
         </View>
 
-        {/* Tabs */}
-        <View style={{ marginBottom: 24 }}>
-          <FlatList
-            data={categories}
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.tabsContainer}
-            keyExtractor={(item) => item.id}
-            renderItem={({ item }) => (
-              <TouchableOpacity
-                style={[styles.tab, selectedCategory === item.name && styles.activeTab]}
-                onPress={() => setSelectedCategory(item.name)}
-              >
-                <item.icon
-                  size={20}
-                  color={selectedCategory === item.name ? "#FFFFFF" : "#666666"}
-                  style={{ marginRight: 6 }}
-                />
-                <Text
-                  style={selectedCategory === item.name ? styles.tabTextActive : styles.tabText}
-                >
-                  {item.name}
-                </Text>
-              </TouchableOpacity>
-            )}
-          />
+        <View style={styles.section}>
+          {/* Communities Section */}
+          <Communities showSeeAll={false} />
         </View>
 
         {/* Section Title */}
-        <Text style={styles.sectionTitle}>
-          Encontre as comunidades perto de você!
-        </Text>
+        <Text style={styles.sectionTitle}>Encontre as comunidades perto de você!</Text>
 
         {loading ? (
           <View style={styles.loadingContainer}>
@@ -255,7 +212,10 @@ const CommunityScreen: React.FC = () => {
               style={styles.card}
               activeOpacity={0.9}
             >
-              <Image source={{ uri: item.imageurl || "https://via.placeholder.com/150" }} style={styles.cardImage} />
+              <Image
+                source={{ uri: item.imageurl || "https://via.placeholder.com/150" }}
+                style={styles.cardImage}
+              />
 
               <View style={styles.cardContent}>
                 <Text style={styles.cardTitle}>{item.nome || "Sem Nome"}</Text>
@@ -284,7 +244,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#fff",
   },
   contentHeader: {
-    paddingHorizontal: 16,
+    paddingHorizontal: 30,
     paddingVertical: 12,
     backgroundColor: "#FFFFFF",
   },
@@ -293,7 +253,6 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     color: "#111827",
     marginBottom: 10,
-    marginLeft: 14,
   },
   heroContainer: {
     marginBottom: 20,
@@ -312,47 +271,21 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     resizeMode: "cover",
   },
-  tabsContainer: {
-    paddingHorizontal: 16,
-  },
-  tab: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "#FFFFFF",
-    paddingHorizontal: 12,
-    height: 35, // Ajustado para ser funcional (aprox 30px)
-    minWidth: 100, // Ajustado para ser funcional (aprox 100px)
-    borderRadius: 8,
-    marginRight: 10,
-    borderWidth: 1,
-    borderColor: "#c3c3c3",
-    marginTop: 8,
-  },
-  activeTab: {
-    backgroundColor: "#4CAF50",
-  },
-  tabText: {
-    fontSize: 16,
-    color: "#666",
-    fontWeight: "600",
-  },
-  tabTextActive: {
-    fontSize: 16,
-    color: "#fff",
-    fontWeight: "600",
-  },
   sectionTitle: {
     fontSize: 18,
     fontWeight: "bold",
     color: "#000",
-    paddingHorizontal: 16,
+    paddingHorizontal: 30,
     marginBottom: 16,
+  },
+  section: {
+    marginBottom: 24,
+    paddingHorizontal: 30,
   },
   card: {
     flexDirection: "row",
     backgroundColor: "#fff",
-    marginHorizontal: 16,
+    marginHorizontal: 30,
     marginBottom: 16,
     borderRadius: 16,
     overflow: "hidden",

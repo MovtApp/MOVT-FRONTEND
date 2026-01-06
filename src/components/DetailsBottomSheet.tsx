@@ -149,7 +149,6 @@ export function DetailsBottomSheet({
     >
       <BottomSheetView style={styles.bottomSheetView}>
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ flexGrow: 1 }}>
-          
           {/* Cabeçalho */}
           <View style={styles.headerContainer}>
             <H4 style={styles.headerTitle}>{title}</H4>

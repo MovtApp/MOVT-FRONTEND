@@ -1,10 +1,5 @@
 import React from "react";
-import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-} from "react-native";
+import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
 import { Calendar, Flame } from "lucide-react-native";
 
 interface Appointment {
@@ -36,10 +31,10 @@ const capitalizeFirstLetter = (text: string): string => {
   return text.charAt(0).toUpperCase() + text.slice(1).toLowerCase();
 };
 
-const AppointmentCard: React.FC<AppointmentCardProps> = ({ 
-  appointment, 
+const AppointmentCard: React.FC<AppointmentCardProps> = ({
+  appointment,
   isPast = false,
-  onCancel 
+  onCancel,
 }) => {
   return (
     <View style={styles.appointmentCard}>
@@ -50,15 +45,26 @@ const AppointmentCard: React.FC<AppointmentCardProps> = ({
             <View style={styles.iconCircle}>
               <Flame size={16} color={isPast ? "#4CAF50" : "#192126"} />
               <Text style={styles.relativeText}>
-                {appointment.weekday ? capitalizeFirstLetter(appointment.weekday) : 
-                 appointment.absoluteDate ? capitalizeFirstLetter(appointment.absoluteDate) : ''}
+                {appointment.weekday
+                  ? capitalizeFirstLetter(appointment.weekday)
+                  : appointment.absoluteDate
+                    ? capitalizeFirstLetter(appointment.absoluteDate)
+                    : ""}
               </Text>
             </View>
           </View>
-          <View style={{ backgroundColor: "#FFFFFF", borderRadius: 6, padding: 8, flexDirection: "row", marginTop: 4 }}>
+          <View
+            style={{
+              backgroundColor: "#FFFFFF",
+              borderRadius: 6,
+              padding: 8,
+              flexDirection: "row",
+              marginTop: 4,
+            }}
+          >
             {appointment.weekday && (
               <View style={{ flexDirection: "row", alignItems: "center" }}>
-                <Calendar size={16} color={"#192126"} style={{ marginRight: 6 }}/>
+                <Calendar size={16} color={"#192126"} style={{ marginRight: 6 }} />
                 <Text style={styles.absoluteText}>{appointment.absoluteDate}</Text>
               </View>
             )}
@@ -72,10 +78,7 @@ const AppointmentCard: React.FC<AppointmentCardProps> = ({
           <Text style={styles.subtitleText}>{appointment.statusText}</Text>
         </View>
         {!isPast && (
-          <TouchableOpacity
-            style={styles.cancelButton}
-            onPress={() => onCancel(appointment.id)}
-          >
+          <TouchableOpacity style={styles.cancelButton} onPress={() => onCancel(appointment.id)}>
             <Text style={styles.cancelButtonText}>Cancelar</Text>
           </TouchableOpacity>
         )}

@@ -1,10 +1,5 @@
 import React, { useState } from "react";
-import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-} from "react-native";
+import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 
 interface CalendarComponentProps {
@@ -104,9 +99,7 @@ const CalendarComponent: React.FC<CalendarComponentProps> = ({
           </TouchableOpacity>
 
           <TouchableOpacity onPress={() => setShowMonthSelector(true)}>
-            <Text style={styles.monthText}>
-              {formatMonthYear(currentMonth).toLowerCase()}
-            </Text>
+            <Text style={styles.monthText}>{formatMonthYear(currentMonth).toLowerCase()}</Text>
           </TouchableOpacity>
 
           <TouchableOpacity onPress={goToNextMonth}>
@@ -154,7 +147,9 @@ const CalendarComponent: React.FC<CalendarComponentProps> = ({
                   >
                     {dateObj.day}
                   </Text>
-                  {!isPastDate(dateObj.date) && hasAppointments(dateObj.date) && <View style={styles.appointmentIndicator} />}
+                  {!isPastDate(dateObj.date) && hasAppointments(dateObj.date) && (
+                    <View style={styles.appointmentIndicator} />
+                  )}
                 </TouchableOpacity>
               ) : (
                 <View style={styles.emptyCell} />
@@ -216,10 +211,7 @@ const CalendarComponent: React.FC<CalendarComponentProps> = ({
                     }}
                   >
                     <Text
-                      style={[
-                        styles.monthButtonText,
-                        isSelected && styles.selectedMonthButtonText,
-                      ]}
+                      style={[styles.monthButtonText, isSelected && styles.selectedMonthButtonText]}
                     >
                       {monthNames[i]}
                     </Text>
@@ -356,8 +348,8 @@ const styles = StyleSheet.create({
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3, // Increased shadow opacity for better visibility
-    shadowRadius: 12,   // Increased radius for more spread
-    elevation: 12,      // Increased elevation for better shadow
+    shadowRadius: 12, // Increased radius for more spread
+    elevation: 12, // Increased elevation for better shadow
   },
   modalHeader: {
     flexDirection: "row",

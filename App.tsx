@@ -23,6 +23,20 @@ function AppContent() {
   });
 
   const { loading: isLoadingAuth, user } = useAuth();
+  const [currentRoute, setCurrentRoute] = React.useState<"Auth" | "Verify" | "App">("Auth");
+
+  // Monitora mudanças no estado de autenticação e atualiza a rota atual
+  React.useEffect(() => {
+    let initialRouteName: "Auth" | "Verify" | "App" = "Auth";
+    if (user) {
+      if (user.isVerified) {
+        initialRouteName = "App";
+      } else {
+        initialRouteName = "Verify";
+      }
+    }
+    setCurrentRoute(initialRouteName);
+  }, [user]);
 
   if (!fontsLoaded || isLoadingAuth) {
     return (
@@ -32,19 +46,10 @@ function AppContent() {
     );
   }
 
-  let initialRouteName: "Auth" | "Verify" | "App" = "Auth";
-  if (user) {
-    if (user.isVerified) {
-      initialRouteName = "App";
-    } else {
-      initialRouteName = "Verify";
-    }
-  }
-
   return (
     <LocationProvider>
       <NotificationProvider>
-        <Routes initialRouteName={initialRouteName} />
+        <Routes initialRouteName={currentRoute} />
       </NotificationProvider>
     </LocationProvider>
   );

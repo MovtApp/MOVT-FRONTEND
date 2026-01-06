@@ -1,20 +1,22 @@
-import React from "react";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
-import { createDrawerNavigator } from "@react-navigation/drawer"; // Importar createDrawerNavigator
-import HomeScreen from "../screens/App/home/homeScreen"; // Caminho corrigido
+import { createDrawerNavigator } from "@react-navigation/drawer";
+import HomeScreen from "../screens/App/home/homeScreen";
 import MapScreen from "../screens/App/map/mapScreen";
 import DietScreen from "../screens/App/diet/dietScreen";
 import DataScreen from "../screens/App/data/dataScreen";
-import ChatScreen from "../screens/App/chat/chatScreen"; // Caminho corrigido
+import ChatScreen from "../screens/App/chat/chatScreen";
+import ChatProtected from "../screens/App/chat/[protected]/chat";
 import BottomNavigationBar from "../components/BottomNavigationBar";
 import { View, StyleSheet } from "react-native";
 import DietDetailsScreen from "../screens/App/diet/dietDetailsScreen";
-import { CustomDrawerContent } from "../components/CustomDrawerContent"; // Importar CustomDrawerContent
+import { CustomDrawerContent } from "../components/CustomDrawerContent";
 import { AppStackParamList } from "../@types/routes";
 import ProfileScreen from "../screens/App/profile/profileScreen";
 import ProfilePJ from "../screens/App/profile/ProfilePJScreen";
 import { TrainerProfileScreen } from "../screens/App/profile/TrainerProfileScreen";
 import SelectedTrainersScreen from "../screens/App/profile/SelectedTrainersScreen";
+import ConfigScreen from "../screens/App/config/configScreen";
+
 
 // Importando o Appointment do novo local
 import Appointment from "../screens/App/appointments/[protected]/appointment";
@@ -50,6 +52,7 @@ function AppLayout() {
         <Stack.Screen name="DietDetails" component={DietDetailsScreen} />
         <Stack.Screen name="DataScreen" component={DataScreen} />
         <Stack.Screen name="ChatScreen" component={ChatScreen} />
+        <Stack.Screen name="Chat" component={ChatProtected} />
         <Stack.Screen name="ProfileScreen" component={ProfileScreen} />
         <Stack.Screen name="ProfilePJ" component={ProfilePJ} />
         <Stack.Screen name="TrainerProfile" component={TrainerProfileScreen} />
@@ -65,6 +68,7 @@ function AppLayout() {
         <Stack.Screen name="ResultsScreen" component={ResultsScreen} />
         <Stack.Screen name="TestWearScreen" component={TestWearScreen} />
         <Stack.Screen name="CommunityScreen" component={CommunityScreen} />
+        <Stack.Screen name="ConfigScreen" component={ConfigScreen} />
       </Stack.Navigator>
       <BottomNavigationBar />
       {/* Renderizando BottomNavigationBar diretamente, pois isDietSheetOpen não a controla mais. */}

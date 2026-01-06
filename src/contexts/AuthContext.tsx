@@ -11,6 +11,7 @@ interface User {
   username: string;
   isVerified: boolean; // Adicionado o status de verificação do e-mail
   sessionId?: string; // Adicionado o sessionId
+  supabaseUserId?: string | null; // Adicionado o UUID do Supabase
   photo?: string | null; // Adicionado para o avatar do usuário
   documentId?: string | null;
   documentType?: "CPF" | "CNPJ" | null;
@@ -54,6 +55,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               const refreshedUser = {
                 ...parsedUserDetails,
                 ...response.data.user,
+                supabaseUserId: response.data.user.supabase_uid || parsedUserDetails.supabaseUserId,
                 sessionId: storedSessionId,
               };
 
@@ -68,6 +70,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                   username: refreshedUser.username,
                   isVerified: refreshedUser.isVerified,
                   photo: refreshedUser.photo,
+                  supabaseUserId: refreshedUser.supabaseUserId,
                 })
               );
             } else {
@@ -134,6 +137,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         isVerified: updatedUser.isVerified,
         photo: updatedUser.photo,
         id: updatedUser.id,
+        supabaseUserId: updatedUser.supabaseUserId,
         documentId: updatedUser.documentId,
         documentType: updatedUser.documentType,
       })

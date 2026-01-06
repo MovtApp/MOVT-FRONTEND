@@ -29,9 +29,11 @@ const HIDDEN_SCREENS = [
   "ResultsScreen",
   "WaterScreen",
   "AppointmentScreen",
-  "appointmentScreen", // lowercase variant
-  "Appointments", // actual route name used in navigation
+  "appointmentScreen",
+  "Appointments",
   "CommunityScreen",
+  "Chat",
+  "ConfigScreen",
 ];
 // ============================================================================
 

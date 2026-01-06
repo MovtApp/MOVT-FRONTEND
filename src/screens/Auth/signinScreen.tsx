@@ -108,6 +108,7 @@ export const SignInScreen = () => {
         email: response.data.user.email,
         username: response.data.user.username,
         isVerified: response.data.user.isVerified,
+        supabaseUserId: response.data.user.supabase_uid,
         documentId,
         documentType: resolvedDocumentType,
       });

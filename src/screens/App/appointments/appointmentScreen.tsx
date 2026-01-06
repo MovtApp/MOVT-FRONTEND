@@ -356,7 +356,9 @@ export function AppointmentScreen() {
           ) : isPastDate(selectedDate) ? (
             <View style={styles.emptyState}>
               <AlertCircle size={32} color="#d1d5db" />
-              <Text style={styles.emptyStateText}>Não é possível agendar horários em datas anteriores</Text>
+              <Text style={styles.emptyStateText}>
+                Não é possível agendar horários em datas anteriores
+              </Text>
             </View>
           ) : availableSlots.length > 0 ? (
             <View style={styles.slotsContainer}>{availableSlots.map(renderSlot)}</View>
@@ -390,7 +392,6 @@ export function AppointmentScreen() {
           </View>
         )}
 
-
         {selectedSlot && (
           <View style={styles.notesSection}>
             <Text style={styles.notesTitle}>Adicione uma nota (opcional)</Text>
@@ -407,7 +408,7 @@ export function AppointmentScreen() {
             style={[
               styles.confirmButtonAdjusted,
               isBooking && styles.confirmButtonDisabled,
-              isPastDate(selectedDate) && styles.confirmButtonDisabled
+              isPastDate(selectedDate) && styles.confirmButtonDisabled,
             ]}
             onPress={handleBook}
             disabled={isBooking || isPastDate(selectedDate)}
@@ -665,8 +666,8 @@ const styles = StyleSheet.create({
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3, // Increased shadow opacity for better visibility
-    shadowRadius: 12,   // Increased radius for more spread
-    elevation: 12,      // Increased elevation for better shadow
+    shadowRadius: 12, // Increased radius for more spread
+    elevation: 12, // Increased elevation for better shadow
   },
   modalHeader: {
     flexDirection: "row",

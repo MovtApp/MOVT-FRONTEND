@@ -1,5 +1,6 @@
 import { View, Text, TouchableOpacity, StyleSheet, Image } from "react-native";
 import { DrawerContentScrollView, DrawerContentComponentProps } from "@react-navigation/drawer";
+import { CommonActions } from "@react-navigation/native";
 import {
   X,
   Home,
@@ -38,15 +39,16 @@ export function CustomDrawerContent(props: DrawerContentComponentProps) {
   ];
 
   const panelItems = [
-    { name: "Treinos", icon: Calendar, route: "TrainingScreen" }, 
-    { name: "Agendamentos", icon: Calendar, route: "Appointments" }, 
-    { name: "Comunidades", icon: Users, route: "CommunityScreen" }, 
+    { name: "Treinos", icon: Calendar, route: "TrainingScreen" },
+    { name: "Agendamentos", icon: Calendar, route: "Appointments" },
+    { name: "Comunidades", icon: Users, route: "CommunityScreen" },
   ];
 
   const accountItems = [
-    { name: "Configurações e privacidades", icon: Settings, route: "ConfigScreen"}, 
-    { name: "Ajuda e suporte", icon: HelpCircle, route: "SupportScreen" }, 
-    { name: "Sobre", icon: Info, route: "AboutScreen" }, 
+    { name: "Configurações e privacidades", icon: Settings, route: "ConfigScreen" as keyof AppStackParamList },
+
+    { name: "Ajuda e suporte", icon: HelpCircle, route: "SupportScreen" },
+    { name: "Sobre", icon: Info, route: "AboutScreen" },
   ];
 
   return (
@@ -68,8 +70,8 @@ export function CustomDrawerContent(props: DrawerContentComponentProps) {
             user?.photo
               ? { uri: user.photo }
               : {
-                  uri: "https://img.freepik.com/vetores-gratis/circulo-azul-com-usuario-branco_78370-4707.jpg?t=st=1760290901~exp=1760294501~hmac=54c484fcb1eb3bfdc377aeeaa901c951421c366a6a55921cf0ce792c078fe4df&w=1480",
-                }
+                uri: "https://img.freepik.com/vetores-gratis/circulo-azul-com-usuario-branco_78370-4707.jpg?t=st=1760290901~exp=1760294501~hmac=54c484fcb1eb3bfdc377aeeaa901c951421c366a6a55921cf0ce792c078fe4df&w=1480",
+              }
           }
           style={styles.profileImage}
         />
@@ -135,7 +137,14 @@ export function CustomDrawerContent(props: DrawerContentComponentProps) {
         ))}
       </View>
 
-      <TouchableOpacity style={styles.logoutButton} onPress={signOut}>
+      <TouchableOpacity
+        style={styles.logoutButton}
+        onPress={async () => {
+          await signOut();
+          // Fecha o drawer antes de redirecionar
+          props.navigation.closeDrawer();
+        }}
+      >
         <LogOut size={20} color="#BBF246" style={styles.drawerItemIcon} />
         <Text style={styles.logoutText}>Desconectar</Text>
       </TouchableOpacity>
