@@ -1,6 +1,20 @@
 import React, { useState, useEffect, useLayoutEffect, useCallback } from "react";
-import { View, StyleSheet, ActivityIndicator, KeyboardAvoidingView, Platform, Text } from "react-native";
-import { GiftedChat, Bubble, InputToolbar, Send, MessageText, Time } from "react-native-gifted-chat";
+import {
+  View,
+  StyleSheet,
+  ActivityIndicator,
+  KeyboardAvoidingView,
+  Platform,
+  Text,
+} from "react-native";
+import {
+  GiftedChat,
+  Bubble,
+  InputToolbar,
+  Send,
+  MessageText,
+  Time,
+} from "react-native-gifted-chat";
 import { useMessages } from "@/hooks/useChat";
 import { useRoute, useNavigation } from "@react-navigation/native";
 import { Send as SendIcon, ChevronLeft, CheckCheck } from "lucide-react-native";
@@ -27,14 +41,9 @@ const Chat = () => {
         borderBottomColor: "#f0f0f0",
       },
       headerTitleAlign: "center",
-      headerTitle: () => (
-        <Text style={styles.headerTitleText}>{participantName || "Chat"}</Text>
-      ),
+      headerTitle: () => <Text style={styles.headerTitleText}>{participantName || "Chat"}</Text>,
       headerLeft: () => (
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={() => navigation.goBack()}
-        >
+        <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
           <ChevronLeft color="#fff" size={24} />
         </TouchableOpacity>
       ),
@@ -42,11 +51,14 @@ const Chat = () => {
     });
   }, [navigation, participantName]);
 
-  const onSend = useCallback((newMessages: any[]) => {
-    if (newMessages.length > 0) {
-      sendMessage(newMessages);
-    }
-  }, [sendMessage]);
+  const onSend = useCallback(
+    (newMessages: any[]) => {
+      if (newMessages.length > 0) {
+        sendMessage(newMessages);
+      }
+    },
+    [sendMessage]
+  );
 
   const renderBubble = (props: any) => {
     const isMine = props.currentMessage.user._id === effectiveUserId;
@@ -142,7 +154,7 @@ const Chat = () => {
           scrollToBottom: true,
           minInputToolbarHeight: 80,
           maxInputToolbarHeight: 120,
-          messagesContainerStyle: { paddingBottom: 20 }
+          messagesContainerStyle: { paddingBottom: 20 },
         } as any)}
       />
     </View>
@@ -151,7 +163,12 @@ const Chat = () => {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#fff", marginBottom: 20 },
-  loadingContainer: { flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: "#fff" },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "#fff",
+  },
   headerTitleText: { fontSize: 20, fontWeight: "bold", color: "#000" },
   backButton: {
     backgroundColor: "#192126",

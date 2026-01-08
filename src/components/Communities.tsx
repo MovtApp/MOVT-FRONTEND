@@ -93,6 +93,7 @@ const styles = StyleSheet.create({
   },
   communitiesList: {
     marginLeft: -4,
+    marginTop: -18,
   },
   communityItem: {
     alignItems: "center",

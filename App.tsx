@@ -1,4 +1,5 @@
 import "./global.css";
+import "./src/i18n";
 import React from "react";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
@@ -49,7 +50,7 @@ function AppContent() {
   return (
     <LocationProvider>
       <NotificationProvider>
-        <Routes initialRouteName={currentRoute} />
+        <Routes key={currentRoute} initialRouteName={currentRoute} />
       </NotificationProvider>
     </LocationProvider>
   );

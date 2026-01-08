@@ -1,101 +1,195 @@
+import { useState } from "react";
 import {
   View,
   Text,
   Image,
   TouchableOpacity,
   ScrollView,
-  SafeAreaView,
   StatusBar,
   StyleSheet,
+  Dimensions,
+  Alert,
+  ActivityIndicator,
 } from "react-native";
-import { Heart, Grid3X3, Bookmark, MapPin, Briefcase, ArrowLeft } from "lucide-react-native";
+import { useAuth } from "@contexts/AuthContext";
+import { Heart, Grid3X3, Bookmark, MapPin, Briefcase } from "lucide-react-native";
+import * as ImagePicker from "expo-image-picker";
+import { userService } from "@services/userService";
+import BackButton from "@components/BackButton";
+
+const { width } = Dimensions.get("window");
 
 const ProfilePFScreen = () => {
+  const { user, updateUser } = useAuth();
+  const [activeTab, setActiveTab] = useState("Posts");
+  const [loadingUpdate, setLoadingUpdate] = useState(false);
+
+  // Mock de fotos para o grid seguindo a estética da imagem
+  const posts = [
+    "https://res.cloudinary.com/ditlmzgrh/image/upload/v1757838100/image_2_kgtuno.jpg",
+    "https://img.freepik.com/free-photo/view-woman-helping-man-exercise-gym_52683-98092.jpg",
+    "https://img.freepik.com/free-photo/medium-shot-people-helping-each-other-gym_23-2149591024.jpg",
+    "https://img.freepik.com/free-photo/man-helping-woman-with-her-workout-gym_23-2149591022.jpg",
+    "https://img.freepik.com/free-photo/man-working-out-gym_23-2149591020.jpg",
+    "https://img.freepik.com/free-photo/woman-working-out-gym_23-2149591018.jpg",
+  ];
+
+  const handlePickImage = async (type: "avatar" | "banner") => {
+    try {
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ["images"],
+        allowsEditing: true,
+        aspect: type === "avatar" ? [1, 1] : [16, 9],
+        quality: 0.8,
+      });
+
+      if (!result.canceled) {
+        setLoadingUpdate(true);
+        const imageUri = result.assets[0].uri;
+
+        if (type === "avatar") {
+          const response = await userService.updateAvatar(imageUri);
+          if (response.success) {
+            updateUser({ photo: response.data.photo });
+            Alert.alert("Sucesso", "Foto de perfil atualizada!");
+          }
+        } else {
+          const response = await userService.updateBanner(imageUri);
+          if (response.success) {
+            updateUser({ banner: response.data.banner });
+            Alert.alert("Sucesso", "Banner atualizado!");
+          }
+        }
+      }
+    } catch (error: any) {
+      console.error("Erro ao atualizar imagem:", error);
+      Alert.alert("Erro", "Não foi possível atualizar a imagem.");
+    } finally {
+      setLoadingUpdate(false);
+    }
+  };
+
   return (
-    <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor="#000" />\
-      {/* Header com seta de voltar */}
-      <View style={styles.header}>
-        <TouchableOpacity style={styles.backButton}>
-          <ArrowLeft color="#fff" size={28} />
-        </TouchableOpacity>
+    <View style={styles.container}>
+      <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
+
+      <View style={styles.backButtonContainer}>
+        <BackButton />
       </View>
-      <ScrollView showsVerticalScrollIndicator={false}>
-        {/* Banner + Foto de perfil */}
+
+      <ScrollView showsVerticalScrollIndicator={false} bounces={false}>
+        {/* Banner de Topo */}
         <View style={styles.bannerContainer}>
           <Image
-            source={{ uri: "https://via.placeholder.com/600x300/111111/333333" }} // substitua pela imagem real
+            source={
+              user?.banner
+                ? { uri: user.banner }
+                : {
+                    uri: "https://res.cloudinary.com/ditlmzgrh/image/upload/v1767896239/Captura_de_tela_2026-01-08_151542_r3acpt.png",
+                  }
+            }
             style={styles.banner}
           />
-          <View style={styles.profilePicContainer}>
-            <Image
-              source={{ uri: "https://via.placeholder.com/150" }} // foto do perfil
-              style={styles.profilePic}
-            />
-          </View>
+          <TouchableOpacity
+            onPress={() => handlePickImage("banner")}
+            disabled={loadingUpdate}
+          ></TouchableOpacity>
         </View>
 
-        {/* Nome e botão seguir */}
-        <View style={styles.nameContainer}>
-          <Text style={styles.name}>Oliver Augusto</Text>
-          <Text style={styles.username}>@Oliver_guto</Text>
-
-          <TouchableOpacity style={styles.followButton}>
-            <Text style={styles.followText}>Seguir</Text>
-          </TouchableOpacity>
-        </View>
-
-        {/* Status e localização */}
-        <View style={styles.statusContainer}>
-          <View style={styles.statusItem}>
-            <View style={styles.onlineDot} />
-            <Text style={styles.statusText}>Disponível agora</Text>
-          </View>
-
-          <View style={styles.locationContainer}>
-            <MapPin color="#999" size={18} />
-            <Text style={styles.locationText}>São Paulo</Text>
-          </View>
-
-          <View style={styles.curriculumContainer}>
-            <Briefcase color="#999" size={18} />
-            <Text style={styles.curriculumText}>Currículo</Text>
-          </View>
-        </View>
-
-        {/* Tabs */}
-        <View style={styles.tabsContainer}>
-          <TouchableOpacity style={styles.tabActive}>
-            <Grid3X3 color="#007AFF" size={24} />
-            <Text style={styles.tabTextActive}>Posts</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity style={styles.tab}>
-            <Heart color="#888" size={24} />
-            <Text style={styles.tabText}>Destaques</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity style={styles.tab}>
-            <Bookmark color="#888" size={24} />
-            <Text style={styles.tabText}>Marcados</Text>
-          </TouchableOpacity>
-        </View>
-
-        {/* Grid de fotos */}
-        <View style={styles.grid}>
-          {[1, 2, 3, 4, 5, 6].map((item) => (
-            <View key={item} style={styles.gridItem}>
+        {/* Informações do Perfil */}
+        <View style={styles.contentWrap}>
+          {/* Foto de Perfil + Botão Editar */}
+          <View style={styles.profileHeader}>
+            <View style={styles.avatarContainer}>
               <Image
-                source={{
-                  uri: `https://res.cloudinary.com/ditlmzgrh/image/upload/v1757838100/image_2_kgtuno.jpg`,
-                }}
-                style={styles.gridImage}
+                source={
+                  user?.photo
+                    ? { uri: user.photo }
+                    : {
+                        uri: "https://res.cloudinary.com/ditlmzgrh/image/upload/v1767896239/Captura_de_tela_2026-01-08_151542_r3acpt.png",
+                      }
+                }
+                style={styles.avatar}
               />
+              <TouchableOpacity
+                onPress={() => handlePickImage("avatar")}
+                disabled={loadingUpdate}
+              ></TouchableOpacity>
             </View>
-          ))}
+          </View>
+
+          {/* Nome e Username */}
+          <View style={styles.nameSection}>
+            <Text style={styles.nameText}>{user?.name || "Oliver Augusto"}</Text>
+            <Text style={styles.usernameText}>@{user?.username || "Oliver_guto"}</Text>
+          </View>
+
+          {/* Linha de Status e Info */}
+          <View style={styles.statsRow}>
+            <View style={styles.statusItem}>
+              <View style={styles.statusDot} />
+              <Text style={styles.statusLabel}>Disponível agora</Text>
+            </View>
+
+            <View style={styles.infoItem}>
+              <View style={styles.iconBox}>
+                <MapPin color="#6366F1" size={14} />
+              </View>
+              <Text style={styles.infoLabel}>São Paulo</Text>
+            </View>
+
+            <View style={styles.infoItem}>
+              <View style={styles.iconBox}>
+                <Briefcase color="#6366F1" size={14} />
+              </View>
+              <Text style={styles.infoLabel}>Currículo</Text>
+            </View>
+          </View>
+
+          {/* Abas / Categorias */}
+          <View style={styles.tabsContainer}>
+            <TouchableOpacity style={styles.tabItem} onPress={() => setActiveTab("Posts")}>
+              <Grid3X3 color={activeTab === "Posts" ? "#000" : "#94A3B8"} size={22} />
+              <Text style={[styles.tabText, activeTab === "Posts" && styles.tabTextActive]}>
+                Posts
+              </Text>
+              {activeTab === "Posts" && <View style={styles.activeLine} />}
+            </TouchableOpacity>
+
+            <TouchableOpacity style={styles.tabItem} onPress={() => setActiveTab("Destaques")}>
+              <Heart color={activeTab === "Destaques" ? "#000" : "#94A3B8"} size={22} />
+              <Text style={[styles.tabText, activeTab === "Destaques" && styles.tabTextActive]}>
+                Destaques
+              </Text>
+              {activeTab === "Destaques" && <View style={styles.activeLine} />}
+            </TouchableOpacity>
+
+            <TouchableOpacity style={styles.tabItem} onPress={() => setActiveTab("Marcados")}>
+              <Bookmark color={activeTab === "Marcados" ? "#000" : "#94A3B8"} size={22} />
+              <Text style={[styles.tabText, activeTab === "Marcados" && styles.tabTextActive]}>
+                Marcados
+              </Text>
+              {activeTab === "Marcados" && <View style={styles.activeLine} />}
+            </TouchableOpacity>
+          </View>
+
+          {/* Grid de Fotos */}
+          <View style={styles.grid}>
+            {posts.map((url, index) => (
+              <View key={index} style={styles.gridItem}>
+                <Image source={{ uri: url }} style={styles.gridImage} />
+              </View>
+            ))}
+          </View>
         </View>
       </ScrollView>
-    </SafeAreaView>
+
+      {loadingUpdate && (
+        <View style={styles.loadingOverlay}>
+          <ActivityIndicator size="large" color="#CBFB5E" />
+        </View>
+      )}
+    </View>
   );
 };
 
@@ -104,140 +198,240 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: "#fff",
   },
-  header: {
+  backButtonContainer: {
     position: "absolute",
     top: 50,
     left: 20,
     zIndex: 10,
   },
   backButton: {
-    backgroundColor: "rgba(0,0,0,0.4)",
-    padding: 8,
-    borderRadius: 20,
+    position: "absolute",
+    top: 50,
+    left: 20,
+    zIndex: 10,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    width: 44,
+    height: 44,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
   },
   bannerContainer: {
+    width: "100%",
     height: 220,
-    position: "relative",
   },
   banner: {
     width: "100%",
     height: "100%",
-    backgroundColor: "#111",
+    resizeMode: "cover",
   },
-  profilePicContainer: {
-    position: "absolute",
-    bottom: -50,
-    left: 20,
+  contentWrap: {
+    paddingHorizontal: 24,
+  },
+  profileHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-end",
+    marginTop: -55, // Overlap exato da foto com o banner
+    marginBottom: 10,
+  },
+  avatarContainer: {
+    width: 110,
+    height: 110,
+    borderRadius: 55,
     borderWidth: 4,
     borderColor: "#fff",
-    borderRadius: 75,
+    overflow: "hidden",
+    backgroundColor: "#eee",
   },
-  profilePic: {
-    width: 130,
-    height: 130,
-    borderRadius: 65,
+  avatar: {
+    width: "100%",
+    height: "100%",
   },
-  nameContainer: {
-    marginTop: 60,
-    paddingHorizontal: 20,
+  settingsButton: {
+    backgroundColor: "#F1F5F9",
+    width: 44,
+    height: 44,
+    borderRadius: 12,
     alignItems: "center",
-  },
-  name: {
-    fontSize: 26,
-    fontWeight: "bold",
-    color: "#000",
-  },
-  username: {
-    fontSize: 16,
-    color: "#666",
-    marginBottom: 12,
-  },
-  followButton: {
-    backgroundColor: "#BBF246",
-    paddingHorizontal: 40,
-    paddingVertical: 12,
-    borderRadius: 25,
-  },
-  followText: {
-    color: "#fff",
-    fontWeight: "600",
-    fontSize: 16,
-  },
-  statusContainer: {
-    flexDirection: "row",
     justifyContent: "center",
+    marginBottom: 8,
+  },
+  nameSection: {
+    marginTop: 10,
+  },
+  nameText: {
+    fontSize: 20,
+    fontWeight: "bold",
+    color: "#1E293B",
+  },
+  usernameText: {
+    fontSize: 12,
+    color: "#94A3B8",
+    marginTop: 2,
+  },
+  statsRow: {
+    flexDirection: "row",
     alignItems: "center",
-    marginVertical: 20,
-    gap: 20,
+    marginTop: 18,
+    gap: 16,
   },
   statusItem: {
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
   },
-  onlineDot: {
-    width: 10,
-    height: 10,
-    backgroundColor: "#4CD964",
-    borderRadius: 5,
+  statusDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: "#22C55E",
   },
-  statusText: {
-    color: "#4CD964",
-    fontWeight: "600",
+  statusLabel: {
+    fontSize: 13,
+    fontWeight: "bold",
+    color: "#0F172A",
   },
-  locationContainer: {
+  infoItem: {
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
   },
-  locationText: {
-    color: "#666",
-  },
-  curriculumContainer: {
-    flexDirection: "row",
+  iconBox: {
+    backgroundColor: "#EEF2FF", // Fundo azul claro/roxo dos ícones
+    width: 24,
+    height: 24,
+    borderRadius: 8,
     alignItems: "center",
-    gap: 6,
+    justifyContent: "center",
   },
-  curriculumText: {
-    color: "#666",
+  infoLabel: {
+    fontSize: 13,
+    fontWeight: "bold",
+    color: "#0F172A",
   },
   tabsContainer: {
     flexDirection: "row",
-    justifyContent: "space-around",
-    borderTopWidth: 1,
+    marginTop: 35,
     borderBottomWidth: 1,
-    borderColor: "#ddd",
-    paddingVertical: 12,
+    borderBottomColor: "#F1F5F9",
+    paddingBottom: 15,
   },
-  tabActive: {
+  tabItem: {
+    flex: 1,
     alignItems: "center",
-    gap: 4,
-  },
-  tab: {
-    alignItems: "center",
-    gap: 4,
-  },
-  tabTextActive: {
-    color: "#007AFF",
-    fontWeight: "600",
+    gap: 6,
+    position: "relative",
   },
   tabText: {
-    color: "#888",
+    fontSize: 16,
+    color: "#94A3B8",
+    fontWeight: "600",
+  },
+  tabTextActive: {
+    color: "#000",
+  },
+  activeLine: {
+    position: "absolute",
+    bottom: -16,
+    width: "40%",
+    height: 3,
+    backgroundColor: "#CBFB5E",
+    borderRadius: 10,
   },
   grid: {
     flexDirection: "row",
     flexWrap: "wrap",
-    paddingHorizontal: 2,
-    paddingTop: 4,
+    justifyContent: "space-between",
+    marginTop: 20,
+    paddingBottom: 40,
   },
   gridItem: {
-    width: "33.33%",
-    padding: 2,
+    width: (width - 64) / 2, // Ajustado para contemplar o paddingHorizontal 24 (24*2 + gap 16)
+    height: 200,
+    marginBottom: 16,
+    borderRadius: 25, // Bordas bem arredondadas conforme a imagem
+    overflow: "hidden",
   },
   gridImage: {
     width: "100%",
-    height: 140,
-    borderRadius: 8,
+    height: "100%",
+    resizeMode: "cover",
+  },
+  editProfileButton: {
+    backgroundColor: "#1E293B",
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 12,
+    marginBottom: 10,
+  },
+  editProfileText: {
+    color: "#fff",
+    fontWeight: "bold",
+    fontSize: 14,
+  },
+  modalScrollContainer: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    justifyContent: "flex-end",
+  },
+  editModalContent: {
+    backgroundColor: "#fff",
+    borderTopLeftRadius: 30,
+    borderTopRightRadius: 30,
+    padding: 24,
+    paddingBottom: 40,
+  },
+  modalHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 24,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: "bold",
+    color: "#1E293B",
+  },
+  inputGroup: {
+    marginBottom: 20,
+  },
+  inputLabel: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#64748B",
+    marginBottom: 8,
+  },
+  input: {
+    backgroundColor: "#F8FAFC",
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    borderRadius: 12,
+    padding: 14,
+    fontSize: 16,
+    color: "#1E293B",
+  },
+  saveButton: {
+    backgroundColor: "#CBFB5E",
+    paddingVertical: 16,
+    borderRadius: 12,
+    alignItems: "center",
+    marginTop: 10,
+  },
+  saveButtonDisabled: {
+    opacity: 0.7,
+  },
+  saveButtonText: {
+    color: "#000",
+    fontWeight: "bold",
+    fontSize: 16,
+  },
+  loadingOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(0,0,0,0.3)",
+    alignItems: "center",
+    justifyContent: "center",
+    zIndex: 999,
   },
 });
 

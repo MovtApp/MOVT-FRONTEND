@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { View, Text, TouchableOpacity, StyleSheet, Alert } from "react-native";
 import BackButton from "@/components/BackButton";
 import SocialButton from "@/components/SocialButton";
@@ -13,16 +13,14 @@ import { useAuth } from "@contexts/AuthContext";
 import { supabase } from "../../services/supabaseClient";
 import * as WebBrowser from "expo-web-browser";
 import * as Google from "expo-auth-session/providers/google";
-import * as AuthSession from "expo-auth-session";
 // import { LoginManager, AccessToken } from 'react-native-fbsdk-next'; // Para Facebook (Removido)
 
-// --- CONFIGURAÇÃO DA URL DA API ---
-const API_BASE_URL = "http://10.0.2.2:3000";
-// --- FIM DA CONFIGURAÇÃO ---
+const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || "http://10.0.2.2:3000";
 
 // URL da sua Edge Function que receberá os tokens dos provedores
-const SOCIAL_SIGN_IN_EDGE_FUNCTION_URL =
-  "https://ukxvqhguvbyhcvpkxyky.supabase.co/functions/v1/auth/social-sign-in";
+const SOCIAL_SIGN_IN_EDGE_FUNCTION_URL = `${
+  process.env.EXPO_PUBLIC_SUPABASE_URL || "https://ypnpdjgsyzdwsmnxsoqj.supabase.co"
+}/functions/v1/auth/social-sign-in`;
 
 // Variáveis de ambiente (usa EXPO_PUBLIC_* e faz fallback)
 const GOOGLE_WEB_CLIENT_ID =
@@ -153,60 +151,119 @@ export const SignInScreen = () => {
 
   WebBrowser.maybeCompleteAuthSession();
 
-  // @ts-expect-error 'useProxy' é suportado em runtime para forçar proxy do Expo
-  const redirectUri = AuthSession.makeRedirectUri({ useProxy: true });
+  // No Expo Go, precisamos usar o Proxy da Expo
+  const redirectUri = "https://auth.expo.io/@jvlima22/movt";
 
   const [, response, promptAsync] = Google.useAuthRequest({
-    // request removido
+    // IMPORTANTE: Para o Proxy da Expo, o Google sempre espera o Client ID de Web
     clientId: GOOGLE_WEB_CLIENT_ID,
     scopes: ["profile", "email"],
     redirectUri,
   });
 
+  // Log para conferência
+  useEffect(() => {
+    console.log("--- [DEBUG] Google Auth Configuration ---");
+    console.log("Web Client ID:", GOOGLE_WEB_CLIENT_ID ? "OK ✅" : "NÃO CARREGADO ❌");
+    console.log("Redirect URI Gerada:", redirectUri);
+    console.log("---------------------------------------");
+  }, [redirectUri]);
+
+  const handleSignInWithSocialToken = useCallback(
+    async (provider: "google", token: string) => {
+      setLoading(true);
+      try {
+        const response = await fetch(SOCIAL_SIGN_IN_EDGE_FUNCTION_URL, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ provider, token }),
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.message || "Erro ao autenticar via Edge Function.");
+        }
+
+        const { access_token, refresh_token } = await response.json();
+
+        if (access_token && refresh_token) {
+          // Define a sessão no Supabase para obter os dados do usuário
+          const {
+            data: { user: supabaseUser },
+            error: userError,
+          } = await supabase.auth.setSession({
+            access_token,
+            refresh_token,
+          });
+
+          if (userError || !supabaseUser) {
+            throw new Error("Erro ao obter dados do usuário do Supabase.");
+          }
+
+          // Atualiza o contexto global de autenticação do App
+          await signIn(access_token, {
+            id: supabaseUser.id,
+            name:
+              supabaseUser.user_metadata?.full_name ||
+              supabaseUser.user_metadata?.name ||
+              "Usuário Google",
+            email: supabaseUser.email || "",
+            username:
+              supabaseUser.user_metadata?.user_name ||
+              supabaseUser.email?.split("@")[0] ||
+              "google_user",
+            isVerified: true,
+            supabaseUserId: supabaseUser.id,
+            photo: supabaseUser.user_metadata?.avatar_url || null,
+          });
+
+          console.log("Login social bem-sucedido!");
+
+          // Redireciona para a Home
+          navigation.reset({
+            index: 0,
+            routes: [
+              {
+                name: "App" as never,
+                params: { screen: "HomeStack" } as never,
+              },
+            ],
+          });
+        } else {
+          throw new Error("Tokens de sessão Supabase não recebidos da Edge Function.");
+        }
+      } catch (error: any) {
+        console.error("Erro na autenticação social:", error.message);
+        Alert.alert("Erro de Login", error.message);
+      } finally {
+        setLoading(false);
+      }
+    },
+    [navigation, signIn]
+  );
+
   useEffect(() => {
     if (response?.type === "success") {
-      const idToken = response.authentication?.idToken;
-      if (idToken) {
-        handleSignInWithSocialToken("google", idToken);
+      const { idToken, accessToken } = response.authentication || {};
+      const token = idToken || accessToken;
+
+      if (token) {
+        handleSignInWithSocialToken("google", token);
       } else if ((response as any).params?.id_token) {
         handleSignInWithSocialToken("google", (response as any).params.id_token as string);
+      } else if ((response as any).params?.access_token) {
+        handleSignInWithSocialToken("google", (response as any).params.access_token as string);
       }
     }
-  }, [response]);
-
-  const handleSignInWithSocialToken = async (provider: "google", token: string) => {
-    try {
-      const response = await fetch(SOCIAL_SIGN_IN_EDGE_FUNCTION_URL, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ provider, token }),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || "Erro ao autenticar via Edge Function.");
-      }
-
-      const { access_token, refresh_token } = await response.json();
-
-      if (access_token && refresh_token) {
-        await supabase.auth.setSession({ access_token, refresh_token });
-        console.log("Login social bem-sucedido via Edge Function!");
-        // navigation.navigate('AppStack');
-      } else {
-        throw new Error("Tokens de sessão Supabase não recebidos da Edge Function.");
-      }
-    } catch (error: any) {
-      console.error("Erro na autenticação social via Edge Function:", error.message);
-      Alert.alert("Erro de Login", error.message);
-    }
-  };
+  }, [response, handleSignInWithSocialToken]);
 
   const signInWithGoogle = async () => {
     try {
-      await promptAsync();
+      // Forçamos o uso do proxy para o Expo Go
+      // @ts-ignore
+      await promptAsync({ useProxy: true });
     } catch (error: any) {
       Alert.alert("Erro", `Falha no login com Google: ${error.message}`);
     }

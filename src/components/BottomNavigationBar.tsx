@@ -34,6 +34,9 @@ const HIDDEN_SCREENS = [
   "CommunityScreen",
   "Chat",
   "ConfigScreen",
+  "ProfilePFScreen",
+  "PlanScreen",
+  "LanguageScreen",
 ];
 // ============================================================================
 

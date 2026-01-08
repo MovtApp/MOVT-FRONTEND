@@ -13,6 +13,7 @@ interface User {
   sessionId?: string; // Adicionado o sessionId
   supabaseUserId?: string | null; // Adicionado o UUID do Supabase
   photo?: string | null; // Adicionado para o avatar do usuário
+  banner?: string | null; // Adicionado para o banner do perfil
   documentId?: string | null;
   documentType?: "CPF" | "CNPJ" | null;
 }
@@ -136,6 +137,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         username: updatedUser.username,
         isVerified: updatedUser.isVerified,
         photo: updatedUser.photo,
+        banner: updatedUser.banner,
         id: updatedUser.id,
         supabaseUserId: updatedUser.supabaseUserId,
         documentId: updatedUser.documentId,

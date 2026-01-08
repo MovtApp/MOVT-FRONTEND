@@ -1,0 +1,19 @@
+{
+    "settings": {
+        "language": "Idioma",
+        "manage_language": "Gerencie seu idioma",
+        "selected_language": "Idioma selecionado",
+        "others": "Outros",
+        "edit": "Editar",
+        "portuguese": "Português",
+        "spanish": "Espanhol",
+        "english": "Inglês",
+        "german": "Alemão",
+        "japanese": "Japonês",
+        "french": "Francês",
+        "italian": "Italiano",
+        "korean": "Coreano",
+        "chinese": "Chinês",
+        "russian": "Russo"
+    }
+}

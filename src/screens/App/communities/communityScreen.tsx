@@ -11,21 +11,16 @@ import {
   SafeAreaView,
   ActivityIndicator,
   Alert,
-
   NativeSyntheticEvent,
   NativeScrollEvent,
   Animated,
 } from "react-native";
-import {
-  Users,
-} from "lucide-react-native";
+import { Users } from "lucide-react-native";
 
 import Header from "@components/Header";
 import { useAuth } from "@contexts/AuthContext";
 import { listCommunities } from "@services/communityService";
 import Communities from "@components/Communities";
-
-
 
 const { width } = Dimensions.get("window");
 const ITEM_WIDTH = 270;
@@ -37,9 +32,6 @@ const heroImages = [
   "https://res.cloudinary.com/ditlmzgrh/image/upload/v1766512307/image_1_v03nyz.png",
   "https://img.freepik.com/free-photo/yoga-group-enjoying-outdoor-workout_1262-20499.jpg?t=st=1766512380~exp=1766515980~hmac=27576ac5ad65441c2d80f61fd4f2841ba71fc535f4014c71c26bac1f15514fa5&w=1480",
 ];
-
-
-
 
 interface Community {
   id_comunidade: number;

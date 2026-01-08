@@ -1,0 +1,19 @@
+{
+    "settings": {
+        "language": "Language",
+        "manage_language": "Manage your language",
+        "selected_language": "Selected language",
+        "others": "Others",
+        "edit": "Edit",
+        "portuguese": "Portuguese",
+        "spanish": "Spanish",
+        "english": "English",
+        "german": "German",
+        "japanese": "Japanese",
+        "french": "French",
+        "italian": "Italian",
+        "korean": "Korean",
+        "chinese": "Chinese",
+        "russian": "Russian"
+    }
+}

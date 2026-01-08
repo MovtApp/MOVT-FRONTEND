@@ -12,11 +12,13 @@ import DietDetailsScreen from "../screens/App/diet/dietDetailsScreen";
 import { CustomDrawerContent } from "../components/CustomDrawerContent";
 import { AppStackParamList } from "../@types/routes";
 import ProfileScreen from "../screens/App/profile/profileScreen";
+import ProfilePFScreen from "../screens/App/profile/profilePFScreen";
 import ProfilePJ from "../screens/App/profile/ProfilePJScreen";
 import { TrainerProfileScreen } from "../screens/App/profile/TrainerProfileScreen";
 import SelectedTrainersScreen from "../screens/App/profile/SelectedTrainersScreen";
 import ConfigScreen from "../screens/App/config/configScreen";
-
+import PlanScreen from "../screens/App/plan/planScreen";
+import LanguageScreen from "../screens/App/language/languageScreen";
 
 // Importando o Appointment do novo local
 import Appointment from "../screens/App/appointments/[protected]/appointment";
@@ -54,6 +56,7 @@ function AppLayout() {
         <Stack.Screen name="ChatScreen" component={ChatScreen} />
         <Stack.Screen name="Chat" component={ChatProtected} />
         <Stack.Screen name="ProfileScreen" component={ProfileScreen} />
+        <Stack.Screen name="ProfilePFScreen" component={ProfilePFScreen} />
         <Stack.Screen name="ProfilePJ" component={ProfilePJ} />
         <Stack.Screen name="TrainerProfile" component={TrainerProfileScreen} />
         <Stack.Screen name="Appointments" component={Appointment} />
@@ -69,6 +72,8 @@ function AppLayout() {
         <Stack.Screen name="TestWearScreen" component={TestWearScreen} />
         <Stack.Screen name="CommunityScreen" component={CommunityScreen} />
         <Stack.Screen name="ConfigScreen" component={ConfigScreen} />
+        <Stack.Screen name="PlanScreen" component={PlanScreen} />
+        <Stack.Screen name="LanguageScreen" component={LanguageScreen} />
       </Stack.Navigator>
       <BottomNavigationBar />
       {/* Renderizando BottomNavigationBar diretamente, pois isDietSheetOpen não a controla mais. */}

@@ -1,11 +1,28 @@
-import { ChevronLeft, ChevronRight, User, Radio, Calendar, Bell, Lock, Key, Target, Globe, HelpCircle } from "lucide-react-native";
+import {
+  ChevronRight,
+  User,
+  Radio,
+  Calendar,
+  Bell,
+  Key,
+  Target,
+  Globe,
+  HelpCircle,
+  PhoneCall,
+  UserStar,
+  ClipboardMinus,
+  BookText,
+} from "lucide-react-native";
 import React, { useState } from "react";
-import { View, Text, ScrollView, TouchableOpacity, Switch, StyleSheet } from "react-native";
+import { useAuth } from "@contexts/AuthContext";
+import { View, Text, ScrollView, TouchableOpacity, Switch, StyleSheet, Image } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useNavigation } from "@react-navigation/native";
+import BackButton from "@components/BackButton";
+import MVLogo from "@assets/MV.png";
 
 const ConfigScreen: React.FC = () => {
-  const navigation = useNavigation();
+  const navigation = useNavigation<any>();
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [privateAccount, setPrivateAccount] = useState(true);
 
@@ -15,14 +32,18 @@ const ConfigScreen: React.FC = () => {
     onPress,
     hasSwitch = false,
     switchValue = false,
-    onSwitchChange = () => { }
+    onSwitchChange = () => { },
+    iconColor,
+    hideChevron = false,
   }: {
-    icon: any,
-    label: string,
-    onPress?: () => void,
-    hasSwitch?: boolean,
-    switchValue?: boolean,
-    onSwitchChange?: (val: boolean) => void
+    icon: any;
+    label: string;
+    onPress?: () => void;
+    hasSwitch?: boolean;
+    switchValue?: boolean;
+    onSwitchChange?: (val: boolean) => void;
+    iconColor?: string;
+    hideChevron?: boolean;
   }) => (
     <TouchableOpacity
       style={styles.itemContainer}
@@ -31,8 +52,8 @@ const ConfigScreen: React.FC = () => {
       activeOpacity={0.7}
     >
       <View style={styles.itemLeft}>
-        <Icon size={24} color="#000" />
-        <Text style={styles.itemLabel}>{label}</Text>
+        <Icon size={24} color={iconColor || "#000"} />
+        <Text style={[styles.itemLabel, iconColor ? { color: iconColor } : {}]}>{label}</Text>
       </View>
       {hasSwitch ? (
         <Switch
@@ -42,7 +63,7 @@ const ConfigScreen: React.FC = () => {
           thumbColor="#F9FAFB"
         />
       ) : (
-        <ChevronRight size={24} color="#000" />
+        !hideChevron && <ChevronRight size={24} color={iconColor || "#000"} />
       )}
     </TouchableOpacity>
   );
@@ -58,22 +79,32 @@ const ConfigScreen: React.FC = () => {
       <View style={styles.content}>
         {/* Header */}
         <View style={styles.header}>
-          <TouchableOpacity
-            style={styles.backButton}
-            onPress={() => navigation.goBack()}
-          >
-            <ChevronLeft size={24} color="#fff" />
-          </TouchableOpacity>
+          <BackButton />
           <Text style={styles.headerTitle}>Configurações</Text>
           <View style={styles.headerPlaceholder} />
         </View>
 
-        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={styles.scrollContent}
+        >
           {/* Minha conta */}
           <SectionTitle title="Minha conta" />
-          <SettingItem icon={User} label="Perfil" />
-          <SettingItem icon={Radio} label="Minha assinatura" />
-          <SettingItem icon={Calendar} label="Meus agendamentos" />
+          <SettingItem
+            icon={User}
+            label="Perfil"
+            onPress={() => navigation.navigate("ProfilePFScreen")}
+          />
+          <SettingItem
+            icon={Radio}
+            label="Minha assinatura"
+            onPress={() => navigation.navigate("PlanScreen")}
+          />
+          <SettingItem
+            icon={Calendar}
+            label="Meus agendamentos"
+            onPress={() => navigation.navigate("Appointments")}
+          />
 
           <Separator />
 
@@ -99,19 +130,42 @@ const ConfigScreen: React.FC = () => {
             onSwitchChange={setPrivateAccount}
           />
 
-          <SettingItem icon={Key} label="Redefinir de senha" />
-          <SettingItem icon={Target} label="Editar objetivos" />
-          <SettingItem icon={Globe} label="Mudar idioma" />
+          <SettingItem
+            icon={Key}
+            label="Redefinir de senha"
+            onPress={() => navigation.navigate("Verify", { screen: "RecoveryScreen" })}
+          />
+          <SettingItem
+            icon={Target}
+            label="Editar objetivos"
+            onPress={() => navigation.navigate("Info", { screen: "ObjectivesScreen" })}
+          />
+          <SettingItem
+            icon={Globe}
+            label="Mudar idioma"
+            onPress={() => navigation.navigate("LanguageScreen")}
+          />
 
           <Separator />
 
           {/* Ajuda e suporte */}
           <SectionTitle title="Ajuda e suporte" />
           <SettingItem icon={HelpCircle} label="FAQ" />
+          <SettingItem icon={PhoneCall} label="Atendimento" />
+          <SettingItem icon={UserStar} label="Nos avalie" />
+
+          <Separator />
+
+          {/* Regulamentos */}
+          <SectionTitle title="Regulamentos" />
+          <SettingItem icon={ClipboardMinus} label="Termos e condições" />
+          <SettingItem icon={BookText} label="Política de privacidade" />
+
+          <Separator />
 
           {/* Footer */}
           <View style={styles.footer}>
-            <Text style={styles.logoText}>MV</Text>
+            <Image source={MVLogo} style={styles.logoImage} resizeMode="contain" />
             <Text style={styles.versionText}>Versão 1.0.0</Text>
           </View>
         </ScrollView>
@@ -187,11 +241,9 @@ const styles = StyleSheet.create({
     marginTop: 40,
     marginBottom: 20,
   },
-  logoText: {
-    fontSize: 20,
-    fontWeight: "900",
-    fontStyle: "italic",
-    color: "#192126",
+  logoImage: {
+    width: 60,
+    height: 30,
   },
   versionText: {
     fontSize: 12,
@@ -201,5 +253,3 @@ const styles = StyleSheet.create({
 });
 
 export default ConfigScreen;
-
-
