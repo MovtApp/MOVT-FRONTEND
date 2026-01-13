@@ -11,7 +11,6 @@ import { View, StyleSheet } from "react-native";
 import DietDetailsScreen from "../screens/App/diet/dietDetailsScreen";
 import { CustomDrawerContent } from "../components/CustomDrawerContent";
 import { AppStackParamList } from "../@types/routes";
-import ProfileScreen from "../screens/App/profile/profileScreen";
 import ProfilePFScreen from "../screens/App/profile/profilePFScreen";
 import ProfilePJ from "../screens/App/profile/ProfilePJScreen";
 import { TrainerProfileScreen } from "../screens/App/profile/TrainerProfileScreen";
@@ -19,6 +18,11 @@ import SelectedTrainersScreen from "../screens/App/profile/SelectedTrainersScree
 import ConfigScreen from "../screens/App/config/configScreen";
 import PlanScreen from "../screens/App/plan/planScreen";
 import LanguageScreen from "../screens/App/language/languageScreen";
+import FAQScreen from "../screens/App/faq/faqScreen";
+import ServiceScreen from "../screens/App/service/serviceScreen";
+import ReviewScreen from "../screens/App/reviews/reviewScreen";
+import TermsScreen from "../screens/App/terms&conditions/termsScreen";
+import PoliciesScreen from "../screens/App/policies/policiesScreen";
 
 // Importando o Appointment do novo local
 import Appointment from "../screens/App/appointments/[protected]/appointment";
@@ -55,7 +59,6 @@ function AppLayout() {
         <Stack.Screen name="DataScreen" component={DataScreen} />
         <Stack.Screen name="ChatScreen" component={ChatScreen} />
         <Stack.Screen name="Chat" component={ChatProtected} />
-        <Stack.Screen name="ProfileScreen" component={ProfileScreen} />
         <Stack.Screen name="ProfilePFScreen" component={ProfilePFScreen} />
         <Stack.Screen name="ProfilePJ" component={ProfilePJ} />
         <Stack.Screen name="TrainerProfile" component={TrainerProfileScreen} />
@@ -74,6 +77,11 @@ function AppLayout() {
         <Stack.Screen name="ConfigScreen" component={ConfigScreen} />
         <Stack.Screen name="PlanScreen" component={PlanScreen} />
         <Stack.Screen name="LanguageScreen" component={LanguageScreen} />
+        <Stack.Screen name="FAQScreen" component={FAQScreen} />
+        <Stack.Screen name="ServiceScreen" component={ServiceScreen} />
+        <Stack.Screen name="ReviewScreen" component={ReviewScreen} />
+        <Stack.Screen name="TermsScreen" component={TermsScreen} />
+        <Stack.Screen name="PoliciesScreen" component={PoliciesScreen} />
       </Stack.Navigator>
       <BottomNavigationBar />
       {/* Renderizando BottomNavigationBar diretamente, pois isDietSheetOpen não a controla mais. */}

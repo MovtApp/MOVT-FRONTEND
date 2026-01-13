@@ -37,6 +37,11 @@ const HIDDEN_SCREENS = [
   "ProfilePFScreen",
   "PlanScreen",
   "LanguageScreen",
+  "FAQScreen",
+  "ServiceScreen",
+  "ReviewScreen",
+  "TermsScreen",
+  "PoliciesScreen",
 ];
 // ============================================================================
 

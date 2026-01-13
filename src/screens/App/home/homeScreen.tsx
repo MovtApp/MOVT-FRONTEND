@@ -7,6 +7,7 @@ import {
   ScrollView,
   ImageBackground,
   Alert,
+  Image,
 } from "react-native";
 import { Search, Play } from "lucide-react-native";
 import TrainingSelector from "../../../components/TrainingSelector";
@@ -23,6 +24,7 @@ import { useNavigation } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { AppStackParamList } from "../../../@types/routes";
 import { useAuth } from "@contexts/AuthContext";
+import MVLogo from "@assets/MV.png";
 
 interface ExerciseItem {
   id: string;
@@ -100,22 +102,22 @@ const HomeScreen: React.FC = () => {
     const entries: SearchEntry[] = [
       ...(user
         ? [
-            {
-              id: "profile",
-              title: user.name || "Seu perfil",
-              description: user.username ? `@${user.username}` : "Gerencie sua conta",
-              keywords: [
-                user.name || "",
-                user.username || "",
-                user.email || "",
-                "perfil",
-                "conta",
-                "usuario",
-                "account",
-              ],
-              targetScreen: "ProfileScreen" as keyof AppStackParamList,
-            },
-          ]
+          {
+            id: "profile",
+            title: user.name || "Seu perfil",
+            description: user.username ? `@${user.username}` : "Gerencie sua conta",
+            keywords: [
+              user.name || "",
+              user.username || "",
+              user.email || "",
+              "perfil",
+              "conta",
+              "usuario",
+              "account",
+            ],
+            targetScreen: "ProfileScreen" as keyof AppStackParamList,
+          },
+        ]
         : []),
       {
         id: "data-dashboard",
@@ -322,7 +324,7 @@ const HomeScreen: React.FC = () => {
         <TrainingBanner
           title="Melhor treino de superiores"
           imageUrl="https://img.freepik.com/free-photo/view-woman-helping-man-exercise-gym_52683-98092.jpg?t=st=1758297406~exp=1758301006~hmac=66860a69d0b54e22b28d0831392e01278764d6b6d47e956a9576e041c9e016c2&w=1480"
-          onPress={() => {}}
+          onPress={() => { }}
         />
         {/* The best for you */}
         <TheBestForYou />
@@ -330,6 +332,12 @@ const HomeScreen: React.FC = () => {
         <ChallengesSection />
         {/* Rapid heating */}
         <HeatingScreen /> {/* Usando o nome correto do componente: HeatingScreen */}
+
+        {/* Footer */}
+        <View style={styles.footer}>
+          <Image source={MVLogo} style={styles.logoImage} resizeMode="contain" />
+          <Text style={styles.versionText}>Versão 1.0.0</Text>
+        </View>
       </ScrollView>
     </View>
   );
@@ -586,6 +594,22 @@ const styles = StyleSheet.create({
   },
   heightButtonTextActive: {
     color: "#192126",
+  },
+  footer: {
+    alignItems: "flex-start",
+    marginTop: -80,
+    marginBottom: 120,
+  },
+  logoImage: {
+    width: 50,
+    height: 25,
+    marginBottom: 4,
+  },
+  versionText: {
+    fontSize: 14,
+    color: "#192126",
+    fontFamily: "Rubik_400Regular",
+    opacity: 0.8,
   },
 });
 

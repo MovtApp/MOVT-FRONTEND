@@ -14,7 +14,6 @@ import {
   BookText,
 } from "lucide-react-native";
 import React, { useState } from "react";
-import { useAuth } from "@contexts/AuthContext";
 import { View, Text, ScrollView, TouchableOpacity, Switch, StyleSheet, Image } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useNavigation } from "@react-navigation/native";
@@ -93,17 +92,17 @@ const ConfigScreen: React.FC = () => {
           <SettingItem
             icon={User}
             label="Perfil"
-            onPress={() => navigation.navigate("ProfilePFScreen")}
+            onPress={() => navigation.navigate("App", { screen: "HomeStack", params: { screen: "ProfilePFScreen" } })}
           />
           <SettingItem
             icon={Radio}
             label="Minha assinatura"
-            onPress={() => navigation.navigate("PlanScreen")}
+            onPress={() => navigation.navigate("App", { screen: "HomeStack", params: { screen: "PlanScreen" } })}
           />
           <SettingItem
             icon={Calendar}
             label="Meus agendamentos"
-            onPress={() => navigation.navigate("Appointments")}
+            onPress={() => navigation.navigate("App", { screen: "HomeStack", params: { screen: "Appointments" } })}
           />
 
           <Separator />
@@ -143,23 +142,43 @@ const ConfigScreen: React.FC = () => {
           <SettingItem
             icon={Globe}
             label="Mudar idioma"
-            onPress={() => navigation.navigate("LanguageScreen")}
+            onPress={() => navigation.navigate("App", { screen: "HomeStack", params: { screen: "LanguageScreen" } })}
           />
 
           <Separator />
 
           {/* Ajuda e suporte */}
           <SectionTitle title="Ajuda e suporte" />
-          <SettingItem icon={HelpCircle} label="FAQ" />
-          <SettingItem icon={PhoneCall} label="Atendimento" />
-          <SettingItem icon={UserStar} label="Nos avalie" />
+          <SettingItem
+            icon={HelpCircle}
+            label="FAQ"
+            onPress={() => navigation.navigate("App", { screen: "HomeStack", params: { screen: "FAQScreen" } })}
+          />
+          <SettingItem
+            icon={PhoneCall}
+            label="Atendimento"
+            onPress={() => navigation.navigate("App", { screen: "HomeStack", params: { screen: "ServiceScreen" } })}
+          />
+          <SettingItem
+            icon={UserStar}
+            label="Nos avalie"
+            onPress={() => navigation.navigate("App", { screen: "HomeStack", params: { screen: "ReviewScreen" } })}
+          />
 
           <Separator />
 
           {/* Regulamentos */}
           <SectionTitle title="Regulamentos" />
-          <SettingItem icon={ClipboardMinus} label="Termos e condições" />
-          <SettingItem icon={BookText} label="Política de privacidade" />
+          <SettingItem
+            icon={ClipboardMinus}
+            label="Termos e condições"
+            onPress={() => navigation.navigate("App", { screen: "HomeStack", params: { screen: "TermsScreen" } })}
+          />
+          <SettingItem
+            icon={BookText}
+            label="Política de privacidade"
+            onPress={() => navigation.navigate("App", { screen: "HomeStack", params: { screen: "PoliciesScreen" } })}
+          />
 
           <Separator />
 

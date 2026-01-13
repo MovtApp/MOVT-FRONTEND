@@ -1,6 +1,5 @@
 import { View, Text, TouchableOpacity, StyleSheet, Image, Alert } from "react-native";
 import { DrawerContentScrollView, DrawerContentComponentProps } from "@react-navigation/drawer";
-import { CommonActions } from "@react-navigation/native";
 import {
   X,
   Home,
@@ -14,6 +13,7 @@ import {
   HelpCircle,
   Info,
   LogOut,
+  Globe,
 } from "lucide-react-native";
 import { AppStackParamList } from "../@types/routes";
 import { useAuth } from "../hooks/useAuth";
@@ -26,8 +26,10 @@ export function CustomDrawerContent(props: DrawerContentComponentProps) {
   };
 
   const handleProfilePress = () => {
-    props.navigation.navigate("HomeStack", { screen: "ProfileScreen" } as any);
-    handleCloseDrawer();
+    props.navigation.navigate("HomeStack", {
+      screen: "ProfilePFScreen",
+    } as any);
+    props.navigation.closeDrawer();
   };
 
   const menuItems = [
@@ -39,6 +41,7 @@ export function CustomDrawerContent(props: DrawerContentComponentProps) {
   ];
 
   const panelItems = [
+    { name: "Explorar", icon: Globe, route: "TrainingScreen" },
     { name: "Treinos", icon: Calendar, route: "TrainingScreen" },
     { name: "Agendamentos", icon: Calendar, route: "Appointments" },
     { name: "Comunidades", icon: Users, route: "CommunityScreen" },
@@ -74,13 +77,14 @@ export function CustomDrawerContent(props: DrawerContentComponentProps) {
             user?.photo
               ? { uri: user.photo }
               : {
-                  uri: "https://img.freepik.com/vetores-gratis/circulo-azul-com-usuario-branco_78370-4707.jpg?t=st=1760290901~exp=1760294501~hmac=54c484fcb1eb3bfdc377aeeaa901c951421c366a6a55921cf0ce792c078fe4df&w=1480",
-                }
+                uri: "https://res.cloudinary.com/ditlmzgrh/image/upload/v1767896239/Captura_de_tela_2026-01-08_151542_r3acpt.png",
+              }
           }
           style={styles.profileImage}
         />
         <View style={styles.profileInfo}>
-          <Text style={styles.profileName}>{user?.name || "Visitante"}</Text>
+          <Text style={styles.profileName}>{user?.name}</Text>
+          <Text style={styles.profileUsername}>@{user?.username}</Text>
         </View>
       </TouchableOpacity>
 
@@ -168,15 +172,14 @@ export function CustomDrawerContent(props: DrawerContentComponentProps) {
 
 const styles = StyleSheet.create({
   drawerContent: {
-    // flex: 1, // Removido para permitir rolagem natural
     backgroundColor: "#192126",
-    paddingTop: 40, // Ajuste para o padding superior
+    paddingTop: 40,
   },
   header: {
     flexDirection: "row",
     alignItems: "center",
     paddingHorizontal: 20,
-    marginBottom: 30,
+    marginBottom: 20,
   },
   closeButton: {
     marginRight: 10,
@@ -190,15 +193,13 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     paddingHorizontal: 20,
-    marginBottom: 30,
+    marginBottom: 20,
   },
   profileImage: {
     width: 50,
     height: 50,
     borderRadius: 25,
     marginRight: 15,
-    borderWidth: 2,
-    borderColor: "#BBF246",
   },
   profileInfo: {
     flex: 1,
@@ -207,6 +208,11 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "bold",
     color: "#FFFFFF",
+  },
+  profileUsername: {
+    fontSize: 14,
+    color: "#BBF246",
+    opacity: 0.8,
   },
   viewMoreText: {
     fontSize: 14,
