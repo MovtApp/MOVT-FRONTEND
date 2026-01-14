@@ -1,19 +1,22 @@
 import axios from "axios";
 import { API_BASE_URL } from "../config/api";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 const api = axios.create({
   baseURL: API_BASE_URL,
-  timeout: 30000, // 30 segundos de timeout
+  timeout: 30000,
   headers: {
     "Content-Type": "application/json",
   },
 });
 
 api.interceptors.request.use(
-  (config) => {
+  async (config) => {
+    const sessionId = await AsyncStorage.getItem("userSessionId");
+    if (sessionId) {
+      config.headers.Authorization = `Bearer ${sessionId}`;
+    }
     console.log("🚀 Requisição enviada:", config.method?.toUpperCase(), config.url);
-    console.log("🚀 Headers:", config.headers);
-    console.log("🚀 Data:", config.data);
     return config;
   },
   (error) => {

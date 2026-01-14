@@ -59,7 +59,6 @@ interface HeatingScreenProps {
 const HeatingScreen: React.FC<HeatingScreenProps> = ({ heatingData: _propheatingData }) => {
   return (
     <View style={styles.section}>
-      {/* heatingo de hoje */}
       <Text style={styles.sectionTitle}>Aquecimento rápido</Text>
       <View style={styles.heatingCardsContainer}>
         {heatingData.map((heating) => (

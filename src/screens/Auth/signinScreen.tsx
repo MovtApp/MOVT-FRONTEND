@@ -7,20 +7,17 @@ import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { RootStackParamList } from "@typings/routes"; // Corrigida importação de RootStackParamList
 import CustomInput from "@/components/CustomInput";
 import { Eye, EyeOff } from "lucide-react-native";
-import axios from "axios";
-// import AsyncStorage from "@react-native-async-storage/async-storage"; // Removida importação não utilizada
 import { useAuth } from "@contexts/AuthContext";
 import { supabase } from "../../services/supabaseClient";
 import * as WebBrowser from "expo-web-browser";
 import * as Google from "expo-auth-session/providers/google";
 // import { LoginManager, AccessToken } from 'react-native-fbsdk-next'; // Para Facebook (Removido)
 
-const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || "http://10.0.2.2:3000";
+import { api } from "../../services/api";
 
 // URL da sua Edge Function que receberá os tokens dos provedores
-const SOCIAL_SIGN_IN_EDGE_FUNCTION_URL = `${
-  process.env.EXPO_PUBLIC_SUPABASE_URL || "https://ypnpdjgsyzdwsmnxsoqj.supabase.co"
-}/functions/v1/auth/social-sign-in`;
+const SOCIAL_SIGN_IN_EDGE_FUNCTION_URL = `${process.env.EXPO_PUBLIC_SUPABASE_URL || "https://ypnpdjgsyzdwsmnxsoqj.supabase.co"
+  }/functions/v1/auth/social-sign-in`;
 
 // Variáveis de ambiente (usa EXPO_PUBLIC_* e faz fallback)
 const GOOGLE_WEB_CLIENT_ID =
@@ -35,9 +32,6 @@ export const SignInScreen = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  // const [sessionId, setSessionId] = useState<string | null>(null); // Variável não utilizada removida
-  // const [loggedInUser, setLoggedInUser] = useState<any | null>(null); // Variável não utilizada removida
 
   function handleSignup() {
     navigation.navigate("Auth", { screen: "SignUpScreen" });
@@ -58,21 +52,12 @@ export const SignInScreen = () => {
     }
 
     try {
-      // Timeout curto para evitar loading infinito em rede lenta
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 15000);
+      const response = await api.post("/login", {
+        email,
+        senha: password,
+      });
 
-      const response = await axios.post(
-        `${API_BASE_URL}/login`,
-        {
-          email,
-          senha: password,
-        },
-        { signal: controller.signal }
-      );
-      clearTimeout(timeoutId);
-
-      Alert.alert("Login Efetuado", response.data.message);
+      Alert.alert("Login efetuado", response.data.message);
 
       const documentId =
         response.data.user?.cpf_cnpj ||
@@ -269,25 +254,6 @@ export const SignInScreen = () => {
     }
   };
 
-  // const signInWithFacebook = async () => {
-  //   try {
-  //     const result = await LoginManager.logInWithPermissions(['public_profile', 'email']);
-  //     if (result.isCancelled) {
-  //       console.log('Login do Facebook cancelado.');
-  //       return;
-  //     }
-  //     const data = await AccessToken.getCurrentAccessToken();
-  //     if (data?.accessToken) {
-  //       await handleSignInWithSocialToken('facebook', data.accessToken);
-  //     } else {
-  //       Alert.alert('Erro', 'Token de acesso do Facebook não encontrado.');
-  //     }
-  //   } catch (error: any) {
-  //     console.error('Erro no login do Facebook:', error);
-  //     Alert.alert('Erro', `Falha no login com Facebook: ${error.message}`);
-  //   }
-  // };
-
   return (
     <View style={styles.container}>
       <BackButton />
@@ -327,7 +293,11 @@ export const SignInScreen = () => {
         {/* Exibe o erro se houver */}
         {error && <Text style={styles.error}>{error}</Text>}
 
-        <TouchableOpacity style={styles.loginButton} onPress={handleLogin} disabled={loading}>
+        <TouchableOpacity
+          style={styles.loginButton}
+          onPress={handleLogin}
+          disabled={loading}
+        >
           <Text style={styles.loginButtonText}>{loading ? "Entrando..." : "Log In"}</Text>
         </TouchableOpacity>
         <View style={styles.separatorContainer}>
@@ -390,7 +360,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
   loginButton: {
-    backgroundColor: "#222",
+    backgroundColor: "#192126",
     borderRadius: 10,
     paddingVertical: 14,
     alignItems: "center",

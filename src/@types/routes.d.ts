@@ -78,6 +78,9 @@ export type AppStackParamList = {
   ReviewScreen: undefined;
   TermsScreen: undefined;
   PoliciesScreen: undefined;
+  AboutScreen: undefined;
+  PlatformRulesScreen: undefined;
+  CommunityDetails: { community: Community };
   AppointmentScreen:
   | {
     trainerId?: string;
@@ -88,6 +91,17 @@ export type AppStackParamList = {
   }
   | undefined;
 };
+
+export interface Community {
+  id_comunidade: number;
+  nome: string;
+  descricao: string;
+  imageurl: string;
+  participantes: string;
+  max_participantes: number;
+  categoria: string;
+  tipo_comunidade: string;
+}
 
 export interface DietMeal {
   id_dieta: string;

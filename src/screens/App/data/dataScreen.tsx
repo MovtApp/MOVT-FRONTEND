@@ -14,29 +14,15 @@ import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { AppDrawerParamList, AppStackParamList } from "../../../@types/routes";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import Header from "../../../components/Header";
-import { Canvas, Path, vec } from "@shopify/react-native-skia";
 import MapView, { LatLng, MapStyleElement, Polyline, Region } from "react-native-maps";
-import * as Location from "expo-location";
 import { Bike, Footprints } from "lucide-react-native";
-import Svg, { Circle, Defs, LinearGradient, Stop } from "react-native-svg";
-import Animated, {
-  useSharedValue,
-  useAnimatedProps,
-  withTiming,
-  Easing,
-} from "react-native-reanimated";
-import {
-  ensureGoogleFitPermissions,
-  fetchTodayStepCount,
-  subscribeToStepUpdates,
-} from "../../../services/googleFitService";
-import {
-  getLatestWearOsHealthDataFromAllDevices,
-  pollWearOsHealthData,
-  checkWearOsDeviceRegistered,
-} from "../../../services/wearOsHealthService";
 import { useAuth } from "../../../contexts/AuthContext";
 import ECGDisplay from "../../../components/ECGDisplay";
+import MiniRadarChart from "../../../components/MiniRadarChart";
+import WaterWave from "../../../components/WaterWave";
+import StepProgressRing from "../../../components/StepProgressRing";
+import { useHealthTracking } from "../../../hooks/useHealthTracking";
+import { formatTrainingTime } from "../../../utils/formatters";
 
 const { width } = Dimensions.get("window");
 
@@ -73,139 +59,6 @@ const cyclingMapStyle: MapStyleElement[] = [
     stylers: [{ color: "#e2e8f0" }],
   },
 ];
-const AnimatedSvgCircle = Animated.createAnimatedComponent(Circle);
-const STEPS_INACTIVITY_TIMEOUT = 6000;
-const DEFAULT_STEPS_GOAL = 10000;
-
-const getTodayKey = (): string => {
-  const d = new Date();
-  const yyyy = d.getFullYear();
-  const mm = String(d.getMonth() + 1).padStart(2, "0");
-  const dd = String(d.getDate()).padStart(2, "0");
-  return `water:${yyyy}-${mm}-${dd}`;
-};
-
-// Componente isolado da onda para evitar re-render do DataScreen
-const WaterWave: React.FC<{ progress: number; height?: number }> = React.memo(function WaterWave({
-  progress,
-  height = 60,
-}) {
-  const [phase, setPhase] = useState<number>(0);
-  const [size, setSize] = useState<{ width: number; height: number }>({ width: 0, height });
-
-  const buildWavePath = useCallback(
-    (w: number, h: number, phaseValue: number, amplitude: number, prog: number): string => {
-      if (w <= 0 || h <= 0) return "";
-      const baseY = h * (1 - Math.max(0, Math.min(1, prog)));
-      const wavelength = Math.max(60, w / 1.5);
-      const k = (2 * Math.PI) / wavelength;
-      const step = Math.max(1, Math.floor(w / 120));
-      let d = `M 0 ${h} L 0 ${baseY}`;
-      for (let x = 0; x <= w; x += step) {
-        const y = baseY - amplitude * Math.sin(k * x + phaseValue);
-        d += ` L ${x} ${y}`;
-      }
-      d += ` L ${w} ${h} Z`;
-      return d;
-    },
-    []
-  );
-
-  useEffect(() => {
-    let rafId: number;
-    let last = performance.now();
-    const speed = 1.4; // rad/s (mais lento)
-    const loop = (now: number) => {
-      const dt = Math.min(32, now - last) / 1000;
-      last = now;
-      setPhase((prev) => (prev + speed * dt) % (Math.PI * 2));
-      rafId = requestAnimationFrame(loop);
-    };
-    rafId = requestAnimationFrame(loop);
-    return () => cancelAnimationFrame(rafId);
-  }, []);
-
-  return (
-    <View
-      style={{ position: "absolute", inset: 0 }}
-      onLayout={(e) =>
-        setSize({ width: e.nativeEvent.layout.width, height: e.nativeEvent.layout.height })
-      }
-      pointerEvents="none"
-    >
-      <Canvas style={{ position: "absolute", left: 0, top: 0, right: 0, bottom: 0 }}>
-        <Path
-          path={buildWavePath(size.width, size.height, phase, 11, progress)}
-          color="#9ED0F5"
-          style="fill"
-        />
-        <Path
-          path={buildWavePath(
-            size.width,
-            size.height,
-            phase + Math.PI / 2,
-            8,
-            Math.max(0, Math.min(1, progress * 0.98))
-          )}
-          color="#79BDEB"
-          style="fill"
-        />
-      </Canvas>
-    </View>
-  );
-});
-
-const StepProgressRing: React.FC<{ progress: number; size?: number }> = ({
-  progress,
-  size = 78,
-}) => {
-  const radius = size / 2 - 8;
-  const circumference = 2 * Math.PI * radius;
-  const clamped = Math.max(0, Math.min(1, progress));
-  const animatedProgress = useSharedValue(0);
-
-  useEffect(() => {
-    animatedProgress.value = withTiming(clamped, {
-      duration: 800,
-      easing: Easing.out(Easing.cubic),
-    });
-  }, [clamped, animatedProgress]);
-
-  const animatedProps = useAnimatedProps(() => ({
-    strokeDashoffset: circumference * (1 - animatedProgress.value),
-  }));
-
-  return (
-    <Svg width={size} height={size}>
-      <Defs>
-        <LinearGradient id="stepsGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-          <Stop offset="0%" stopColor="#FFE0B2" />
-          <Stop offset="100%" stopColor="#FF8C00" />
-        </LinearGradient>
-      </Defs>
-      <Circle
-        cx={size / 2}
-        cy={size / 2}
-        r={radius}
-        stroke="#FFE0B2"
-        strokeWidth={10}
-        fill="none"
-      />
-      <AnimatedSvgCircle
-        cx={size / 2}
-        cy={size / 2}
-        r={radius}
-        stroke="url(#stepsGradient)"
-        strokeWidth={10}
-        fill="none"
-        strokeDasharray={circumference}
-        animatedProps={animatedProps}
-        strokeLinecap="round"
-      />
-    </Svg>
-  );
-};
-
 const DataScreen: React.FC = () => {
   type DataScreenNavigationProp = CompositeNavigationProp<
     DrawerNavigationProp<AppDrawerParamList, "HomeStack">,
@@ -214,766 +67,69 @@ const DataScreen: React.FC = () => {
   const navigation = useNavigation<DataScreenNavigationProp>();
   const { user } = useAuth();
 
-  // Estados para dados de saúde em tempo real do Wear OS
-  const [heartRate, setHeartRate] = useState<number | null>(null);
-  const [isWearOsConnected, setIsWearOsConnected] = useState(false);
-  const [hasWearOsDevice, setHasWearOsDevice] = useState<boolean | null>(null);
-
-  // Estado para tempo de treino
-  const [trainingTime, setTrainingTime] = useState<number>(0); // em segundos
-  const trainingIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
-
-  // Estado para calorias diárias
-  const [dailyCalories, setDailyCalories] = useState<number>(0);
-
-  // Estado para sono diário
-  const [sleepHours, setSleepHours] = useState<number>(0);
-  const [sleepMinutes, setSleepMinutes] = useState<number>(0);
-
-  const getTodaySleepKey = (): string => {
-    const d = new Date();
-    const yyyy = d.getFullYear();
-    const mm = String(d.getMonth() + 1).padStart(2, "0");
-    const dd = String(d.getDate()).padStart(2, "0");
-    return `sleep:${yyyy}-${mm}-${dd}`;
-  };
-
-  const getTodayCaloriesKey = (): string => {
-    const d = new Date();
-    const yyyy = d.getFullYear();
-    const mm = String(d.getMonth() + 1).padStart(2, "0");
-    const dd = String(d.getDate()).padStart(2, "0");
-    return `calories:${yyyy}-${mm}-${dd}`;
-  };
+  const {
+    heartRate,
+    isWearOsConnected,
+    stepsToday,
+    stepsLoading,
+    isWalking,
+    stepsGoal,
+    trainingTime,
+    cyclingRoute,
+    cyclingRegion,
+    locationError,
+    dailyCalories,
+    sleepHours,
+    sleepMinutes,
+    waterConsumedMl,
+  } = useHealthTracking(user?.id);
 
   const healthData = {
     calories: dailyCalories,
-    steps: 999,
-    heartRate: heartRate ?? 0, // Zera o valor até conectar com o relógio
-    sleep: 0,
-    Results: 0,
-    water: 6,
+    steps: stepsToday,
+    heartRate: heartRate ?? 0,
+    sleep: sleepHours,
+    water: waterConsumedMl / 250,
   };
 
-  const [currentDate] = useState(new Date()); // Data atual
-  const [selectedDay, setSelectedDay] = useState(new Date().getDate()); // Seleciona automaticamente o dia atual
+  const [currentDate] = useState(new Date());
+  const [selectedDay, setSelectedDay] = useState(new Date().getDate());
   const flatListRef = useRef<FlatList>(null);
 
-  const [waterConsumedMl, setWaterConsumedMl] = useState<number>(0);
-  const [stepsToday, setStepsToday] = useState<number>(0);
-  const [stepsLoading, setStepsLoading] = useState<boolean>(false);
-  const [isWalking, setIsWalking] = useState<boolean>(false);
-  const lastStepCountRef = useRef<number>(0);
-  const stepsInactivityTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const stepsGoal = DEFAULT_STEPS_GOAL;
-
-  const scheduleWalkingTimeout = useCallback(() => {
-    if (stepsInactivityTimeoutRef.current) {
-      clearTimeout(stepsInactivityTimeoutRef.current);
-    }
-    stepsInactivityTimeoutRef.current = setTimeout(() => {
-      setIsWalking(false);
-      stepsInactivityTimeoutRef.current = null;
-    }, STEPS_INACTIVITY_TIMEOUT);
-  }, []);
-
-  const [cyclingRoute, setCyclingRoute] = useState<LatLng[]>([]);
-  const [cyclingRegion, setCyclingRegion] = useState<Region | null>(null);
-  const [locationError, setLocationError] = useState<string | null>(null);
-  const cyclingWatcherRef = useRef<Location.LocationSubscription | null>(null);
-
-  const loadWaterConsumed = useCallback(async () => {
-    try {
-      const key = getTodayKey();
-      const raw = await AsyncStorage.getItem(key);
-      if (raw) {
-        const parsed = JSON.parse(raw) as { consumedMl?: number };
-        setWaterConsumedMl(typeof parsed.consumedMl === "number" ? parsed.consumedMl : 0);
-      } else {
-        setWaterConsumedMl(0);
-      }
-    } catch {
-      setWaterConsumedMl(0);
-    }
-  }, []);
-
-  const calculateAndSaveCalories = useCallback(async () => {
-    try {
-      // Fórmula de gasto calórico baseada em:
-      // 1. Passos: ~0.05 kcal por passo
-      // 2. Frequência cardíaca: intensidade extra
-      // 3. Tempo de treino: 5 kcal por minuto de atividade
-
-      let calories = 0;
-
-      // Calorias por passos (0.05 kcal por passo)
-      calories += stepsToday * 0.05;
-
-      // Calorias por frequência cardíaca elevada
-      // Se BPM > 60 (repouso), adiciona calorias extras por intensidade
-      if (heartRate && heartRate > 60) {
-        const excessBpm = heartRate - 60;
-        calories += excessBpm * 0.15; // 0.15 kcal por BPM acima do repouso
-      }
-
-      // Calorias por tempo de treino (5 kcal por minuto)
-      if (trainingTime > 0) {
-        const minutesOfTraining = trainingTime / 60;
-        calories += minutesOfTraining * 5;
-      }
-
-      // Arredondar para 2 casas decimais
-      const roundedCalories = Math.round(calories * 100) / 100;
-      setDailyCalories(roundedCalories);
-
-      // Salvar no AsyncStorage
-      const key = getTodayCaloriesKey();
-      await AsyncStorage.setItem(key, JSON.stringify({ calories: roundedCalories }));
-    } catch (error) {
-      console.error("Erro ao calcular/salvar calorias:", error);
-    }
-  }, [stepsToday, heartRate, trainingTime]);
-
-  const loadDailyCalories = useCallback(async () => {
-    try {
-      const key = getTodayCaloriesKey();
-      const raw = await AsyncStorage.getItem(key);
-      if (raw) {
-        const parsed = JSON.parse(raw) as { calories?: number };
-        setDailyCalories(typeof parsed.calories === "number" ? parsed.calories : 0);
-      } else {
-        setDailyCalories(0);
-      }
-    } catch {
-      setDailyCalories(0);
-    }
-  }, []);
-
-  const loadDailySleep = useCallback(async () => {
-    try {
-      const key = getTodaySleepKey();
-      const raw = await AsyncStorage.getItem(key);
-      if (raw) {
-        const parsed = JSON.parse(raw) as { hours?: number; minutes?: number };
-        setSleepHours(typeof parsed.hours === "number" ? parsed.hours : 0);
-        setSleepMinutes(typeof parsed.minutes === "number" ? parsed.minutes : 0);
-      } else {
-        setSleepHours(0);
-        setSleepMinutes(0);
-      }
-    } catch {
-      setSleepHours(0);
-      setSleepMinutes(0);
-    }
-  }, []);
-
-  useFocusEffect(
-    useCallback(() => {
-      loadWaterConsumed();
-      loadDailyCalories();
-      loadDailySleep();
-      return () => {};
-    }, [loadWaterConsumed, loadDailyCalories, loadDailySleep])
-  );
-
-  // Atualizar calorias quando houver mudanças nos dados (passos, BPM, tempo de treino)
-  useEffect(() => {
-    calculateAndSaveCalories();
-  }, [stepsToday, heartRate, trainingTime, calculateAndSaveCalories]);
-
-  // Controlar timer de treino baseado em movimento
-  useEffect(() => {
-    if (isWalking) {
-      // Iniciar timer quando começar a caminhar
-      if (!trainingIntervalRef.current) {
-        trainingIntervalRef.current = setInterval(() => {
-          setTrainingTime((prev) => prev + 1);
-        }, 1000); // Incrementar a cada 1 segundo
-      }
-    } else {
-      // Parar timer quando parar de caminhar
-      if (trainingIntervalRef.current) {
-        clearInterval(trainingIntervalRef.current);
-        trainingIntervalRef.current = null;
-      }
-    }
-
-    return () => {
-      if (trainingIntervalRef.current) {
-        clearInterval(trainingIntervalRef.current);
-        trainingIntervalRef.current = null;
-      }
-    };
-  }, [isWalking]);
-
-  // Verificar se existe dispositivo Wear OS antes de tentar conectar
-  useFocusEffect(
-    useCallback(() => {
-      let isActive = true;
-
-      const verifyWearDevice = async () => {
-        if (!user?.id) {
-          if (isActive) {
-            setHasWearOsDevice(false);
-          }
-          return;
-        }
-
-        const parsedId = parseInt(user.id, 10);
-        if (Number.isNaN(parsedId)) {
-          if (isActive) {
-            setHasWearOsDevice(false);
-          }
-          return;
-        }
-
-        try {
-          const device = await checkWearOsDeviceRegistered(parsedId);
-          if (isActive) {
-            setHasWearOsDevice(Boolean(device));
-          }
-        } catch {
-          if (isActive) {
-            setHasWearOsDevice(false);
-          }
-        }
-      };
-
-      verifyWearDevice();
-
-      return () => {
-        isActive = false;
-      };
-    }, [user?.id])
-  );
-
-  // Carregar dados de batimento cardíaco do Wear OS em tempo real
-  useFocusEffect(
-    useCallback(() => {
-      if (!user?.id || hasWearOsDevice !== true) {
-        setIsWearOsConnected(false);
-        setHeartRate(null);
-        return;
-      }
-
-      const userId = parseInt(user.id, 10);
-      if (Number.isNaN(userId)) {
-        setIsWearOsConnected(false);
-        return;
-      }
-
-      let isMounted = true;
-      let unsubscribe: (() => void) | undefined;
-
-      const loadWearOsData = async () => {
-        try {
-          // Obter dados iniciais
-          const data = await getLatestWearOsHealthDataFromAllDevices(userId);
-          if (isMounted) {
-            if (data && data.heartRate) {
-              setHeartRate(data.heartRate);
-              setIsWearOsConnected(true);
-            } else {
-              setIsWearOsConnected(false);
-            }
-          }
-
-          // Configurar polling para atualizações em tempo real
-          unsubscribe = pollWearOsHealthData(
-            userId,
-            5000,
-            (newData: {
-              heartRate: number | null;
-              pressure: number | null;
-              oxygen: number | null;
-            }) => {
-              if (!isMounted) {
-                return;
-              }
-
-              if (newData.heartRate) {
-                setHeartRate(newData.heartRate);
-                setIsWearOsConnected(true);
-              }
-            }
-          );
-        } catch (error) {
-          if (isMounted) {
-            console.error("Erro ao carregar dados do Wear OS:", error);
-            setIsWearOsConnected(false);
-          }
-        }
-      };
-
-      loadWearOsData();
-
-      return () => {
-        isMounted = false;
-        if (unsubscribe) {
-          unsubscribe();
-        }
-      };
-    }, [user?.id, hasWearOsDevice])
-  );
-
-  useFocusEffect(
-    useCallback(() => {
-      let isMounted = true;
-      let unsubscribeSteps: (() => void) | null = null;
-
-      const start = async () => {
-        setStepsLoading(true);
-        const authorized = await ensureGoogleFitPermissions();
-        if (!authorized) {
-          if (isMounted) {
-            setStepsLoading(false);
-          }
-          return;
-        }
-
-        try {
-          const initialSteps = await fetchTodayStepCount();
-          if (!isMounted) {
-            return;
-          }
-          lastStepCountRef.current = initialSteps;
-          setStepsToday(initialSteps);
-        } catch {
-          // Error handled silently
-        } finally {
-          if (isMounted) {
-            setStepsLoading(false);
-          }
-        }
-
-        unsubscribeSteps = subscribeToStepUpdates((value) => {
-          if (!isMounted) {
-            return;
-          }
-          const numericValue = Number(value);
-          if (!Number.isFinite(numericValue)) {
-            return;
-          }
-
-          if (numericValue > lastStepCountRef.current) {
-            setIsWalking(true);
-            scheduleWalkingTimeout();
-          }
-
-          lastStepCountRef.current = numericValue;
-          setStepsToday(numericValue);
-        });
-      };
-
-      start();
-
-      return () => {
-        isMounted = false;
-        if (unsubscribeSteps) {
-          unsubscribeSteps();
-        }
-        if (stepsInactivityTimeoutRef.current) {
-          clearTimeout(stepsInactivityTimeoutRef.current);
-          stepsInactivityTimeoutRef.current = null;
-        }
-        setIsWalking(false);
-      };
-    }, [scheduleWalkingTimeout])
-  );
-
-  useFocusEffect(
-    useCallback(() => {
-      let isActive = true;
-
-      const startCyclingTracking = async () => {
-        try {
-          if (cyclingWatcherRef.current) {
-            cyclingWatcherRef.current.remove();
-            cyclingWatcherRef.current = null;
-          }
-
-          const { status } = await Location.requestForegroundPermissionsAsync();
-          if (!isActive) {
-            return;
-          }
-
-          if (status !== Location.PermissionStatus.GRANTED) {
-            setLocationError("Permissão de localização negada.");
-            setCyclingRoute([]);
-            setCyclingRegion(null);
-            return;
-          }
-
-          const initialPosition = await Location.getCurrentPositionAsync({
-            accuracy: Location.Accuracy.Balanced,
-          });
-
-          if (!isActive) {
-            return;
-          }
-
-          const initialPoint: LatLng = {
-            latitude: initialPosition.coords.latitude,
-            longitude: initialPosition.coords.longitude,
-          };
-
-          setCyclingRoute([initialPoint]);
-          setCyclingRegion({
-            latitude: initialPoint.latitude,
-            longitude: initialPoint.longitude,
-            latitudeDelta: 0.005,
-            longitudeDelta: 0.005,
-          });
-          setLocationError(null);
-
-          cyclingWatcherRef.current = await Location.watchPositionAsync(
-            {
-              accuracy: Location.Accuracy.BestForNavigation,
-              timeInterval: 5000,
-              distanceInterval: 5,
-            },
-            (update) => {
-              if (!isActive) {
-                return;
-              }
-
-              const newPoint: LatLng = {
-                latitude: update.coords.latitude,
-                longitude: update.coords.longitude,
-              };
-
-              setCyclingRoute((prev) => {
-                const next = [...prev, newPoint];
-                return next.length > 60 ? next.slice(next.length - 60) : next;
-              });
-
-              setCyclingRegion((prev) => {
-                if (!prev) {
-                  return {
-                    latitude: newPoint.latitude,
-                    longitude: newPoint.longitude,
-                    latitudeDelta: 0.005,
-                    longitudeDelta: 0.005,
-                  };
-                }
-
-                return {
-                  ...prev,
-                  latitude: newPoint.latitude,
-                  longitude: newPoint.longitude,
-                };
-              });
-            }
-          );
-        } catch {
-          if (isActive) {
-            setLocationError("Não foi possível iniciar o rastreamento de ciclismo.");
-          }
-        }
-      };
-
-      startCyclingTracking();
-
-      return () => {
-        isActive = false;
-        if (cyclingWatcherRef.current) {
-          cyclingWatcherRef.current.remove();
-          cyclingWatcherRef.current = null;
-        }
-        setCyclingRoute([]);
-        setCyclingRegion(null);
-      };
-    }, [])
-  );
-
-  // Água - progresso relativo à meta
-  const waterGoalMl = 2000; // fallback para 8 copos de 250ml
+  const waterGoalMl = 2000;
   const waterProgress = Math.max(0, Math.min(1, waterConsumedMl / waterGoalMl));
-
   const stepsProgress = stepsGoal > 0 ? Math.min(1, stepsToday / stepsGoal) : 0;
   const stepsProgressPercent = Math.round(Math.max(0, Math.min(1, stepsProgress)) * 100);
-  const formattedSteps = useMemo(
-    () => (stepsLoading ? "--" : stepsToday.toLocaleString("pt-BR")),
-    [stepsLoading, stepsToday]
-  );
-  const stepsStatusText = useMemo(() => {
-    if (stepsLoading) return "Sincronizando...";
-    return isWalking ? "Contando agora" : "";
-  }, [stepsLoading, isWalking]);
-  const stepsStatusStyle = styles.stepsStatusText;
-
-  // Formatar tempo de treino para exibição (mm:ss ou h:mm:ss)
-  const formattedTrainingTime = useMemo(() => {
-    const hours = Math.floor(trainingTime / 3600);
-    const minutes = Math.floor((trainingTime % 3600) / 60);
-    const seconds = trainingTime % 60;
-
-    if (hours > 0) {
-      return `${hours}h ${minutes}m`;
-    } else if (minutes > 0) {
-      return `${minutes}m ${seconds}s`;
-    } else {
-      return `${seconds}s`;
-    }
-  }, [trainingTime]);
+  const formattedSteps = stepsLoading ? "--" : stepsToday.toLocaleString("pt-BR");
+  const stepsStatusText = stepsLoading ? "Sincronizando..." : isWalking ? "Contando agora" : "";
+  const formattedTrainingTime = formatTrainingTime(trainingTime);
 
   const DAY_ITEM_WIDTH = 50 + 4 * 2;
 
   const handleFlatListLayout = () => {
     if (flatListRef.current) {
       const flatListVisibleWidth = width - 20 * 2;
-      const offset =
-        (selectedDay - 1) * DAY_ITEM_WIDTH - flatListVisibleWidth / 2 + DAY_ITEM_WIDTH / 2;
-      flatListRef.current.scrollToOffset({
-        offset: Math.max(0, offset),
-        animated: false,
-      });
+      const offset = (selectedDay - 1) * DAY_ITEM_WIDTH - flatListVisibleWidth / 2 + DAY_ITEM_WIDTH / 2;
+      flatListRef.current.scrollToOffset({ offset: Math.max(0, offset), animated: false });
     }
   };
 
   const getMonthAndYear = (date: Date) => {
-    const options: Intl.DateTimeFormatOptions = {
-      month: "long",
-      year: "numeric",
-    };
+    const options: Intl.DateTimeFormatOptions = { month: "long", year: "numeric" };
     const formattedDate = date.toLocaleDateString("pt-BR", options);
     return formattedDate.charAt(0).toUpperCase() + formattedDate.slice(1);
   };
 
   const getDaysInMonth = (date: Date) => {
-    const year = date.getFullYear();
-    const month = date.getMonth();
-    return new Date(year, month + 1, 0).getDate();
+    return new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
   };
 
   const getDayOfWeek = (year: number, month: number, day: number) => {
-    const date = new Date(year, month, day);
-    const dayIndex = date.getDay();
     const days = ["D", "S", "T", "Q", "Q", "S", "S"];
-    return days[dayIndex];
+    return days[new Date(year, month, day).getDay()];
   };
 
-  // Tamanho interno do card de Resultados (width/height menos padding do card), reduzido levemente para dar respiro aos rótulos
   const RESULTS_CARD_INNER_SIZE = Math.floor(Math.min(202 - 30, 188 - 30) * 0.9);
-
-  // Mini Radar Chart (mesma lógica do ResultsScreen, sem labels para caber no card)
-  const MiniRadar: React.FC<{ size?: number }> = ({ size = 150 }) => {
-    const center = size / 2;
-    const radius = size * 0.32;
-    const axisRadius = size * 0.38;
-    const gridRadius = size * 0.38;
-    const labelRadius = axisRadius + 8;
-    const levels = 5;
-    const RADAR_LABELS = ["Água", "Sono", "Passos", "BPM", "IMC", "Calorias"] as const;
-    const MAX_VALUE = 100;
-
-    type RadarData = {
-      water: number;
-      sleep: number;
-      steps: number;
-      bpm: number;
-      imc: number;
-      calories: number;
-    };
-
-    const forcaData: RadarData = {
-      water: 92,
-      sleep: 88,
-      steps: 93,
-      bpm: 90,
-      imc: 89,
-      calories: 94,
-    };
-    const agilidadeData: RadarData = {
-      water: 74,
-      sleep: 72,
-      steps: 78,
-      bpm: 73,
-      imc: 77,
-      calories: 75,
-    };
-    const resistenciaData: RadarData = {
-      water: 62,
-      sleep: 58,
-      steps: 65,
-      bpm: 64,
-      imc: 68,
-      calories: 61,
-    };
-
-    const getValues = (data: RadarData) => {
-      return RADAR_LABELS.map((_, i) => {
-        const key = Object.keys(data)[i] as keyof RadarData;
-        return (data[key] / MAX_VALUE) * radius;
-      });
-    };
-
-    const getPolygonPoints = (values: number[]) => {
-      return RADAR_LABELS.map((_, i) => {
-        const angle = (Math.PI * 2 * i) / RADAR_LABELS.length - Math.PI / 2;
-        const r = values[i];
-        const x = center + r * Math.cos(angle);
-        const y = center + r * Math.sin(angle);
-        return vec(x, y);
-      });
-    };
-
-    const createRoundedPolygonPath = (
-      points: ReturnType<typeof vec>[],
-      cornerRadius: number = 14
-    ) => {
-      if (points.length < 3) return "";
-      const numPoints = points.length;
-      const pathSegments: string[] = [];
-      const controlPoints: {
-        before: { x: number; y: number };
-        after: { x: number; y: number };
-      }[] = [];
-      for (let i = 0; i < numPoints; i++) {
-        const prevIndex = (i - 1 + numPoints) % numPoints;
-        const nextIndex = (i + 1) % numPoints;
-        const p0 = points[prevIndex];
-        const p1 = points[i];
-        const p2 = points[nextIndex];
-        const v1x = p1.x - p0.x;
-        const v1y = p1.y - p0.y;
-        const v2x = p2.x - p1.x;
-        const v2y = p2.y - p1.y;
-        const len1 = Math.sqrt(v1x * v1x + v1y * v1y);
-        const len2 = Math.sqrt(v2x * v2x + v2y * v2y);
-        const nv1x = len1 > 0 ? v1x / len1 : 0;
-        const nv1y = len1 > 0 ? v1y / len1 : 0;
-        const nv2x = len2 > 0 ? v2x / len2 : 0;
-        const nv2y = len2 > 0 ? v2y / len2 : 0;
-        const maxRadius = Math.min(len1, len2) / 2;
-        const effectiveRadius = Math.min(cornerRadius, maxRadius * 0.8);
-        controlPoints.push({
-          before: {
-            x: p1.x - nv1x * effectiveRadius,
-            y: p1.y - nv1y * effectiveRadius,
-          },
-          after: {
-            x: p1.x + nv2x * effectiveRadius,
-            y: p1.y + nv2y * effectiveRadius,
-          },
-        });
-      }
-      const firstControl = controlPoints[0];
-      pathSegments.push(`M ${firstControl.before.x} ${firstControl.before.y}`);
-      for (let i = 0; i < numPoints; i++) {
-        const control = controlPoints[i];
-        const p1 = points[i];
-        pathSegments.push(`Q ${p1.x} ${p1.y} ${control.after.x} ${control.after.y}`);
-      }
-      return pathSegments.join(" ") + " Z";
-    };
-
-    const forcaPath = createRoundedPolygonPath(getPolygonPoints(getValues(forcaData)), 16);
-    const agilidadePath = createRoundedPolygonPath(getPolygonPoints(getValues(agilidadeData)), 16);
-    const resistenciaPath = createRoundedPolygonPath(
-      getPolygonPoints(getValues(resistenciaData)),
-      16
-    );
-
-    return (
-      <View style={{ width: size, height: size, position: "relative" }}>
-        <Canvas style={{ width: size, height: size }}>
-          {[...Array(levels)].map((_, i) => {
-            const r = (gridRadius / levels) * (i + 1);
-            const levelPoints = [0, 1, 2, 3, 4, 5].map((j) => {
-              const angle = (Math.PI * 2 * j) / 6 - Math.PI / 2;
-              const x = center + r * Math.cos(angle);
-              const y = center + r * Math.sin(angle);
-              return vec(x, y);
-            });
-            const path =
-              levelPoints.reduce(
-                (p, pt, idx) => (idx === 0 ? `M ${pt.x} ${pt.y}` : `${p} L ${pt.x} ${pt.y}`),
-                ""
-              ) + " Z";
-            return <Path key={i} path={path} color="#E5E7EB" style="stroke" strokeWidth={1} />;
-          })}
-          {[0, 1, 2, 3, 4, 5].map((i) => {
-            const angle = (Math.PI * 2 * i) / 6 - Math.PI / 2;
-            const x = center + axisRadius * Math.cos(angle);
-            const y = center + axisRadius * Math.sin(angle);
-            return (
-              <Path
-                key={i}
-                path={`M ${center} ${center} L ${x} ${y}`}
-                color="#F1F5F9"
-                style="stroke"
-                strokeWidth={2}
-              />
-            );
-          })}
-          <Path path={forcaPath} style="fill" color="rgba(209, 161, 122, 0.5)" />
-          <Path
-            path={forcaPath}
-            color="#F97316"
-            style="stroke"
-            strokeWidth={3}
-            strokeJoin="round"
-            strokeCap="round"
-          />
-          <Path path={agilidadePath} style="fill" color="rgba(69, 69, 77, 0.4)" />
-          <Path
-            path={agilidadePath}
-            color="#192126"
-            style="stroke"
-            strokeWidth={3}
-            strokeJoin="round"
-            strokeCap="round"
-          />
-          <Path path={resistenciaPath} style="fill" color="rgba(118, 118, 150, 0.4)" />
-          <Path
-            path={resistenciaPath}
-            color="#3F5EBC"
-            style="stroke"
-            strokeWidth={3}
-            strokeJoin="round"
-            strokeCap="round"
-          />
-        </Canvas>
-
-        {RADAR_LABELS.map((label, i) => {
-          const angle = (Math.PI * 2 * i) / RADAR_LABELS.length - Math.PI / 2;
-          const lx = center + labelRadius * Math.cos(angle);
-          const ly = center + labelRadius * Math.sin(angle);
-          let textAlign: "left" | "center" | "right" = "center";
-          const isSide = Math.abs(Math.cos(angle)) > 0.7;
-          if (isSide) {
-            textAlign = Math.cos(angle) > 0 ? "left" : "right";
-          } else {
-            textAlign = "center";
-          }
-          const lateralSpacing = 16;
-          const horizontalNudge = isSide
-            ? Math.cos(angle) > 0
-              ? lateralSpacing
-              : -lateralSpacing
-            : 0;
-          const verticalNudge = label === "BPM" ? 6 : 0;
-          return (
-            <Text
-              key={i}
-              style={[
-                styles.resultsAxisLabel,
-                {
-                  position: "absolute",
-                  left: lx - 20 + horizontalNudge,
-                  top: ly - 8 + verticalNudge,
-                  textAlign,
-                },
-              ]}
-            >
-              {label}
-            </Text>
-          );
-        })}
-      </View>
-    );
-  };
 
   const monthNameAndYear = getMonthAndYear(currentDate);
   const totalDaysInMonth = getDaysInMonth(currentDate);
@@ -1080,7 +236,7 @@ const DataScreen: React.FC = () => {
                     <Text style={styles.ResultsCategory}>Resultados</Text>
                   </View>
                   <View style={styles.ResultsGraphPlaceholder}>
-                    <MiniRadar size={RESULTS_CARD_INNER_SIZE} />
+                    <MiniRadarChart size={RESULTS_CARD_INNER_SIZE} />
                   </View>
                 </View>
               </TouchableOpacity>
@@ -1148,7 +304,7 @@ const DataScreen: React.FC = () => {
                     <Text style={styles.stepsMetaText}>
                       de {stepsGoal.toLocaleString("pt-BR")} passos
                     </Text>
-                    <Text style={stepsStatusStyle}>{stepsStatusText}</Text>
+                    <Text style={styles.stepsStatusText}>{stepsStatusText}</Text>
                   </View>
                 </View>
               </TouchableOpacity>

@@ -2,8 +2,8 @@ import { View, StyleSheet, TouchableOpacity, Text } from "react-native";
 import BackButton from "@components/BackButton";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useNavigation } from "@react-navigation/native";
-import { Input } from "@components/Input";
-import { RootStackParamList } from "@typings/routes"; // Corrigida a importação de RootStackParamList
+import { SelectButton } from "@components/SelectButton";
+import { RootStackParamList } from "@typings/routes";
 
 const ObjectivesScreen = () => {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
@@ -23,11 +23,11 @@ const ObjectivesScreen = () => {
           manter o peso atual.
         </Text>
 
-        <Input text="Perder peso" />
-        <Input text="Ganhar peso" />
-        <Input text="Ganho de massa muscular" />
-        <Input text="Definir corpo" />
-        <Input text="Condicionamento físico" />
+        <SelectButton text="Perder peso" />
+        <SelectButton text="Ganhar peso" />
+        <SelectButton text="Ganho de massa muscular" />
+        <SelectButton text="Definir corpo" />
+        <SelectButton text="Condicionamento físico" />
 
         <Text style={styles.subtitle}>Outros</Text>
       </View>

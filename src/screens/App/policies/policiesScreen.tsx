@@ -8,7 +8,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import BackButton from "@components/BackButton";
-import MVLogo from "@assets/MV.png";
+import { FooterVersion } from "@components/FooterVersion";
 
 const PoliciesScreen: React.FC = () => {
     return (
@@ -179,10 +179,7 @@ const PoliciesScreen: React.FC = () => {
                 </View>
 
                 {/* Footer */}
-                <View style={styles.footer}>
-                    <Image source={MVLogo} style={styles.logoImage} resizeMode="contain" />
-                    <Text style={styles.versionText}>Versão 1.0.0</Text>
-                </View>
+                <FooterVersion />
             </ScrollView>
         </SafeAreaView>
     );
@@ -258,20 +255,5 @@ const styles = StyleSheet.create({
         height: 1,
         backgroundColor: "#E2E8F0",
         marginVertical: 20,
-    },
-    footer: {
-        alignItems: "flex-start",
-        marginTop: 50,
-    },
-    logoImage: {
-        width: 50,
-        height: 25,
-        marginBottom: 4,
-    },
-    versionText: {
-        fontSize: 14,
-        color: "#192126",
-        fontFamily: "Rubik_400Regular",
-        opacity: 0.8,
     },
 });

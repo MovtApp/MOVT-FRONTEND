@@ -1,4 +1,3 @@
-// CommunityScreen.tsx
 import React, { useEffect, useState, useRef, useCallback } from "react";
 import {
   View,
@@ -16,11 +15,14 @@ import {
   Animated,
 } from "react-native";
 import { Users } from "lucide-react-native";
+import { useNavigation } from "@react-navigation/native";
+import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 
 import Header from "@components/Header";
 import { useAuth } from "@contexts/AuthContext";
 import { listCommunities } from "@services/communityService";
 import Communities from "@components/Communities";
+import { AppStackParamList, Community } from "../../../@types/routes";
 
 const { width } = Dimensions.get("window");
 const ITEM_WIDTH = 270;
@@ -33,19 +35,9 @@ const heroImages = [
   "https://img.freepik.com/free-photo/yoga-group-enjoying-outdoor-workout_1262-20499.jpg?t=st=1766512380~exp=1766515980~hmac=27576ac5ad65441c2d80f61fd4f2841ba71fc535f4014c71c26bac1f15514fa5&w=1480",
 ];
 
-interface Community {
-  id_comunidade: number;
-  nome: string;
-  descricao: string;
-  imageurl: string;
-  participantes: string;
-  max_participantes: number;
-  categoria: string;
-  tipo_comunidade: string;
-}
-
 const CommunityScreen: React.FC = () => {
   const { user } = useAuth();
+  const navigation = useNavigation<NativeStackNavigationProp<AppStackParamList>>();
   const [communities, setCommunities] = useState<Community[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeBannerIndex, setActiveBannerIndex] = useState(0);
@@ -142,6 +134,10 @@ const CommunityScreen: React.FC = () => {
     [activeBannerIndex]
   );
 
+  const handleCommunityPress = (community: Community) => {
+    navigation.navigate("CommunityDetails", { community });
+  };
+
   return (
     <SafeAreaView style={styles.container}>
       <View style={{ marginTop: 20 }}>
@@ -203,6 +199,7 @@ const CommunityScreen: React.FC = () => {
               key={item.id_comunidade ? String(item.id_comunidade) : `comm-${index}`}
               style={styles.card}
               activeOpacity={0.9}
+              onPress={() => handleCommunityPress(item)}
             >
               <Image
                 source={{ uri: item.imageurl || "https://via.placeholder.com/150" }}

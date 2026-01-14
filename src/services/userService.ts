@@ -1,7 +1,5 @@
-import axios from "axios";
+import { api } from "./api";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-
-const API_BASE_URL = "http://10.0.2.2:3000";
 
 const getAuthHeaders = async () => {
   const sessionId = await AsyncStorage.getItem("userSessionId");
@@ -15,8 +13,8 @@ const getAuthHeaders = async () => {
 export const userService = {
   updateField: async (field: string, value: string) => {
     const headers = await getAuthHeaders();
-    const response = await axios.put(
-      `${API_BASE_URL}/api/user/update-field`,
+    const response = await api.put(
+      "/user/update-field",
       { field, value },
       headers
     );
@@ -34,7 +32,7 @@ export const userService = {
       type: "image/jpeg",
     });
 
-    const response = await axios.put(`${API_BASE_URL}/api/user/avatar`, formData, {
+    const response = await api.put("/user/avatar", formData, {
       ...headers,
       headers: {
         ...headers.headers,
@@ -44,7 +42,6 @@ export const userService = {
     return response.data;
   },
 
-  // Banner update will need a specific endpoint in the backend
   updateBanner: async (imageUri: string) => {
     const headers = await getAuthHeaders();
     const formData = new FormData();
@@ -56,8 +53,7 @@ export const userService = {
       type: "image/jpeg",
     });
 
-    // We'll create this endpoint in the backend next
-    const response = await axios.put(`${API_BASE_URL}/api/user/banner`, formData, {
+    const response = await api.put("/user/banner", formData, {
       ...headers,
       headers: {
         ...headers.headers,

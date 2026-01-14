@@ -24,7 +24,7 @@ import { useNavigation } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { AppStackParamList } from "../../../@types/routes";
 import { useAuth } from "@contexts/AuthContext";
-import MVLogo from "@assets/MV.png";
+import { FooterVersion } from "@components/FooterVersion";
 
 interface ExerciseItem {
   id: string;
@@ -115,7 +115,7 @@ const HomeScreen: React.FC = () => {
               "usuario",
               "account",
             ],
-            targetScreen: "ProfileScreen" as keyof AppStackParamList,
+            targetScreen: "ProfilePFScreen" as keyof AppStackParamList,
           },
         ]
         : []),
@@ -246,8 +246,6 @@ const HomeScreen: React.FC = () => {
   return (
     <View style={styles.container}>
       <Header notificationSheetHeight={notificationSheetHeight} />
-
-      {/* Search Bar */}
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         <SearchInput
           value={search}
@@ -255,89 +253,17 @@ const HomeScreen: React.FC = () => {
           placeholder="Pesquisar"
           icon={<Search size={24} color="#888" />}
         />
-        {search.trim().length > 0 && (
+        {!!search.trim().length && (
           <View style={styles.searchResultsContainer}>
-            {filteredResults.length > 0 ? (
-              filteredResults.map((result) => (
-                <TouchableOpacity
-                  key={result.id}
-                  style={styles.searchResultItem}
-                  onPress={() => handleResultPress(result)}
-                >
-                  <Text style={styles.searchResultTitle}>{result.title}</Text>
-                  {result.description ? (
-                    <Text style={styles.searchResultSubtitle}>{result.description}</Text>
-                  ) : null}
-                </TouchableOpacity>
-              ))
-            ) : (
-              <Text style={styles.noSearchResultsText}>Nenhuma referência encontrada.</Text>
-            )}
+            {filteredResults.length > 0 ? filteredResults.map((result) => (
+              <TouchableOpacity key={result.id} style={styles.searchResultItem} onPress={() => handleResultPress(result)}>
+                <Text style={styles.searchResultTitle}>{result.title}</Text>{result.description ? <Text style={styles.searchResultSubtitle}>{result.description}</Text> : null}
+              </TouchableOpacity>
+            )) : <Text style={styles.noSearchResultsText}>Nenhuma referência encontrada.</Text>}
           </View>
         )}
-        {/* Promotional Banner */}
-        <PromotionalBanner gender={selectedGender} />
-        {/* Workout Selection */}
-        <TrainingSelector title="Selecione seu treino" containerStyle={{ marginBottom: 24 }} />
-        {/* Communities */}
-        <Communities />
-        {/* Popular Exercises */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Exercícios populares</Text>
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            style={styles.exercisesList}
-          >
-            {exerciseData.map((exercise) => (
-              <ImageBackground
-                key={exercise.id}
-                source={{ uri: exercise.imageUrl }}
-                style={styles.exerciseCard}
-                imageStyle={{ borderRadius: 16 }}
-              >
-                <View style={styles.imageOverlay}>
-                  <View style={styles.exerciseCardContent}>
-                    <Text style={styles.exerciseTitle}>{exercise.title}</Text>
-                    <View style={styles.exerciseInfo}>
-                      <View style={styles.tagsContainer}>
-                        <View style={styles.calorieTag}>
-                          <Text style={styles.calorieText}>{exercise.calories}</Text>
-                        </View>
-                        <View style={styles.MinutesTag}>
-                          <Text style={styles.MinutesText}>{exercise.minutes}</Text>
-                        </View>
-                      </View>
-                      <TouchableOpacity style={styles.playButton}>
-                        <Play size={12} fill={"#192126"} />
-                      </TouchableOpacity>
-                    </View>
-                  </View>
-                </View>
-              </ImageBackground>
-            ))}
-          </ScrollView>
-        </View>
-        {/* Plan today */}
-        <PlanCardTraining />
-        {/* Banner */}
-        <TrainingBanner
-          title="Melhor treino de superiores"
-          imageUrl="https://img.freepik.com/free-photo/view-woman-helping-man-exercise-gym_52683-98092.jpg?t=st=1758297406~exp=1758301006~hmac=66860a69d0b54e22b28d0831392e01278764d6b6d47e956a9576e041c9e016c2&w=1480"
-          onPress={() => { }}
-        />
-        {/* The best for you */}
-        <TheBestForYou />
-        {/* Challenges */}
-        <ChallengesSection />
-        {/* Rapid heating */}
-        <HeatingScreen /> {/* Usando o nome correto do componente: HeatingScreen */}
-
-        {/* Footer */}
-        <View style={styles.footer}>
-          <Image source={MVLogo} style={styles.logoImage} resizeMode="contain" />
-          <Text style={styles.versionText}>Versão 1.0.0</Text>
-        </View>
+        <PromotionalBanner gender={selectedGender} /><TrainingSelector title="Selecione seu treino" containerStyle={{ marginBottom: 24 }} /><Communities />
+        <View style={styles.section}><Text style={styles.sectionTitle}>Exercícios populares</Text><ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.exercisesList}>{exerciseData.map((exercise) => (<ImageBackground key={exercise.id} source={{ uri: exercise.imageUrl }} style={styles.exerciseCard} imageStyle={{ borderRadius: 16 }}><View style={styles.imageOverlay}><View style={styles.exerciseCardContent}><Text style={styles.exerciseTitle}>{exercise.title}</Text><View style={styles.exerciseInfo}><View style={styles.tagsContainer}><View style={styles.calorieTag}><Text style={styles.calorieText}>{exercise.calories}</Text></View><View style={styles.MinutesTag}><Text style={styles.MinutesText}>{exercise.minutes}</Text></View></View><TouchableOpacity style={styles.playButton} activeOpacity={0.7} onPress={() => { }}><Play size={12} fill={"#192126"} /></TouchableOpacity></View></View></View></ImageBackground>))}</ScrollView></View><PlanCardTraining /><TrainingBanner title="Melhor treino de superiores" imageUrl="https://img.freepik.com/free-photo/view-woman-helping-man-exercise-gym_52683-98092.jpg?t=st=1758297406~exp=1758301006~hmac=66860a69d0b54e22b28d0831392e01278764d6b6d47e956a9576e041c9e016c2&w=1480" onPress={() => { }} /><TheBestForYou /><ChallengesSection /><HeatingScreen /><FooterVersion style={styles.footer} />
       </ScrollView>
     </View>
   );
@@ -599,17 +525,6 @@ const styles = StyleSheet.create({
     alignItems: "flex-start",
     marginTop: -80,
     marginBottom: 120,
-  },
-  logoImage: {
-    width: 50,
-    height: 25,
-    marginBottom: 4,
-  },
-  versionText: {
-    fontSize: 14,
-    color: "#192126",
-    fontFamily: "Rubik_400Regular",
-    opacity: 0.8,
   },
 });
 

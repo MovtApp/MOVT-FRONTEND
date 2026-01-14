@@ -11,7 +11,6 @@ import {
   Dimensions,
   TouchableWithoutFeedback,
 } from "react-native";
-import { Button } from "@/components/ui/button";
 import {
   Calendar,
   MapPin,
@@ -108,7 +107,7 @@ const NotificationModal: React.FC<NotificationModalProps> = ({
     <Modal animationType="none" transparent={true} visible={isVisible} onRequestClose={onClose}>
       <TouchableWithoutFeedback onPress={onClose}>
         <View style={modalStyles.overlay}>
-          <TouchableWithoutFeedback onPress={() => {}}>
+          <TouchableWithoutFeedback onPress={() => { }}>
             <Animated.View
               style={[
                 {
@@ -335,9 +334,7 @@ const ProfilePJScreen = () => {
             {/* Botões */}
             <View style={styles.buttonRowContainer}>
               <View style={styles.buttonRow}>
-                <Button
-                  variant="outline"
-                  size="icon"
+                <TouchableOpacity
                   style={styles.outlineButton}
                   onPress={() =>
                     navigation.navigate("AppointmentScreen", {
@@ -350,10 +347,10 @@ const ProfilePJScreen = () => {
                   }
                 >
                   <Calendar size={24} color="#fff" />
-                </Button>
-                <Button size="default" style={styles.mainButton} onPress={handleViewProfile}>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.mainButton} onPress={handleViewProfile}>
                   <Text style={styles.buttonText}>Ver perfil</Text>
-                </Button>
+                </TouchableOpacity>
               </View>
             </View>
           </View>

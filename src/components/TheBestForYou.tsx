@@ -74,7 +74,6 @@ interface TheBestForYouProps {
 const TheBestForYou: React.FC<TheBestForYouProps> = ({ planData: _propPlanData }) => {
   return (
     <View style={styles.section}>
-      {/* Plano de hoje */}
       <Text style={styles.sectionTitle}>Plano de hoje</Text>
       <View style={styles.planCardsContainer}>
         {planData.map((plan) => (

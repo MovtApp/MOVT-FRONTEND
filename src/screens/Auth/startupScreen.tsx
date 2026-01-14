@@ -3,7 +3,6 @@ import { Image, ScrollView, View, StyleSheet, Text, TouchableOpacity } from "rea
 import LogoIcon from "@assets/icon.png";
 import { MapPin, QrCode, Network, HeartPlus } from "lucide-react-native";
 import { ContainerX } from "@components/ContainerX";
-import { H4, P } from "@components/Typography";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 
 type Props = NativeStackScreenProps<any, "StartupScreen">;
@@ -45,10 +44,10 @@ export const StartupScreen = ({ navigation }: Props) => {
                   <MapPin size={30} color="#111" />
                 </View>
                 <View style={{ flex: 1, overflow: "hidden" }}>
-                  <H4 style={{ fontFamily: "Rubik_700Bold" }}>Encontre personal trainers</H4>
-                  <P style={{ color: "#666", fontFamily: "Rubik_400Regular" }}>
+                  <Text style={{ fontFamily: "Rubik_700Bold" }}>Encontre personal trainers</Text>
+                  <Text style={{ color: "#666", fontFamily: "Rubik_400Regular" }}>
                     Veja treinadores perto de você com base na localização de forma eficiente.
-                  </P>
+                  </Text>
                 </View>
               </View>
               <View style={{ flexDirection: "row", marginBottom: 24 }}>
@@ -56,10 +55,10 @@ export const StartupScreen = ({ navigation }: Props) => {
                   <QrCode size={30} color="#111" />
                 </View>
                 <View style={{ flex: 1, overflow: "hidden" }}>
-                  <H4 style={{ fontFamily: "Rubik_700Bold" }}>Integração com empresas parceiras</H4>
-                  <P style={{ color: "#666", fontFamily: "Rubik_400Regular" }}>
+                  <Text style={{ fontFamily: "Rubik_700Bold" }}>Integração com empresas parceiras</Text>
+                  <Text style={{ color: "#666", fontFamily: "Rubik_400Regular" }}>
                     Encontre academias parceiras nas proximidades que oferecem benefícios.
-                  </P>
+                  </Text>
                 </View>
               </View>
               <View style={{ flexDirection: "row", marginBottom: 24 }}>
@@ -67,10 +66,10 @@ export const StartupScreen = ({ navigation }: Props) => {
                   <Network size={30} color="#111" />
                 </View>
                 <View style={{ flex: 1, overflow: "hidden" }}>
-                  <H4 style={{ fontFamily: "Rubik_700Bold" }}>Tecnologia a favor do usuário</H4>
-                  <P style={{ color: "#666", fontFamily: "Rubik_400Regular" }}>
+                  <Text style={{ fontFamily: "Rubik_700Bold" }}>Tecnologia a favor do usuário</Text>
+                  <Text style={{ color: "#666", fontFamily: "Rubik_400Regular" }}>
                     Oferecemos soluções tecnológicas para gerenciamento de métricas e resultados.
-                  </P>
+                  </Text>
                 </View>
               </View>
               <View style={{ flexDirection: "row", marginBottom: 24 }}>
@@ -78,17 +77,16 @@ export const StartupScreen = ({ navigation }: Props) => {
                   <HeartPlus size={30} color="#111" />
                 </View>
                 <View style={{ flex: 1, overflow: "hidden" }}>
-                  <H4 style={{ fontFamily: "Rubik_700Bold" }}>Saúde e bem-estar</H4>
-                  <P style={{ color: "#666", fontFamily: "Rubik_400Regular" }}>
+                  <Text style={{ fontFamily: "Rubik_700Bold" }}>Saúde e bem-estar</Text>
+                  <Text style={{ color: "#666", fontFamily: "Rubik_400Regular" }}>
                     Facilita o cuidado com a saúde, tornando o acompanhamento de treinos e hábitos
                     mais prático e motivador.
-                  </P>
+                  </Text>
                 </View>
               </View>
             </View>
           </View>
         </ScrollView>
-
         <TouchableOpacity style={styles.advanceButton} onPress={handleStart}>
           <Text style={styles.advanceButtonText}>Começar</Text>
         </TouchableOpacity>

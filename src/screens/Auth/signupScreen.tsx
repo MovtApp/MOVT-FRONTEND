@@ -11,15 +11,12 @@ import {
 } from "react-native";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
-import axios from "axios";
+import { api } from "@/services/api";
 import BackButton from "@/components/BackButton";
 import CustomInput from "@/components/CustomInput";
-import { Button } from "@/components/Button";
 import DateTimePickerModal from "react-native-modal-datetime-picker";
 import { Calendar, Eye, EyeOff } from "lucide-react-native";
 import { useForm, Controller, ControllerRenderProps } from "react-hook-form";
-
-const API_BASE_URL = "http://10.0.2.2:3000"; // IP para emuladores Android
 
 const registerSchema = z.object({
   nome: z.string().min(2, { message: "Nome obrigatório" }),
@@ -105,7 +102,7 @@ export const SignUpScreen = ({ navigation }: Props) => {
 
   const onSubmit = async (data: RegisterFormData) => {
     try {
-      const response = await axios.post(`${API_BASE_URL}/register`, {
+      const response = await api.post("/register", {
         nome: data.nome,
         email: data.email,
         senha: data.senha,
@@ -321,7 +318,7 @@ export const SignUpScreen = ({ navigation }: Props) => {
             />
             {errors.senha && <Text style={styles.error}>{errors.senha.message}</Text>}
 
-            <Button
+            <TouchableOpacity
               style={styles.registerButton}
               onPress={handleSubmit(onSubmit)}
               disabled={isSubmitting}
@@ -329,11 +326,10 @@ export const SignUpScreen = ({ navigation }: Props) => {
               <Text style={styles.registerButtonText}>
                 {isSubmitting ? "Registrando..." : "Registrar"}
               </Text>
-            </Button>
+            </TouchableOpacity>
           </View>
           <View style={styles.footer}>
             <Text style={styles.footerText}>Já tem uma conta?</Text>
-            <Button variant="default" onPress={handleLogin}></Button>
             <TouchableOpacity onPress={handleSignIn}>
               <Text style={styles.signIn}> Log In</Text>
             </TouchableOpacity>
@@ -405,7 +401,7 @@ const styles = StyleSheet.create({
     marginLeft: 2,
   },
   registerButton: {
-    backgroundColor: "#222",
+    backgroundColor: "#192126",
     borderRadius: 10,
     paddingVertical: 14,
     alignItems: "center",

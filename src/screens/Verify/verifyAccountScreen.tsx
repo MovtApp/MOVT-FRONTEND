@@ -5,18 +5,10 @@ import CustomInput from "@/components/CustomInput"; // Ajustei o caminho para o 
 import { useNavigation, useRoute, RouteProp } from "@react-navigation/native"; // Adicionei useRoute
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { RootStackParamList } from "@typings/routes"; // Já corrigido para @typings/routes
-import axios from "axios"; // Adicionado axios
-import AsyncStorage from "@react-native-async-storage/async-storage"; // Importar AsyncStorage
+import { api } from "@/services/api";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useAuth } from "@contexts/AuthContext";
 
-// --- CONFIGURAÇÃO DA URL DA API ---
-// IMPORTANTE: Substitua pelo IP da sua máquina na rede local ou 10.0.2.2 para emuladores Android
-// Exemplo: 'http://192.168.1.100:3000' para um dispositivo físico na mesma rede Wi-Fi
-// Exemplo: 'http://10.0.2.2:3000' para emuladores Android
-const API_BASE_URL = "http://10.0.2.2:3000"; // USE O IP CORRETO AQUI (ex: 10.0.2.2 para Android Emulator)
-// --- FIM DA CONFIGURAÇÃO ---
-
-// Definindo o tipo da rota para acessar os parâmetros
 type VerifyAccountScreenRouteProp = RouteProp<RootStackParamList, "Verify">;
 
 const VerifyAccountScreen = () => {
@@ -24,13 +16,11 @@ const VerifyAccountScreen = () => {
   const route = useRoute<VerifyAccountScreenRouteProp>();
   const { updateUser } = useAuth();
 
-  // O sessionId deve ser passado como parâmetro de navegação do login/registro
-  // Ex: navigation.navigate("Verify", { screen: "VerifyAccountScreen", sessionId: response.data.sessionId });
-  const { sessionId: routeSessionId } = route.params?.params || {}; // Acessa params dentro de params, conforme o RootStackParamList
+  const { sessionId: routeSessionId } = route.params?.params || {};
 
-  const [code, setCode] = useState(""); // Estado para o código digitado
-  const [loading, setLoading] = useState(false); // Estado de carregamento
-  const [error, setError] = useState<string | null>(null); // Estado para mensagens de erro
+  const [code, setCode] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(routeSessionId ?? null);
 
@@ -51,28 +41,18 @@ const VerifyAccountScreen = () => {
     loadAndCheckSessionId();
   }, [routeSessionId, navigation]);
 
-  // --- Função para Reenviar o Código de Verificação ---
   const handleResend = async () => {
     if (!currentSessionId) {
       Alert.alert("Erro", "Sessão inválida. Por favor, faça login novamente.");
-      navigation.navigate("Auth", { screen: "SignInScreen" }); // Redireciona para login se não houver sessionId
+      navigation.navigate("Auth", { screen: "SignInScreen" });
       return;
     }
 
     setError(null);
     setLoading(true);
     try {
-      const response = await axios.post(
-        `${API_BASE_URL}/user/send-verification`,
-        {}, // Body vazio para reenviar
-        {
-          headers: {
-            Authorization: `Bearer ${currentSessionId}`, // Envia o sessionId para identificar o usuário
-          },
-        }
-      );
+      const response = await api.post("/user/send-verification");
 
-      // Verifica se o e-mail já está verificado para redirecionar
       if (response.data.message === "Seu e-mail já está verificado.") {
         Alert.alert("Sucesso", response.data.message);
         navigation.navigate("App", { screen: "HomeStack" });
@@ -92,7 +72,6 @@ const VerifyAccountScreen = () => {
     }
   };
 
-  // --- Função para Verificar o Código ---
   const handleVerify = async () => {
     if (!currentSessionId) {
       Alert.alert("Erro", "Sessão inválida. Por favor, faça login novamente.");
@@ -111,21 +90,10 @@ const VerifyAccountScreen = () => {
     setError(null);
     setLoading(true);
     try {
-      const response = await axios.post(
-        `${API_BASE_URL}/user/verify`,
-        { code }, // Envia o código digitado pelo usuário
-        {
-          headers: {
-            Authorization: `Bearer ${currentSessionId}`, // Envia o sessionId para identificar o usuário
-          },
-        }
-      );
+      const response = await api.post("/user/verify", { code });
       Alert.alert("Verificação Concluída", response.data.message);
       await updateUser({ isVerified: true });
 
-      // --- Lógica de navegação após a verificação bem-sucedida ---
-      // Redireciona para uma tela principal ou dashboard
-      // TODO: Substituir por navigation.navigate("App", { screen: "HomeStack" }); ou a tela pós-verificação correta
       navigation.reset({
         index: 0,
         routes: [{ name: "App", params: { screen: "HomeStack" } as never }],
@@ -163,16 +131,18 @@ const VerifyAccountScreen = () => {
         />
         {error && <Text style={styles.error}>{error}</Text>}
 
-        <TouchableOpacity style={styles.resendButton} onPress={handleResend} disabled={loading}>
-          <Text style={styles.resendButtonText}>
-            {loading ? "Reenviando..." : "Reenviar Código"}
-          </Text>
+        <TouchableOpacity
+          style={styles.resendButton}
+          onPress={handleResend}
+          disabled={loading}
+        >
+          <Text style={styles.resendButtonText}>{loading ? "Reenviando..." : "Reenviar Código"}</Text>
         </TouchableOpacity>
 
         <TouchableOpacity
           style={styles.verifyButton}
           onPress={handleVerify}
-          disabled={loading || !code || code.length !== 6} // Desabilita se estiver carregando ou código inválido
+          disabled={loading || !code || code.length !== 6}
         >
           <Text style={styles.verifyButtonText}>{loading ? "Verificando..." : "Verificar"}</Text>
         </TouchableOpacity>

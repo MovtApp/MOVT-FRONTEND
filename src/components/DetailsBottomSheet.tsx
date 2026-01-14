@@ -6,10 +6,10 @@ import {
   StyleSheet,
   Image,
   TouchableOpacity,
+  Text,
 } from "react-native";
 import BottomSheet, { BottomSheetView } from "@gorhom/bottom-sheet";
 import { api } from "../services/api";
-import { H4, P } from "./Typography";
 import { Star } from "lucide-react-native";
 
 export interface PersonalTrainer {
@@ -51,13 +51,13 @@ const PersonalTrainerCard = ({
     >
       <Image source={{ uri: trainer.imageUrl }} style={styles.cardImage} />
       <View style={styles.cardContent}>
-        <P style={styles.cardTitle}>{trainer.name}</P>
-        <P style={styles.cardDescription} numberOfLines={2}>
+        <Text style={styles.cardTitle}>{trainer.name}</Text>
+        <Text style={styles.cardDescription} numberOfLines={2}>
           {trainer.description}
-        </P>
+        </Text>
         <View style={styles.cardRatingContainer}>
           <Star size={16} color="#FFC107" fill="#FFC107" />
-          <P style={styles.cardRatingText}>{trainer.rating} avaliações</P>
+          <Text style={styles.cardRatingText}>{trainer.rating} avaliações</Text>
         </View>
       </View>
     </TouchableOpacity>
@@ -151,15 +151,14 @@ export function DetailsBottomSheet({
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ flexGrow: 1 }}>
           {/* Cabeçalho */}
           <View style={styles.headerContainer}>
-            <H4 style={styles.headerTitle}>{title}</H4>
+            <Text style={styles.headerTitle}>{title}</Text>
           </View>
-
           {/* Lista de Personal Trainers */}
           {loadingToShow ? (
             <View style={styles.loaderContainer}>
               <ActivityIndicator size="large" color="#1e3a8a" />
             </View>
-          ) : trainersToRender.length > 0 ? (
+          ) : (!!trainersToRender.length) ? (
             trainersToRender.map((trainer) => (
               <PersonalTrainerCard
                 key={trainer.id}
@@ -169,13 +168,13 @@ export function DetailsBottomSheet({
             ))
           ) : (
             <View style={styles.noDataContainer}>
-              <P style={styles.noDataText}>{noDataMessage}</P>
+              <Text style={styles.noDataText}>{noDataMessage}</Text>
             </View>
           )}
-          {selectedIds.length > 0 && (
+          {!!selectedIds.length && (
             <View style={styles.footerActions}>
               <TouchableOpacity style={styles.viewSelectedButton} onPress={handleViewSelected}>
-                <P style={styles.viewSelectedText}>Ver selecionados ({selectedIds.length})</P>
+                <Text style={styles.viewSelectedText}>Ver selecionados ({selectedIds.length})</Text>
               </TouchableOpacity>
             </View>
           )}

@@ -23,6 +23,8 @@ import ServiceScreen from "../screens/App/service/serviceScreen";
 import ReviewScreen from "../screens/App/reviews/reviewScreen";
 import TermsScreen from "../screens/App/terms&conditions/termsScreen";
 import PoliciesScreen from "../screens/App/policies/policiesScreen";
+import AboutScreen from "../screens/App/about/aboutScreen";
+import PlatformRulesScreen from "../screens/App/rules/PlatformRulesScreen";
 
 // Importando o Appointment do novo local
 import Appointment from "../screens/App/appointments/[protected]/appointment";
@@ -38,6 +40,7 @@ import WaterScreen from "../screens/App/data/[protected]/WaterScreen";
 import ResultsScreen from "../screens/App/data/[protected]/ResultsScreen";
 import TestWearScreen from "../screens/TestWearScreen";
 import CommunityScreen from "@screens/App/communities/communityScreen";
+import CommunityDetails from "../screens/App/communities/[protected]/community";
 
 const Stack = createNativeStackNavigator<AppStackParamList>();
 const Drawer = createDrawerNavigator(); // Definir o Drawer Navigator
@@ -74,6 +77,7 @@ function AppLayout() {
         <Stack.Screen name="ResultsScreen" component={ResultsScreen} />
         <Stack.Screen name="TestWearScreen" component={TestWearScreen} />
         <Stack.Screen name="CommunityScreen" component={CommunityScreen} />
+        <Stack.Screen name="CommunityDetails" component={CommunityDetails} />
         <Stack.Screen name="ConfigScreen" component={ConfigScreen} />
         <Stack.Screen name="PlanScreen" component={PlanScreen} />
         <Stack.Screen name="LanguageScreen" component={LanguageScreen} />
@@ -82,9 +86,10 @@ function AppLayout() {
         <Stack.Screen name="ReviewScreen" component={ReviewScreen} />
         <Stack.Screen name="TermsScreen" component={TermsScreen} />
         <Stack.Screen name="PoliciesScreen" component={PoliciesScreen} />
+        <Stack.Screen name="AboutScreen" component={AboutScreen} />
+        <Stack.Screen name="PlatformRulesScreen" component={PlatformRulesScreen} />
       </Stack.Navigator>
       <BottomNavigationBar />
-      {/* Renderizando BottomNavigationBar diretamente, pois isDietSheetOpen não a controla mais. */}
     </View>
   );
 }

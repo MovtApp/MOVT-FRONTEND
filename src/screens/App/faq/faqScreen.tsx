@@ -13,7 +13,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Plus, Minus } from "lucide-react-native";
 import BackButton from "@components/BackButton";
-import MVLogo from "@assets/MV.png";
+import { FooterVersion } from "@components/FooterVersion";
 
 // Habilita animações no Android
 if (Platform.OS === "android" && UIManager.setLayoutAnimationEnabledExperimental) {
@@ -105,10 +105,7 @@ const FAQScreen: React.FC = () => {
                 ))}
 
                 {/* Footer alinhado à esquerda conforme a imagem */}
-                <View style={styles.footer}>
-                    <Image source={MVLogo} style={styles.logoImage} resizeMode="contain" />
-                    <Text style={styles.versionText}>Versão 1.0.0</Text>
-                </View>
+                <FooterVersion style={styles.footer} />
             </ScrollView>
         </SafeAreaView>
     );
@@ -179,16 +176,5 @@ const styles = StyleSheet.create({
         alignItems: "flex-start",
         marginTop: 60,
         marginBottom: 20,
-    },
-    logoImage: {
-        width: 50,
-        height: 25,
-        marginBottom: 4,
-    },
-    versionText: {
-        fontSize: 14,
-        color: "#192126",
-        fontFamily: "Rubik_400Regular",
-        opacity: 0.8,
     },
 });

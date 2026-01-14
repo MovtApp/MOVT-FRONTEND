@@ -20,7 +20,7 @@ import { AppStackParamList } from "../../../@types/routes";
 import { useChats, Chat } from "@/hooks/useChat";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/services/supabaseClient";
-import axios from "axios";
+import { api } from "@/services/api";
 
 type ChatScreenNavigationProp = NativeStackNavigationProp<AppStackParamList, "ChatScreen">;
 
@@ -39,8 +39,6 @@ const ChatScreen = () => {
 
   const navigation = useNavigation<ChatScreenNavigationProp>();
   const { user } = useAuth();
-  const sessionId = user?.sessionId;
-  const API_URL = process.env.EXPO_PUBLIC_API_URL || "http://10.0.2.2:3000";
   const effectiveUserId = user?.supabaseUserId || (user as any)?.supabase_uid || null;
   const [supabaseUserId, setSupabaseUserId] = useState<string | null>(effectiveUserId);
 
@@ -65,21 +63,16 @@ const ChatScreen = () => {
   const chats = useChats(supabaseUserId || "");
 
   const fetchContacts = useCallback(async () => {
-    if (!sessionId) return;
     setLoadingContacts(true);
     try {
-      let finalUrl = API_URL;
-      if (finalUrl.includes("localhost")) finalUrl = finalUrl.replace("localhost", "10.0.2.2");
-      const resp = await axios.get(`${finalUrl}/api/chat/contacts/mutual`, {
-        headers: { Authorization: `Bearer ${sessionId}` },
-      });
+      const resp = await api.get("/chat/contacts/mutual");
       setContacts(resp.data.data || []);
     } catch (e) {
       console.error("Error fetching contacts:", e);
     } finally {
       setLoadingContacts(false);
     }
-  }, [sessionId, API_URL]);
+  }, []);
 
   useFocusEffect(
     useCallback(() => {
@@ -88,16 +81,9 @@ const ChatScreen = () => {
   );
 
   const handleStartChat = async (targetUserId: number, targetUserName: string) => {
-    if (!sessionId) return;
     setIsModalVisible(false);
     try {
-      let finalUrl = API_URL;
-      if (finalUrl.includes("localhost")) finalUrl = finalUrl.replace("localhost", "10.0.2.2");
-      const resp = await axios.post(
-        `${finalUrl}/api/chat`,
-        { participant2_id: targetUserId },
-        { headers: { Authorization: `Bearer ${sessionId}` } }
-      );
+      const resp = await api.post("/chat", { participant2_id: targetUserId });
       if (resp.data.chatId) {
         navigation.navigate("Chat", { chatId: resp.data.chatId, participantName: targetUserName });
       }
@@ -139,9 +125,9 @@ const ChatScreen = () => {
             <Text style={styles.chatTime}>
               {item.last_timestamp
                 ? new Date(item.last_timestamp).toLocaleTimeString([], {
-                    hour: "2-digit",
-                    minute: "2-digit",
-                  })
+                  hour: "2-digit",
+                  minute: "2-digit",
+                })
                 : "Agora"}
             </Text>
           </View>
@@ -179,7 +165,10 @@ const ChatScreen = () => {
 
       <View style={styles.headerActionRow}>
         <Text style={styles.screenTitle}>Mensagens</Text>
-        <TouchableOpacity style={styles.plusButton} onPress={() => setIsModalVisible(true)}>
+        <TouchableOpacity
+          style={styles.plusButton}
+          onPress={() => setIsModalVisible(true)}
+        >
           <Plus color="#000" size={24} />
         </TouchableOpacity>
       </View>

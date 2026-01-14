@@ -54,7 +54,7 @@ export function CustomDrawerContent(props: DrawerContentComponentProps) {
       route: "ConfigScreen" as keyof AppStackParamList,
     },
 
-    { name: "Ajuda e suporte", icon: HelpCircle, route: "SupportScreen" },
+    { name: "Ajuda e suporte", icon: HelpCircle, route: "FAQScreen" as keyof AppStackParamList },
     { name: "Sobre", icon: Info, route: "AboutScreen" },
   ];
 
@@ -83,8 +83,8 @@ export function CustomDrawerContent(props: DrawerContentComponentProps) {
           style={styles.profileImage}
         />
         <View style={styles.profileInfo}>
-          <Text style={styles.profileName}>{user?.name}</Text>
-          <Text style={styles.profileUsername}>@{user?.username}</Text>
+          <Text style={styles.profileName}>{user?.name || ""}</Text>
+          <Text style={styles.profileUsername}>{user?.username ? `@${user.username}` : ""}</Text>
         </View>
       </TouchableOpacity>
 
@@ -99,7 +99,7 @@ export function CustomDrawerContent(props: DrawerContentComponentProps) {
                 screen: "HomeStack",
                 params: { screen: item.route as keyof AppStackParamList },
               })
-            } // Navegação corrigida
+            }
           >
             <item.icon size={20} color="#FFFFFF" style={styles.drawerItemIcon} />
             <Text style={styles.drawerItemText}>{item.name}</Text>
@@ -118,7 +118,7 @@ export function CustomDrawerContent(props: DrawerContentComponentProps) {
                 screen: "HomeStack",
                 params: { screen: item.route as keyof AppStackParamList },
               });
-            }} // Navegação corrigida
+            }}
           >
             <item.icon size={20} color="#FFFFFF" style={styles.drawerItemIcon} />
             <Text style={styles.drawerItemText}>{item.name}</Text>
@@ -137,7 +137,7 @@ export function CustomDrawerContent(props: DrawerContentComponentProps) {
                 screen: "HomeStack",
                 params: { screen: item.route as keyof AppStackParamList },
               })
-            } // Navegação corrigida
+            }
           >
             <item.icon size={20} color="#FFFFFF" style={styles.drawerItemIcon} />
             <Text style={styles.drawerItemText}>{item.name}</Text>
@@ -153,18 +153,7 @@ export function CustomDrawerContent(props: DrawerContentComponentProps) {
           props.navigation.closeDrawer();
         }}
       >
-        <LogOut size={20} color="#BBF246" style={styles.drawerItemIcon} />
-        <Text
-          style={styles.logoutText}
-          onPress={() => {
-            Alert.alert("Sair", "Tem certeza que deseja sair da sua conta?", [
-              { text: "Cancelar", style: "cancel" },
-              { text: "Sair", style: "destructive", onPress: () => signOut() },
-            ]);
-          }}
-        >
-          Sair
-        </Text>
+        <LogOut size={20} color="#BBF246" style={styles.drawerItemIcon} /><Text style={styles.logoutText} onPress={() => { Alert.alert("Sair", "Tem certeza que deseja sair da sua conta?", [{ text: "Cancelar", style: "cancel" }, { text: "Sair", style: "destructive", onPress: () => signOut() }]); }}>Sair</Text>
       </TouchableOpacity>
     </DrawerContentScrollView>
   );

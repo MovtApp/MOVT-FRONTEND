@@ -2,14 +2,14 @@ import { View, StyleSheet, TouchableOpacity, Text } from "react-native";
 import BackButton from "@components/BackButton";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useNavigation } from "@react-navigation/native";
-import { Input } from "@components/Input";
-import { RootStackParamList } from "@typings/routes"; // Corrigida a importação de RootStackParamList
+import { SelectButton } from "@components/SelectButton";
+import { RootStackParamList } from "@typings/routes";
 
 const LevelScreen = () => {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
 
   const handleLevel = () => {
-    navigation.navigate("App", { screen: "HomeScreen" });
+    navigation.navigate("App", { screen: "HomeStack" });
   };
 
   return (
@@ -22,9 +22,9 @@ const LevelScreen = () => {
           Classifique seu nível de atividade física: Iniciante, intermediário ou avançado.
         </Text>
 
-        <Input text="Iniciante" />
-        <Input text="Intermediário" />
-        <Input text="Avançado" />
+        <SelectButton text="Iniciante" />
+        <SelectButton text="Intermediário" />
+        <SelectButton text="Avançado" />
       </View>
 
       <TouchableOpacity style={styles.advanceButton} onPress={handleLevel}>

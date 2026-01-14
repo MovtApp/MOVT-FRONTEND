@@ -18,7 +18,7 @@ import { View, Text, ScrollView, TouchableOpacity, Switch, StyleSheet, Image } f
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useNavigation } from "@react-navigation/native";
 import BackButton from "@components/BackButton";
-import MVLogo from "@assets/MV.png";
+import { FooterVersion } from "@components/FooterVersion";
 
 const ConfigScreen: React.FC = () => {
   const navigation = useNavigation<any>();
@@ -183,10 +183,7 @@ const ConfigScreen: React.FC = () => {
           <Separator />
 
           {/* Footer */}
-          <View style={styles.footer}>
-            <Image source={MVLogo} style={styles.logoImage} resizeMode="contain" />
-            <Text style={styles.versionText}>Versão 1.0.0</Text>
-          </View>
+          <FooterVersion style={styles.footer} />
         </ScrollView>
       </View>
     </SafeAreaView>
@@ -259,15 +256,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginTop: 40,
     marginBottom: 20,
-  },
-  logoImage: {
-    width: 60,
-    height: 30,
-  },
-  versionText: {
-    fontSize: 12,
-    color: "#64748B",
-    marginTop: 5,
   },
 });
 

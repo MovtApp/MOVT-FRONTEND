@@ -12,7 +12,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { useTranslation } from "react-i18next";
 import { Pencil } from "lucide-react-native";
 import BackButton from "@components/BackButton";
-import MVLogo from "@assets/MV.png";
+import { FooterVersion } from "@components/FooterVersion";
 import "@/i18n"; // Import the config
 
 const languages = [
@@ -101,10 +101,7 @@ const LanguageScreen: React.FC = () => {
                     </View>
 
                     {/* Footer Logo */}
-                    <View style={styles.footer}>
-                        <Image source={MVLogo} style={styles.logoImage} resizeMode="contain" />
-                        <Text style={styles.versionText}>Versão 1.0.0</Text>
-                    </View>
+                    <FooterVersion style={styles.footer} />
                 </ScrollView>
             </View>
         </SafeAreaView>
@@ -236,15 +233,6 @@ const styles = StyleSheet.create({
         alignItems: "center",
         marginTop: 80,
         marginBottom: 20,
-    },
-    logoImage: {
-        width: 60,
-        height: 30,
-    },
-    versionText: {
-        fontSize: 12,
-        color: "#64748B",
-        marginTop: 5,
     },
 });
 
