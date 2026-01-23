@@ -102,22 +102,22 @@ const HomeScreen: React.FC = () => {
     const entries: SearchEntry[] = [
       ...(user
         ? [
-          {
-            id: "profile",
-            title: user.name || "Seu perfil",
-            description: user.username ? `@${user.username}` : "Gerencie sua conta",
-            keywords: [
-              user.name || "",
-              user.username || "",
-              user.email || "",
-              "perfil",
-              "conta",
-              "usuario",
-              "account",
-            ],
-            targetScreen: "ProfilePFScreen" as keyof AppStackParamList,
-          },
-        ]
+            {
+              id: "profile",
+              title: user.name || "Seu perfil",
+              description: user.username ? `@${user.username}` : "Gerencie sua conta",
+              keywords: [
+                user.name || "",
+                user.username || "",
+                user.email || "",
+                "perfil",
+                "conta",
+                "usuario",
+                "account",
+              ],
+              targetScreen: "ProfilePFScreen" as keyof AppStackParamList,
+            },
+          ]
         : []),
       {
         id: "data-dashboard",
@@ -255,15 +255,77 @@ const HomeScreen: React.FC = () => {
         />
         {!!search.trim().length && (
           <View style={styles.searchResultsContainer}>
-            {filteredResults.length > 0 ? filteredResults.map((result) => (
-              <TouchableOpacity key={result.id} style={styles.searchResultItem} onPress={() => handleResultPress(result)}>
-                <Text style={styles.searchResultTitle}>{result.title}</Text>{result.description ? <Text style={styles.searchResultSubtitle}>{result.description}</Text> : null}
-              </TouchableOpacity>
-            )) : <Text style={styles.noSearchResultsText}>Nenhuma referência encontrada.</Text>}
+            {filteredResults.length > 0 ? (
+              filteredResults.map((result) => (
+                <TouchableOpacity
+                  key={result.id}
+                  style={styles.searchResultItem}
+                  onPress={() => handleResultPress(result)}
+                >
+                  <Text style={styles.searchResultTitle}>{result.title}</Text>
+                  {result.description ? (
+                    <Text style={styles.searchResultSubtitle}>{result.description}</Text>
+                  ) : null}
+                </TouchableOpacity>
+              ))
+            ) : (
+              <Text style={styles.noSearchResultsText}>Nenhuma referência encontrada.</Text>
+            )}
           </View>
         )}
-        <PromotionalBanner gender={selectedGender} /><TrainingSelector title="Selecione seu treino" containerStyle={{ marginBottom: 24 }} /><Communities />
-        <View style={styles.section}><Text style={styles.sectionTitle}>Exercícios populares</Text><ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.exercisesList}>{exerciseData.map((exercise) => (<ImageBackground key={exercise.id} source={{ uri: exercise.imageUrl }} style={styles.exerciseCard} imageStyle={{ borderRadius: 16 }}><View style={styles.imageOverlay}><View style={styles.exerciseCardContent}><Text style={styles.exerciseTitle}>{exercise.title}</Text><View style={styles.exerciseInfo}><View style={styles.tagsContainer}><View style={styles.calorieTag}><Text style={styles.calorieText}>{exercise.calories}</Text></View><View style={styles.MinutesTag}><Text style={styles.MinutesText}>{exercise.minutes}</Text></View></View><TouchableOpacity style={styles.playButton} activeOpacity={0.7} onPress={() => { }}><Play size={12} fill={"#192126"} /></TouchableOpacity></View></View></View></ImageBackground>))}</ScrollView></View><PlanCardTraining /><TrainingBanner title="Melhor treino de superiores" imageUrl="https://img.freepik.com/free-photo/view-woman-helping-man-exercise-gym_52683-98092.jpg?t=st=1758297406~exp=1758301006~hmac=66860a69d0b54e22b28d0831392e01278764d6b6d47e956a9576e041c9e016c2&w=1480" onPress={() => { }} /><TheBestForYou /><ChallengesSection /><HeatingScreen /><FooterVersion style={styles.footer} />
+        <PromotionalBanner gender={selectedGender} />
+        <TrainingSelector title="Selecione seu treino" containerStyle={{ marginBottom: 24 }} />
+        <Communities />
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Exercícios populares</Text>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            style={styles.exercisesList}
+          >
+            {exerciseData.map((exercise) => (
+              <ImageBackground
+                key={exercise.id}
+                source={{ uri: exercise.imageUrl }}
+                style={styles.exerciseCard}
+                imageStyle={{ borderRadius: 16 }}
+              >
+                <View style={styles.imageOverlay}>
+                  <View style={styles.exerciseCardContent}>
+                    <Text style={styles.exerciseTitle}>{exercise.title}</Text>
+                    <View style={styles.exerciseInfo}>
+                      <View style={styles.tagsContainer}>
+                        <View style={styles.calorieTag}>
+                          <Text style={styles.calorieText}>{exercise.calories}</Text>
+                        </View>
+                        <View style={styles.MinutesTag}>
+                          <Text style={styles.MinutesText}>{exercise.minutes}</Text>
+                        </View>
+                      </View>
+                      <TouchableOpacity
+                        style={styles.playButton}
+                        activeOpacity={0.7}
+                        onPress={() => {}}
+                      >
+                        <Play size={12} fill={"#192126"} />
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                </View>
+              </ImageBackground>
+            ))}
+          </ScrollView>
+        </View>
+        <PlanCardTraining />
+        <TrainingBanner
+          title="Melhor treino de superiores"
+          imageUrl="https://img.freepik.com/free-photo/view-woman-helping-man-exercise-gym_52683-98092.jpg?t=st=1758297406~exp=1758301006~hmac=66860a69d0b54e22b28d0831392e01278764d6b6d47e956a9576e041c9e016c2&w=1480"
+          onPress={() => {}}
+        />
+        <TheBestForYou />
+        <ChallengesSection />
+        <HeatingScreen />
+        <FooterVersion style={styles.footer} />
       </ScrollView>
     </View>
   );

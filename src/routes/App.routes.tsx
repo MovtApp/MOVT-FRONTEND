@@ -41,6 +41,9 @@ import ResultsScreen from "../screens/App/data/[protected]/ResultsScreen";
 import TestWearScreen from "../screens/TestWearScreen";
 import CommunityScreen from "@screens/App/communities/communityScreen";
 import CommunityDetails from "../screens/App/communities/[protected]/community";
+import TrainingScreen from "../screens/App/training/trainingScreen";
+import TrainingDetails from "../screens/App/training/[protected]/training";
+import ExplorerScreen from "../screens/App/explorer/explorerScreen";
 
 const Stack = createNativeStackNavigator<AppStackParamList>();
 const Drawer = createDrawerNavigator(); // Definir o Drawer Navigator
@@ -78,6 +81,9 @@ function AppLayout() {
         <Stack.Screen name="TestWearScreen" component={TestWearScreen} />
         <Stack.Screen name="CommunityScreen" component={CommunityScreen} />
         <Stack.Screen name="CommunityDetails" component={CommunityDetails} />
+        <Stack.Screen name="TrainingScreen" component={TrainingScreen} />
+        <Stack.Screen name="TrainingDetails" component={TrainingDetails} />
+        <Stack.Screen name="ExplorerScreen" component={ExplorerScreen} />
         <Stack.Screen name="ConfigScreen" component={ConfigScreen} />
         <Stack.Screen name="PlanScreen" component={PlanScreen} />
         <Stack.Screen name="LanguageScreen" component={LanguageScreen} />

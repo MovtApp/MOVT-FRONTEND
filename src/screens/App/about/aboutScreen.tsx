@@ -1,12 +1,5 @@
 import React from "react";
-import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  Image,
-  ScrollView,
-} from "react-native";
+import { View, Text, StyleSheet, TouchableOpacity, Image, ScrollView } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { ChevronRight } from "lucide-react-native";
 import { useNavigation } from "@react-navigation/native";
@@ -56,25 +49,15 @@ const AboutScreen: React.FC = () => {
       </View>
       <View style={styles.headerDivider} />
 
-      <ScrollView
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
-      >
-        <AboutItem
-          title="Versão"
-          rightText="1.0.0"
-          showChevron={false}
-        />
+      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+        <AboutItem title="Versão" rightText="1.0.0" showChevron={false} />
 
         <AboutItem
           title="Políticas de privacidade"
           onPress={() => handleNavigate("PoliciesScreen")}
         />
 
-        <AboutItem
-          title="Termos e condições"
-          onPress={() => handleNavigate("TermsScreen")}
-        />
+        <AboutItem title="Termos e condições" onPress={() => handleNavigate("TermsScreen")} />
 
         <AboutItem
           title="Regras da plataforma"
@@ -83,10 +66,7 @@ const AboutScreen: React.FC = () => {
           }}
         />
 
-        <AboutItem
-          title="Atendimento"
-          onPress={() => handleNavigate("FAQScreen")}
-        />
+        <AboutItem title="Atendimento" onPress={() => handleNavigate("FAQScreen")} />
 
         {/* Footer Section */}
         <FooterVersion style={styles.footer} />

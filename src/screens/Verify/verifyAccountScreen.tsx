@@ -131,12 +131,10 @@ const VerifyAccountScreen = () => {
         />
         {error && <Text style={styles.error}>{error}</Text>}
 
-        <TouchableOpacity
-          style={styles.resendButton}
-          onPress={handleResend}
-          disabled={loading}
-        >
-          <Text style={styles.resendButtonText}>{loading ? "Reenviando..." : "Reenviar Código"}</Text>
+        <TouchableOpacity style={styles.resendButton} onPress={handleResend} disabled={loading}>
+          <Text style={styles.resendButtonText}>
+            {loading ? "Reenviando..." : "Reenviar Código"}
+          </Text>
         </TouchableOpacity>
 
         <TouchableOpacity

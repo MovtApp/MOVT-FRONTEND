@@ -125,9 +125,9 @@ const ChatScreen = () => {
             <Text style={styles.chatTime}>
               {item.last_timestamp
                 ? new Date(item.last_timestamp).toLocaleTimeString([], {
-                  hour: "2-digit",
-                  minute: "2-digit",
-                })
+                    hour: "2-digit",
+                    minute: "2-digit",
+                  })
                 : "Agora"}
             </Text>
           </View>
@@ -165,10 +165,7 @@ const ChatScreen = () => {
 
       <View style={styles.headerActionRow}>
         <Text style={styles.screenTitle}>Mensagens</Text>
-        <TouchableOpacity
-          style={styles.plusButton}
-          onPress={() => setIsModalVisible(true)}
-        >
+        <TouchableOpacity style={styles.plusButton} onPress={() => setIsModalVisible(true)}>
           <Plus color="#000" size={24} />
         </TouchableOpacity>
       </View>

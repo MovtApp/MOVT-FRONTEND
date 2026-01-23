@@ -44,7 +44,7 @@ export const LocationProvider: React.FC<{ children: React.ReactNode }> = ({ chil
             // Abre configurações para o usuário habilitar manualmente
             try {
               await Linking.openSettings();
-            } catch {}
+            } catch { }
           }
         }
       }
@@ -60,12 +60,12 @@ export const LocationProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         });
       }
 
-      // Inicia watcher para manter atualizado em background enquanto app está ativo
+      // Inicia watcher para manter atualizado em tempo real com alta precisão
       watcherRef.current = await Location.watchPositionAsync(
         {
-          accuracy: Location.Accuracy.Balanced,
-          timeInterval: 2000,
-          distanceInterval: 5,
+          accuracy: Location.Accuracy.Highest,
+          timeInterval: 1000, // Atualiza a cada 1 segundo
+          distanceInterval: 1, // Atualiza a cada 1 metro de deslocamento
         },
         (loc) => {
           if (loc?.coords?.latitude && loc?.coords?.longitude) {

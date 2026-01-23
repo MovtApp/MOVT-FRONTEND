@@ -107,7 +107,7 @@ const NotificationModal: React.FC<NotificationModalProps> = ({
     <Modal animationType="none" transparent={true} visible={isVisible} onRequestClose={onClose}>
       <TouchableWithoutFeedback onPress={onClose}>
         <View style={modalStyles.overlay}>
-          <TouchableWithoutFeedback onPress={() => { }}>
+          <TouchableWithoutFeedback onPress={() => {}}>
             <Animated.View
               style={[
                 {

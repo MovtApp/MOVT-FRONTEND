@@ -13,11 +13,7 @@ const getAuthHeaders = async () => {
 export const userService = {
   updateField: async (field: string, value: string) => {
     const headers = await getAuthHeaders();
-    const response = await api.put(
-      "/user/update-field",
-      { field, value },
-      headers
-    );
+    const response = await api.put("/user/update-field", { field, value }, headers);
     return response.data;
   },
 

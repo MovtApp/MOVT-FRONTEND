@@ -1,21 +1,50 @@
 import React, { useRef, useState, useEffect } from "react";
-import { Text, View, TouchableOpacity } from "react-native";
+import { Text, View, TouchableOpacity, StyleSheet } from "react-native";
 import MapView, { Marker } from "react-native-maps";
 import TrainingSelector from "@components/TrainingSelector";
 import { DetailsBottomSheet, PersonalTrainer } from "@components/DetailsBottomSheet";
 import { MapSettingSheet } from "@components/MapSettingSheet";
+import { GymCard } from "@components/GymCard";
 import BottomSheet from "@gorhom/bottom-sheet";
-import { Globe, Settings2 } from "lucide-react-native";
+import { Globe, Settings2, MapPin } from "lucide-react-native";
 import { useLocationContext } from "@contexts/LocationContext";
 import { useNavigation } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { AppStackParamList } from "../../../@types/routes";
+import { getNearbyGyms, Gym } from "@services/gymService";
+import { useAuth } from "@contexts/AuthContext";
+import { Animated, Easing } from "react-native";
+
+const CustomGymMarker = ({ selected }: { selected: boolean }) => {
+  const mainColor = selected ? "#059669" : "#B1F232";
+  return (
+    <View style={markerStyles.container}>
+      {/* Camada de Borda Branca Exterior */}
+      <MapPin
+        size={44}
+        color="#fff"
+        fill="#fff"
+        style={{ position: 'absolute' }}
+      />
+      {/* Camada Colorida Interna */}
+      <MapPin
+        size={34}
+        color={mainColor}
+        fill={mainColor}
+      />
+      {/* Ponto Branco Central */}
+      <View style={markerStyles.innerDot} />
+    </View>
+  );
+};
 
 const MapScreen: React.FC = () => {
   const { location, refreshLocation } = useLocationContext();
+  const { user } = useAuth();
   const [isSheetOpen, setIsSheetOpen] = useState(false);
   const [sheetIndex, setSheetIndex] = useState(1);
   const bottomSheetRef = useRef<BottomSheet>(null);
+  const mapRef = useRef<MapView>(null);
 
   const navigation = useNavigation<NativeStackNavigationProp<AppStackParamList>>();
 
@@ -38,8 +67,13 @@ const MapScreen: React.FC = () => {
   );
   const [showsUserLocation, setShowsUserLocation] = useState(true);
   const [showsCompass, setShowsCompass] = useState(false);
-  const [displayRadiusKm, setDisplayRadiusKm] = useState(5); // Valor inicial em Km
+  const [displayRadiusKm, setDisplayRadiusKm] = useState(50); // Valor inicial em 50Km para abranger mais áreas
   const [loadingTimeout, setLoadingTimeout] = useState(false);
+
+  // Estados para academias
+  const [gyms, setGyms] = useState<Gym[]>([]);
+  const [selectedGym, setSelectedGym] = useState<Gym | null>(null);
+  const [loadingGyms, setLoadingGyms] = useState(false);
 
   // Timeout para evitar tempo de carregamento infinito
   useEffect(() => {
@@ -49,6 +83,56 @@ const MapScreen: React.FC = () => {
 
     return () => clearTimeout(timeout);
   }, []);
+
+  // Buscar academias próximas quando a localização estiver disponível
+  useEffect(() => {
+    if (location && user?.sessionId) {
+      fetchNearbyGyms();
+
+      // Centraliza o mapa no usuário suavemente na primeira vez ou se estiver seguindo
+      if (location && showsUserLocation) {
+        mapRef.current?.animateToRegion({
+          latitude: location.latitude,
+          longitude: location.longitude,
+          latitudeDelta: latitudeDelta,
+          longitudeDelta: longitudeDelta,
+        }, 1000);
+      }
+    }
+  }, [location?.latitude, location?.longitude, user, displayRadiusKm]);
+
+  const fetchNearbyGyms = async () => {
+    if (!location || !user?.sessionId) return;
+
+    try {
+      setLoadingGyms(true);
+      const response = await getNearbyGyms(
+        location.latitude,
+        location.longitude,
+        displayRadiusKm,
+        user.sessionId
+      );
+      console.log("📍 Academias próximas encontradas:", response.data?.length || 0);
+      setGyms(response.data || []);
+    } catch (error) {
+      console.error("Erro ao buscar academias:", error);
+      setGyms([]);
+    } finally {
+      setLoadingGyms(false);
+    }
+  };
+
+  const handleGymPress = (gym: Gym) => {
+    if (selectedGym?.id_academia === gym.id_academia) {
+      setSelectedGym(null);
+    } else {
+      setSelectedGym(gym);
+    }
+  };
+
+  const handleCloseGymCard = () => {
+    setSelectedGym(null);
+  };
 
   // Calcula os deltas com base no raio de exibição
   const latitudeDelta = location ? (displayRadiusKm * 2) / 111.32 : 0.0421; // Valor padrão se location for nulo
@@ -154,6 +238,7 @@ const MapScreen: React.FC = () => {
         </View>
       ) : (
         <MapView
+          ref={mapRef}
           style={{ flex: 1 }}
           initialRegion={{
             latitude: location?.latitude || defaultLocation.latitude,
@@ -171,16 +256,25 @@ const MapScreen: React.FC = () => {
           loadingBackgroundColor="#FFFFFF"
           loadingIndicatorColor="#666666"
         >
-          {location && (
+
+
+          {/* Markers das academias */}
+          {gyms.map((gym) => (
             <Marker
+              key={gym.id_academia}
               coordinate={{
-                latitude: location.latitude,
-                longitude: location.longitude,
+                latitude: gym.latitude,
+                longitude: gym.longitude,
               }}
-              title="Sua Localização"
-              description="Você está aqui"
-            />
-          )}
+              onPress={(e) => {
+                e.stopPropagation(); // Impede que o toque bubble para o mapa
+                handleGymPress(gym);
+              }}
+              anchor={{ x: 0.5, y: 1 }} // Define a ponta do pin como o ponto exato de geolocalização
+            >
+              <CustomGymMarker selected={selectedGym?.id_academia === gym.id_academia} />
+            </Marker>
+          ))}
         </MapView>
       )}
 
@@ -256,8 +350,48 @@ const MapScreen: React.FC = () => {
         displayRadiusKm={displayRadiusKm}
         onDisplayRadiusKmChange={setDisplayRadiusKm}
       />
+
+      {/* Card de Academia */}
+      {selectedGym && (
+        <View style={gymCardStyles.container}>
+          <GymCard gym={selectedGym} />
+        </View>
+      )}
     </View>
   );
 };
+
+const gymCardStyles = StyleSheet.create({
+  container: {
+    position: "absolute",
+    bottom: 90, // Aumentado para 160 para subir o card e limpar a BottomNavigationBar
+    left: 20,
+    right: 20,
+    zIndex: 999, // Garantindo que fique acima de tudo
+  },
+});
+
+const markerStyles = StyleSheet.create({
+  container: {
+    alignItems: "center",
+    justifyContent: "center",
+    width: 38, // Reduzido de 44 para 38 (hitbox mais precisa)
+    height: 48, // Ajustado para a altura do Pin (maior para a ponta)
+  },
+  innerDot: {
+    position: "absolute",
+    top: 14,
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: "#fff",
+    zIndex: 1,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 1,
+    elevation: 2,
+  },
+});
 
 export default MapScreen;

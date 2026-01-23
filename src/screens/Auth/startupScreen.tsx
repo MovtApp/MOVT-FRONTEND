@@ -55,7 +55,9 @@ export const StartupScreen = ({ navigation }: Props) => {
                   <QrCode size={30} color="#111" />
                 </View>
                 <View style={{ flex: 1, overflow: "hidden" }}>
-                  <Text style={{ fontFamily: "Rubik_700Bold" }}>Integração com empresas parceiras</Text>
+                  <Text style={{ fontFamily: "Rubik_700Bold" }}>
+                    Integração com empresas parceiras
+                  </Text>
                   <Text style={{ color: "#666", fontFamily: "Rubik_400Regular" }}>
                     Encontre academias parceiras nas proximidades que oferecem benefícios.
                   </Text>

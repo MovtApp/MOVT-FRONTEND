@@ -41,15 +41,17 @@ export function CustomDrawerContent(props: DrawerContentComponentProps) {
   ];
 
   const panelItems = [
-    { name: "Explorar", icon: Globe, route: "TrainingScreen" },
-    { name: "Treinos", icon: Calendar, route: "TrainingScreen" },
     { name: "Agendamentos", icon: Calendar, route: "Appointments" },
     { name: "Comunidades", icon: Users, route: "CommunityScreen" },
+    { name: "Planos", icon: Users, route: "PlanScreen" },
   ];
 
   const accountItems = [
     {
       name: "Configurações e privacidades",
+
+
+
       icon: Settings,
       route: "ConfigScreen" as keyof AppStackParamList,
     },
@@ -153,7 +155,18 @@ export function CustomDrawerContent(props: DrawerContentComponentProps) {
           props.navigation.closeDrawer();
         }}
       >
-        <LogOut size={20} color="#BBF246" style={styles.drawerItemIcon} /><Text style={styles.logoutText} onPress={() => { Alert.alert("Sair", "Tem certeza que deseja sair da sua conta?", [{ text: "Cancelar", style: "cancel" }, { text: "Sair", style: "destructive", onPress: () => signOut() }]); }}>Sair</Text>
+        <LogOut size={20} color="#BBF246" style={styles.drawerItemIcon} />
+        <Text
+          style={styles.logoutText}
+          onPress={() => {
+            Alert.alert("Sair", "Tem certeza que deseja sair da sua conta?", [
+              { text: "Cancelar", style: "cancel" },
+              { text: "Sair", style: "destructive", onPress: () => signOut() },
+            ]);
+          }}
+        >
+          Sair
+        </Text>
       </TouchableOpacity>
     </DrawerContentScrollView>
   );

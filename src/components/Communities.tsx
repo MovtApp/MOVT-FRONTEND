@@ -1,6 +1,6 @@
 import React from "react";
 import { View, Text, TouchableOpacity, ScrollView, StyleSheet } from "react-native";
-import { Users, Dumbbell, Activity } from "lucide-react-native";
+import { Users, Dumbbell, Activity, Heart, Globe } from "lucide-react-native";
 import { useNavigation, NavigationProp } from "@react-navigation/native";
 import { AppStackParamList } from "../@types/routes";
 
@@ -11,38 +11,23 @@ interface CommunityItem {
 }
 
 const communityData: CommunityItem[] = [
-  {
-    id: "1",
-    name: "Powerlifters",
-    icon: Users,
-  },
-  {
-    id: "2",
-    name: "Pilates",
-    icon: Activity,
-  },
-  {
-    id: "3",
-    name: "Yoga",
-    icon: Activity,
-  },
-  {
-    id: "4",
-    name: "Corridas",
-    icon: Dumbbell,
-  },
-  {
-    id: "5",
-    name: "Bodybuilders",
-    icon: Dumbbell,
-  },
+  { id: "1", name: "Powerlifters", icon: Users },
+  { id: "2", name: "Pilates", icon: Activity },
+  { id: "3", name: "Yoga", icon: Activity },
+  { id: "4", name: "Corridas", icon: Dumbbell },
+  { id: "5", name: "Bodybuilders", icon: Dumbbell },
 ];
-
 interface CommunitiesProps {
   showSeeAll?: boolean;
+  selectedCategory?: string;
+  onSelectCategory?: (category: string) => void;
 }
 
-const Communities: React.FC<CommunitiesProps> = ({ showSeeAll = true }) => {
+const Communities: React.FC<CommunitiesProps> = ({
+  showSeeAll = true,
+  selectedCategory,
+  onSelectCategory
+}) => {
   const navigation = useNavigation<NavigationProp<AppStackParamList>>();
 
   return (
@@ -56,14 +41,37 @@ const Communities: React.FC<CommunitiesProps> = ({ showSeeAll = true }) => {
         )}
       </View>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.communitiesList}>
-        {communityData.map((community) => (
-          <View key={community.id} style={styles.communityItem}>
-            <View style={styles.communityAvatar}>
-              <community.icon size={24} color="#BBF246" />
-            </View>
-            <Text style={styles.communityName}>{community.name}</Text>
-          </View>
-        ))}
+        {communityData.map((community) => {
+          const isActive = selectedCategory === community.name;
+          return (
+            <TouchableOpacity
+              key={community.id}
+              style={styles.communityItem}
+              onPress={() => {
+                if (onSelectCategory) {
+                  onSelectCategory(community.name);
+                } else {
+                  navigation.navigate("CommunityScreen", { category: community.name });
+                }
+              }}
+              activeOpacity={0.7}
+            >
+              <View style={[
+                styles.communityAvatar,
+                isActive && styles.communityAvatarActive
+              ]}>
+                <community.icon
+                  size={24}
+                  color={isActive ? "#000" : "#BBF246"}
+                />
+              </View>
+              <Text style={[
+                styles.communityName,
+                isActive && styles.communityNameActive
+              ]}>{community.name}</Text>
+            </TouchableOpacity>
+          );
+        })}
       </ScrollView>
     </View>
   );
@@ -112,6 +120,15 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: "#666",
     textAlign: "center",
+  },
+  communityAvatarActive: {
+    backgroundColor: "#BBF246",
+    borderWidth: 2,
+    borderColor: "#BBF246",
+  },
+  communityNameActive: {
+    color: "#BBF246",
+    fontWeight: "bold",
   },
 });
 

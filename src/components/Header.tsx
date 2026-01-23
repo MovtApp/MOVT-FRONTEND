@@ -1,11 +1,5 @@
 import React, { useState } from "react";
-import {
-  View,
-  Image,
-  TouchableOpacity,
-  StyleSheet,
-  Dimensions,
-} from "react-native";
+import { View, Image, TouchableOpacity, StyleSheet, Dimensions } from "react-native";
 import { Bell, Menu } from "lucide-react-native";
 import { useNavigation, NavigationProp, CompositeNavigationProp } from "@react-navigation/native";
 import { DrawerNavigationProp } from "@react-navigation/drawer";

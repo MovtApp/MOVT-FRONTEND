@@ -15,13 +15,14 @@ import {
   Animated,
 } from "react-native";
 import { Users } from "lucide-react-native";
-import { useNavigation } from "@react-navigation/native";
+import { useNavigation, useRoute, RouteProp } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 
 import Header from "@components/Header";
 import { useAuth } from "@contexts/AuthContext";
 import { listCommunities } from "@services/communityService";
 import Communities from "@components/Communities";
+import { FooterVersion } from "@components/FooterVersion";
 import { AppStackParamList, Community } from "../../../@types/routes";
 
 const { width } = Dimensions.get("window");
@@ -38,23 +39,31 @@ const heroImages = [
 const CommunityScreen: React.FC = () => {
   const { user } = useAuth();
   const navigation = useNavigation<NativeStackNavigationProp<AppStackParamList>>();
+  const route = useRoute<RouteProp<AppStackParamList, 'CommunityScreen'>>(); // Hook to access route params
   const [communities, setCommunities] = useState<Community[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeBannerIndex, setActiveBannerIndex] = useState(0);
-  const [selectedCategory, setSelectedCategory] = useState("Todas");
+  const [selectedCategory, setSelectedCategory] = useState(route.params?.category || "Todas");
   const scrollX = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    // Update selectedCategory if it changes via route params (e.g., subsequent navigations)
+    if (route.params?.category) {
+      setSelectedCategory(route.params.category);
+    }
+  }, [route.params?.category]);
 
   useEffect(() => {
     if (user?.sessionId) {
       fetchCommunities();
     }
-  }, [user]);
+  }, [user, selectedCategory]);
 
   const fetchCommunities = async () => {
     try {
       setLoading(true);
       if (user?.sessionId) {
-        const data = await listCommunities(user.sessionId);
+        const data = await listCommunities(user.sessionId, selectedCategory);
 
         // Adaptar dados da API para garantir que seja um array
         let formattedData: Community[] = [];
@@ -91,6 +100,14 @@ const CommunityScreen: React.FC = () => {
       categoria === selectedCategory || nome.toLowerCase().includes(selectedCategory.toLowerCase())
     );
   });
+
+  const handleSelectCategory = (category: string) => {
+    if (selectedCategory === category) {
+      setSelectedCategory("Todas");
+    } else {
+      setSelectedCategory(category);
+    }
+  };
 
   const renderHeroItem = ({ item, index }: { item: string; index: number }) => {
     const inputRange = [(index - 1) * ITEM_WIDTH, index * ITEM_WIDTH, (index + 1) * ITEM_WIDTH];
@@ -182,7 +199,11 @@ const CommunityScreen: React.FC = () => {
 
         <View style={styles.section}>
           {/* Communities Section */}
-          <Communities showSeeAll={false} />
+          <Communities
+            showSeeAll={false}
+            selectedCategory={selectedCategory}
+            onSelectCategory={handleSelectCategory}
+          />
         </View>
 
         {/* Section Title */}
@@ -194,7 +215,7 @@ const CommunityScreen: React.FC = () => {
           </View>
         ) : (
           /* Nearby Communities Cards */
-          filteredCommunities.map((item, index) => (
+          communities.map((item, index) => (
             <TouchableOpacity
               key={item.id_comunidade ? String(item.id_comunidade) : `comm-${index}`}
               style={styles.card}
@@ -222,6 +243,7 @@ const CommunityScreen: React.FC = () => {
             </TouchableOpacity>
           ))
         )}
+        <FooterVersion style={styles.footer} />
       </ScrollView>
     </SafeAreaView>
   );
@@ -231,6 +253,12 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "#fff",
+  },
+  footer: {
+    paddingHorizontal: 30,
+    marginTop: 20,
+    paddingBottom: 20,
+    alignItems: "flex-start",
   },
   contentHeader: {
     paddingHorizontal: 30,
@@ -268,7 +296,7 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   section: {
-    marginBottom: 24,
+    marginBottom: 10,
     paddingHorizontal: 30,
   },
   card: {

@@ -158,7 +158,7 @@ export function DetailsBottomSheet({
             <View style={styles.loaderContainer}>
               <ActivityIndicator size="large" color="#1e3a8a" />
             </View>
-          ) : (!!trainersToRender.length) ? (
+          ) : !!trainersToRender.length ? (
             trainersToRender.map((trainer) => (
               <PersonalTrainerCard
                 key={trainer.id}

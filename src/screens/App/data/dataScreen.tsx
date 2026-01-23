@@ -109,7 +109,8 @@ const DataScreen: React.FC = () => {
   const handleFlatListLayout = () => {
     if (flatListRef.current) {
       const flatListVisibleWidth = width - 20 * 2;
-      const offset = (selectedDay - 1) * DAY_ITEM_WIDTH - flatListVisibleWidth / 2 + DAY_ITEM_WIDTH / 2;
+      const offset =
+        (selectedDay - 1) * DAY_ITEM_WIDTH - flatListVisibleWidth / 2 + DAY_ITEM_WIDTH / 2;
       flatListRef.current.scrollToOffset({ offset: Math.max(0, offset), animated: false });
     }
   };

@@ -42,6 +42,7 @@ const HIDDEN_SCREENS = [
   "TermsScreen",
   "PoliciesScreen",
   "CommunityDetails",
+  "TrainingDetails",
 ];
 // ============================================================================
 
@@ -138,19 +139,20 @@ const BottomNavigationBar = () => {
   }
 
   return (
-    <View style={styles.container}>{navItems.map((item: NavItem) => {
-      const isActive = activeTab === item.name;
-      return (
-        <TouchableOpacity
-          key={item.name as string}
-          style={[styles.navItem, isActive && styles.activeNavItem]}
-          onPress={() => navigateTo(item.name)}
-        >
-          <item.icon size={24} color={isActive ? "#192126" : "#fff"} />
-          {isActive && <Text style={styles.activeNavText}>{item.label}</Text>}
-        </TouchableOpacity>
-      );
-    })}
+    <View style={styles.container}>
+      {navItems.map((item: NavItem) => {
+        const isActive = activeTab === item.name;
+        return (
+          <TouchableOpacity
+            key={item.name as string}
+            style={[styles.navItem, isActive && styles.activeNavItem]}
+            onPress={() => navigateTo(item.name)}
+          >
+            <item.icon size={24} color={isActive ? "#192126" : "#fff"} />
+            {isActive && <Text style={styles.activeNavText}>{item.label}</Text>}
+          </TouchableOpacity>
+        );
+      })}
     </View>
   );
 };

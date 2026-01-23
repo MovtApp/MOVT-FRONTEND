@@ -1,8 +1,13 @@
 import { api } from "./api";
 
-export async function listCommunities(sessionId: string) {
+export async function listCommunities(sessionId: string, category?: string) {
   try {
-    const response = await api.get("/comunidades", {
+    let url = "/comunidades";
+    if (category && category !== "Todas") {
+      url += `?categoria=${encodeURIComponent(category)}`;
+    }
+
+    const response = await api.get(url, {
       headers: {
         Authorization: `Bearer ${sessionId}`,
       },
@@ -38,3 +43,4 @@ export async function joinCommunity(id: string, sessionId: string) {
     throw error;
   }
 }
+

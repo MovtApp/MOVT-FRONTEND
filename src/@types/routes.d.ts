@@ -69,7 +69,7 @@ export type AppStackParamList = {
   WeightScreen: undefined;
   AgeScreen: undefined;
   WelcomeScreen: undefined;
-  CommunityScreen: undefined;
+  CommunityScreen: { category?: string } | undefined;
   ConfigScreen: undefined;
   FAQScreen: undefined;
   PlanScreen: undefined;
@@ -81,6 +81,9 @@ export type AppStackParamList = {
   AboutScreen: undefined;
   PlatformRulesScreen: undefined;
   CommunityDetails: { community: Community };
+  TrainingScreen: undefined;
+  TrainingDetails: { training: Training };
+  ExplorerScreen: undefined;
   AppointmentScreen:
   | {
     trainerId?: string;
@@ -101,6 +104,14 @@ export interface Community {
   max_participantes: number;
   categoria: string;
   tipo_comunidade: string;
+  duracao?: string;
+  calorias?: string;
+  data_evento?: string; // ISO String ou formatada
+  faixa_etaria?: string;
+  premiacao?: string;
+  local_inicio?: string;
+  local_fim?: string;
+  telefone_contato?: string;
 }
 
 export interface DietMeal {
@@ -117,6 +128,29 @@ export interface DietMeal {
   protein?: string | undefined;
   carbs?: string | undefined;
   categoria?: string;
+}
+
+export interface Exercise {
+  id: string;
+  nome: string;
+  series: number;
+  repeticoes: number;
+  descanso: string; // "30s", "1min"
+  imageUrl?: string;
+}
+
+export interface Training {
+  id_treino: string;
+  nome: string;
+  descricao: string;
+  imageurl: string;
+  duracao: string; // "30 min"
+  calorias: string; // "250 kcal"
+  nivel: string; // "Iniciante", "Intermediário", "Avançado"
+  categoria: string; // "Cardio", "Força", "Flexibilidade", "HIIT", "Yoga"
+  exercicios: Exercise[];
+  instrutor?: string;
+  equipamentos?: string[];
 }
 
 export type AppDrawerParamList = {
