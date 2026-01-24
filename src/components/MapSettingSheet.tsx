@@ -6,9 +6,10 @@ import {
   TouchableOpacity,
   Text,
   Switch,
-  TextInput,
 } from "react-native";
 import BottomSheet, { BottomSheetView } from "@gorhom/bottom-sheet";
+import { Slider } from "react-native-awesome-slider";
+import { useSharedValue } from "react-native-reanimated";
 // ProgressBar local para evitar dependências de terceiros - Removido componente não utilizado
 // function ProgressBar({ value }: { value: number }) {
 //   const clamped = Math.max(0, Math.min(1, value));
@@ -52,6 +53,15 @@ export function MapSettingSheet({
   onDisplayRadiusKmChange,
 }: MapSettingSheetProps) {
   const snapPoints = useMemo(() => ["40%", "70%"], []);
+
+  const progress = useSharedValue(displayRadiusKm);
+  const min = useSharedValue(1);
+  const max = useSharedValue(100);
+
+  // Sincroniza o valor do slider quando alterado externamente
+  React.useEffect(() => {
+    progress.value = displayRadiusKm;
+  }, [displayRadiusKm]);
   // Remover estados de zoom
   // const [mapType, setMapType] = useState<"standard" | "satellite" | "hybrid" | "terrain">("standard");
   // const [showsUserLocation, setShowsUserLocation] = useState(true);
@@ -133,23 +143,51 @@ export function MapSettingSheet({
             </View>
           </View>
 
-          {/* Nova seção para área de exibição por km */}
+          {/* Nova seção para área de exibição por km com Slider Customizado */}
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Área de exibição (Km)</Text>
-            <TextInput
-              style={styles.input}
-              keyboardType="numeric"
-              value={String(displayRadiusKm)}
-              onChangeText={(text) => {
-                const num = parseFloat(text);
-                if (!isNaN(num) && num >= 0) {
-                  onDisplayRadiusKmChange(num);
-                } else if (text === "") {
-                  // Permite apagar o texto
-                  onDisplayRadiusKmChange(0);
-                }
-              }}
-            />
+
+            <View style={styles.sliderContainer}>
+              <View style={styles.sliderHeader}>
+                <TouchableOpacity
+                  onPress={() => onDisplayRadiusKmChange(Math.max(1, displayRadiusKm - 1))}
+                  style={styles.sliderBtn}
+                >
+                  <Text style={styles.sliderBtnText}>-</Text>
+                </TouchableOpacity>
+
+                <View style={styles.sliderValueBox}>
+                  <Text style={styles.sliderValueText}>{displayRadiusKm}</Text>
+                </View>
+
+                <TouchableOpacity
+                  onPress={() => onDisplayRadiusKmChange(Math.min(100, displayRadiusKm + 1))}
+                  style={styles.sliderBtn}
+                >
+                  <Text style={styles.sliderBtnText}>+</Text>
+                </TouchableOpacity>
+              </View>
+
+              <Slider
+                progress={progress}
+                minimumValue={min}
+                maximumValue={max}
+                onValueChange={(value) => {
+                  onDisplayRadiusKmChange(Math.round(value));
+                }}
+                theme={{
+                  disableMinTrackTintColor: '#BBF246',
+                  maximumTrackTintColor: '#e5e7eb',
+                  minimumTrackTintColor: '#BBF246',
+                  cacheTrackTintColor: '#BBF246',
+                  bubbleBackgroundColor: '#192126',
+                  heartbeatColor: '#BBF246',
+                }}
+                renderThumb={() => <View style={styles.customThumb} />}
+                containerStyle={styles.awesomeSlider}
+              />
+            </View>
+
             <Text style={styles.helperText}>Defina o raio de exibição do mapa em quilômetros.</Text>
           </View>
         </ScrollView>
@@ -274,5 +312,53 @@ const styles = StyleSheet.create({
   primaryBtnText: {
     color: "#fff",
     fontWeight: "700",
+  },
+  sliderContainer: {
+    backgroundColor: "#F9FAFB",
+    borderRadius: 12,
+    padding: 12,
+    marginTop: 8,
+  },
+  sliderHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 20,
+  },
+  sliderBtn: {
+    width: 32,
+    height: 32,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  sliderBtnText: {
+    fontSize: 24,
+    color: "#9CA3AF",
+    fontWeight: "300",
+  },
+  sliderValueBox: {
+    flex: 1,
+    alignItems: "center",
+  },
+  sliderValueText: {
+    fontSize: 18,
+    fontWeight: "700",
+    color: "#111827",
+  },
+  awesomeSlider: {
+    height: 30,
+  },
+  customThumb: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: "#fff",
+    borderWidth: 2,
+    borderColor: "#BBF246",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 2,
+    elevation: 3,
   },
 });

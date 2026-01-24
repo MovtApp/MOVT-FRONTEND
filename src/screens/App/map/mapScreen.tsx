@@ -6,7 +6,7 @@ import { DetailsBottomSheet, PersonalTrainer } from "@components/DetailsBottomSh
 import { MapSettingSheet } from "@components/MapSettingSheet";
 import { GymCard } from "@components/GymCard";
 import BottomSheet from "@gorhom/bottom-sheet";
-import { Globe, Settings2, MapPin } from "lucide-react-native";
+import { Globe, Settings2, MapPin, LocateFixed } from "lucide-react-native";
 import { useLocationContext } from "@contexts/LocationContext";
 import { useNavigation } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
@@ -255,6 +255,7 @@ const MapScreen: React.FC = () => {
           loadingEnabled={true} // Mostra indicador de carregamento do mapa enquanto renderiza
           loadingBackgroundColor="#FFFFFF"
           loadingIndicatorColor="#666666"
+          showsMyLocationButton={false}
         >
 
 
@@ -321,6 +322,28 @@ const MapScreen: React.FC = () => {
           }}
         >
           <Settings2 size={30} color="#192126" />
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          onPress={() => {
+            if (location) {
+              mapRef.current?.animateToRegion({
+                latitude: location.latitude,
+                longitude: location.longitude,
+                latitudeDelta: latitudeDelta,
+                longitudeDelta: longitudeDelta,
+              }, 1000);
+            }
+          }}
+          activeOpacity={0.8}
+          style={{
+            width: 56,
+            height: 56,
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
+          <LocateFixed size={30} color="#192126" />
         </TouchableOpacity>
       </View>
       <DetailsBottomSheet
