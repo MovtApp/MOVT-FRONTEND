@@ -8,7 +8,7 @@ export type AppStackParamList = {
   ChatScreen: undefined; // Adicionando ChatScreen à lista de rotas
   Chat: { chatId: string; participantName: string }; // Adding protected chat route
   NewChat: undefined;
-  ProfilePFScreen: undefined;
+  ProfilePFScreen: { user?: any } | undefined;
   ProfilePJ:
   | {
     trainer?: {

@@ -10,15 +10,6 @@ import {
 import BottomSheet, { BottomSheetView } from "@gorhom/bottom-sheet";
 import { Slider } from "react-native-awesome-slider";
 import { useSharedValue } from "react-native-reanimated";
-// ProgressBar local para evitar dependências de terceiros - Removido componente não utilizado
-// function ProgressBar({ value }: { value: number }) {
-//   const clamped = Math.max(0, Math.min(1, value));
-//   return (
-//     <View style={styles.progress}>
-//       <View style={[styles.progressFill, { width: `${clamped * 100}%` }]} />
-//     </View>
-//   );
-// }
 
 interface MapSettingSheetProps {
   isOpen: boolean;
@@ -31,8 +22,6 @@ interface MapSettingSheetProps {
   onMapTypeChange: (type: "standard" | "satellite" | "hybrid" | "terrain") => void;
   showsUserLocation: boolean;
   onShowsUserLocationChange: (value: boolean) => void;
-  showsCompass: boolean;
-  onShowsCompassChange: (value: boolean) => void;
   displayRadiusKm: number;
   onDisplayRadiusKmChange: (value: number) => void;
 }
@@ -47,34 +36,27 @@ export function MapSettingSheet({
   onMapTypeChange,
   showsUserLocation,
   onShowsUserLocationChange,
-  showsCompass,
-  onShowsCompassChange,
   displayRadiusKm,
   onDisplayRadiusKmChange,
 }: MapSettingSheetProps) {
-  const snapPoints = useMemo(() => ["40%", "70%"], []);
+  const snapPoints = useMemo(() => ["56%"], []);
+
+  // Estado local para o valor exibido, evita re-renders no mapa durante o deslize
+  const [localRadius, setLocalRadius] = React.useState(displayRadiusKm);
 
   const progress = useSharedValue(displayRadiusKm);
   const min = useSharedValue(1);
   const max = useSharedValue(100);
 
-  // Sincroniza o valor do slider quando alterado externamente
+  // Sincroniza o valor do slider e do estado local quando alterado externamente (props ou botões +/-)
   React.useEffect(() => {
     progress.value = displayRadiusKm;
+    setLocalRadius(displayRadiusKm);
   }, [displayRadiusKm]);
-  // Remover estados de zoom
-  // const [mapType, setMapType] = useState<"standard" | "satellite" | "hybrid" | "terrain">("standard");
-  // const [showsUserLocation, setShowsUserLocation] = useState(true);
-  // const [showsCompass, setShowsCompass] = useState(false);
-  // const [zoomProgress, setZoomProgress] = useState(0.5); // 0..1
 
   if (!isOpen) {
     return null;
   }
-
-  // Remover funções de zoom
-  // const increaseZoom = () => setZoomProgress((v) => Math.min(1, v + 0.1));
-  // const decreaseZoom = () => setZoomProgress((v) => Math.max(0, v - 0.1));
 
   return (
     <BottomSheet
@@ -130,18 +112,7 @@ export function MapSettingSheet({
             </View>
           </View>
 
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Bússola</Text>
-            <View style={styles.rowBetween}>
-              <Text style={styles.itemLabel}>Exibir bússola</Text>
-              <Switch
-                value={showsCompass}
-                onValueChange={onShowsCompassChange}
-                trackColor={{ false: "#192126", true: "#BBF246" }}
-                thumbColor={showsCompass ? "#192126" : "#BBF246"}
-              />
-            </View>
-          </View>
+
 
           {/* Nova seção para área de exibição por km com Slider Customizado */}
           <View style={styles.section}>
@@ -157,11 +128,14 @@ export function MapSettingSheet({
                 </TouchableOpacity>
 
                 <View style={styles.sliderValueBox}>
-                  <Text style={styles.sliderValueText}>{displayRadiusKm}</Text>
+                  <Text style={styles.sliderValueText}>{localRadius}</Text>
                 </View>
 
                 <TouchableOpacity
-                  onPress={() => onDisplayRadiusKmChange(Math.min(100, displayRadiusKm + 1))}
+                  onPress={() => {
+                    const newValue = Math.min(100, displayRadiusKm + 1);
+                    onDisplayRadiusKmChange(newValue);
+                  }}
                   style={styles.sliderBtn}
                 >
                   <Text style={styles.sliderBtnText}>+</Text>
@@ -173,6 +147,9 @@ export function MapSettingSheet({
                 minimumValue={min}
                 maximumValue={max}
                 onValueChange={(value) => {
+                  setLocalRadius(Math.round(value));
+                }}
+                onSlidingComplete={(value) => {
                   onDisplayRadiusKmChange(Math.round(value));
                 }}
                 theme={{
@@ -333,7 +310,7 @@ const styles = StyleSheet.create({
   },
   sliderBtnText: {
     fontSize: 24,
-    color: "#9CA3AF",
+    color: "#192126",
     fontWeight: "300",
   },
   sliderValueBox: {
@@ -352,9 +329,9 @@ const styles = StyleSheet.create({
     width: 20,
     height: 20,
     borderRadius: 10,
-    backgroundColor: "#fff",
+    backgroundColor: "#192126",
     borderWidth: 2,
-    borderColor: "#BBF246",
+    borderColor: "#192126",
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.2,

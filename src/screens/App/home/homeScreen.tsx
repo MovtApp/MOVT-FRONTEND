@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useState, useRef, useCallback, useEffect } from "react";
 import {
   View,
   Text,
@@ -8,6 +8,7 @@ import {
   ImageBackground,
   Alert,
   Image,
+  ActivityIndicator,
 } from "react-native";
 import { Search, Play } from "lucide-react-native";
 import TrainingSelector from "../../../components/TrainingSelector";
@@ -72,15 +73,6 @@ const exerciseData: ExerciseItem[] = [
   },
 ];
 
-interface SearchEntry {
-  id: string;
-  title: string;
-  description?: string;
-  keywords: string[];
-  targetScreen?: keyof AppStackParamList;
-  extraAction?: () => void;
-}
-
 const HomeScreen: React.FC = () => {
   const [search, setSearch] = useState("");
   const [selectedGender] = useState<"male" | "female">("female");
@@ -88,191 +80,155 @@ const HomeScreen: React.FC = () => {
   const navigation = useNavigation<NativeStackNavigationProp<AppStackParamList>>();
   const { user } = useAuth();
 
-  const handleNotificationSheetHeightChange = (height: number | string) => {
-    setNotificationSheetHeight(height);
-  };
+  const [searchResults, setSearchResults] = useState<any[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
+  const searchTimeout = useRef<NodeJS.Timeout | null>(null);
 
-  const normalizeText = (value?: string) =>
-    (value || "")
-      .normalize("NFD")
-      .replace(/[\u0300-\u036f]/g, "")
-      .toLowerCase();
+  const performSearch = useCallback(async (query: string) => {
+    if (!query.trim()) {
+      setSearchResults([]);
+      return;
+    }
 
-  const searchEntries = useMemo<SearchEntry[]>(() => {
-    const entries: SearchEntry[] = [
-      ...(user
-        ? [
-            {
-              id: "profile",
-              title: user.name || "Seu perfil",
-              description: user.username ? `@${user.username}` : "Gerencie sua conta",
-              keywords: [
-                user.name || "",
-                user.username || "",
-                user.email || "",
-                "perfil",
-                "conta",
-                "usuario",
-                "account",
-              ],
-              targetScreen: "ProfilePFScreen" as keyof AppStackParamList,
-            },
-          ]
-        : []),
-      {
-        id: "data-dashboard",
-        title: "Painel de dados",
-        description: "Passos, batimentos, água, sono",
-        keywords: [
-          "dados",
-          "dashboard",
-          "relatorio",
-          "estatisticas",
-          "passos",
-          "batimentos",
-          "agua",
-          "sono",
-        ],
-        targetScreen: "DataScreen" as keyof AppStackParamList,
-      },
-      {
-        id: "calories",
-        title: "Calorias e nutrição",
-        description: "Resumo nutricional diário",
-        keywords: ["calorias", "nutricao", "dieta", "alimentacao", "consumo"],
-        targetScreen: "CaloriesScreen" as keyof AppStackParamList,
-      },
-      {
-        id: "steps",
-        title: "Monitor de passos",
-        description: "Metas e progresso diário",
-        keywords: ["passos", "steps", "caminhada", "andamento", "distancia"],
-        targetScreen: "StepsScreen" as keyof AppStackParamList,
-      },
-      {
-        id: "sleep",
-        title: "Sono e descanso",
-        description: "Qualidade do sono",
-        keywords: ["sono", "sleep", "descanso", "noturno", "qualidade", "horas"],
-        targetScreen: "SleepScreen" as keyof AppStackParamList,
-      },
-      {
-        id: "water",
-        title: "Hidratação",
-        description: "Controle de água ingerida",
-        keywords: ["agua", "hidratacao", "hidratação", "water", "líquidos"],
-        targetScreen: "WaterScreen" as keyof AppStackParamList,
-      },
-      {
-        id: "results",
-        title: "Resultados gerais",
-        description: "Radar de performance",
-        keywords: ["resultados", "performance", "radar", "comparativo"],
-        targetScreen: "ResultsScreen" as keyof AppStackParamList,
-      },
-      {
-        id: "cycling",
-        title: "Ciclismo",
-        description: "Mapeamento das rotas",
-        keywords: ["ciclismo", "bike", "rotas", "trajetos", "gps"],
-        targetScreen: "CyclingScreen" as keyof AppStackParamList,
-      },
-      {
-        id: "map",
-        title: "Mapa e rotas",
-        description: "Visualizar mapa e rotas",
-        keywords: ["mapa", "rotas", "trajetos", "localizacao", "explorar"],
-        targetScreen: "MapScreen" as keyof AppStackParamList,
-      },
-      {
-        id: "diet",
-        title: "Planos de dieta",
-        description: "Sugestões de refeições",
-        keywords: ["dieta", "refeicoes", "nutricao", "meal", "alimentacao"],
-        targetScreen: "DietScreen" as keyof AppStackParamList,
-      },
-      {
-        id: "chat",
-        title: "Chat e mensagens",
-        description: "Converse com especialistas",
-        keywords: ["chat", "mensagens", "comunicar", "ajuda", "suporte"],
-        targetScreen: "ChatScreen" as keyof AppStackParamList,
-      },
-    ];
+    if (!user?.sessionId) return;
 
-    const exerciseEntries = exerciseData.map<SearchEntry>((exercise) => ({
-      id: `exercise-${exercise.id}`,
-      title: exercise.title,
-      description: `${exercise.minutes} · ${exercise.calories}`,
-      keywords: [
-        exercise.title,
-        "exercicio",
-        "treino",
-        "popular",
-        exercise.calories,
-        exercise.minutes,
-      ],
-      extraAction: () =>
-        Alert.alert(
-          exercise.title,
-          "Localize este exercício na seção “Exercícios populares” para saber mais."
-        ),
-    }));
-
-    return [...entries, ...exerciseEntries];
+    try {
+      setIsSearching(true);
+      const { searchService } = await import("@services/searchService");
+      const results = await searchService.globalSearch(query, user.sessionId);
+      setSearchResults(results);
+    } catch (error) {
+      console.error("Erro ao pesquisar:", error);
+    } finally {
+      setIsSearching(false);
+    }
   }, [user]);
 
-  const filteredResults = useMemo(() => {
-    const term = normalizeText(search.trim());
-    if (!term) {
-      return [];
+  useEffect(() => {
+    if (searchTimeout.current) clearTimeout(searchTimeout.current);
+
+    if (search.trim()) {
+      searchTimeout.current = setTimeout(() => {
+        performSearch(search);
+      }, 500); // 500ms debounce
+    } else {
+      setSearchResults([]);
     }
 
-    return searchEntries.filter((entry) =>
-      entry.keywords.some((keyword) => normalizeText(keyword).includes(term))
-    );
-  }, [search, searchEntries]);
+    return () => {
+      if (searchTimeout.current) clearTimeout(searchTimeout.current);
+    };
+  }, [search, performSearch]);
 
-  const handleResultPress = (item: SearchEntry) => {
-    if (item.targetScreen) {
-      navigation.navigate(item.targetScreen as never);
-    }
-    if (item.extraAction) {
-      item.extraAction();
-    }
+  const handleResultPress = (item: any) => {
     setSearch("");
+    setSearchResults([]);
+
+    const nav = navigation as any;
+    const itemData = item.data || item;
+
+    // Logic to navigate based on type or target
+    if (item.target === "TrainerProfile" || item.type === "trainer") {
+      if (itemData.role === "trainer" || itemData.role === "personal") {
+        nav.navigate("ProfilePJ", { trainer: itemData });
+      } else {
+        nav.navigate("ProfilePFScreen", { user: itemData });
+      }
+    } else if (item.target === "ProfilePFScreen" || item.type === "user") {
+      nav.navigate("ProfilePFScreen", { user: itemData });
+    } else if (item.target === "DietDetails" || item.type === "diet") {
+      nav.navigate("DietDetails", { meal: itemData });
+    } else if (item.target === "TrainingDetails" || item.type === "training") {
+      nav.navigate("TrainingDetails", { training: itemData });
+    } else if (item.target === "CommunityDetails" || item.type === "community") {
+      nav.navigate("CommunityDetails", { community: itemData });
+    } else if (item.target === "MapScreen" || item.type === "gym") {
+      // For gyms, navigate to map and possibly pass the gym coordinates
+      nav.navigate("MapScreen", { selectedGym: item.type === 'gym' ? itemData : undefined });
+    } else if (item.targetScreen) {
+      nav.navigate(item.targetScreen);
+    }
+  };
+  const getBadgeColor = (type: string) => {
+    switch (type) {
+      case 'trainer': return '#192126';
+      case 'user': return '#6366F1'; // Purple for users
+      case 'gym': return '#BBF246';
+      case 'diet': return '#4ECDC4';
+      case 'community': return '#FF6B6B';
+      default: return '#6B7280';
+    }
+  };
+
+  const getBadgeTextColor = (type: string) => {
+    return type === 'gym' ? '#192126' : '#fff';
   };
 
   return (
     <View style={styles.container}>
       <Header notificationSheetHeight={notificationSheetHeight} />
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+      <View style={styles.searchWrapper}>
         <SearchInput
           value={search}
           onChangeText={setSearch}
-          placeholder="Pesquisar"
+          placeholder="Busque treinos, dietas, academias..."
           icon={<Search size={24} color="#888" />}
         />
         {!!search.trim().length && (
           <View style={styles.searchResultsContainer}>
-            {filteredResults.length > 0 ? (
-              filteredResults.map((result) => (
-                <TouchableOpacity
-                  key={result.id}
-                  style={styles.searchResultItem}
-                  onPress={() => handleResultPress(result)}
-                >
-                  <Text style={styles.searchResultTitle}>{result.title}</Text>
-                  {result.description ? (
-                    <Text style={styles.searchResultSubtitle}>{result.description}</Text>
-                  ) : null}
-                </TouchableOpacity>
-              ))
+            {isSearching ? (
+              <View style={{ padding: 16, alignItems: "center" }}>
+                <ActivityIndicator color="#BBF246" />
+                <Text style={{ marginTop: 8, fontSize: 12, color: "#6B7280" }}>Buscando...</Text>
+              </View>
+            ) : searchResults.length > 0 ? (
+              <ScrollView
+                style={{ maxHeight: 400 }}
+                showsVerticalScrollIndicator={false}
+                keyboardShouldPersistTaps="handled"
+              >
+                {searchResults.map((result, idx) => (
+                  <TouchableOpacity
+                    key={`${result.id}-${idx}`}
+                    style={styles.searchResultItem}
+                    onPress={() => handleResultPress(result)}
+                  >
+                    <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
+                      {result.image ? (
+                        <Image source={{ uri: result.image }} style={styles.resultAvatar} />
+                      ) : (
+                        <View style={[styles.resultAvatar, { backgroundColor: '#F3F4F6', alignItems: 'center', justifyContent: 'center' }]}>
+                          <Search size={16} color="#9CA3AF" />
+                        </View>
+                      )}
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.searchResultTitle} numberOfLines={1}>{result.title}</Text>
+                        {result.subtitle ? (
+                          <Text style={styles.searchResultSubtitle} numberOfLines={1}>{result.subtitle}</Text>
+                        ) : null}
+                      </View>
+                      <View style={{
+                        backgroundColor: getBadgeColor(result.type),
+                        paddingHorizontal: 8,
+                        paddingVertical: 4,
+                        borderRadius: 6
+                      }}>
+                        <Text style={{ fontSize: 10, fontWeight: "700", color: getBadgeTextColor(result.type), textTransform: "uppercase" }}>
+                          {result.type || "Geral"}
+                        </Text>
+                      </View>
+                    </View>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
             ) : (
               <Text style={styles.noSearchResultsText}>Nenhuma referência encontrada.</Text>
             )}
           </View>
         )}
+      </View>
+
+      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         <PromotionalBanner gender={selectedGender} />
         <TrainingSelector title="Selecione seu treino" containerStyle={{ marginBottom: 24 }} />
         <Communities />
@@ -305,7 +261,7 @@ const HomeScreen: React.FC = () => {
                       <TouchableOpacity
                         style={styles.playButton}
                         activeOpacity={0.7}
-                        onPress={() => {}}
+                        onPress={() => { }}
                       >
                         <Play size={12} fill={"#192126"} />
                       </TouchableOpacity>
@@ -320,7 +276,7 @@ const HomeScreen: React.FC = () => {
         <TrainingBanner
           title="Melhor treino de superiores"
           imageUrl="https://img.freepik.com/free-photo/view-woman-helping-man-exercise-gym_52683-98092.jpg?t=st=1758297406~exp=1758301006~hmac=66860a69d0b54e22b28d0831392e01278764d6b6d47e956a9576e041c9e016c2&w=1480"
-          onPress={() => {}}
+          onPress={() => { }}
         />
         <TheBestForYou />
         <ChallengesSection />
@@ -374,14 +330,29 @@ const styles = StyleSheet.create({
   content: {
     flex: 1,
     paddingHorizontal: 20,
+    paddingTop: 8,
+  },
+  searchWrapper: {
+    paddingHorizontal: 20,
     paddingTop: 20,
+    zIndex: 100,
+    position: "relative",
   },
   searchResultsContainer: {
-    marginBottom: 16,
+    position: "absolute",
+    top: 72,
+    left: 20,
+    right: 20,
+    backgroundColor: "#FFFFFF",
+    borderRadius: 12,
     borderWidth: 1,
     borderColor: "#E5E7EB",
-    borderRadius: 12,
-    backgroundColor: "#FFFFFF",
+    zIndex: 999,
+    elevation: 8,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 12,
   },
   searchResultItem: {
     paddingHorizontal: 16,
@@ -398,6 +369,11 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: "#6B7280",
     marginTop: 2,
+  },
+  resultAvatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
   },
   noSearchResultsText: {
     padding: 16,

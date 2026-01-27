@@ -58,4 +58,58 @@ export const userService = {
     });
     return response.data;
   },
+
+  getUserPosts: async (userId: string) => {
+    const headers = await getAuthHeaders();
+    const response = await api.get(`/user/${userId}/posts`, headers);
+    return response.data;
+  },
+
+  getUserProfile: async (userId: string) => {
+    const headers = await getAuthHeaders();
+    const response = await api.get(`/user/${userId}`, headers);
+    return response.data;
+  },
+
+  followUser: async (userId: string) => {
+    const headers = await getAuthHeaders();
+    const response = await api.post(`/user/${userId}/follow`, {}, headers);
+    return response.data;
+  },
+
+  unfollowUser: async (userId: string) => {
+    const headers = await getAuthHeaders();
+    const response = await api.delete(`/user/${userId}/unfollow`, headers);
+    return response.data;
+  },
+
+  getFollowStatus: async (userId: string) => {
+    const headers = await getAuthHeaders();
+    const response = await api.get(`/user/${userId}/follow-status`, headers);
+    return response.data;
+  },
+
+  getUserStats: async (userId: string) => {
+    const headers = await getAuthHeaders();
+    const response = await api.get(`/user/${userId}/stats`, headers);
+    return response.data;
+  },
+
+  getUserFollowers: async (userId: string) => {
+    const headers = await getAuthHeaders();
+    const response = await api.get(`/user/${userId}/followers`, headers);
+    return response.data;
+  },
+
+  getUserFollowing: async (userId: string) => {
+    const headers = await getAuthHeaders();
+    const response = await api.get(`/user/${userId}/following`, headers);
+    return response.data;
+  },
+
+  updateBio: async (bio: string) => {
+    const headers = await getAuthHeaders();
+    const response = await api.put("/user/bio", { bio }, headers);
+    return response.data;
+  },
 };

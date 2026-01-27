@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -12,29 +12,141 @@ import {
   ActivityIndicator,
 } from "react-native";
 import { useAuth } from "@contexts/AuthContext";
-import { Heart, Grid3X3, Bookmark, MapPin, Briefcase } from "lucide-react-native";
+import { Heart, Grid3X3, Bookmark, MessageCircle } from "lucide-react-native";
 import * as ImagePicker from "expo-image-picker";
 import { userService } from "@services/userService";
 import BackButton from "@components/BackButton";
+import FollowListModal from "@components/FollowListModal";
+import { useRoute, RouteProp, useNavigation } from "@react-navigation/native";
+import { AppStackParamList } from "../../../@types/routes";
 
 const { width } = Dimensions.get("window");
 
 const ProfilePFScreen = () => {
-  const { user, updateUser } = useAuth();
+  const { user: authUser, updateUser } = useAuth();
+  const route = useRoute<RouteProp<AppStackParamList, "ProfilePFScreen">>();
+  const navigation = useNavigation<any>();
+
+  // State for fully fetched user data
+  const [fetchedUser, setFetchedUser] = useState<any>(null);
+  const [loadingProfile, setLoadingProfile] = useState(false);
   const [activeTab, setActiveTab] = useState("Posts");
   const [loadingUpdate, setLoadingUpdate] = useState(false);
+  const [posts, setPosts] = useState<string[]>([]);
+  const [loadingPosts, setLoadingPosts] = useState(true);
 
-  // Mock de fotos para o grid seguindo a estética da imagem
-  const posts = [
-    "https://res.cloudinary.com/ditlmzgrh/image/upload/v1757838100/image_2_kgtuno.jpg",
-    "https://img.freepik.com/free-photo/view-woman-helping-man-exercise-gym_52683-98092.jpg",
-    "https://img.freepik.com/free-photo/medium-shot-people-helping-each-other-gym_23-2149591024.jpg",
-    "https://img.freepik.com/free-photo/man-helping-woman-with-her-workout-gym_23-2149591022.jpg",
-    "https://img.freepik.com/free-photo/man-working-out-gym_23-2149591020.jpg",
-    "https://img.freepik.com/free-photo/woman-working-out-gym_23-2149591018.jpg",
-  ];
+  // Stats and modal states
+  const [stats, setStats] = useState({ posts: 0, followers: 0, following: 0 });
+  const [loadingStats, setLoadingStats] = useState(true);
+  const [modalVisible, setModalVisible] = useState(false);
+  const [modalType, setModalType] = useState<"followers" | "following" | null>(null);
+
+  // Normalize user data to handle both AuthContext structure and Search results structure
+  // Priority: Fetched from DB > Route Param > Auth User
+  const baseUser = route.params?.user || authUser;
+
+  // Social state
+  const [isFollowing, setIsFollowing] = useState(baseUser?.isFollowing || false);
+  const [loadingFollow, setLoadingFollow] = useState(false);
+
+  const profileData = {
+    id: fetchedUser?.id || baseUser?.id || baseUser?.id_us,
+    name: fetchedUser?.name || baseUser?.name || baseUser?.title || "Usuário",
+    username: fetchedUser?.username || baseUser?.username || baseUser?.subtitle || "usuario",
+    photo: fetchedUser?.photo || baseUser?.photo || baseUser?.image || baseUser?.avatar_url,
+    banner: fetchedUser?.banner || baseUser?.banner || baseUser?.banner_url,
+    location: fetchedUser?.location || baseUser?.location || "São Paulo",
+    job_title: fetchedUser?.job_title || baseUser?.job_title || "Entusiasta Fitness",
+    bio: fetchedUser?.bio || baseUser?.bio || null,
+  };
+
+  const isOwnProfile = !route.params?.user || String(profileData.id) === String(authUser?.id);
+
+  // Fetch full profile, posts, follow status and stats
+  useEffect(() => {
+    async function loadFullProfile() {
+      const targetId = route.params?.user?.id || route.params?.user?.id_us || authUser?.id;
+      if (!targetId) return;
+
+      try {
+        setLoadingProfile(true);
+        setLoadingPosts(true);
+        setLoadingStats(true);
+
+        const promises: Promise<any>[] = [
+          userService.getUserProfile(String(targetId)),
+          userService.getUserPosts(String(targetId)),
+          userService.getUserStats(String(targetId))
+        ];
+
+        const [profileRes, postsRes, statsRes] = await Promise.all(promises);
+
+        if (profileRes.success) {
+          setFetchedUser(profileRes.data);
+          setIsFollowing(profileRes.data.isFollowing); // Update with absolute truth from DB
+        }
+        if (postsRes.success) {
+          setPosts(postsRes.data);
+        }
+        if (statsRes.success) {
+          setStats(statsRes.data);
+        }
+      } catch (error) {
+        console.error("Erro ao carregar dados do perfil:", error);
+      } finally {
+        setLoadingProfile(false);
+        setLoadingPosts(false);
+        setLoadingStats(false);
+      }
+    }
+
+    loadFullProfile();
+  }, [route.params?.user?.id, route.params?.user?.id_us, authUser?.id]);
+
+  const toggleFollow = async () => {
+    if (!profileData.id || loadingFollow) return;
+
+    if (isFollowing) {
+      Alert.alert(
+        "Deixar de seguir",
+        `Deseja parar de seguir ${profileData.name}?`,
+        [
+          { text: "Cancelar", style: "cancel" },
+          {
+            text: "Deixar de seguir",
+            style: "destructive",
+            onPress: async () => {
+              try {
+                setLoadingFollow(true);
+                const res = await userService.unfollowUser(String(profileData.id));
+                if (res.success) setIsFollowing(false);
+              } catch (error) {
+                console.error("Erro ao deixar de seguir:", error);
+                Alert.alert("Erro", "Não foi possível deixar de seguir.");
+              } finally {
+                setLoadingFollow(false);
+              }
+            }
+          }
+        ]
+      );
+      return;
+    }
+
+    try {
+      setLoadingFollow(true);
+      const res = await userService.followUser(String(profileData.id));
+      if (res.success) setIsFollowing(true);
+    } catch (error) {
+      console.error("Erro ao seguir:", error);
+      Alert.alert("Erro", "Não foi possível seguir.");
+    } finally {
+      setLoadingFollow(false);
+    }
+  };
 
   const handlePickImage = async (type: "avatar" | "banner") => {
+    if (!isOwnProfile) return;
     try {
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ["images"],
@@ -51,12 +163,14 @@ const ProfilePFScreen = () => {
           const response = await userService.updateAvatar(imageUri);
           if (response.success) {
             updateUser({ photo: response.data.photo });
+            setFetchedUser((prev: any) => ({ ...prev, photo: response.data.photo }));
             Alert.alert("Sucesso", "Foto de perfil atualizada!");
           }
         } else {
           const response = await userService.updateBanner(imageUri);
           if (response.success) {
             updateUser({ banner: response.data.banner });
+            setFetchedUser((prev: any) => ({ ...prev, banner: response.data.banner }));
             Alert.alert("Sucesso", "Banner atualizado!");
           }
         }
@@ -68,6 +182,18 @@ const ProfilePFScreen = () => {
       setLoadingUpdate(false);
     }
   };
+
+  if (loadingProfile && !fetchedUser && !route.params?.user) {
+    return (
+      <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
+        <ActivityIndicator size="large" color="#CBFB5E" />
+      </View>
+    );
+  }
+
+  // Placeholder URLs
+  const DEFAULT_AVATAR = "https://images.unsplash.com/photo-1633332755192-727a05c4013d?w=400&h=400&fit=crop";
+  const DEFAULT_BANNER = "https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?w=800&h=400&fit=crop";
 
   return (
     <View style={styles.container}>
@@ -81,70 +207,117 @@ const ProfilePFScreen = () => {
         {/* Banner de Topo */}
         <View style={styles.bannerContainer}>
           <Image
-            source={
-              user?.banner
-                ? { uri: user.banner }
-                : {
-                    uri: "https://res.cloudinary.com/ditlmzgrh/image/upload/v1767896239/Captura_de_tela_2026-01-08_151542_r3acpt.png",
-                  }
-            }
+            source={{ uri: profileData.banner || DEFAULT_BANNER }}
             style={styles.banner}
           />
-          <TouchableOpacity
-            onPress={() => handlePickImage("banner")}
-            disabled={loadingUpdate}
-          ></TouchableOpacity>
+          {isOwnProfile && (
+            <TouchableOpacity
+              onPress={() => handlePickImage("banner")}
+              disabled={loadingUpdate}
+              style={StyleSheet.absoluteFill}
+            />
+          )}
         </View>
 
         {/* Informações do Perfil */}
         <View style={styles.contentWrap}>
-          {/* Foto de Perfil + Botão Editar */}
+          {/* Foto de Perfil + Estatísticas */}
           <View style={styles.profileHeader}>
             <View style={styles.avatarContainer}>
               <Image
-                source={
-                  user?.photo
-                    ? { uri: user.photo }
-                    : {
-                        uri: "https://res.cloudinary.com/ditlmzgrh/image/upload/v1767896239/Captura_de_tela_2026-01-08_151542_r3acpt.png",
-                      }
-                }
+                source={{ uri: profileData.photo || DEFAULT_AVATAR }}
                 style={styles.avatar}
               />
+              {isOwnProfile && (
+                <TouchableOpacity
+                  onPress={() => handlePickImage("avatar")}
+                  disabled={loadingUpdate}
+                  style={StyleSheet.absoluteFill}
+                />
+              )}
+            </View>
+
+            {/* Estatísticas: Posts, Seguidores, Seguindo */}
+            <View style={styles.statsContainer}>
+              <TouchableOpacity style={styles.statItemHorizontal} activeOpacity={0.7}>
+                <Text style={styles.statNumber}>
+                  {loadingStats ? "..." : stats.posts}
+                </Text>
+                <Text style={styles.statLabel}>Publicações</Text>
+              </TouchableOpacity>
+
               <TouchableOpacity
-                onPress={() => handlePickImage("avatar")}
-                disabled={loadingUpdate}
-              ></TouchableOpacity>
+                style={styles.statItemHorizontal}
+                onPress={() => {
+                  setModalType("followers");
+                  setModalVisible(true);
+                }}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.statNumber}>
+                  {loadingStats ? "..." : stats.followers}
+                </Text>
+                <Text style={styles.statLabel}>Seguidores</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.statItemHorizontal}
+                onPress={() => {
+                  setModalType("following");
+                  setModalVisible(true);
+                }}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.statNumber}>
+                  {loadingStats ? "..." : stats.following}
+                </Text>
+                <Text style={styles.statLabel}>Seguindo</Text>
+              </TouchableOpacity>
             </View>
           </View>
 
-          {/* Nome e Username */}
+          {/* Nome e Bio */}
           <View style={styles.nameSection}>
-            <Text style={styles.nameText}>{user?.name || "Oliver Augusto"}</Text>
-            <Text style={styles.usernameText}>@{user?.username || "Oliver_guto"}</Text>
+            <Text style={styles.nameText}>{profileData.name}</Text>
+            {profileData.bio && (
+              <Text style={styles.bioText}>{profileData.bio}</Text>
+            )}
           </View>
 
-          {/* Linha de Status e Info */}
-          <View style={styles.statsRow}>
-            <View style={styles.statusItem}>
-              <View style={styles.statusDot} />
-              <Text style={styles.statusLabel}>Disponível agora</Text>
-            </View>
+          {/* Botões de Ação: Seguir e Mensagem */}
+          {!isOwnProfile && (
+            <View style={styles.followButtonContainer}>
+              <TouchableOpacity
+                style={[
+                  styles.followButton,
+                  isFollowing && styles.unfollowButton
+                ]}
+                onPress={toggleFollow}
+                disabled={loadingFollow}
+              >
+                {loadingFollow ? (
+                  <ActivityIndicator size="small" color={isFollowing ? "#1E293B" : "#fff"} />
+                ) : (
+                  <Text style={[
+                    styles.followButtonText,
+                    isFollowing && styles.unfollowButtonText
+                  ]}>
+                    {isFollowing ? "Seguindo" : "Seguir"}
+                  </Text>
+                )}
+              </TouchableOpacity>
 
-            <View style={styles.infoItem}>
-              <View style={styles.iconBox}>
-                <MapPin color="#6366F1" size={14} />
-              </View>
-              <Text style={styles.infoLabel}>São Paulo</Text>
+              <TouchableOpacity
+                style={styles.messageButton}
+                onPress={() => Alert.alert("Mensagem", "Funcionalidade de chat em breve!")}
+              >
+                <Text style={styles.messageButtonText}>Mensagem</Text>
+              </TouchableOpacity>
             </View>
+          )}
 
-            <View style={styles.infoItem}>
-              <View style={styles.iconBox}>
-                <Briefcase color="#6366F1" size={14} />
-              </View>
-              <Text style={styles.infoLabel}>Currículo</Text>
-            </View>
-          </View>
+          {/* Linha Separadora */}
+          <View style={styles.separator} />
 
           {/* Abas / Categorias */}
           <View style={styles.tabsContainer}>
@@ -174,13 +347,24 @@ const ProfilePFScreen = () => {
           </View>
 
           {/* Grid de Fotos */}
-          <View style={styles.grid}>
-            {posts.map((url, index) => (
-              <View key={index} style={styles.gridItem}>
-                <Image source={{ uri: url }} style={styles.gridImage} />
-              </View>
-            ))}
-          </View>
+          {loadingPosts ? (
+            <View style={{ padding: 40, alignItems: 'center' }}>
+              <ActivityIndicator color="#CBFB5E" />
+            </View>
+          ) : (
+            <View style={styles.grid}>
+              {posts.map((url, index) => (
+                <View key={index} style={styles.gridItem}>
+                  <Image source={{ uri: url }} style={styles.gridImage} />
+                </View>
+              ))}
+              {posts.length === 0 && (
+                <View style={{ width: '100%', alignItems: 'center', marginTop: 40 }}>
+                  <Text style={{ color: '#94A3B8' }}>Nenhum post encontrado.</Text>
+                </View>
+              )}
+            </View>
+          )}
         </View>
       </ScrollView>
 
@@ -189,6 +373,17 @@ const ProfilePFScreen = () => {
           <ActivityIndicator size="large" color="#CBFB5E" />
         </View>
       )}
+
+      <FollowListModal
+        visible={modalVisible}
+        type={modalType}
+        userId={profileData.id}
+        onClose={() => setModalVisible(false)}
+        onUserPress={(user) => {
+          setModalVisible(false);
+          navigation.push("ProfilePFScreen", { user });
+        }}
+      />
     </View>
   );
 };
@@ -200,7 +395,7 @@ const styles = StyleSheet.create({
   },
   backButtonContainer: {
     position: "absolute",
-    top: 50,
+    top: 30,
     left: 20,
     zIndex: 10,
   },
@@ -218,7 +413,7 @@ const styles = StyleSheet.create({
   },
   bannerContainer: {
     width: "100%",
-    height: 220,
+    height: 150,
   },
   banner: {
     width: "100%",
@@ -248,6 +443,17 @@ const styles = StyleSheet.create({
     width: "100%",
     height: "100%",
   },
+  statsContainer: {
+    flexDirection: "row",
+    alignItems: "flex-end",
+    gap: 16,
+    flex: 1,
+    justifyContent: "space-around",
+    marginBottom: 8,
+  },
+  statItemHorizontal: {
+    alignItems: "flex-start",
+  },
   settingsButton: {
     backgroundColor: "#F1F5F9",
     width: 44,
@@ -261,58 +467,57 @@ const styles = StyleSheet.create({
     marginTop: 10,
   },
   nameText: {
-    fontSize: 20,
+    fontSize: 16,
     fontWeight: "bold",
     color: "#1E293B",
+  },
+  bioText: {
+    fontSize: 12,
+    color: "#64748B",
+    marginTop: 6,
+    lineHeight: 20,
   },
   usernameText: {
     fontSize: 12,
     color: "#94A3B8",
     marginTop: 2,
   },
+  followButtonContainer: {
+    marginTop: 16,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+  separator: {
+    height: 1,
+    backgroundColor: "#94A3B8",
+    marginTop: 30,
+    marginBottom: 30,
+    marginHorizontal: -2
+  },
   statsRow: {
     flexDirection: "row",
     alignItems: "center",
+    justifyContent: "space-around",
     marginTop: 18,
-    gap: 16,
+    paddingHorizontal: 20,
   },
-  statusItem: {
-    flexDirection: "row",
+  statItem: {
     alignItems: "center",
-    gap: 6,
+    flex: 1,
   },
-  statusDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: "#22C55E",
-  },
-  statusLabel: {
-    fontSize: 13,
+  statNumber: {
+    fontSize: 14,
     fontWeight: "bold",
-    color: "#0F172A",
+    color: "#1E293B",
   },
-  infoItem: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-  },
-  iconBox: {
-    backgroundColor: "#EEF2FF", // Fundo azul claro/roxo dos ícones
-    width: 24,
-    height: 24,
-    borderRadius: 8,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  infoLabel: {
-    fontSize: 13,
-    fontWeight: "bold",
-    color: "#0F172A",
+  statLabel: {
+    fontSize: 10,
+    color: "#64748B",
   },
   tabsContainer: {
     flexDirection: "row",
-    marginTop: 35,
+    marginTop: 10,
     borderBottomWidth: 1,
     borderBottomColor: "#F1F5F9",
     paddingBottom: 15,
@@ -432,6 +637,46 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     zIndex: 999,
+  },
+  followButton: {
+    backgroundColor: "#1E293B",
+    paddingHorizontal: 18,
+    borderRadius: 10,
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    height: 36,
+  },
+  messageButton: {
+    flex: 1,
+    flexDirection: "row",
+    backgroundColor: "#F1F5F9",
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    paddingHorizontal: 20,
+    borderRadius: 10,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    height: 36,
+  },
+  messageButtonText: {
+    color: "#1E293B",
+    fontWeight: "bold",
+    fontSize: 12,
+  },
+  unfollowButton: {
+    backgroundColor: "#F1F5F9",
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+  },
+  followButtonText: {
+    color: "#fff",
+    fontWeight: "bold",
+    fontSize: 12,
+  },
+  unfollowButtonText: {
+    color: "#1E293B",
   },
 });
 

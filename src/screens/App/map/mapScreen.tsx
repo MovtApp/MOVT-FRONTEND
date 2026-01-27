@@ -13,7 +13,6 @@ import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { AppStackParamList } from "../../../@types/routes";
 import { getNearbyGyms, Gym } from "@services/gymService";
 import { useAuth } from "@contexts/AuthContext";
-import { Animated, Easing } from "react-native";
 
 const CustomGymMarker = ({ selected }: { selected: boolean }) => {
   const mainColor = selected ? "#059669" : "#B1F232";
@@ -66,7 +65,6 @@ const MapScreen: React.FC = () => {
     "standard"
   );
   const [showsUserLocation, setShowsUserLocation] = useState(true);
-  const [showsCompass, setShowsCompass] = useState(false);
   const [displayRadiusKm, setDisplayRadiusKm] = useState(50); // Valor inicial em 50Km para abranger mais áreas
   const [loadingTimeout, setLoadingTimeout] = useState(false);
 
@@ -128,10 +126,6 @@ const MapScreen: React.FC = () => {
     } else {
       setSelectedGym(gym);
     }
-  };
-
-  const handleCloseGymCard = () => {
-    setSelectedGym(null);
   };
 
   // Calcula os deltas com base no raio de exibição
@@ -248,7 +242,6 @@ const MapScreen: React.FC = () => {
           }}
           showsUserLocation={showsUserLocation}
           followsUserLocation={true}
-          showsCompass={showsCompass}
           toolbarEnabled={false}
           zoomControlEnabled={false}
           mapType={mapType}
@@ -368,8 +361,6 @@ const MapScreen: React.FC = () => {
         onMapTypeChange={setMapType}
         showsUserLocation={showsUserLocation}
         onShowsUserLocationChange={setShowsUserLocation}
-        showsCompass={showsCompass}
-        onShowsCompassChange={setShowsCompass}
         displayRadiusKm={displayRadiusKm}
         onDisplayRadiusKmChange={setDisplayRadiusKm}
       />
