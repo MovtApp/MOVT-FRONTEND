@@ -5,8 +5,10 @@ import { SafeAreaProvider } from "react-native-safe-area-context";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { Routes } from "@routes/index";
 import { AuthProvider, useAuth } from "@contexts/AuthContext";
+import { usePreloadChat } from "@/hooks/useChat";
 import { LocationProvider } from "@contexts/LocationContext";
 import { NotificationProvider } from "@contexts/NotificationContext";
+import { BottomNavProvider } from "@contexts/BottomNavContext";
 import { StatusBar, ActivityIndicator, View } from "react-native";
 import {
   useFonts,
@@ -25,6 +27,9 @@ function AppContent() {
 
   const { loading: isLoadingAuth, user } = useAuth();
   const [currentRoute, setCurrentRoute] = React.useState<"Auth" | "Verify" | "App">("Auth");
+
+  // Inicia o carregamento de chats em background
+  usePreloadChat();
 
   // Monitora mudanças no estado de autenticação e atualiza a rota atual
   React.useEffect(() => {
@@ -48,11 +53,13 @@ function AppContent() {
   }
 
   return (
-    <LocationProvider>
-      <NotificationProvider>
-        <Routes key={currentRoute} initialRouteName={currentRoute} />
-      </NotificationProvider>
-    </LocationProvider>
+    <BottomNavProvider>
+      <LocationProvider>
+        <NotificationProvider>
+          <Routes key={currentRoute} initialRouteName={currentRoute} />
+        </NotificationProvider>
+      </LocationProvider>
+    </BottomNavProvider>
   );
 }
 

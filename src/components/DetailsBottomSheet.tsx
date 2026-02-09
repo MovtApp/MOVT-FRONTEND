@@ -10,15 +10,9 @@ import {
 } from "react-native";
 import BottomSheet, { BottomSheetView } from "@gorhom/bottom-sheet";
 import { api } from "../services/api";
-import { Star } from "lucide-react-native";
+import { PersonalTrainerCard, PersonalTrainer } from "@components/PersonalTrainerCard";
 
-export interface PersonalTrainer {
-  id: string;
-  name: string;
-  description: string;
-  rating: number;
-  imageUrl: string;
-}
+export type { PersonalTrainer };
 
 interface DetailsBottomSheetProps {
   isOpen: boolean;
@@ -33,36 +27,6 @@ interface DetailsBottomSheetProps {
   onTrainerPress?: (trainer: PersonalTrainer) => void;
   onViewSelected?: (trainers: PersonalTrainer[]) => void;
 }
-
-// Componente para renderizar texto com truncamento inteligente
-const PersonalTrainerCard = ({
-  trainer,
-  onPress,
-}: {
-  trainer: PersonalTrainer;
-  onPress?: (t: PersonalTrainer) => void;
-}) => {
-  return (
-    <TouchableOpacity
-      style={styles.cardContainer}
-      activeOpacity={0.85}
-      onPress={() => onPress?.(trainer)}
-      accessibilityRole="button"
-    >
-      <Image source={{ uri: trainer.imageUrl }} style={styles.cardImage} />
-      <View style={styles.cardContent}>
-        <Text style={styles.cardTitle}>{trainer.name}</Text>
-        <Text style={styles.cardDescription} numberOfLines={2}>
-          {trainer.description}
-        </Text>
-        <View style={styles.cardRatingContainer}>
-          <Star size={16} color="#FFC107" fill="#FFC107" />
-          <Text style={styles.cardRatingText}>{trainer.rating} avaliações</Text>
-        </View>
-      </View>
-    </TouchableOpacity>
-  );
-};
 
 export function DetailsBottomSheet({
   isOpen,
@@ -213,44 +177,6 @@ const styles = StyleSheet.create({
     fontSize: 18,
     textAlign: "left",
     marginLeft: 10,
-  },
-  cardContainer: {
-    flexDirection: "row",
-    borderRadius: 12,
-    padding: 12,
-    marginBottom: 16,
-    alignItems: "center",
-    borderWidth: 1,
-    borderColor: "#E1EBF4",
-  },
-  cardImage: {
-    width: 116,
-    height: 104,
-    borderRadius: 8,
-    marginRight: 16,
-  },
-  cardContent: {
-    flex: 1,
-  },
-  cardTitle: {
-    fontSize: 16,
-    fontWeight: "bold",
-    color: "#111827",
-  },
-  cardDescription: {
-    fontSize: 14,
-    color: "#6b7280",
-    marginTop: 4,
-  },
-  cardRatingContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginTop: 8,
-  },
-  cardRatingText: {
-    marginLeft: 4,
-    fontSize: 14,
-    color: "#4b5563",
   },
   loaderContainer: {
     padding: 20,

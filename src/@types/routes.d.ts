@@ -6,7 +6,7 @@ export type AppStackParamList = {
   DietDetails: { meal: DietMeal };
   DataScreen: undefined;
   ChatScreen: undefined; // Adicionando ChatScreen à lista de rotas
-  Chat: { chatId: string; participantName: string }; // Adding protected chat route
+  Chat: { chatId: string; participantName: string; participantAvatar?: string; participantId: string }; // Adding protected chat route
   NewChat: undefined;
   ProfilePFScreen: { user?: any } | undefined;
   ProfilePJ:

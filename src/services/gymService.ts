@@ -18,6 +18,28 @@ export interface Gym {
     whatsapp?: string;
     ativo: boolean;
     distancia_km?: number;
+    // Google Places API fields
+    website?: string;
+    horarios_funcionamento?: {
+        [key: string]: Array<{
+            abre: string;
+            fecha: string;
+        }
+
+        >;
+    };
+    fotos?: Array<{
+        reference: string;
+        url: string;
+        width: number;
+        height: number;
+    }>;
+    google_place_id?: string;
+    google_maps_url?: string;
+    source?: 'cache' | 'google_places_api' | 'database';
+    cached_at?: string;
+    fetched_at?: string;
+    open_now?: boolean;
 }
 
 export async function listGyms(sessionId: string) {

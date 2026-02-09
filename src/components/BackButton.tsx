@@ -1,7 +1,8 @@
-import { TouchableOpacity, StyleSheet } from "react-native";
+import { TouchableOpacity, StyleSheet, Platform, ViewStyle, StyleProp } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
 import type { NavigationProp } from "@react-navigation/native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 type BackButtonProps = {
   to?: {
@@ -9,10 +10,17 @@ type BackButtonProps = {
     params?: Record<string, unknown>;
   };
   onPress?: () => void;
+  style?: StyleProp<ViewStyle>;
+  autoTopInset?: boolean;
 };
 
-const BackButton: React.FC<BackButtonProps> = ({ to, onPress }) => {
+const BackButton: React.FC<BackButtonProps> = ({ to, onPress, style, autoTopInset = false }) => {
   const navigation = useNavigation<NavigationProp<Record<string, object | undefined>>>();
+  const insets = useSafeAreaInsets();
+
+  const dynamicStyle = Platform.OS === 'android' && autoTopInset
+    ? { marginTop: insets.top > 0 ? insets.top + 20 : 40 }
+    : {};
 
   const handlePress = () => {
     if (onPress) {
@@ -29,7 +37,7 @@ const BackButton: React.FC<BackButtonProps> = ({ to, onPress }) => {
   };
 
   return (
-    <TouchableOpacity style={styles.button} onPress={handlePress}>
+    <TouchableOpacity style={[styles.button, dynamicStyle, style]} onPress={handlePress}>
       <Ionicons name="arrow-back" size={20} color="#fff" />
     </TouchableOpacity>
   );

@@ -1,10 +1,12 @@
 import React, { useRef, useState, useEffect } from "react";
-import { Text, View, TouchableOpacity, StyleSheet } from "react-native";
+import { Text, View, TouchableOpacity, StyleSheet, Platform } from "react-native";
 import MapView, { Marker } from "react-native-maps";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import TrainingSelector from "@components/TrainingSelector";
 import { DetailsBottomSheet, PersonalTrainer } from "@components/DetailsBottomSheet";
 import { MapSettingSheet } from "@components/MapSettingSheet";
 import { GymCard } from "@components/GymCard";
+import { GymDetailsSheet } from "@components/GymDetailsSheet";
 import BottomSheet from "@gorhom/bottom-sheet";
 import { Globe, Settings2, MapPin, LocateFixed } from "lucide-react-native";
 import { useLocationContext } from "@contexts/LocationContext";
@@ -44,6 +46,11 @@ const MapScreen: React.FC = () => {
   const [sheetIndex, setSheetIndex] = useState(1);
   const bottomSheetRef = useRef<BottomSheet>(null);
   const mapRef = useRef<MapView>(null);
+  const insets = useSafeAreaInsets();
+
+  const topPosition = Platform.OS === 'android'
+    ? (insets.top > 0 ? insets.top + 20 : 40)
+    : (insets.top > 0 ? insets.top + 10 : 40);
 
   const navigation = useNavigation<NativeStackNavigationProp<AppStackParamList>>();
 
@@ -59,6 +66,9 @@ const MapScreen: React.FC = () => {
   const [isMapSheetOpen, setIsMapSheetOpen] = useState(false);
   const [mapSheetIndex, setMapSheetIndex] = useState(0);
   const mapBottomSheetRef = useRef<BottomSheet>(null);
+
+  const [isGymDetailsOpen, setIsGymDetailsOpen] = useState(false);
+  const gymDetailsSheetRef = useRef<BottomSheet>(null);
 
   // Estados para as configurações do mapa
   const [mapType, setMapType] = useState<"standard" | "satellite" | "hybrid" | "terrain">(
@@ -82,22 +92,37 @@ const MapScreen: React.FC = () => {
     return () => clearTimeout(timeout);
   }, []);
 
+  const [isFirstLoad, setIsFirstLoad] = useState(true);
+
   // Buscar academias próximas quando a localização estiver disponível
   useEffect(() => {
     if (location && user?.sessionId) {
       fetchNearbyGyms();
 
-      // Centraliza o mapa no usuário suavemente na primeira vez ou se estiver seguindo
-      if (location && showsUserLocation) {
+      // Centraliza o mapa no usuário somente na primeira vez que a localização é carregada
+      if (isFirstLoad && location && showsUserLocation) {
         mapRef.current?.animateToRegion({
           latitude: location.latitude,
           longitude: location.longitude,
           latitudeDelta: latitudeDelta,
           longitudeDelta: longitudeDelta,
         }, 1000);
+        setIsFirstLoad(false);
       }
     }
-  }, [location?.latitude, location?.longitude, user, displayRadiusKm]);
+  }, [location?.latitude, location?.longitude, user, isFirstLoad]); // Removido displayRadiusKm daqui para ter efeito separado
+
+  // Efeito dedicado para atualizar o zoom quando o raio muda
+  useEffect(() => {
+    if (location && !isFirstLoad) {
+      mapRef.current?.animateToRegion({
+        latitude: location.latitude,
+        longitude: location.longitude,
+        latitudeDelta: latitudeDelta,
+        longitudeDelta: longitudeDelta,
+      }, 500);
+    }
+  }, [displayRadiusKm, location, isFirstLoad]); // Depende do displayRadiusKm e location
 
   const fetchNearbyGyms = async () => {
     if (!location || !user?.sessionId) return;
@@ -190,6 +215,12 @@ const MapScreen: React.FC = () => {
     mapBottomSheetRef.current?.expand();
   };
 
+  const handleOpenGymDetails = (gym: Gym) => {
+    setSelectedGym(gym);
+    setIsGymDetailsOpen(true);
+    gymDetailsSheetRef.current?.expand();
+  };
+
   // Tenta obter a localização novamente se estiver demorando
   const handleRetryLocation = () => {
     setLoadingTimeout(false);
@@ -241,7 +272,7 @@ const MapScreen: React.FC = () => {
             longitudeDelta: longitudeDelta,
           }}
           showsUserLocation={showsUserLocation}
-          followsUserLocation={true}
+          followsUserLocation={false}
           toolbarEnabled={false}
           zoomControlEnabled={false}
           mapType={mapType}
@@ -275,7 +306,7 @@ const MapScreen: React.FC = () => {
       <View
         style={{
           position: "absolute",
-          top: 40,
+          top: topPosition,
           left: 20,
           right: 0,
           backgroundColor: "transparent",
@@ -287,7 +318,7 @@ const MapScreen: React.FC = () => {
       <View
         style={{
           position: "absolute",
-          top: 100,
+          top: topPosition + 60, // Ajustado para ficar relativo ao TrainingSelector
           right: 20,
         }}
       >
@@ -366,11 +397,22 @@ const MapScreen: React.FC = () => {
       />
 
       {/* Card de Academia */}
-      {selectedGym && (
+      {selectedGym && !isGymDetailsOpen && (
         <View style={gymCardStyles.container}>
-          <GymCard gym={selectedGym} />
+          <GymCard
+            gym={selectedGym}
+            onDetailsPress={handleOpenGymDetails}
+          />
         </View>
       )}
+
+      <GymDetailsSheet
+        gym={selectedGym}
+        isOpen={isGymDetailsOpen}
+        onClose={() => setIsGymDetailsOpen(false)}
+        bottomSheetRef={gymDetailsSheetRef}
+        onTrainerPress={handleTrainerPress}
+      />
     </View>
   );
 };
@@ -378,7 +420,11 @@ const MapScreen: React.FC = () => {
 const gymCardStyles = StyleSheet.create({
   container: {
     position: "absolute",
-    bottom: 90, // Aumentado para 160 para subir o card e limpar a BottomNavigationBar
+    bottom: Platform.select({
+      ios: 100,
+      android: 80,
+      default: 90,
+    }),
     left: 20,
     right: 20,
     zIndex: 999, // Garantindo que fique acima de tudo

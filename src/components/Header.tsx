@@ -1,8 +1,9 @@
 import React, { useState } from "react";
-import { View, Image, TouchableOpacity, StyleSheet, Dimensions } from "react-native";
+import { View, Image, TouchableOpacity, StyleSheet, Dimensions, Platform } from "react-native";
 import { Bell, Menu } from "lucide-react-native";
 import { useNavigation, NavigationProp, CompositeNavigationProp } from "@react-navigation/native";
 import { DrawerNavigationProp } from "@react-navigation/drawer";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { AppStackParamList, AppDrawerParamList } from "../@types/routes";
 import NotificationModal from "./NotificationModal";
 
@@ -22,6 +23,7 @@ const Header: React.FC<HeaderProps> = ({
     NavigationProp<AppStackParamList>
   >;
   const navigation = useNavigation<HeaderNavigationProp>();
+  const insets = useSafeAreaInsets();
   const [isNotificationModalVisible, setIsNotificationModalVisible] = useState(false);
 
   const toggleNotificationModal = () => {
@@ -32,26 +34,29 @@ const Header: React.FC<HeaderProps> = ({
     navigation.openDrawer();
   };
 
+  // Ajuste específico: Android costuma precisar de mais respiro comparado ao iOS que já usa Safe Area bem
+  const paddingTop = Platform.OS === 'android'
+    ? (insets.top > 0 ? insets.top + 20 : 40)
+    : Math.max(insets.top, 10);
+
   return (
-    <View>
-      <View style={styles.header}>
-        <View style={styles.headerTop}>
-          <TouchableOpacity style={styles.menuButton} onPress={handleMenuPress}>
-            <Menu size={24} color="#000" />
+    <View style={[styles.header, { paddingTop }]}>
+      <View style={styles.headerTop}>
+        <TouchableOpacity style={styles.menuButton} onPress={handleMenuPress}>
+          <Menu size={24} color="#000" />
+        </TouchableOpacity>
+        <Image
+          source={{
+            uri: "https://res.cloudinary.com/ditlmzgrh/image/upload/v1758030169/MV_pukwcn.png",
+          }}
+          style={{ width: 80, height: 40 }}
+          resizeMode="cover"
+        />
+        {showNotifications && (
+          <TouchableOpacity style={styles.iconButton} onPress={toggleNotificationModal}>
+            <Bell size={24} color="#000" />
           </TouchableOpacity>
-          <Image
-            source={{
-              uri: "https://res.cloudinary.com/ditlmzgrh/image/upload/v1758030169/MV_pukwcn.png",
-            }}
-            style={{ width: 80, height: 40 }}
-            resizeMode="cover"
-          />
-          {showNotifications && (
-            <TouchableOpacity style={styles.iconButton} onPress={toggleNotificationModal}>
-              <Bell size={24} color="#000" />
-            </TouchableOpacity>
-          )}
-        </View>
+        )}
       </View>
       {showNotifications && (
         <NotificationModal
@@ -67,7 +72,7 @@ const Header: React.FC<HeaderProps> = ({
 const styles = StyleSheet.create({
   header: {
     backgroundColor: "#fff",
-    paddingVertical: 10,
+    paddingBottom: 10,
     alignItems: "center",
     justifyContent: "center",
     position: "relative",
@@ -79,7 +84,6 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     width: "100%",
     paddingHorizontal: 20,
-    paddingTop: 10,
   },
   menuButton: {
     padding: 10,

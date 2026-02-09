@@ -1,5 +1,6 @@
-import { View, TouchableOpacity, StyleSheet, Text } from "react-native";
+import { View, TouchableOpacity, StyleSheet, Text, Platform } from "react-native";
 import { useState, useEffect, useMemo } from "react";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { RootStackParamList, AppStackParamList, AppDrawerParamList } from "../@types/routes";
 import { ChartPie, House, Map, MessageCircle, Soup } from "lucide-react-native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
@@ -9,6 +10,7 @@ import {
   NavigationState,
   PartialState,
 } from "@react-navigation/native";
+import { useBottomNav } from "@contexts/BottomNavContext";
 
 interface NavItem {
   name: keyof AppStackParamList;
@@ -76,20 +78,32 @@ const getDeepRouteName = (
 };
 
 const BottomNavigationBar = () => {
+  const insets = useSafeAreaInsets();
   const navigation =
     useNavigation<NativeStackNavigationProp<RootStackParamList & AppDrawerParamList>>();
   const [activeTab, setActiveTab] = useState<keyof AppStackParamList>("HomeScreen");
   const currentScreen = useNavigationState((state) => getDeepRouteName(state) ?? null);
+  const { isVisible: isVisibleFromContext } = useBottomNav();
 
-  const appStackScreenNames = useMemo(
-    () => ["HomeScreen", "MapScreen", "DietScreen", "DataScreen", "ChatScreen"],
-    []
-  );
+  const bottomInset = useMemo(() => {
+    if (Platform.OS === "android") {
+      // Se tiver insets (botões virtuais), usamos o valor real. 
+      // Se for 0 (gestos ou botões físicos), usamos um valor menor (10) para ficar elegante.
+      return insets.bottom > 0 ? insets.bottom + 5 : 10;
+    }
+    // No iOS mantemos um pouco mais de espaço devido à "pill" de home
+    return insets.bottom || 12;
+  }, [insets.bottom]);
 
   // Verifica se a tela atual deve ocultar o BottomNavigationBar
   const shouldHide = useMemo(() => {
     return shouldHideBottomNavigationBar(currentScreen);
   }, [currentScreen]);
+
+  const appStackScreenNames = useMemo(
+    () => ["HomeScreen", "MapScreen", "DietScreen", "DataScreen", "ChatScreen"],
+    []
+  );
 
   useEffect(() => {
     if (currentScreen && appStackScreenNames.includes(currentScreen as keyof AppStackParamList)) {
@@ -133,13 +147,13 @@ const BottomNavigationBar = () => {
     });
   };
 
-  // Se deve esconder, retorna null
-  if (shouldHide) {
+  // Se deve esconder por tela ou por contexto, retorna null
+  if (shouldHide || !isVisibleFromContext) {
     return null;
   }
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { bottom: bottomInset }]}>
       {navItems.map((item: NavItem) => {
         const isActive = activeTab === item.name;
         return (
@@ -166,7 +180,6 @@ const styles = StyleSheet.create({
     height: 60,
     borderRadius: 100,
     marginHorizontal: 20,
-    marginBottom: 20,
     position: "absolute",
     bottom: 0,
     left: 0,

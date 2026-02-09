@@ -8,9 +8,10 @@ import {
   ActivityIndicator,
   Alert,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRoute, useNavigation } from "@react-navigation/native";
 import { Clock, CheckCircle, AlertCircle } from "lucide-react-native";
+import { Platform } from "react-native";
 import { useAuth } from "../../../contexts/AuthContext";
 import { getAvailability, createAppointment } from "../../../services/appointmentService";
 import BackButton from "../../../components/BackButton";
@@ -34,6 +35,11 @@ export function AppointmentScreen() {
   const route = useRoute();
   const navigation = useNavigation();
   const { user } = useAuth();
+  const insets = useSafeAreaInsets();
+
+  const paddingTop = Platform.OS === 'android'
+    ? (insets.top > 0 ? insets.top + 20 : 40)
+    : Math.max(insets.top, 10);
 
   const trainerId = (route.params as any)?.trainerId;
 
@@ -316,8 +322,8 @@ export function AppointmentScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
-      <View style={styles.headerContainer}>
+    <View style={styles.container}>
+      <View style={[styles.headerContainer, { paddingTop }]}>
         <View style={styles.headerTop}>
           <BackButton />
         </View>
@@ -421,7 +427,7 @@ export function AppointmentScreen() {
           </TouchableOpacity>
         )}
       </ScrollView>
-    </SafeAreaView>
+    </View>
   );
 }
 
@@ -435,7 +441,7 @@ const styles = StyleSheet.create({
   headerContainer: {
     backgroundColor: "#fff",
     paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingBottom: 12,
   },
   headerTop: {
     flexDirection: "row",

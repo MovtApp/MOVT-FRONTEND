@@ -1,14 +1,15 @@
 import React from "react";
-import { View, Text, StyleSheet } from "react-native";
-import { MapPin, Phone, Star } from "lucide-react-native";
+import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
+import { MapPin, Phone, Star, Globe } from "lucide-react-native";
 import { Gym } from "@services/gymService";
 
 interface GymCardProps {
     gym: Gym;
     onClose?: () => void;
+    onDetailsPress?: (gym: Gym) => void;
 }
 
-export const GymCard: React.FC<GymCardProps> = ({ gym }) => {
+export const GymCard: React.FC<GymCardProps> = ({ gym, onDetailsPress }) => {
     return (
         <View style={styles.container}>
             <View style={styles.header}>
@@ -38,6 +39,14 @@ export const GymCard: React.FC<GymCardProps> = ({ gym }) => {
                     </Text>
                 </View>
             </View>
+
+            <TouchableOpacity
+                onPress={() => onDetailsPress?.(gym)}
+                activeOpacity={0.7}
+                style={styles.detailsButton}
+            >
+                <Globe size={24} color="#059669" />
+            </TouchableOpacity>
         </View>
     );
 };
@@ -58,13 +67,13 @@ const styles = StyleSheet.create({
         alignItems: "center",
         justifyContent: "space-between",
         marginBottom: 12,
+        gap: 8,
     },
     title: {
         fontSize: 18,
         fontWeight: "bold",
         color: "#192126",
         flex: 1,
-        marginRight: 12,
     },
     ratingContainer: {
         flexDirection: "row",
@@ -87,11 +96,22 @@ const styles = StyleSheet.create({
         flexDirection: "row",
         alignItems: "center",
         gap: 8,
+        maxWidth: "85%",
     },
     infoText: {
         fontSize: 13,
         color: "#4A4A4A",
         flex: 1,
         lineHeight: 18,
+    },
+    detailsButton: {
+        position: "absolute",
+        bottom: 2,
+        right: 2,
+        width: 48,
+        height: 48,
+        borderRadius: 24,
+        alignItems: "center",
+        justifyContent: "center",
     },
 });

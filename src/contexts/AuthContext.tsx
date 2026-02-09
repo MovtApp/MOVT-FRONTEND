@@ -4,6 +4,7 @@ import { api } from "../services/api";
 
 interface User {
   id: string;
+  id_us?: string | number; // Adicionado para compatibilidade com o backend
   name: string;
   email: string;
   username: string;

@@ -8,9 +8,11 @@ import {
   FlatList,
   StyleSheet,
   StatusBar,
-  SafeAreaView,
   ActivityIndicator,
   Modal,
+  Platform,
+  Alert,
+  ActionSheetIOS,
 } from "react-native";
 import { Search, Plus, X } from "lucide-react-native";
 import Header from "@/components/Header";
@@ -60,12 +62,12 @@ const ChatScreen = () => {
     }
   }, [effectiveUserId]);
 
-  const chats = useChats(supabaseUserId || "");
+  const { chats, refreshChats, deleteChat } = useChats(supabaseUserId || "");
 
   const fetchContacts = useCallback(async () => {
     setLoadingContacts(true);
     try {
-      const resp = await api.get("/chat/contacts/mutual");
+      const resp = await api.get("/chat/contacts/following");
       setContacts(resp.data.data || []);
     } catch (e) {
       console.error("Error fetching contacts:", e);
@@ -77,7 +79,8 @@ const ChatScreen = () => {
   useFocusEffect(
     useCallback(() => {
       fetchContacts();
-    }, [fetchContacts])
+      refreshChats();
+    }, [fetchContacts, refreshChats])
   );
 
   const handleStartChat = async (targetUserId: number, targetUserName: string) => {
@@ -85,7 +88,12 @@ const ChatScreen = () => {
     try {
       const resp = await api.post("/chat", { participant2_id: targetUserId });
       if (resp.data.chatId) {
-        navigation.navigate("Chat", { chatId: resp.data.chatId, participantName: targetUserName });
+        navigation.navigate("Chat", {
+          chatId: resp.data.chatId,
+          participantName: targetUserName,
+          participantAvatar: contacts.find(c => c.id === targetUserId)?.avatar,
+          participantId: String(targetUserId)
+        } as any);
       }
     } catch (e) {
       console.error("Error starting chat:", e);
@@ -103,17 +111,72 @@ const ChatScreen = () => {
     );
   };
 
-  const filteredExistingChats = chats.filter((c) =>
-    getParticipantName(c).toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const filteredExistingChats = chats.filter((c) => {
+    const pName = getParticipantName(c);
+    console.log(`[ChatScreen] Chat ID: ${c.id}, Participant: ${pName}`);
+    return pName.toLowerCase().includes(searchQuery.toLowerCase());
+  });
+
+  const handleLongPressChat = (chat: Chat) => {
+    const pName = getParticipantName(chat);
+    const options = ["Excluir Conversa", "Cancelar"];
+    const destructiveButtonIndex = 0;
+    const cancelButtonIndex = 1;
+
+    if (Platform.OS === 'ios') {
+      ActionSheetIOS.showActionSheetWithOptions(
+        {
+          options,
+          destructiveButtonIndex,
+          cancelButtonIndex,
+          title: `Conversa com ${pName}`,
+          message: "Deseja excluir esta conversa? Esta ação não pode ser desfeita.",
+        },
+        (buttonIndex) => {
+          if (buttonIndex === destructiveButtonIndex) {
+            confirmDeleteChat(chat.id);
+          }
+        }
+      );
+    } else {
+      Alert.alert(
+        `Conversa com ${pName}`,
+        "Deseja excluir esta conversa? Esta ação não pode ser desfeita.",
+        [
+          { text: "Cancelar", style: "cancel" },
+          {
+            text: "Excluir Conversa",
+            style: "destructive",
+            onPress: () => confirmDeleteChat(chat.id)
+          },
+        ],
+        { cancelable: true }
+      );
+    }
+  };
+
+  const confirmDeleteChat = (chatId: string) => {
+    if (deleteChat) {
+      deleteChat(chatId);
+    }
+  };
 
   const renderChat = ({ item }: { item: Chat }) => {
     const unreadCount = item.unread_count || 0;
     const pName = getParticipantName(item);
+    const isMeLastSender = item.last_sender_id === supabaseUserId;
+
     return (
       <TouchableOpacity
         style={styles.chatItem}
-        onPress={() => navigation.navigate("Chat", { chatId: item.id, participantName: pName })}
+        onPress={() => navigation.navigate("Chat", {
+          chatId: item.id,
+          participantName: pName,
+          participantAvatar: item.participant_avatar,
+          participantId: item.participant1_id === supabaseUserId ? item.participant2_id : item.participant1_id
+        } as any)}
+        onLongPress={() => handleLongPressChat(item)}
+        delayLongPress={500}
       >
         <Image
           source={{ uri: item.participant_avatar || "https://i.pravatar.cc/150?img=4" }}
@@ -121,22 +184,36 @@ const ChatScreen = () => {
         />
         <View style={styles.chatContent}>
           <View style={styles.chatHeader}>
-            <Text style={[styles.chatName, unreadCount > 0 && styles.unreadText]}>{pName}</Text>
+            <Text
+              style={[styles.chatName, unreadCount > 0 && styles.unreadText]}
+              numberOfLines={1}
+            >
+              {pName}
+            </Text>
             <Text style={styles.chatTime}>
               {item.last_timestamp
                 ? new Date(item.last_timestamp).toLocaleTimeString([], {
-                    hour: "2-digit",
-                    minute: "2-digit",
-                  })
+                  hour: "2-digit",
+                  minute: "2-digit",
+                })
                 : "Agora"}
             </Text>
           </View>
-          <Text
-            style={[styles.chatMessage, unreadCount > 0 && styles.unreadMessage]}
-            numberOfLines={1}
-          >
-            {item.last_message || "Iniciar nova conversa..."}
-          </Text>
+          <View style={styles.chatFooter}>
+            <Text
+              style={[styles.chatMessage, unreadCount > 0 && styles.unreadMessage]}
+              numberOfLines={1}
+            >
+              {isMeLastSender ? "Você: " : ""}{item.last_message || "Iniciar nova conversa..."}
+            </Text>
+            {unreadCount > 0 && (
+              <View style={styles.unreadBadge}>
+                <Text style={styles.unreadBadgeText}>
+                  {unreadCount > 99 ? "99+" : unreadCount}
+                </Text>
+              </View>
+            )}
+          </View>
         </View>
       </TouchableOpacity>
     );
@@ -159,7 +236,7 @@ const ChatScreen = () => {
   );
 
   return (
-    <SafeAreaView style={styles.container}>
+    <View style={styles.container}>
       <StatusBar barStyle="dark-content" backgroundColor="#fff" />
       <Header />
 
@@ -217,9 +294,20 @@ const ChatScreen = () => {
                 keyExtractor={(item) => String(item.id)}
                 renderItem={renderContact}
                 ListEmptyComponent={
-                  <Text style={styles.modalEmpty}>
-                    Você ainda não segue ninguém para conversar.
-                  </Text>
+                  <View style={styles.modalEmptyContainer}>
+                    <Text style={styles.modalEmpty}>
+                      Você ainda não segue ninguém para conversar.
+                    </Text>
+                    <TouchableOpacity
+                      style={styles.discoverButton}
+                      onPress={() => {
+                        setIsModalVisible(false);
+                        navigation.navigate("ExplorerScreen");
+                      }}
+                    >
+                      <Text style={styles.discoverButtonText}>Descobrir Usuários</Text>
+                    </TouchableOpacity>
+                  </View>
                 }
                 contentContainerStyle={{ paddingBottom: 20 }}
               />
@@ -227,7 +315,7 @@ const ChatScreen = () => {
           </View>
         </View>
       </Modal>
-    </SafeAreaView>
+    </View>
   );
 };
 
@@ -276,12 +364,27 @@ const styles = StyleSheet.create({
     borderBottomColor: "#eee",
     paddingBottom: 12,
   },
-  chatHeader: { flexDirection: "row", justifyContent: "space-between", marginBottom: 4 },
-  chatName: { fontSize: 16, fontWeight: "600", color: "#333" },
-  chatTime: { fontSize: 13, color: "#aaa" },
-  chatMessage: { fontSize: 14, color: "#666" },
+  chatHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 2 },
+  chatFooter: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
+  chatName: { fontSize: 16, fontWeight: "600", color: "#000" },
+  chatTime: { fontSize: 12, color: "#999" },
+  chatMessage: { fontSize: 14, color: "#888", flex: 1, marginRight: 10 },
   unreadText: { fontWeight: "bold", color: "#000" },
-  unreadMessage: { fontWeight: "600", color: "#000" },
+  unreadMessage: { color: "#666", fontWeight: "500" },
+  unreadBadge: {
+    backgroundColor: "#BBF246",
+    minWidth: 18,
+    height: 18,
+    borderRadius: 9,
+    justifyContent: "center",
+    alignItems: "center",
+    paddingHorizontal: 4,
+  },
+  unreadBadgeText: {
+    color: "#000",
+    fontSize: 10,
+    fontWeight: "bold",
+  },
   emptyContainer: { paddingVertical: 60, alignItems: "center" },
   emptyText: { color: "#999", fontSize: 15 },
 
@@ -315,6 +418,21 @@ const styles = StyleSheet.create({
   contactNameText: { fontSize: 16, fontWeight: "600", color: "#333" },
   contactUsername: { fontSize: 13, color: "#999" },
   modalEmpty: { textAlign: "center", marginTop: 40, color: "#999" },
+  modalEmptyContainer: {
+    alignItems: "center",
+    marginTop: 40,
+  },
+  discoverButton: {
+    backgroundColor: "#BBF246",
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 20,
+    marginTop: 20,
+  },
+  discoverButtonText: {
+    color: "#000",
+    fontWeight: "bold",
+  },
 });
 
 export default ChatScreen;

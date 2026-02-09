@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { View, Text, TouchableOpacity, StyleSheet, Alert } from "react-native";
+import { View, Text, TouchableOpacity, StyleSheet, Alert, Platform } from "react-native";
 import BackButton from "@/components/BackButton";
 import SocialButton from "@/components/SocialButton";
 import { useNavigation } from "@react-navigation/native";
@@ -16,9 +16,8 @@ import * as Google from "expo-auth-session/providers/google";
 import { api } from "../../services/api";
 
 // URL da sua Edge Function que receberá os tokens dos provedores
-const SOCIAL_SIGN_IN_EDGE_FUNCTION_URL = `${
-  process.env.EXPO_PUBLIC_SUPABASE_URL || "https://ypnpdjgsyzdwsmnxsoqj.supabase.co"
-}/functions/v1/auth/social-sign-in`;
+const SOCIAL_SIGN_IN_EDGE_FUNCTION_URL = `${process.env.EXPO_PUBLIC_SUPABASE_URL || "https://ypnpdjgsyzdwsmnxsoqj.supabase.co"
+  }/functions/v1/auth/social-sign-in`;
 
 // Variáveis de ambiente (usa EXPO_PUBLIC_* e faz fallback)
 const GOOGLE_WEB_CLIENT_ID =
@@ -257,7 +256,7 @@ export const SignInScreen = () => {
 
   return (
     <View style={styles.container}>
-      <BackButton />
+      <BackButton autoTopInset={true} />
       <Text style={styles.title}>Entre na sua conta</Text>
       <Text style={styles.subtitle}>Digite seu e-mail e senha para fazer login</Text>
       <View style={{ marginTop: 30 }}>
@@ -327,7 +326,7 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: "#fff",
     paddingHorizontal: 20,
-    paddingTop: 30,
+    paddingTop: Platform.OS === 'android' ? 0 : 30, // Inset agora é controlado individualmente ou via SafeArea
   },
   title: {
     fontFamily: "Rubik_700Bold",

@@ -7,7 +7,6 @@ import {
   TouchableOpacity,
   StyleSheet,
   Dimensions,
-  SafeAreaView,
   ActivityIndicator,
   Alert,
   NativeSyntheticEvent,
@@ -156,10 +155,8 @@ const CommunityScreen: React.FC = () => {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
-      <View style={{ marginTop: 20 }}>
-        <Header showNotifications={true} />
-      </View>
+    <View style={styles.container}>
+      <Header showNotifications={true} />
 
       <ScrollView showsVerticalScrollIndicator={false}>
         <View style={styles.contentHeader}>
@@ -245,7 +242,7 @@ const CommunityScreen: React.FC = () => {
         )}
         <FooterVersion style={styles.footer} />
       </ScrollView>
-    </SafeAreaView>
+    </View>
   );
 };
 

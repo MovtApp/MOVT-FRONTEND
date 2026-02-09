@@ -5,10 +5,10 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  SafeAreaView,
   ActivityIndicator,
   Alert,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAuth } from "@contexts/AuthContext";
 import { listAppointments, cancelAppointment } from "@services/appointmentService";
 import Header from "@components/Header";
@@ -34,6 +34,7 @@ interface Appointment {
 
 export function Appointment() {
   const { user } = useAuth();
+  const insets = useSafeAreaInsets();
   // Função para verificar se uma data é anterior à data atual
   const isPastDate = (dateStr: string) => {
     const currentDate = new Date();
@@ -232,20 +233,18 @@ export function Appointment() {
   // Mostrar loading enquanto carrega os dados
   if (loading) {
     return (
-      <SafeAreaView style={styles.container}>
+      <View style={styles.container}>
         <Header showNotifications={true} />
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#192126" />
           <Text style={styles.loadingText}>Carregando agendamentos...</Text>
         </View>
-      </SafeAreaView>
+      </View>
     );
   }
   return (
-    <SafeAreaView style={styles.container}>
-      <View style={{ marginTop: 20 }}>
-        <Header showNotifications={true} />
-      </View>
+    <View style={styles.container}>
+      <Header showNotifications={true} />
       <ScrollView style={styles.scrollContent} showsVerticalScrollIndicator={false}>
         <View style={styles.contentHeader}>
           <Text style={styles.headerTitle}>Meus agendamentos</Text>
@@ -380,7 +379,7 @@ export function Appointment() {
           </View>
         )}
       </ScrollView>
-    </SafeAreaView>
+    </View>
   );
 }
 export default Appointment;

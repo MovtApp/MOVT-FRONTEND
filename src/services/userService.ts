@@ -112,4 +112,34 @@ export const userService = {
     const response = await api.put("/user/bio", { bio }, headers);
     return response.data;
   },
+  deletePost: async (postId: string) => {
+    const headers = await getAuthHeaders();
+    const response = await api.delete(`/user/posts/${postId}`, headers);
+    return response.data;
+  },
+  updatePost: async (postId: string, legenda: string) => {
+    const headers = await getAuthHeaders();
+    const response = await api.put(`/user/posts/${postId}`, { legenda }, headers);
+    return response.data;
+  },
+  toggleLike: async (postId: string) => {
+    const headers = await getAuthHeaders();
+    const response = await api.post(`/user/posts/${postId}/like`, {}, headers);
+    return response.data;
+  },
+  addComment: async (postId: string, comentario: string) => {
+    const headers = await getAuthHeaders();
+    const response = await api.post(`/user/posts/${postId}/comment`, { comentario }, headers);
+    return response.data;
+  },
+  getComments: async (postId: string) => {
+    const headers = await getAuthHeaders();
+    const response = await api.get(`/user/posts/${postId}/comments`, headers);
+    return response.data;
+  },
+  deleteComment: async (commentId: string) => {
+    const headers = await getAuthHeaders();
+    const response = await api.delete(`/user/posts/comments/${commentId}`, headers);
+    return response.data;
+  },
 };
