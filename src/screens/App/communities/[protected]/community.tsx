@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -13,13 +13,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRoute, useNavigation, RouteProp } from "@react-navigation/native";
-import {
-  Calendar,
-  Users,
-  Activity,
-  Trophy,
-  Phone,
-} from "lucide-react-native";
+import { Calendar, Users, Activity, Trophy, Phone } from "lucide-react-native";
 import BackButton from "@components/BackButton";
 import { StatsCard } from "@components/StatsCard";
 import { AppStackParamList, Community } from "../../../../@types/routes";
@@ -53,7 +47,10 @@ const CommunityDetails = () => {
   const loadDetails = async () => {
     if (!initialCommunity?.id_comunidade || !user?.sessionId) return;
     try {
-      const response = await getCommunityDetails(String(initialCommunity.id_comunidade), user.sessionId);
+      const response = await getCommunityDetails(
+        String(initialCommunity.id_comunidade),
+        user.sessionId
+      );
       // A API retorna { data: comunidade }
       const details = response.data || response;
       setCommunity(details);
@@ -93,7 +90,9 @@ const CommunityDetails = () => {
         year: "numeric",
         hour: "2-digit",
         minute: "2-digit",
-      }).format(date).replace(" ", " às ");
+      })
+        .format(date)
+        .replace(" ", " às ");
     } catch (e) {
       return dateString;
     }
@@ -144,7 +143,11 @@ const CommunityDetails = () => {
         <View style={styles.infoSection}>
           <Text style={styles.communityTitle}>
             {community.nome}{" "}
-            {totalMembers ? `(${totalMembers})` : (community.max_participantes ? `(${community.max_participantes}+)` : "(50+)")}
+            {totalMembers
+              ? `(${totalMembers})`
+              : community.max_participantes
+                ? `(${community.max_participantes}+)`
+                : "(50+)"}
           </Text>
           <Text style={styles.description}>
             {community.descricao ||
@@ -163,7 +166,9 @@ const CommunityDetails = () => {
             </View>
             <View style={styles.detailRow}>
               <Activity size={20} color="#192126" />
-              <Text style={styles.detailText}>{community.tipo_comunidade || community.categoria}</Text>
+              <Text style={styles.detailText}>
+                {community.tipo_comunidade || community.categoria}
+              </Text>
             </View>
             <View style={styles.detailRow}>
               <Users size={20} color="#192126" />
@@ -202,7 +207,9 @@ const CommunityDetails = () => {
                 members.map((member, index) => (
                   <Image
                     key={member.id_us || index}
-                    source={{ uri: member.avatar_url || `https://i.pravatar.cc/100?img=${index + 10}` }}
+                    source={{
+                      uri: member.avatar_url || `https://i.pravatar.cc/100?img=${index + 10}`,
+                    }}
                     style={[styles.avatar, { marginLeft: index === 0 ? 0 : -15 }]}
                   />
                 ))

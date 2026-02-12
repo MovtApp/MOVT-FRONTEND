@@ -91,8 +91,8 @@ const ChatScreen = () => {
         navigation.navigate("Chat", {
           chatId: resp.data.chatId,
           participantName: targetUserName,
-          participantAvatar: contacts.find(c => c.id === targetUserId)?.avatar,
-          participantId: String(targetUserId)
+          participantAvatar: contacts.find((c) => c.id === targetUserId)?.avatar,
+          participantId: String(targetUserId),
         } as any);
       }
     } catch (e) {
@@ -123,7 +123,7 @@ const ChatScreen = () => {
     const destructiveButtonIndex = 0;
     const cancelButtonIndex = 1;
 
-    if (Platform.OS === 'ios') {
+    if (Platform.OS === "ios") {
       ActionSheetIOS.showActionSheetWithOptions(
         {
           options,
@@ -147,7 +147,7 @@ const ChatScreen = () => {
           {
             text: "Excluir Conversa",
             style: "destructive",
-            onPress: () => confirmDeleteChat(chat.id)
+            onPress: () => confirmDeleteChat(chat.id),
           },
         ],
         { cancelable: true }
@@ -169,12 +169,15 @@ const ChatScreen = () => {
     return (
       <TouchableOpacity
         style={styles.chatItem}
-        onPress={() => navigation.navigate("Chat", {
-          chatId: item.id,
-          participantName: pName,
-          participantAvatar: item.participant_avatar,
-          participantId: item.participant1_id === supabaseUserId ? item.participant2_id : item.participant1_id
-        } as any)}
+        onPress={() =>
+          navigation.navigate("Chat", {
+            chatId: item.id,
+            participantName: pName,
+            participantAvatar: item.participant_avatar,
+            participantId:
+              item.participant1_id === supabaseUserId ? item.participant2_id : item.participant1_id,
+          } as any)
+        }
         onLongPress={() => handleLongPressChat(item)}
         delayLongPress={500}
       >
@@ -184,10 +187,7 @@ const ChatScreen = () => {
         />
         <View style={styles.chatContent}>
           <View style={styles.chatHeader}>
-            <Text
-              style={[styles.chatName, unreadCount > 0 && styles.unreadText]}
-              numberOfLines={1}
-            >
+            <Text style={[styles.chatName, unreadCount > 0 && styles.unreadText]} numberOfLines={1}>
               {pName}
             </Text>
             <Text style={styles.chatTime}>
@@ -204,13 +204,12 @@ const ChatScreen = () => {
               style={[styles.chatMessage, unreadCount > 0 && styles.unreadMessage]}
               numberOfLines={1}
             >
-              {isMeLastSender ? "Você: " : ""}{item.last_message || "Iniciar nova conversa..."}
+              {isMeLastSender ? "Você: " : ""}
+              {item.last_message || "Iniciar nova conversa..."}
             </Text>
             {unreadCount > 0 && (
               <View style={styles.unreadBadge}>
-                <Text style={styles.unreadBadgeText}>
-                  {unreadCount > 99 ? "99+" : unreadCount}
-                </Text>
+                <Text style={styles.unreadBadgeText}>{unreadCount > 99 ? "99+" : unreadCount}</Text>
               </View>
             )}
           </View>
@@ -364,7 +363,12 @@ const styles = StyleSheet.create({
     borderBottomColor: "#eee",
     paddingBottom: 12,
   },
-  chatHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 2 },
+  chatHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 2,
+  },
   chatFooter: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
   chatName: { fontSize: 16, fontWeight: "600", color: "#000" },
   chatTime: { fontSize: 12, color: "#999" },

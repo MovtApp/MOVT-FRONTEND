@@ -15,7 +15,7 @@ const globalChatCache: {
   list: [],
   messages: {},
   profiles: {},
-  lastFetch: 0
+  lastFetch: 0,
 };
 
 export interface Chat {
@@ -69,12 +69,12 @@ export const useChats = (userId: string) => {
 
     // Opcional: Escutar mudanças na tabela chats para atualizar a lista em tempo real
     const subscription = supabase
-      .channel('public:chats')
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'chats' }, () => {
+      .channel("public:chats")
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "chats" }, () => {
         console.log("Novo chat detectado!");
         fetchChats();
       })
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'chats' }, () => {
+      .on("postgres_changes", { event: "UPDATE", schema: "public", table: "chats" }, () => {
         console.log("Chat atualizado!");
         fetchChats();
       })
@@ -90,7 +90,7 @@ export const useChats = (userId: string) => {
 
     // Optimistic Update: Remove da UI e do cache
     const originalChats = [...chats];
-    const newChats = chats.filter(c => c.id !== chatId);
+    const newChats = chats.filter((c) => c.id !== chatId);
 
     setChats(newChats);
     globalChatCache.list = newChats;
@@ -128,79 +128,85 @@ export const useMessages = (chatId: string, userId: string) => {
   const isFetchingRef = useRef(false);
   const refreshTimerRef = useRef<NodeJS.Timeout | null>(null);
 
-  const fetchMessages = useCallback(async (isSilent = false) => {
-    if (!sessionId || !chatId) return;
+  const fetchMessages = useCallback(
+    async (isSilent = false) => {
+      if (!sessionId || !chatId) return;
 
-    // Evita múltiplas buscas pesadas ao mesmo tempo, mas permite o "silent" (realtime)
-    if (isFetchingRef.current && !isSilent) return;
+      // Evita múltiplas buscas pesadas ao mesmo tempo, mas permite o "silent" (realtime)
+      if (isFetchingRef.current && !isSilent) return;
 
-    if (isSilent) {
-      if (refreshTimerRef.current) clearTimeout(refreshTimerRef.current);
-      refreshTimerRef.current = setTimeout(() => executeFetch(), 400);
-      return;
-    }
-
-    await executeFetch();
-
-    async function executeFetch() {
-      isFetchingRef.current = true;
-      try {
-        const resp = await api.get(`/chat/${chatId}/messages`, {
-          params: { limit: 50, offset: 0 }
-        });
-        if (resp.status === 200) {
-          const data = resp.data.data || [];
-          const formatted: Message[] = data.map((msg: any) => ({
-            _id: msg.id,
-            text: msg.text || "",
-            image: msg.image_url,
-            createdAt: new Date(msg.created_at),
-            user: {
-              _id: msg.sender_id,
-              name: String(msg.sender_id) === String(userId) ? "Eu" : "Participante",
-              avatar: `https://i.pravatar.cc/150?u=${msg.sender_id}`,
-            },
-            read: !!msg.is_read
-          }));
-
-          setMessages(prev => {
-            const newMessages = (prev.length === 0 || !isSilent) ? formatted : (() => {
-              // Merge inteligente: Atualiza status de leitura e insere novas
-              const prevMap = new Map(prev.map(m => [String(m._id), m]));
-              let hasChanges = false;
-
-              const merged = formatted.map(newMsg => {
-                const existing = prevMap.get(String(newMsg._id));
-                if (existing) {
-                  if (existing.read !== newMsg.read) {
-                    hasChanges = true;
-                    return { ...existing, read: newMsg.read };
-                  }
-                  return existing;
-                }
-                hasChanges = true;
-                return newMsg;
-              });
-              // CORREÇÃO: Se a lista da API for menor, algo foi deletado
-              if (formatted.length < prev.length) {
-                console.log("[Chat Realtime] Mensagem deletada!");
-                return formatted;
-              }
-
-              return (hasChanges || formatted.length !== prev.length) ? merged : prev;
-            })();
-
-            globalChatCache.messages[chatId] = newMessages;
-            return newMessages;
-          });
-        }
-      } catch (e) {
-        console.error("useMessages fetch error:", e);
-      } finally {
-        isFetchingRef.current = false;
+      if (isSilent) {
+        if (refreshTimerRef.current) clearTimeout(refreshTimerRef.current);
+        refreshTimerRef.current = setTimeout(() => executeFetch(), 400);
+        return;
       }
-    }
-  }, [chatId, sessionId, userId]);
+
+      await executeFetch();
+
+      async function executeFetch() {
+        isFetchingRef.current = true;
+        try {
+          const resp = await api.get(`/chat/${chatId}/messages`, {
+            params: { limit: 50, offset: 0 },
+          });
+          if (resp.status === 200) {
+            const data = resp.data.data || [];
+            const formatted: Message[] = data.map((msg: any) => ({
+              _id: msg.id,
+              text: msg.text || "",
+              image: msg.image_url,
+              createdAt: new Date(msg.created_at),
+              user: {
+                _id: msg.sender_id,
+                name: String(msg.sender_id) === String(userId) ? "Eu" : "Participante",
+                avatar: `https://i.pravatar.cc/150?u=${msg.sender_id}`,
+              },
+              read: !!msg.is_read,
+            }));
+
+            setMessages((prev) => {
+              const newMessages =
+                prev.length === 0 || !isSilent
+                  ? formatted
+                  : (() => {
+                    // Merge inteligente: Atualiza status de leitura e insere novas
+                    const prevMap = new Map(prev.map((m) => [String(m._id), m]));
+                    let hasChanges = false;
+
+                    const merged = formatted.map((newMsg) => {
+                      const existing = prevMap.get(String(newMsg._id));
+                      if (existing) {
+                        if (existing.read !== newMsg.read) {
+                          hasChanges = true;
+                          return { ...existing, read: newMsg.read };
+                        }
+                        return existing;
+                      }
+                      hasChanges = true;
+                      return newMsg;
+                    });
+                    // CORREÇÃO: Se a lista da API for menor, algo foi deletado
+                    if (formatted.length < prev.length) {
+                      console.log("[Chat Realtime] Mensagem deletada!");
+                      return formatted;
+                    }
+
+                    return hasChanges || formatted.length !== prev.length ? merged : prev;
+                  })();
+
+              globalChatCache.messages[chatId] = newMessages;
+              return newMessages;
+            });
+          }
+        } catch (e) {
+          console.error("useMessages fetch error:", e);
+        } finally {
+          isFetchingRef.current = false;
+        }
+      }
+    },
+    [chatId, sessionId, userId]
+  );
 
   useEffect(() => {
     // Não limpa imediatamente para manter o cache visível
@@ -209,22 +215,22 @@ export const useMessages = (chatId: string, userId: string) => {
     const channel = supabase
       .channel(`chat_sync_${chatId}`)
       .on(
-        'postgres_changes',
+        "postgres_changes",
         {
-          event: '*',
-          schema: 'public',
-          table: 'messages',
-          filter: `chat_id=eq.${chatId}`
+          event: "*",
+          schema: "public",
+          table: "messages",
+          filter: `chat_id=eq.${chatId}`,
         },
         (payload) => {
           console.log("[Chat Realtime] Evento:", payload.eventType);
 
-          if (payload.eventType === 'DELETE') {
+          if (payload.eventType === "DELETE") {
             const deletedId = payload.old?.id;
             if (deletedId) {
-              setMessages(prev => {
-                if (prev.some(m => String(m._id) === String(deletedId))) {
-                  return prev.filter(m => String(m._id) !== String(deletedId));
+              setMessages((prev) => {
+                if (prev.some((m) => String(m._id) === String(deletedId))) {
+                  return prev.filter((m) => String(m._id) !== String(deletedId));
                 }
                 return prev;
               });
@@ -263,7 +269,7 @@ export const useMessages = (chatId: string, userId: string) => {
     try {
       const resp = await api.post(`/chat/${chatId}/messages`, {
         text: msg.text,
-        image_url: msg.image
+        image_url: msg.image,
       });
 
       if (resp.status === 201 || resp.status === 200) {
@@ -271,21 +277,27 @@ export const useMessages = (chatId: string, userId: string) => {
         const savedMsg = result.data;
 
         // Substituir a otimista pela real do banco
-        setMessages((prev) => prev.map(m => String(m._id) === String(tempId) ? {
-          ...m,
-          _id: savedMsg.id,
-          text: savedMsg.text ? savedMsg.text : msg.text,
-          createdAt: new Date(savedMsg.created_at),
-          image: savedMsg.image_url,
-          read: !!savedMsg.is_read
-        } : m));
+        setMessages((prev) =>
+          prev.map((m) =>
+            String(m._id) === String(tempId)
+              ? {
+                ...m,
+                _id: savedMsg.id,
+                text: savedMsg.text ? savedMsg.text : msg.text,
+                createdAt: new Date(savedMsg.created_at),
+                image: savedMsg.image_url,
+                read: !!savedMsg.is_read,
+              }
+              : m
+          )
+        );
       } else {
-        setMessages((prev) => prev.filter(m => String(m._id) !== String(tempId)));
+        setMessages((prev) => prev.filter((m) => String(m._id) !== String(tempId)));
         Alert.alert("Erro", "Erro ao enviar mensagem.");
       }
     } catch (e) {
       console.error("sendMessage error:", e);
-      setMessages((prev) => prev.filter(m => m._id !== tempId));
+      setMessages((prev) => prev.filter((m) => m._id !== tempId));
     }
   };
 
@@ -294,13 +306,13 @@ export const useMessages = (chatId: string, userId: string) => {
     try {
       const fileName = `${chatId}/${Date.now()}.jpg`;
       const formData = new FormData();
-      formData.append('file', {
+      formData.append("file", {
         uri: fileUri,
         name: fileName,
-        type: 'image/jpeg',
+        type: "image/jpeg",
       } as any);
 
-      const fileExt = fileUri.split('.').pop();
+      const fileExt = fileUri.split(".").pop();
       const path = `chat_attachments/${chatId}/${Date.now()}.${fileExt}`;
 
       // Para simplificar, usaremos o Blob se disponível ou o sistema de arquivos
@@ -308,14 +320,14 @@ export const useMessages = (chatId: string, userId: string) => {
       const blob = await response.blob();
 
       const { data, error } = await supabase.storage
-        .from('avatars') // Reutilizando bucket existente ou use um novo
+        .from("avatars") // Reutilizando bucket existente ou use um novo
         .upload(path, blob);
 
       if (error) throw error;
 
-      const { data: { publicUrl } } = supabase.storage
-        .from('avatars')
-        .getPublicUrl(path);
+      const {
+        data: { publicUrl },
+      } = supabase.storage.from("avatars").getPublicUrl(path);
 
       return publicUrl;
     } catch (e) {
@@ -349,7 +361,7 @@ export const useMessages = (chatId: string, userId: string) => {
 
       // Optimistic Update: Remove da UI e do cache
       const originalMessages = [...messages];
-      const newMessages = messages.filter(m => String(m._id) !== String(messageId));
+      const newMessages = messages.filter((m) => String(m._id) !== String(messageId));
 
       setMessages(newMessages);
       globalChatCache.messages[chatId] = newMessages;
@@ -386,7 +398,7 @@ export const useMessages = (chatId: string, userId: string) => {
     uploadMedia,
     markAsRead,
     deleteMessage,
-    refresh: fetchMessages
+    refresh: fetchMessages,
   };
 };
 
@@ -394,15 +406,18 @@ export const useMessages = (chatId: string, userId: string) => {
 export const useProfileCache = (userId: string) => {
   const [profile, setProfile] = useState<any>(globalChatCache.profiles[userId] || null);
 
-  const updateProfileCache = useCallback((data: any) => {
-    if (!userId) return;
-    globalChatCache.profiles[userId] = {
-      ...(globalChatCache.profiles[userId] || {}),
-      ...data,
-      lastUpdate: Date.now()
-    };
-    setProfile(globalChatCache.profiles[userId]);
-  }, [userId]);
+  const updateProfileCache = useCallback(
+    (data: any) => {
+      if (!userId) return;
+      globalChatCache.profiles[userId] = {
+        ...(globalChatCache.profiles[userId] || {}),
+        ...data,
+        lastUpdate: Date.now(),
+      };
+      setProfile(globalChatCache.profiles[userId]);
+    },
+    [userId]
+  );
 
   return { profile, updateProfileCache };
 };
@@ -427,9 +442,10 @@ export const usePreloadChat = () => {
           // Preload das mensagens e perfis dos 3 chats mais recentes
           chatList.slice(0, 3).forEach(async (chat: any) => {
             const myUUID = String(effectiveUserId).toLowerCase();
-            const otherUUID = String(chat.participant1_id).toLowerCase() === myUUID
-              ? chat.participant2_id
-              : chat.participant1_id;
+            const otherUUID =
+              String(chat.participant1_id).toLowerCase() === myUUID
+                ? chat.participant2_id
+                : chat.participant1_id;
 
             try {
               // Preload mensagens
@@ -444,7 +460,7 @@ export const usePreloadChat = () => {
                     name: String(msg.sender_id) === String(effectiveUserId) ? "Eu" : "Participante",
                     avatar: `https://i.pravatar.cc/150?u=${msg.sender_id}`,
                   },
-                  read: !!msg.is_read
+                  read: !!msg.is_read,
                 }));
               }
 
@@ -452,22 +468,28 @@ export const usePreloadChat = () => {
               const [pRes, sRes, poRes] = await Promise.allSettled([
                 userService.getUserProfile(otherUUID),
                 userService.getUserStats(otherUUID),
-                userService.getUserPosts(otherUUID)
+                userService.getUserPosts(otherUUID),
               ]);
 
-              const profileData = pRes.status === 'fulfilled' && pRes.value.success ? pRes.value.data : null;
+              const profileData =
+                pRes.status === "fulfilled" && pRes.value.success ? pRes.value.data : null;
               if (profileData) {
                 globalChatCache.profiles[otherUUID] = {
                   ...profileData,
-                  stats: sRes.status === 'fulfilled' && sRes.value.success ? sRes.value.data : null,
-                  posts: poRes.status === 'fulfilled' && poRes.value.success ? poRes.value.data : null,
-                  lastUpdate: Date.now()
+                  stats: sRes.status === "fulfilled" && sRes.value.success ? sRes.value.data : null,
+                  posts:
+                    poRes.status === "fulfilled" && poRes.value.success ? poRes.value.data : null,
+                  lastUpdate: Date.now(),
                 };
               }
-            } catch (e) { /* silent */ }
+            } catch (e) {
+              /* silent */
+            }
           });
         }
-      } catch (e) { /* silent */ }
+      } catch (e) {
+        /* silent */
+      }
     };
 
     preload();

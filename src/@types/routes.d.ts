@@ -6,48 +6,53 @@ export type AppStackParamList = {
   DietDetails: { meal: DietMeal };
   DataScreen: undefined;
   ChatScreen: undefined; // Adicionando ChatScreen à lista de rotas
-  Chat: { chatId: string; participantName: string; participantAvatar?: string; participantId: string }; // Adding protected chat route
+  Chat: {
+    chatId: string;
+    participantName: string;
+    participantAvatar?: string;
+    participantId: string;
+  }; // Adding protected chat route
   NewChat: undefined;
   ProfilePFScreen: { user?: any } | undefined;
   ProfilePJ:
-  | {
-    trainer?: {
-      id: string;
-      name: string;
-      description: string;
-      rating: number;
-      imageUrl: string;
-    };
-  }
-  | undefined;
+    | {
+        trainer?: {
+          id: string;
+          name: string;
+          description: string;
+          rating: number;
+          imageUrl: string;
+        };
+      }
+    | undefined;
   TrainerProfile:
-  | {
-    trainer?: {
-      id: string;
-      name: string;
-      username: string;
-      avatarUrl: string;
-      coverUrl: string;
-      isOnline: boolean;
-      location: string;
-      hasCurriculum: boolean;
-    };
-  }
-  | undefined;
+    | {
+        trainer?: {
+          id: string;
+          name: string;
+          username: string;
+          avatarUrl: string;
+          coverUrl: string;
+          isOnline: boolean;
+          location: string;
+          hasCurriculum: boolean;
+        };
+      }
+    | undefined;
   SelectedTrainers:
-  | {
-    trainers: {
-      id: string;
-      name: string;
-      username?: string;
-      avatarUrl?: string;
-      coverUrl?: string;
-      isOnline?: boolean;
-      location?: string;
-      hasCurriculum?: boolean;
-    }[];
-  }
-  | undefined;
+    | {
+        trainers: {
+          id: string;
+          name: string;
+          username?: string;
+          avatarUrl?: string;
+          coverUrl?: string;
+          isOnline?: boolean;
+          location?: string;
+          hasCurriculum?: boolean;
+        }[];
+      }
+    | undefined;
   CaloriesScreen: undefined;
   CyclingScreen: undefined;
   HeartbeatsScreen: undefined;
@@ -57,14 +62,14 @@ export type AppStackParamList = {
   ResultsScreen: undefined;
   TestWearScreen: undefined;
   Appointments:
-  | {
-    trainerId?: string;
-    trainer?: {
-      id?: string;
-      name?: string;
-    };
-  }
-  | undefined;
+    | {
+        trainerId?: string;
+        trainer?: {
+          id?: string;
+          name?: string;
+        };
+      }
+    | undefined;
   HeightScreen: undefined;
   WeightScreen: undefined;
   AgeScreen: undefined;
@@ -85,14 +90,14 @@ export type AppStackParamList = {
   TrainingDetails: { training: Training };
   ExplorerScreen: undefined;
   AppointmentScreen:
-  | {
-    trainerId?: string;
-    trainer?: {
-      id?: string;
-      name?: string;
-    };
-  }
-  | undefined;
+    | {
+        trainerId?: string;
+        trainer?: {
+          id?: string;
+          name?: string;
+        };
+      }
+    | undefined;
 };
 
 export interface Community {
@@ -186,24 +191,24 @@ export type InfoStackParamList = {
 export type RootStackParamList = {
   SplashScreen: undefined;
   App:
-  | {
-    screen: keyof AppDrawerParamList;
-    params?: AppDrawerParamList[keyof AppDrawerParamList];
-  }
-  | undefined;
+    | {
+        screen: keyof AppDrawerParamList;
+        params?: AppDrawerParamList[keyof AppDrawerParamList];
+      }
+    | undefined;
   Auth: { screen: keyof AuthStackParamList } | undefined;
   Info:
-  | {
-    screen: keyof InfoStackParamList;
-    params?: InfoStackParamList[keyof InfoStackParamList];
-  }
-  | undefined;
+    | {
+        screen: keyof InfoStackParamList;
+        params?: InfoStackParamList[keyof InfoStackParamList];
+      }
+    | undefined;
   Verify:
-  | {
-    screen: keyof VerifyStackParamList;
-    params?: VerifyStackParamList[keyof VerifyStackParamList];
-  }
-  | undefined;
+    | {
+        screen: keyof VerifyStackParamList;
+        params?: VerifyStackParamList[keyof VerifyStackParamList];
+      }
+    | undefined;
 };
 
 export default RootStackParamList;

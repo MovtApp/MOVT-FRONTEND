@@ -35,9 +35,8 @@ const Header: React.FC<HeaderProps> = ({
   };
 
   // Ajuste específico: Android costuma precisar de mais respiro comparado ao iOS que já usa Safe Area bem
-  const paddingTop = Platform.OS === 'android'
-    ? (insets.top > 0 ? insets.top + 20 : 40)
-    : Math.max(insets.top, 10);
+  const paddingTop =
+    Platform.OS === "android" ? (insets.top > 0 ? insets.top + 20 : 40) : Math.max(insets.top, 10);
 
   return (
     <View style={[styles.header, { paddingTop }]}>

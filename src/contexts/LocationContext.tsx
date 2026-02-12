@@ -44,7 +44,7 @@ export const LocationProvider: React.FC<{ children: React.ReactNode }> = ({ chil
             // Abre configurações para o usuário habilitar manualmente
             try {
               await Linking.openSettings();
-            } catch { }
+            } catch {}
           }
         }
       }

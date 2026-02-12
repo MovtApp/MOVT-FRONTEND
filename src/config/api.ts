@@ -1,24 +1,33 @@
 // Configuração da API
+// Para trocar entre Local e Vercel, basta alterar a variável EXPO_PUBLIC_API_URL no arquivo .env
+// ou definir a URL aqui diretamente.
+
 export const API_CONFIG = {
-  // URL de desenvolvimento (local) - IP da rede para Android
-  DEVELOPMENT: "http://192.168.15.45:3000/api",
-  // URL de produção (Vercel)
-  PRODUCTION: "",
+  // URL de desenvolvimento (local)
+  // localhost funciona para Web e iOS Simulator
+  // 10.0.2.2 é o endereço do host para o Android Emulator
+  LOCAL: "http://localhost:3000/api",
+  ANDROID_EMULATOR: "http://10.0.2.2:3000/api",
+
+  // URL de produção (Vercel) - Substitua após o deploy
+  PRODUCTION: "https://movt-backend.vercel.app/api",
 };
 
-// Determina qual URL usar baseado no ambiente
+// Determina qual URL usar
 export const getApiBaseUrl = (): string => {
-  // Em desenvolvimento, você pode usar __DEV__ para alternar
-  // ou definir uma variável de ambiente
-  if (__DEV__) {
-    // Para alternar entre desenvolvimento e produção durante o desenvolvimento
-    // você pode comentar/descomentar a linha abaixo
-    // return API_CONFIG.PRODUCTION; // Use PRODUCTION para testar com a API da Vercel
-    return API_CONFIG.DEVELOPMENT; // Use DEVELOPMENT para testar localmente
+  // 1. Sempre respeita a variável de ambiente se ela estiver definida explicitamente
+  if (process.env.EXPO_PUBLIC_API_URL) {
+    const url = process.env.EXPO_PUBLIC_API_URL;
+    return url.endsWith('/api') ? url : `${url}/api`;
   }
 
-  // Em produção, sempre usar a URL da Vercel
-  return API_CONFIG.PRODUCTION;
+  // 2. Se estiver em produção (ex: rodando na Vercel Web), usa a URL de produção automaticamente
+  if (process.env.NODE_ENV === 'production' || !__DEV__) {
+    return API_CONFIG.PRODUCTION;
+  }
+
+  // 3. Em desenvolvimento local, usa o localhost
+  return API_CONFIG.LOCAL;
 };
 
 // Exporta a URL base atual

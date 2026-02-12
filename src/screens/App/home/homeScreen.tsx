@@ -84,25 +84,28 @@ const HomeScreen: React.FC = () => {
   const [isSearching, setIsSearching] = useState(false);
   const searchTimeout = useRef<NodeJS.Timeout | null>(null);
 
-  const performSearch = useCallback(async (query: string) => {
-    if (!query.trim()) {
-      setSearchResults([]);
-      return;
-    }
+  const performSearch = useCallback(
+    async (query: string) => {
+      if (!query.trim()) {
+        setSearchResults([]);
+        return;
+      }
 
-    if (!user?.sessionId) return;
+      if (!user?.sessionId) return;
 
-    try {
-      setIsSearching(true);
-      const { searchService } = await import("@services/searchService");
-      const results = await searchService.globalSearch(query, user.sessionId);
-      setSearchResults(results);
-    } catch (error) {
-      console.error("Erro ao pesquisar:", error);
-    } finally {
-      setIsSearching(false);
-    }
-  }, [user]);
+      try {
+        setIsSearching(true);
+        const { searchService } = await import("@services/searchService");
+        const results = await searchService.globalSearch(query, user.sessionId);
+        setSearchResults(results);
+      } catch (error) {
+        console.error("Erro ao pesquisar:", error);
+      } finally {
+        setIsSearching(false);
+      }
+    },
+    [user]
+  );
 
   useEffect(() => {
     if (searchTimeout.current) clearTimeout(searchTimeout.current);
@@ -144,24 +147,30 @@ const HomeScreen: React.FC = () => {
       nav.navigate("CommunityDetails", { community: itemData });
     } else if (item.target === "MapScreen" || item.type === "gym") {
       // For gyms, navigate to map and possibly pass the gym coordinates
-      nav.navigate("MapScreen", { selectedGym: item.type === 'gym' ? itemData : undefined });
+      nav.navigate("MapScreen", { selectedGym: item.type === "gym" ? itemData : undefined });
     } else if (item.targetScreen) {
       nav.navigate(item.targetScreen);
     }
   };
   const getBadgeColor = (type: string) => {
     switch (type) {
-      case 'trainer': return '#192126';
-      case 'user': return '#6366F1'; // Purple for users
-      case 'gym': return '#BBF246';
-      case 'diet': return '#4ECDC4';
-      case 'community': return '#FF6B6B';
-      default: return '#6B7280';
+      case "trainer":
+        return "#192126";
+      case "user":
+        return "#6366F1"; // Purple for users
+      case "gym":
+        return "#BBF246";
+      case "diet":
+        return "#4ECDC4";
+      case "community":
+        return "#FF6B6B";
+      default:
+        return "#6B7280";
     }
   };
 
   const getBadgeTextColor = (type: string) => {
-    return type === 'gym' ? '#192126' : '#fff';
+    return type === "gym" ? "#192126" : "#fff";
   };
 
   return (
@@ -197,23 +206,45 @@ const HomeScreen: React.FC = () => {
                       {result.image ? (
                         <Image source={{ uri: result.image }} style={styles.resultAvatar} />
                       ) : (
-                        <View style={[styles.resultAvatar, { backgroundColor: '#F3F4F6', alignItems: 'center', justifyContent: 'center' }]}>
+                        <View
+                          style={[
+                            styles.resultAvatar,
+                            {
+                              backgroundColor: "#F3F4F6",
+                              alignItems: "center",
+                              justifyContent: "center",
+                            },
+                          ]}
+                        >
                           <Search size={16} color="#9CA3AF" />
                         </View>
                       )}
                       <View style={{ flex: 1 }}>
-                        <Text style={styles.searchResultTitle} numberOfLines={1}>{result.title}</Text>
+                        <Text style={styles.searchResultTitle} numberOfLines={1}>
+                          {result.title}
+                        </Text>
                         {result.subtitle ? (
-                          <Text style={styles.searchResultSubtitle} numberOfLines={1}>{result.subtitle}</Text>
+                          <Text style={styles.searchResultSubtitle} numberOfLines={1}>
+                            {result.subtitle}
+                          </Text>
                         ) : null}
                       </View>
-                      <View style={{
-                        backgroundColor: getBadgeColor(result.type),
-                        paddingHorizontal: 8,
-                        paddingVertical: 4,
-                        borderRadius: 6
-                      }}>
-                        <Text style={{ fontSize: 10, fontWeight: "700", color: getBadgeTextColor(result.type), textTransform: "uppercase" }}>
+                      <View
+                        style={{
+                          backgroundColor: getBadgeColor(result.type),
+                          paddingHorizontal: 8,
+                          paddingVertical: 4,
+                          borderRadius: 6,
+                        }}
+                      >
+                        <Text
+                          style={{
+                            fontSize: 10,
+                            fontWeight: "700",
+                            color: getBadgeTextColor(result.type),
+                            textTransform: "uppercase",
+                          }}
+                        >
                           {result.type || "Geral"}
                         </Text>
                       </View>
@@ -261,7 +292,7 @@ const HomeScreen: React.FC = () => {
                       <TouchableOpacity
                         style={styles.playButton}
                         activeOpacity={0.7}
-                        onPress={() => { }}
+                        onPress={() => {}}
                       >
                         <Play size={12} fill={"#192126"} />
                       </TouchableOpacity>
@@ -276,7 +307,7 @@ const HomeScreen: React.FC = () => {
         <TrainingBanner
           title="Melhor treino de superiores"
           imageUrl="https://img.freepik.com/free-photo/view-woman-helping-man-exercise-gym_52683-98092.jpg?t=st=1758297406~exp=1758301006~hmac=66860a69d0b54e22b28d0831392e01278764d6b6d47e956a9576e041c9e016c2&w=1480"
-          onPress={() => { }}
+          onPress={() => {}}
         />
         <TheBestForYou />
         <ChallengesSection />

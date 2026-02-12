@@ -10,7 +10,6 @@ import {
   KeyboardAvoidingView,
   Keyboard,
   Animated,
-  Dimensions,
   TouchableOpacity,
   ActionSheetIOS,
 } from "react-native";
@@ -21,7 +20,6 @@ import {
   Send,
   Actions,
   ActionsProps,
-  MessageText,
   Composer,
 } from "react-native-gifted-chat";
 import { useMessages, useProfileCache } from "@/hooks/useChat";
@@ -69,18 +67,21 @@ const Chat = () => {
           const [pRes, sRes, poRes] = await Promise.allSettled([
             userService.getUserProfile(participantId),
             userService.getUserStats(participantId),
-            userService.getUserPosts(participantId)
+            userService.getUserPosts(participantId),
           ]);
 
-          const profileData = pRes.status === 'fulfilled' && pRes.value.success ? pRes.value.data : null;
-          const statsData = sRes.status === 'fulfilled' && sRes.value.success ? sRes.value.data : null;
-          const postsData = poRes.status === 'fulfilled' && poRes.value.success ? poRes.value.data : null;
+          const profileData =
+            pRes.status === "fulfilled" && pRes.value.success ? pRes.value.data : null;
+          const statsData =
+            sRes.status === "fulfilled" && sRes.value.success ? sRes.value.data : null;
+          const postsData =
+            poRes.status === "fulfilled" && poRes.value.success ? poRes.value.data : null;
 
           if (profileData) {
             const fullProfile = {
               ...profileData,
               stats: statsData,
-              posts: postsData
+              posts: postsData,
             };
             setParticipantProfile(fullProfile);
             updateProfileCache(fullProfile);
@@ -94,7 +95,7 @@ const Chat = () => {
   }, [participantId]);
 
   useEffect(() => {
-    if (Platform.OS !== 'android') return;
+    if (Platform.OS !== "android") return;
 
     const showSubscription = Keyboard.addListener("keyboardDidShow", (e) => {
       Animated.spring(keyboardOffset, {
@@ -137,9 +138,7 @@ const Chat = () => {
         borderBottomColor: "#f0f0f0",
       },
       headerTitleAlign: "center",
-      headerTitle: () => (
-        <Text style={styles.headerTitleText}>{participantName || "Chat"}</Text>
-      ),
+      headerTitle: () => <Text style={styles.headerTitleText}>{participantName || "Chat"}</Text>,
       headerLeft: () => (
         <View style={{ marginLeft: 15 }}>
           <BackButton />
@@ -151,7 +150,7 @@ const Chat = () => {
           onPress={() => {
             if (participantId) {
               navigation.navigate("ProfilePFScreen", {
-                user: participantProfile || { id: participantId }
+                user: participantProfile || { id: participantId },
               });
             }
           }}
@@ -214,7 +213,7 @@ const Chat = () => {
     const destructiveButtonIndex = 0;
     const cancelButtonIndex = 1;
 
-    if (Platform.OS === 'ios') {
+    if (Platform.OS === "ios") {
       ActionSheetIOS.showActionSheetWithOptions(
         {
           options,
@@ -237,7 +236,7 @@ const Chat = () => {
           {
             text: "Excluir para todos",
             style: "destructive",
-            onPress: () => confirmDelete(msg._id)
+            onPress: () => confirmDelete(msg._id),
           },
         ],
         { cancelable: true }
@@ -251,27 +250,27 @@ const Chat = () => {
 
   const renderBubble = (props: any) => {
     const isLastMessage = !props.nextMessage || !props.nextMessage._id;
-    const marginBottom = isLastMessage ? (Platform.OS === 'ios' ? 10 : 40) : 2;
+    const marginBottom = isLastMessage ? (Platform.OS === "ios" ? 10 : 40) : 2;
 
     return (
       <Bubble
         {...props}
         containerStyle={{
-          left: { alignItems: 'flex-start', width: '100%' },
-          right: { alignItems: 'flex-end', width: '100%' },
+          left: { alignItems: "flex-start", width: "100%" },
+          right: { alignItems: "flex-end", width: "100%" },
         }}
         wrapperStyle={{
           right: {
             backgroundColor: "transparent",
             marginBottom: marginBottom,
-            maxWidth: '100%',
+            maxWidth: "100%",
             minWidth: 0,
             paddingHorizontal: 0,
           },
           left: {
             backgroundColor: "transparent",
             marginBottom: marginBottom,
-            maxWidth: '100%',
+            maxWidth: "100%",
             minWidth: 0,
             paddingHorizontal: 0,
           },
@@ -287,8 +286,8 @@ const Chat = () => {
 
     if (currentMessage && !isSameDay(currentMessage, previousMessage)) {
       const date = dayjs(currentMessage.createdAt);
-      const isToday = date.isSame(dayjs(), 'day');
-      const isYesterday = date.isSame(dayjs().subtract(1, 'day'), 'day');
+      const isToday = date.isSame(dayjs(), "day");
+      const isYesterday = date.isSame(dayjs().subtract(1, "day"), "day");
 
       let dateString = "";
       if (isToday) dateString = "Hoje";
@@ -308,7 +307,7 @@ const Chat = () => {
     if (!previousMessage || !previousMessage.createdAt) return false;
     const current = dayjs(currentMessage.createdAt);
     const previous = dayjs(previousMessage.createdAt);
-    return current.isSame(previous, 'day');
+    return current.isSame(previous, "day");
   };
 
   const renderMessageText = (props: any) => {
@@ -326,7 +325,7 @@ const Chat = () => {
             paddingRight: 6,
             paddingTop: 8,
             paddingBottom: 10,
-            overflow: 'hidden',
+            overflow: "hidden",
             borderRadius: 16,
           },
           isMyMessage
@@ -339,56 +338,62 @@ const Chat = () => {
               backgroundColor: "#F2F2F7",
               color: "#000",
               borderBottomLeftRadius: 4,
-            }
+            },
         ]}
         onLongPress={() => onLongPress(null, currentMessage)}
       >
         {currentMessage.text}
         <Text style={{ fontSize: 11, color: isMyMessage ? "rgba(255,255,255,0.7)" : "#8E8E93" }}>
-          {"\u00A0\u00A0"}{time}
+          {"\u00A0\u00A0"}
+          {time}
         </Text>
         {isMyMessage && (
           <Text>
             {"\u00A0"}
-            <CheckCheck color={isRead ? "#34B7F1" : "rgba(255,255,255,0.7)"} size={12} style={{ transform: [{ translateY: 2 }] }} />
+            <CheckCheck
+              color={isRead ? "#34B7F1" : "rgba(255,255,255,0.7)"}
+              size={12}
+              style={{ transform: [{ translateY: 2 }] }}
+            />
           </Text>
         )}
       </Text>
     );
   };
 
-  const renderFooter = useCallback(() => (
-    <Animated.View style={{ height: Platform.OS === 'android' ? keyboardOffset : 0 }} />
-  ), [keyboardOffset]);
-
-  const renderInputToolbar = useCallback((props: any) => (
-    <Animated.View style={{
-      transform: [{ translateY: Animated.multiply(keyboardOffset, -1) }],
-      position: 'absolute',
-      bottom: 0,
-      width: '100%',
-      zIndex: 10,
-    }}>
-      <InputToolbar
-        {...props}
-        containerStyle={[
-          styles.inputToolbar,
-          {
-            marginBottom: Platform.OS === 'ios' ? 20 : (insets.bottom > 0 ? insets.bottom : 0),
-            position: 'relative', // Override absolute from styles since parent is now absolute
-          }
-        ]}
-        primaryStyle={styles.inputToolbarPrimary}
-      />
-    </Animated.View>
-  ), [insets.bottom, keyboardOffset]);
-
-  const renderComposer = (props: any) => (
-    <Composer
-      {...props}
-      textInputStyle={styles.textInput}
-    />
+  const renderFooter = useCallback(
+    () => <Animated.View style={{ height: Platform.OS === "android" ? keyboardOffset : 0 }} />,
+    [keyboardOffset]
   );
+
+  const renderInputToolbar = useCallback(
+    (props: any) => (
+      <Animated.View
+        style={{
+          transform: [{ translateY: Animated.multiply(keyboardOffset, -1) }],
+          position: "absolute",
+          bottom: 0,
+          width: "100%",
+          zIndex: 10,
+        }}
+      >
+        <InputToolbar
+          {...props}
+          containerStyle={[
+            styles.inputToolbar,
+            {
+              marginBottom: Platform.OS === "ios" ? 20 : insets.bottom > 0 ? insets.bottom : 0,
+              position: "relative", // Override absolute from styles since parent is now absolute
+            },
+          ]}
+          primaryStyle={styles.inputToolbarPrimary}
+        />
+      </Animated.View>
+    ),
+    [insets.bottom, keyboardOffset]
+  );
+
+  const renderComposer = (props: any) => <Composer {...props} textInputStyle={styles.textInput} />;
 
   const renderActions = (props: ActionsProps) => (
     <Actions
@@ -403,7 +408,11 @@ const Chat = () => {
   );
 
   const renderSend = (props: any) => (
-    <Send {...props} disabled={!props.text?.trim() && !isUploading} containerStyle={styles.sendLayout}>
+    <Send
+      {...props}
+      disabled={!props.text?.trim() && !isUploading}
+      containerStyle={styles.sendLayout}
+    >
       <View style={styles.sendButton}>
         {isUploading ? (
           <ActivityIndicator size="small" color="#192126" />
@@ -481,16 +490,16 @@ const styles = StyleSheet.create({
     paddingTop: 0,
     paddingBottom: 0,
     marginBottom: 0,
-    position: 'absolute',
+    position: "absolute",
     bottom: 0,
-    width: '100%',
+    width: "100%",
     zIndex: 1,
   },
   inputToolbarPrimary: {
-    flexDirection: 'row',
+    flexDirection: "row",
     alignItems: "center",
     paddingHorizontal: 10,
-    justifyContent: 'center',
+    justifyContent: "center",
     paddingVertical: 8,
   },
   textInput: {
@@ -511,9 +520,9 @@ const styles = StyleSheet.create({
     marginBottom: 0,
     marginLeft: 0,
     marginRight: 8,
-    justifyContent: 'center',
-    alignItems: 'center',
-    height: '100%'
+    justifyContent: "center",
+    alignItems: "center",
+    height: "100%",
   },
   actionIconContainer: {
     width: 32,
@@ -526,10 +535,10 @@ const styles = StyleSheet.create({
     marginBottom: 0,
   },
   sendLayout: {
-    justifyContent: 'center',
-    alignItems: 'center',
-    height: '100%',
-    marginBottom: 0
+    justifyContent: "center",
+    alignItems: "center",
+    height: "100%",
+    marginBottom: 0,
   },
   sendButton: {
     width: 44,
@@ -542,41 +551,41 @@ const styles = StyleSheet.create({
     paddingRight: 12,
     paddingTop: 8,
     paddingBottom: 10, // Aumentado para dar respiro se a hora quebrar linha
-    position: 'relative',
+    position: "relative",
     minWidth: 80,
   },
   messageText: {
-    fontSize: Platform.OS === 'android' ? 14 : 15,
+    fontSize: Platform.OS === "android" ? 14 : 15,
     lineHeight: 21,
   },
   messageFooter: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    position: 'absolute',
+    flexDirection: "row",
+    alignItems: "center",
+    position: "absolute",
     bottom: 6,
     right: 10,
   },
   timeText: {
     fontSize: 11,
     marginRight: 4,
-    fontWeight: '400'
+    fontWeight: "400",
   },
 
   dayContainer: {
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
     marginTop: 10,
     marginBottom: 10,
   },
   dayText: {
-    backgroundColor: '#F0F0F0',
-    color: '#333',
+    backgroundColor: "#F0F0F0",
+    color: "#333",
     fontSize: 12,
-    fontWeight: '600',
+    fontWeight: "600",
     paddingHorizontal: 12,
     paddingVertical: 4,
     borderRadius: 10,
-    overflow: 'hidden',
+    overflow: "hidden",
   },
 });
 

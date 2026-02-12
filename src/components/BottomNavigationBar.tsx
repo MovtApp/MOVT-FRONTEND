@@ -87,7 +87,7 @@ const BottomNavigationBar = () => {
 
   const bottomInset = useMemo(() => {
     if (Platform.OS === "android") {
-      // Se tiver insets (botões virtuais), usamos o valor real. 
+      // Se tiver insets (botões virtuais), usamos o valor real.
       // Se for 0 (gestos ou botões físicos), usamos um valor menor (10) para ficar elegante.
       return insets.bottom > 0 ? insets.bottom + 5 : 10;
     }

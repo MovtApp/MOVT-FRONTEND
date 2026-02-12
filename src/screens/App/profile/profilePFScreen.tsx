@@ -14,7 +14,18 @@ import {
   TextInput,
 } from "react-native";
 import { useAuth } from "@contexts/AuthContext";
-import { Heart, Grid3X3, Bookmark, Plus, Camera, MoreVertical, X as CloseIcon, MessageCircle, Send, Trash2 } from "lucide-react-native";
+import {
+  Heart,
+  Grid3X3,
+  Bookmark,
+  Plus,
+  Camera,
+  MoreVertical,
+  X as CloseIcon,
+  MessageCircle,
+  Send,
+  Trash2,
+} from "lucide-react-native";
 import * as ImagePicker from "expo-image-picker";
 import { userService } from "@services/userService";
 import BackButton from "@components/BackButton";
@@ -23,6 +34,7 @@ import PostFormSheet from "@components/PostFormSheet";
 import { useRoute, RouteProp, useNavigation } from "@react-navigation/native";
 import { AppStackParamList } from "../../../@types/routes";
 import { useProfileCache } from "@/hooks/useChat";
+import { api } from "@services/api";
 
 const { width } = Dimensions.get("window");
 
@@ -34,7 +46,9 @@ const ProfilePFScreen = () => {
 
   // Normalize user data to handle both AuthContext structure and Search results structure
   const baseUser = route.params?.user || authUser;
-  const targetUserId = String(route.params?.user?.id || route.params?.user?.id_us || authUser?.id || "");
+  const targetUserId = String(
+    route.params?.user?.id || route.params?.user?.id_us || authUser?.id || ""
+  );
 
   // Use global cache for profile data
   const { profile: cachedProfile, updateProfileCache } = useProfileCache(targetUserId);
@@ -49,24 +63,26 @@ const ProfilePFScreen = () => {
   const [posts, setPosts] = useState<any[]>(() => {
     const sourcePosts = route.params?.user?.posts || cachedProfile?.posts;
     if (sourcePosts) {
-      return sourcePosts.filter((p: any) => p.tipo === 'POST' || !p.tipo);
+      return sourcePosts.filter((p: any) => p.tipo === "POST" || !p.tipo);
     }
     return [];
   });
-  const [loadingPosts, setLoadingPosts] = useState(!route.params?.user?.posts && !cachedProfile?.posts);
+  const [loadingPosts, setLoadingPosts] = useState(
+    !route.params?.user?.posts && !cachedProfile?.posts
+  );
 
   // Initialize highlights and tagged from params or cache
   const [highlights, setHighlights] = useState<any[]>(() => {
     const sourcePosts = route.params?.user?.posts || cachedProfile?.posts;
     if (sourcePosts) {
-      return sourcePosts.filter((p: any) => p.tipo === 'DESTAQUE');
+      return sourcePosts.filter((p: any) => p.tipo === "DESTAQUE");
     }
     return [];
   });
   const [tagged, setTagged] = useState<any[]>(() => {
     const sourcePosts = route.params?.user?.posts || cachedProfile?.posts;
     if (sourcePosts) {
-      return sourcePosts.filter((p: any) => p.tipo === 'MARCADO');
+      return sourcePosts.filter((p: any) => p.tipo === "MARCADO");
     }
     return [];
   });
@@ -77,8 +93,12 @@ const ProfilePFScreen = () => {
   const [isPostSheetOpen, setIsPostSheetOpen] = useState(false);
 
   // Stats and modal states
-  const [stats, setStats] = useState(route.params?.user?.stats || cachedProfile?.stats || { posts: 0, followers: 0, following: 0 });
-  const [loadingStats, setLoadingStats] = useState(!route.params?.user?.stats && !cachedProfile?.stats);
+  const [stats, setStats] = useState(
+    route.params?.user?.stats || cachedProfile?.stats || { posts: 0, followers: 0, following: 0 }
+  );
+  const [loadingStats, setLoadingStats] = useState(
+    !route.params?.user?.stats && !cachedProfile?.stats
+  );
   const [modalVisible, setModalVisible] = useState(false);
   const [modalType, setModalType] = useState<"followers" | "following" | null>(null);
 
@@ -95,9 +115,11 @@ const ProfilePFScreen = () => {
   const [loadingComments, setLoadingComments] = useState(false);
 
   // Social state
-  const [isFollowing, setIsFollowing] = useState(route.params?.user?.isFollowing || cachedProfile?.isFollowing || baseUser?.isFollowing || false);
+  const [isFollowing, setIsFollowing] = useState(
+    route.params?.user?.isFollowing || cachedProfile?.isFollowing || baseUser?.isFollowing || false
+  );
   const [loadingFollow, setLoadingFollow] = useState(false);
-
+  const [loadingChat, setLoadingChat] = useState(false);
 
   // Social states
   // highlights and tagged are now initialized above
@@ -133,7 +155,7 @@ const ProfilePFScreen = () => {
         const promises: Promise<any>[] = [
           userService.getUserProfile(String(targetId)),
           userService.getUserPosts(String(targetId)),
-          userService.getUserStats(String(targetId))
+          userService.getUserStats(String(targetId)),
         ];
 
         const [profileRes, postsRes, statsRes] = await Promise.all(promises);
@@ -146,9 +168,9 @@ const ProfilePFScreen = () => {
         if (postsRes.success) {
           const allPosts = postsRes.data;
           // Filtra os posts por tipo conforme definido na estrutura do banco
-          setPosts(allPosts.filter((p: any) => p.tipo === 'POST' || !p.tipo));
-          setHighlights(allPosts.filter((p: any) => p.tipo === 'DESTAQUE'));
-          setTagged(allPosts.filter((p: any) => p.tipo === 'MARCADO'));
+          setPosts(allPosts.filter((p: any) => p.tipo === "POST" || !p.tipo));
+          setHighlights(allPosts.filter((p: any) => p.tipo === "DESTAQUE"));
+          setTagged(allPosts.filter((p: any) => p.tipo === "MARCADO"));
           updateProfileCache({ posts: allPosts });
         }
         if (statsRes.success) {
@@ -175,9 +197,9 @@ const ProfilePFScreen = () => {
       const res = await userService.getUserPosts(String(targetId));
       if (res.success) {
         const allPosts = res.data;
-        setPosts(allPosts.filter((p: any) => p.tipo === 'POST' || !p.tipo));
-        setHighlights(allPosts.filter((p: any) => p.tipo === 'DESTAQUE'));
-        setTagged(allPosts.filter((p: any) => p.tipo === 'MARCADO'));
+        setPosts(allPosts.filter((p: any) => p.tipo === "POST" || !p.tipo));
+        setHighlights(allPosts.filter((p: any) => p.tipo === "DESTAQUE"));
+        setTagged(allPosts.filter((p: any) => p.tipo === "MARCADO"));
       }
     } catch (error) {
       console.error("Erro ao atualizar posts:", error);
@@ -190,29 +212,25 @@ const ProfilePFScreen = () => {
     if (!profileData.id || loadingFollow) return;
 
     if (isFollowing) {
-      Alert.alert(
-        "Deixar de seguir",
-        `Deseja parar de seguir ${profileData.name}?`,
-        [
-          { text: "Cancelar", style: "cancel" },
-          {
-            text: "Deixar de seguir",
-            style: "destructive",
-            onPress: async () => {
-              try {
-                setLoadingFollow(true);
-                const res = await userService.unfollowUser(String(profileData.id));
-                if (res.success) setIsFollowing(false);
-              } catch (error) {
-                console.error("Erro ao deixar de seguir:", error);
-                Alert.alert("Erro", "Não foi possível deixar de seguir.");
-              } finally {
-                setLoadingFollow(false);
-              }
+      Alert.alert("Deixar de seguir", `Deseja parar de seguir ${profileData.name}?`, [
+        { text: "Cancelar", style: "cancel" },
+        {
+          text: "Deixar de seguir",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              setLoadingFollow(true);
+              const res = await userService.unfollowUser(String(profileData.id));
+              if (res.success) setIsFollowing(false);
+            } catch (error) {
+              console.error("Erro ao deixar de seguir:", error);
+              Alert.alert("Erro", "Não foi possível deixar de seguir.");
+            } finally {
+              setLoadingFollow(false);
             }
-          }
-        ]
-      );
+          },
+        },
+      ]);
       return;
     }
 
@@ -225,6 +243,29 @@ const ProfilePFScreen = () => {
       Alert.alert("Erro", "Não foi possível seguir.");
     } finally {
       setLoadingFollow(false);
+    }
+  };
+
+  const handleMessage = async () => {
+    if (!profileData.id || loadingChat) return;
+
+    setLoadingChat(true);
+    try {
+      const response = await api.post("/chat", { participant2_id: profileData.id });
+      if (response.status === 200 || response.status === 201) {
+        const { chatId } = response.data;
+        navigation.navigate("Chat", {
+          chatId,
+          participantId: String(profileData.id),
+          participantName: profileData.name,
+          participantAvatar: profileData.photo,
+        });
+      }
+    } catch (error) {
+      console.error("Erro ao iniciar chat:", error);
+      Alert.alert("Erro", "Não foi possível iniciar a conversa.");
+    } finally {
+      setLoadingChat(false);
     }
   };
 
@@ -302,25 +343,27 @@ const ProfilePFScreen = () => {
     setSelectedPost((prev: any) => ({
       ...prev,
       is_liked: newIsLiked,
-      likes_count: newLikesCount
+      likes_count: newLikesCount,
     }));
 
     // Update main posts list as well
-    setPosts(prev => prev.map(p =>
-      p.id === selectedPost.id ? { ...p, is_liked: newIsLiked, likes_count: newLikesCount } : p
-    ));
+    setPosts((prev) =>
+      prev.map((p) =>
+        p.id === selectedPost.id ? { ...p, is_liked: newIsLiked, likes_count: newLikesCount } : p
+      )
+    );
 
     try {
       const res = await userService.toggleLike(String(selectedPost.id));
       if (!res.success) {
         // Rollback on error
         setSelectedPost(originalPost);
-        setPosts(prev => prev.map(p => p.id === originalPost.id ? originalPost : p));
+        setPosts((prev) => prev.map((p) => (p.id === originalPost.id ? originalPost : p)));
       }
     } catch (error) {
       console.error("Erro ao curtir:", error);
       setSelectedPost(originalPost);
-      setPosts(prev => prev.map(p => p.id === originalPost.id ? originalPost : p));
+      setPosts((prev) => prev.map((p) => (p.id === originalPost.id ? originalPost : p)));
     } finally {
       setIsLiking(false);
     }
@@ -338,19 +381,21 @@ const ProfilePFScreen = () => {
         const normalizedComment = {
           ...commentData,
           comment_user_id: currentUserId,
-          post_owner_id: selectedPost.id_us // ID do dono do post
+          post_owner_id: selectedPost.id_us, // ID do dono do post
         };
-        setComments(prev => [...prev, normalizedComment]);
+        setComments((prev) => [...prev, normalizedComment]);
         setNewComment("");
 
         // Update counts in selectedPost and main list
         setSelectedPost((prev: any) => ({
           ...prev,
-          comments_count: Number(prev.comments_count) + 1
+          comments_count: Number(prev.comments_count) + 1,
         }));
-        setPosts(prev => prev.map(p =>
-          p.id === selectedPost.id ? { ...p, comments_count: Number(p.comments_count) + 1 } : p
-        ));
+        setPosts((prev) =>
+          prev.map((p) =>
+            p.id === selectedPost.id ? { ...p, comments_count: Number(p.comments_count) + 1 } : p
+          )
+        );
       }
     } catch (error) {
       console.error("Erro ao comentar:", error);
@@ -361,35 +406,35 @@ const ProfilePFScreen = () => {
   };
 
   const handleDeleteComment = async (commentId: string) => {
-    Alert.alert(
-      "Excluir Comentário",
-      "Deseja remover este comentário?",
-      [
-        { text: "Cancelar", style: "cancel" },
-        {
-          text: "Excluir",
-          style: "destructive",
-          onPress: async () => {
-            try {
-              const res = await userService.deleteComment(commentId);
-              if (res.success) {
-                setComments(prev => prev.filter(c => String(c.id) !== String(commentId)));
-                setSelectedPost((prev: any) => ({
-                  ...prev,
-                  comments_count: Math.max(0, Number(prev.comments_count) - 1)
-                }));
-                setPosts(prev => prev.map(p =>
-                  p.id === selectedPost.id ? { ...p, comments_count: Math.max(0, Number(p.comments_count) - 1) } : p
-                ));
-              }
-            } catch (error) {
-              console.error("Erro ao excluir comentário:", error);
-              Alert.alert("Erro", "Não foi possível excluir o comentário.");
+    Alert.alert("Excluir Comentário", "Deseja remover este comentário?", [
+      { text: "Cancelar", style: "cancel" },
+      {
+        text: "Excluir",
+        style: "destructive",
+        onPress: async () => {
+          try {
+            const res = await userService.deleteComment(commentId);
+            if (res.success) {
+              setComments((prev) => prev.filter((c) => String(c.id) !== String(commentId)));
+              setSelectedPost((prev: any) => ({
+                ...prev,
+                comments_count: Math.max(0, Number(prev.comments_count) - 1),
+              }));
+              setPosts((prev) =>
+                prev.map((p) =>
+                  p.id === selectedPost.id
+                    ? { ...p, comments_count: Math.max(0, Number(p.comments_count) - 1) }
+                    : p
+                )
+              );
             }
+          } catch (error) {
+            console.error("Erro ao excluir comentário:", error);
+            Alert.alert("Erro", "Não foi possível excluir o comentário.");
           }
-        }
-      ]
-    );
+        },
+      },
+    ]);
   };
 
   const handleDeletePost = () => {
@@ -398,32 +443,28 @@ const ProfilePFScreen = () => {
       return;
     }
 
-    Alert.alert(
-      "Excluir Publicação",
-      "Tem certeza que deseja excluir esta foto permanentemente?",
-      [
-        { text: "Cancelar", style: "cancel" },
-        {
-          text: "Excluir",
-          style: "destructive",
-          onPress: async () => {
-            try {
-              const res = await userService.deletePost(String(selectedPost.id));
-              if (res.success) {
-                setPosts(prev => prev.filter(p => p.id !== selectedPost.id));
-                setManageModalVisible(false);
-                Alert.alert("Sucesso", "Publicação excluída.");
-              } else {
-                Alert.alert("Erro", res.message || "Não foi possível excluir a publicação.");
-              }
-            } catch (error) {
-              console.error("Erro ao excluir post:", error);
-              Alert.alert("Erro", "Ocorreu um problema ao tentar excluir.");
+    Alert.alert("Excluir Publicação", "Tem certeza que deseja excluir esta foto permanentemente?", [
+      { text: "Cancelar", style: "cancel" },
+      {
+        text: "Excluir",
+        style: "destructive",
+        onPress: async () => {
+          try {
+            const res = await userService.deletePost(String(selectedPost.id));
+            if (res.success) {
+              setPosts((prev) => prev.filter((p) => p.id !== selectedPost.id));
+              setManageModalVisible(false);
+              Alert.alert("Sucesso", "Publicação excluída.");
+            } else {
+              Alert.alert("Erro", res.message || "Não foi possível excluir a publicação.");
             }
+          } catch (error) {
+            console.error("Erro ao excluir post:", error);
+            Alert.alert("Erro", "Ocorreu um problema ao tentar excluir.");
           }
-        }
-      ]
-    );
+        },
+      },
+    ]);
   };
 
   const handleEditPost = () => {
@@ -433,15 +474,17 @@ const ProfilePFScreen = () => {
 
   if (loadingProfile && !fetchedUser && !route.params?.user) {
     return (
-      <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
+      <View style={[styles.container, { justifyContent: "center", alignItems: "center" }]}>
         <ActivityIndicator size="large" color="#CBFB5E" />
       </View>
     );
   }
 
   // Placeholder URLs
-  const DEFAULT_AVATAR = "https://images.unsplash.com/photo-1633332755192-727a05c4013d?w=400&h=400&fit=crop";
-  const DEFAULT_BANNER = "https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?w=800&h=400&fit=crop";
+  const DEFAULT_AVATAR =
+    "https://images.unsplash.com/photo-1633332755192-727a05c4013d?w=400&h=400&fit=crop";
+  const DEFAULT_BANNER =
+    "https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?w=800&h=400&fit=crop";
 
   const renderActiveGrid = () => {
     // Use the posts, highlights, or tagged arrays after filtering them for valid entries
@@ -451,10 +494,10 @@ const ProfilePFScreen = () => {
       if (activeTab === "Marcados") rawData = tagged;
 
       // Only keep items that are strings (URLs) or objects with a valid URL
-      return (rawData || []).filter(item => {
+      return (rawData || []).filter((item) => {
         if (!item) return false;
-        if (typeof item === 'string') return item.trim().length > 0;
-        return (item.url || item.image_url);
+        if (typeof item === "string") return item.trim().length > 0;
+        return item.url || item.image_url;
       });
     };
 
@@ -476,7 +519,7 @@ const ProfilePFScreen = () => {
     return (
       <View style={styles.grid}>
         {data.map((item, index) => {
-          const imageUri = typeof item === 'string' ? item : (item.url || item.image_url);
+          const imageUri = typeof item === "string" ? item : item.url || item.image_url;
           return (
             <TouchableOpacity
               key={item.id || `post-${index}`}
@@ -507,10 +550,7 @@ const ProfilePFScreen = () => {
       <ScrollView showsVerticalScrollIndicator={false} bounces={false}>
         {/* Banner de Topo */}
         <View style={styles.bannerContainer}>
-          <Image
-            source={{ uri: profileData.banner || DEFAULT_BANNER }}
-            style={styles.banner}
-          />
+          <Image source={{ uri: profileData.banner || DEFAULT_BANNER }} style={styles.banner} />
           {isOwnProfile && (
             <TouchableOpacity
               onPress={() => handlePickImage("banner")}
@@ -525,10 +565,7 @@ const ProfilePFScreen = () => {
           {/* Foto de Perfil + Estatísticas */}
           <View style={styles.profileHeader}>
             <View style={styles.avatarContainer}>
-              <Image
-                source={{ uri: profileData.photo || DEFAULT_AVATAR }}
-                style={styles.avatar}
-              />
+              <Image source={{ uri: profileData.photo || DEFAULT_AVATAR }} style={styles.avatar} />
               {isOwnProfile && (
                 <TouchableOpacity
                   onPress={() => handlePickImage("avatar")}
@@ -541,9 +578,7 @@ const ProfilePFScreen = () => {
             {/* Estatísticas: Posts, Seguidores, Seguindo */}
             <View style={styles.statsContainer}>
               <View style={styles.statItemHorizontal}>
-                <Text style={styles.statNumber}>
-                  {loadingStats ? "..." : stats.posts}
-                </Text>
+                <Text style={styles.statNumber}>{loadingStats ? "..." : stats.posts}</Text>
                 <Text style={styles.statLabel}>Publicações</Text>
               </View>
 
@@ -555,9 +590,7 @@ const ProfilePFScreen = () => {
                 }}
                 activeOpacity={0.7}
               >
-                <Text style={styles.statNumber}>
-                  {loadingStats ? "..." : stats.followers}
-                </Text>
+                <Text style={styles.statNumber}>{loadingStats ? "..." : stats.followers}</Text>
                 <Text style={styles.statLabel}>Seguidores</Text>
               </TouchableOpacity>
 
@@ -569,9 +602,7 @@ const ProfilePFScreen = () => {
                 }}
                 activeOpacity={0.7}
               >
-                <Text style={styles.statNumber}>
-                  {loadingStats ? "..." : stats.following}
-                </Text>
+                <Text style={styles.statNumber}>{loadingStats ? "..." : stats.following}</Text>
                 <Text style={styles.statLabel}>Seguindo</Text>
               </TouchableOpacity>
             </View>
@@ -580,29 +611,21 @@ const ProfilePFScreen = () => {
           {/* Nome e Bio */}
           <View style={styles.nameSection}>
             <Text style={styles.nameText}>{profileData.name}</Text>
-            {profileData.bio && (
-              <Text style={styles.bioText}>{profileData.bio}</Text>
-            )}
+            {profileData.bio && <Text style={styles.bioText}>{profileData.bio}</Text>}
           </View>
 
           {/* Botões de Ação: Seguir e Mensagem / Novo Post */}
           {!isOwnProfile ? (
             <View style={styles.followButtonContainer}>
               <TouchableOpacity
-                style={[
-                  styles.followButton,
-                  isFollowing && styles.unfollowButton
-                ]}
+                style={[styles.followButton, isFollowing && styles.unfollowButton]}
                 onPress={toggleFollow}
                 disabled={loadingFollow}
               >
                 {loadingFollow ? (
                   <ActivityIndicator size="small" color={isFollowing ? "#1E293B" : "#fff"} />
                 ) : (
-                  <Text style={[
-                    styles.followButtonText,
-                    isFollowing && styles.unfollowButtonText
-                  ]}>
+                  <Text style={[styles.followButtonText, isFollowing && styles.unfollowButtonText]}>
                     {isFollowing ? "Seguindo" : "Seguir"}
                   </Text>
                 )}
@@ -610,9 +633,14 @@ const ProfilePFScreen = () => {
 
               <TouchableOpacity
                 style={styles.messageButton}
-                onPress={() => Alert.alert("Mensagem", "Funcionalidade de chat em breve!")}
+                onPress={handleMessage}
+                disabled={loadingChat}
               >
-                <Text style={styles.messageButtonText}>Mensagem</Text>
+                {loadingChat ? (
+                  <ActivityIndicator size="small" color="#fff" />
+                ) : (
+                  <Text style={styles.messageButtonText}>Mensagem</Text>
+                )}
               </TouchableOpacity>
             </View>
           ) : null}
@@ -661,10 +689,12 @@ const ProfilePFScreen = () => {
 
           {/* Grid de Fotos Dinâmico */}
           {loadingPosts ? (
-            <View style={{ padding: 40, alignItems: 'center' }}>
+            <View style={{ padding: 40, alignItems: "center" }}>
               <ActivityIndicator color="#CBFB5E" />
             </View>
-          ) : renderActiveGrid()}
+          ) : (
+            renderActiveGrid()
+          )}
         </View>
       </ScrollView>
 
@@ -676,7 +706,10 @@ const ProfilePFScreen = () => {
             <TouchableOpacity style={styles.manageOption} onPress={handleEditPost}>
               <Text style={styles.manageOptionText}>Editar Legenda</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={[styles.manageOption, styles.deleteOption]} onPress={handleDeletePost}>
+            <TouchableOpacity
+              style={[styles.manageOption, styles.deleteOption]}
+              onPress={handleDeletePost}
+            >
               <Text style={styles.deleteOptionText}>Excluir Publicação</Text>
             </TouchableOpacity>
             <TouchableOpacity
@@ -696,11 +729,7 @@ const ProfilePFScreen = () => {
       )}
 
       {isOwnProfile && (
-        <TouchableOpacity
-          style={styles.fab}
-          onPress={handleCreatePost}
-          activeOpacity={0.9}
-        >
+        <TouchableOpacity style={styles.fab} onPress={handleCreatePost} activeOpacity={0.9}>
           <Plus color="#0F172A" size={24} />
         </TouchableOpacity>
       )}
@@ -742,9 +771,11 @@ const ProfilePFScreen = () => {
                   source={{ uri: profileData.photo || DEFAULT_AVATAR }}
                   style={styles.viewerAvatar}
                 />
-                <Text style={styles.viewerUsername}>{profileData.username || profileData.name}</Text>
+                <Text style={styles.viewerUsername}>
+                  {profileData.username || profileData.name}
+                </Text>
               </View>
-              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+              <View style={{ flexDirection: "row", alignItems: "center" }}>
                 {isOwnProfile && (
                   <TouchableOpacity
                     onPress={() => {
@@ -774,7 +805,11 @@ const ProfilePFScreen = () => {
                   onPress={handleToggleLike}
                   disabled={isLiking}
                 >
-                  <Heart size={22} color={selectedPost?.is_liked ? "#EF4444" : "#1E293B"} fill={selectedPost?.is_liked ? "#EF4444" : "none"} />
+                  <Heart
+                    size={22}
+                    color={selectedPost?.is_liked ? "#EF4444" : "#1E293B"}
+                    fill={selectedPost?.is_liked ? "#EF4444" : "none"}
+                  />
                   <Text style={styles.viewerActionText}>{selectedPost?.likes_count || 0}</Text>
                 </TouchableOpacity>
                 <View style={styles.viewerActionItem}>
@@ -787,7 +822,9 @@ const ProfilePFScreen = () => {
                 <View style={{ flex: 1 }}>
                   {(selectedPost?.legenda || selectedPost?.caption) && (
                     <Text style={styles.viewerCaption}>
-                      <Text style={styles.viewerCaptionUsername}>{profileData.username || profileData.name} </Text>
+                      <Text style={styles.viewerCaptionUsername}>
+                        {profileData.username || profileData.name}{" "}
+                      </Text>
                       {selectedPost.legenda || selectedPost.caption}
                     </Text>
                   )}
@@ -795,9 +832,9 @@ const ProfilePFScreen = () => {
 
                 {selectedPost?.created_at && (
                   <Text style={styles.viewerDate}>
-                    {new Date(selectedPost.created_at).toLocaleDateString('pt-BR', {
-                      day: '2-digit',
-                      month: 'short'
+                    {new Date(selectedPost.created_at).toLocaleDateString("pt-BR", {
+                      day: "2-digit",
+                      month: "short",
                     })}
                   </Text>
                 )}
@@ -811,14 +848,17 @@ const ProfilePFScreen = () => {
                 ) : comments.length > 0 ? (
                   <View style={styles.commentsList}>
                     {comments.slice(-5).map((comment) => {
-                      const canDelete = currentUserId === comment.comment_user_id ||
+                      const canDelete =
+                        currentUserId === comment.comment_user_id ||
                         currentUserId === comment.post_owner_id;
 
                       return (
                         <View key={comment.id} style={styles.commentItem}>
                           <View style={{ flex: 1 }}>
                             <Text style={styles.commentText}>
-                              <Text style={styles.commentUsername}>{comment.username || comment.name} </Text>
+                              <Text style={styles.commentUsername}>
+                                {comment.username || comment.name}{" "}
+                              </Text>
                               {comment.comentario}
                             </Text>
                           </View>
@@ -834,7 +874,9 @@ const ProfilePFScreen = () => {
                       );
                     })}
                     {comments.length > 3 && (
-                      <Text style={styles.viewMoreComments}>Ver todos os {comments.length} comentários...</Text>
+                      <Text style={styles.viewMoreComments}>
+                        Ver todos os {comments.length} comentários...
+                      </Text>
                     )}
                   </View>
                 ) : (
@@ -1175,7 +1217,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   viewerCloseArea: {
-    position: 'absolute',
+    position: "absolute",
     top: 0,
     left: 0,
     right: 0,
@@ -1189,16 +1231,16 @@ const styles = StyleSheet.create({
     elevation: 10,
   },
   viewerHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
     padding: 12,
     borderBottomWidth: 1,
-    borderBottomColor: '#F1F5F9',
+    borderBottomColor: "#F1F5F9",
   },
   viewerUserInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
   },
   viewerAvatar: {
     width: 32,
@@ -1208,104 +1250,104 @@ const styles = StyleSheet.create({
   },
   viewerUsername: {
     fontSize: 14,
-    fontWeight: '700',
-    color: '#1E293B',
+    fontWeight: "700",
+    color: "#1E293B",
   },
   viewerImage: {
     width: "100%",
     aspectRatio: 1,
-    resizeMode: 'cover',
+    resizeMode: "cover",
   },
   viewerFooter: {
     padding: 16,
-    backgroundColor: '#fff',
+    backgroundColor: "#fff",
   },
   viewerActions: {
-    flexDirection: 'row',
+    flexDirection: "row",
     marginBottom: 12,
     gap: 20,
   },
   viewerActionItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 6,
   },
   viewerActionText: {
     fontSize: 14,
-    fontWeight: '600',
-    color: '#1E293B',
+    fontWeight: "600",
+    color: "#1E293B",
   },
   viewerCaptionRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
     gap: 12,
   },
   viewerCaption: {
     fontSize: 14,
-    color: '#334155',
+    color: "#334155",
     lineHeight: 20,
   },
   viewerCaptionUsername: {
-    fontWeight: '800',
-    color: '#1E293B',
+    fontWeight: "800",
+    color: "#1E293B",
   },
   viewerDate: {
     fontSize: 11,
-    color: '#94A3B8',
-    fontWeight: '600',
-    textTransform: 'uppercase',
+    color: "#94A3B8",
+    fontWeight: "600",
+    textTransform: "uppercase",
     marginTop: 2, // Ajuste fino para alinhar com a primeira linha do texto
   },
   // Comentários
   commentsSection: {
     marginTop: 15,
     borderTopWidth: 1,
-    borderTopColor: '#F1F5F9',
+    borderTopColor: "#F1F5F9",
     paddingTop: 12,
   },
   commentsTitle: {
     fontSize: 13,
-    fontWeight: '700',
-    color: '#1E293B',
+    fontWeight: "700",
+    color: "#1E293B",
     marginBottom: 8,
   },
   commentsList: {
     gap: 6,
   },
   commentItem: {
-    flexDirection: 'row',
+    flexDirection: "row",
   },
   commentText: {
     fontSize: 13,
-    color: '#475569',
+    color: "#475569",
     lineHeight: 18,
   },
   commentUsername: {
-    fontWeight: '700',
-    color: '#1E293B',
+    fontWeight: "700",
+    color: "#1E293B",
   },
   noComments: {
     fontSize: 13,
-    color: '#94A3B8',
-    fontStyle: 'italic',
+    color: "#94A3B8",
+    fontStyle: "italic",
   },
   viewMoreComments: {
     fontSize: 12,
-    color: '#64748B',
+    color: "#64748B",
     marginTop: 4,
-    fontWeight: '500',
+    fontWeight: "500",
   },
   commentInputContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     marginTop: 15,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: "#F8FAFC",
     borderRadius: 25,
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: "#E2E8F0",
   },
   inputAvatar: {
     width: 28,
@@ -1316,7 +1358,7 @@ const styles = StyleSheet.create({
   commentInput: {
     flex: 1,
     fontSize: 13,
-    color: '#1E293B',
+    color: "#1E293B",
     paddingVertical: 6,
   },
   sendButton: {
@@ -1325,7 +1367,7 @@ const styles = StyleSheet.create({
   deleteCommentBtn: {
     padding: 4,
     marginLeft: 8,
-  }
+  },
 });
 
 export default ProfilePFScreen;

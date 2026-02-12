@@ -1,12 +1,5 @@
 import React, { useMemo } from "react";
-import {
-  View,
-  ScrollView,
-  StyleSheet,
-  TouchableOpacity,
-  Text,
-  Switch,
-} from "react-native";
+import { View, ScrollView, StyleSheet, TouchableOpacity, Text, Switch } from "react-native";
 import BottomSheet, { BottomSheetView } from "@gorhom/bottom-sheet";
 import { Slider } from "react-native-awesome-slider";
 import { useSharedValue } from "react-native-reanimated";
@@ -112,8 +105,6 @@ export function MapSettingSheet({
             </View>
           </View>
 
-
-
           {/* Nova seção para área de exibição por km com Slider Customizado */}
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Área de exibição (Km)</Text>
@@ -153,12 +144,12 @@ export function MapSettingSheet({
                   onDisplayRadiusKmChange(Math.round(value));
                 }}
                 theme={{
-                  disableMinTrackTintColor: '#BBF246',
-                  maximumTrackTintColor: '#e5e7eb',
-                  minimumTrackTintColor: '#BBF246',
-                  cacheTrackTintColor: '#BBF246',
-                  bubbleBackgroundColor: '#192126',
-                  heartbeatColor: '#BBF246',
+                  disableMinTrackTintColor: "#BBF246",
+                  maximumTrackTintColor: "#e5e7eb",
+                  minimumTrackTintColor: "#BBF246",
+                  cacheTrackTintColor: "#BBF246",
+                  bubbleBackgroundColor: "#192126",
+                  heartbeatColor: "#BBF246",
                 }}
                 renderThumb={() => <View style={styles.customThumb} />}
                 containerStyle={styles.awesomeSlider}

@@ -16,26 +16,58 @@ import { AppStackParamList } from "../../../@types/routes";
 import { getNearbyGyms, Gym } from "@services/gymService";
 import { useAuth } from "@contexts/AuthContext";
 
-const CustomGymMarker = ({ selected }: { selected: boolean }) => {
+const CustomGymMarker = React.memo(({ selected }: { selected: boolean }) => {
   const mainColor = selected ? "#059669" : "#B1F232";
   return (
     <View style={markerStyles.container}>
       {/* Camada de Borda Branca Exterior */}
-      <MapPin
-        size={44}
-        color="#fff"
-        fill="#fff"
-        style={{ position: 'absolute' }}
-      />
+      <MapPin size={44} color="#fff" fill="#fff" style={{ position: "absolute" }} />
       {/* Camada Colorida Interna */}
-      <MapPin
-        size={34}
-        color={mainColor}
-        fill={mainColor}
-      />
+      <MapPin size={34} color={mainColor} fill={mainColor} />
       {/* Ponto Branco Central */}
       <View style={markerStyles.innerDot} />
     </View>
+  );
+});
+
+const OptimizedGymMarker = ({
+  gym,
+  isSelected,
+  onPress,
+}: {
+  gym: Gym;
+  isSelected: boolean;
+  onPress: (gym: Gym) => void;
+}) => {
+  const [tracksViewChanges, setTracksViewChanges] = useState(true);
+
+  // No Android, desativamos tracksViewChanges após um curto período para evitar o efeito de pulsação/pisca.
+  // Reativamos brevemente quando o estado de seleção muda para permitir a atualização visual.
+  useEffect(() => {
+    if (Platform.OS === "android") {
+      setTracksViewChanges(true);
+      const timer = setTimeout(() => {
+        setTracksViewChanges(false);
+      }, 300);
+      return () => clearTimeout(timer);
+    }
+  }, [isSelected]);
+
+  return (
+    <Marker
+      coordinate={{
+        latitude: gym.latitude,
+        longitude: gym.longitude,
+      }}
+      onPress={(e) => {
+        e.stopPropagation();
+        onPress(gym);
+      }}
+      anchor={{ x: 0.5, y: 1 }}
+      tracksViewChanges={tracksViewChanges}
+    >
+      <CustomGymMarker selected={isSelected} />
+    </Marker>
   );
 };
 
@@ -48,9 +80,14 @@ const MapScreen: React.FC = () => {
   const mapRef = useRef<MapView>(null);
   const insets = useSafeAreaInsets();
 
-  const topPosition = Platform.OS === 'android'
-    ? (insets.top > 0 ? insets.top + 20 : 40)
-    : (insets.top > 0 ? insets.top + 10 : 40);
+  const topPosition =
+    Platform.OS === "android"
+      ? insets.top > 0
+        ? insets.top + 20
+        : 40
+      : insets.top > 0
+        ? insets.top + 10
+        : 40;
 
   const navigation = useNavigation<NativeStackNavigationProp<AppStackParamList>>();
 
@@ -101,12 +138,15 @@ const MapScreen: React.FC = () => {
 
       // Centraliza o mapa no usuário somente na primeira vez que a localização é carregada
       if (isFirstLoad && location && showsUserLocation) {
-        mapRef.current?.animateToRegion({
-          latitude: location.latitude,
-          longitude: location.longitude,
-          latitudeDelta: latitudeDelta,
-          longitudeDelta: longitudeDelta,
-        }, 1000);
+        mapRef.current?.animateToRegion(
+          {
+            latitude: location.latitude,
+            longitude: location.longitude,
+            latitudeDelta: latitudeDelta,
+            longitudeDelta: longitudeDelta,
+          },
+          1000
+        );
         setIsFirstLoad(false);
       }
     }
@@ -115,12 +155,15 @@ const MapScreen: React.FC = () => {
   // Efeito dedicado para atualizar o zoom quando o raio muda
   useEffect(() => {
     if (location && !isFirstLoad) {
-      mapRef.current?.animateToRegion({
-        latitude: location.latitude,
-        longitude: location.longitude,
-        latitudeDelta: latitudeDelta,
-        longitudeDelta: longitudeDelta,
-      }, 500);
+      mapRef.current?.animateToRegion(
+        {
+          latitude: location.latitude,
+          longitude: location.longitude,
+          latitudeDelta: latitudeDelta,
+          longitudeDelta: longitudeDelta,
+        },
+        500
+      );
     }
   }, [displayRadiusKm, location, isFirstLoad]); // Depende do displayRadiusKm e location
 
@@ -281,24 +324,14 @@ const MapScreen: React.FC = () => {
           loadingIndicatorColor="#666666"
           showsMyLocationButton={false}
         >
-
-
           {/* Markers das academias */}
           {gyms.map((gym) => (
-            <Marker
+            <OptimizedGymMarker
               key={gym.id_academia}
-              coordinate={{
-                latitude: gym.latitude,
-                longitude: gym.longitude,
-              }}
-              onPress={(e) => {
-                e.stopPropagation(); // Impede que o toque bubble para o mapa
-                handleGymPress(gym);
-              }}
-              anchor={{ x: 0.5, y: 1 }} // Define a ponta do pin como o ponto exato de geolocalização
-            >
-              <CustomGymMarker selected={selectedGym?.id_academia === gym.id_academia} />
-            </Marker>
+              gym={gym}
+              isSelected={selectedGym?.id_academia === gym.id_academia}
+              onPress={handleGymPress}
+            />
           ))}
         </MapView>
       )}
@@ -351,12 +384,15 @@ const MapScreen: React.FC = () => {
         <TouchableOpacity
           onPress={() => {
             if (location) {
-              mapRef.current?.animateToRegion({
-                latitude: location.latitude,
-                longitude: location.longitude,
-                latitudeDelta: latitudeDelta,
-                longitudeDelta: longitudeDelta,
-              }, 1000);
+              mapRef.current?.animateToRegion(
+                {
+                  latitude: location.latitude,
+                  longitude: location.longitude,
+                  latitudeDelta: latitudeDelta,
+                  longitudeDelta: longitudeDelta,
+                },
+                1000
+              );
             }
           }}
           activeOpacity={0.8}
@@ -399,10 +435,7 @@ const MapScreen: React.FC = () => {
       {/* Card de Academia */}
       {selectedGym && !isGymDetailsOpen && (
         <View style={gymCardStyles.container}>
-          <GymCard
-            gym={selectedGym}
-            onDetailsPress={handleOpenGymDetails}
-          />
+          <GymCard gym={selectedGym} onDetailsPress={handleOpenGymDetails} />
         </View>
       )}
 
@@ -422,7 +455,7 @@ const gymCardStyles = StyleSheet.create({
     position: "absolute",
     bottom: Platform.select({
       ios: 100,
-      android: 80,
+      android: 120,
       default: 90,
     }),
     left: 20,

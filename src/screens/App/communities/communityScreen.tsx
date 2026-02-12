@@ -38,7 +38,7 @@ const heroImages = [
 const CommunityScreen: React.FC = () => {
   const { user } = useAuth();
   const navigation = useNavigation<NativeStackNavigationProp<AppStackParamList>>();
-  const route = useRoute<RouteProp<AppStackParamList, 'CommunityScreen'>>(); // Hook to access route params
+  const route = useRoute<RouteProp<AppStackParamList, "CommunityScreen">>(); // Hook to access route params
   const [communities, setCommunities] = useState<Community[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeBannerIndex, setActiveBannerIndex] = useState(0);

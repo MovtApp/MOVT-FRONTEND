@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -230,6 +230,10 @@ export function Appointment() {
       Alert.alert("Erro", "Não foi possível cancelar o agendamento. Tente novamente.");
     }
   };
+
+  // Dummy function to prevent errors in CalendarComponent
+  const isInactiveDay = (dateStr: string) => false;
+
   // Mostrar loading enquanto carrega os dados
   if (loading) {
     return (
@@ -242,6 +246,7 @@ export function Appointment() {
       </View>
     );
   }
+
   return (
     <View style={styles.container}>
       <Header showNotifications={true} />
@@ -258,6 +263,7 @@ export function Appointment() {
           hasAppointments={hasAppointments}
           fetchAvailabilityForDate={fetchAvailabilityForDate}
           isPastDate={isPastDate}
+          isInactiveDay={isInactiveDay}
         />
 
         {/* Seção de Novos Agendamentos */}

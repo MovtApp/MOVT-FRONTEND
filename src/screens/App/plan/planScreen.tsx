@@ -294,8 +294,8 @@ const PlanScreen: React.FC = () => {
             style={[
               styles.subscribeButton,
               selectedPlanId &&
-              getPlanType(plans.find((p) => p.id === selectedPlanId)) === "free" &&
-              styles.disabledButton,
+                getPlanType(plans.find((p) => p.id === selectedPlanId)) === "free" &&
+                styles.disabledButton,
             ]}
             textStyle={styles.subscribeButtonText}
             icon={subscribing ? <ActivityIndicator color="#FFF" /> : null}

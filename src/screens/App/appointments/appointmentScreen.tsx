@@ -7,13 +7,14 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   Alert,
+  Platform,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRoute, useNavigation } from "@react-navigation/native";
 import { Clock, CheckCircle, AlertCircle } from "lucide-react-native";
-import { Platform } from "react-native";
 import { useAuth } from "../../../contexts/AuthContext";
 import { getAvailability, createAppointment } from "../../../services/appointmentService";
+import { api } from "../../../services/api";
 import BackButton from "../../../components/BackButton";
 import CalendarComponent from "../../../components/CalendarComponent";
 
@@ -37,15 +38,13 @@ export function AppointmentScreen() {
   const { user } = useAuth();
   const insets = useSafeAreaInsets();
 
-  const paddingTop = Platform.OS === 'android'
-    ? (insets.top > 0 ? insets.top + 20 : 40)
-    : Math.max(insets.top, 10);
+  const paddingTop =
+    Platform.OS === "android" ? (insets.top > 0 ? insets.top + 20 : 40) : Math.max(insets.top, 10);
 
   const trainerId = (route.params as any)?.trainerId;
 
   const [selectedDate, setSelectedDate] = useState<string>(new Date().toISOString().split("T")[0]);
   const [currentMonth, setCurrentMonth] = useState(new Date()); // Mês atual
-  const [showMonthSelector, setShowMonthSelector] = useState(false); // Controlar exibição do seletor de mês
 
   // Função para verificar se uma data é anterior à data atual
   const isPastDate = (dateStr: string) => {
@@ -55,6 +54,7 @@ export function AppointmentScreen() {
     // Comparar datas no formato YYYY-MM-DD
     return dateStr < currentDateString;
   };
+  const [userAppointments, setUserAppointments] = useState<any[]>([]);
   const [monthAvailability, setMonthAvailability] = useState<any[]>([]);
   const [availableSlots, setAvailableSlots] = useState<AvailableSlot[]>([]);
   const [bookedSlots, setBookedSlots] = useState<BookedSlot[]>([]);
@@ -74,7 +74,13 @@ export function AppointmentScreen() {
       const response = await getAvailability(trainerId, selectedDate, user?.sessionId);
 
       if (response.availableSlots) {
-        setAvailableSlots(response.availableSlots);
+        // Filter out duplicate slots based on startTime and endTime to prevent double rendering
+        const uniqueSlots = response.availableSlots.filter(
+          (slot: AvailableSlot, index: number, self: AvailableSlot[]) =>
+            index ===
+            self.findIndex((t) => t.startTime === slot.startTime && t.endTime === slot.endTime)
+        );
+        setAvailableSlots(uniqueSlots);
       }
       if (response.bookedSlots) {
         setBookedSlots(response.bookedSlots);
@@ -102,77 +108,49 @@ export function AppointmentScreen() {
     }
   }, [trainerId, user?.sessionId]);
 
+  const fetchUserAppointments = useCallback(async () => {
+    try {
+      if (!user?.sessionId) return;
+      const resp = await api.get(`/appointments?role=client`);
+      if (resp.data && Array.isArray(resp.data.data)) {
+        // Filtrar apenas agendamentos com este trainer
+        const filtered = resp.data.data.filter((a: any) =>
+          (String(a.id_trainer) === String(trainerId) || String(a.id_pj) === String(trainerId)) &&
+          a.status !== 'cancelado'
+        );
+        setUserAppointments(filtered);
+      }
+    } catch (err) {
+      console.warn("[AppointmentScreen] Erro ao buscar agendamentos do usuário", err);
+    }
+  }, [trainerId, user?.sessionId]);
+
   useEffect(() => {
     if (trainerId) {
       fetchWeeklyAvailability();
       fetchAvailability();
+      fetchUserAppointments();
     }
-  }, [trainerId, selectedDate, fetchAvailability, fetchWeeklyAvailability]);
+  }, [trainerId, selectedDate, fetchAvailability, fetchWeeklyAvailability, fetchUserAppointments]);
 
   // Obter dias da semana
   const weekDays = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
 
-  // Gerar datas para o mês atual
-  const generateMonthDates = () => {
-    const dates = [];
-    const year = currentMonth.getFullYear();
-    const month = currentMonth.getMonth();
-
-    const firstDayOfMonth = new Date(year, month, 1);
-    const startDay = firstDayOfMonth.getDay(); // Dia da semana do primeiro dia
-
-    const daysInMonth = new Date(year, month + 1, 0).getDate(); // Total de dias no mês
-
-    // Adicionar dias vazios antes do primeiro dia do mês
-    for (let i = 0; i < startDay; i++) {
-      dates.push(null);
-    }
-
-    // Adicionar dias do mês atual
-    for (let day = 1; day <= daysInMonth; day++) {
-      const dateStr = `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
-      dates.push({ day, isCurrentMonth: true, date: dateStr });
-    }
-
-    // Adicionar dias do próximo mês para completar as 6 semanas (42 células)
-    const remainingCells = 42 - dates.length; // 6 linhas x 7 colunas
-    for (let day = 1; day <= remainingCells; day++) {
-      dates.push({
-        day,
-        isCurrentMonth: false,
-        date: `${year}-${String(month + 2).padStart(2, "0")}-${String(day).padStart(2, "0")}`,
-      });
-    }
-
-    return dates;
+  // Verificar se uma data tem agendamentos DO USUÁRIO (para o indicador verde)
+  const hasUserAppointmentOnDate = (dateStr: string) => {
+    return userAppointments.some((a: any) => {
+      const appDate = a.data ? new Date(a.data).toISOString().split('T')[0] : '';
+      return appDate === dateStr;
+    });
   };
 
-  const monthDates = generateMonthDates();
-
-  // Verificar se uma data tem agendamentos (para o indicador visual)
-  const hasAppointments = (dateStr: string) => {
-    // Para este caso específico, verificamos se a data tem disponibilidade
-    // Nesse contexto, indicamos se a data tem agendamentos (slots disponíveis)
+  // Verificar se o personal NÃO atende neste dia da semana
+  const isInactiveDay = (dateStr: string) => {
     const date = new Date(dateStr);
     const dayOfWeek = date.getDay();
-
-    // Verificar se há slots disponíveis ou agendados para esta data
-    return monthAvailability.some((a: any) => a.dia_semana === dayOfWeek && a.ativo);
-  };
-
-  // Navegar para o mês anterior
-  const goToPreviousMonth = () => {
-    setCurrentMonth((prev) => new Date(prev.getFullYear(), prev.getMonth() - 1, 1));
-  };
-
-  // Navegar para o próximo mês
-  const goToNextMonth = () => {
-    setCurrentMonth((prev) => new Date(prev.getFullYear(), prev.getMonth() + 1, 1));
-  };
-
-  // Formatar o nome do mês e ano
-  const formatMonthYear = (date: Date) => {
-    return date.toLocaleString("pt-BR", { month: "long", year: "numeric" });
+    // Se não encontrar configuração para o dia ou estiver inativo
+    const config = monthAvailability.find((a: any) => a.dia_semana === dayOfWeek);
+    return !config || !config.ativo;
   };
 
   // Função para buscar disponibilidade para uma data específica
@@ -184,7 +162,13 @@ export function AppointmentScreen() {
       const response = await getAvailability(trainerId, date, user?.sessionId);
 
       if (response.availableSlots) {
-        setAvailableSlots(response.availableSlots);
+        // Filter out duplicate slots inside date specific fetch too
+        const uniqueSlots = response.availableSlots.filter(
+          (slot: AvailableSlot, index: number, self: AvailableSlot[]) =>
+            index ===
+            self.findIndex((t) => t.startTime === slot.startTime && t.endTime === slot.endTime)
+        );
+        setAvailableSlots(uniqueSlots);
       }
       if (response.bookedSlots) {
         setBookedSlots(response.bookedSlots);
@@ -236,6 +220,7 @@ export function AppointmentScreen() {
       setSelectedSlot(null);
       setNotes("");
       fetchAvailability();
+      fetchUserAppointments();
     } catch (error) {
       console.error("[AppointmentScreen] Erro ao agendar:", error);
       const errorMessage =
@@ -269,7 +254,23 @@ export function AppointmentScreen() {
       (booked) => booked.hora_inicio === slot.startTime && booked.hora_fim === slot.endTime
     );
 
-    const isAvailable = slot.available && !isBooked;
+    // Lógica para desabilitar horários passados se a data for hoje
+    const isToday = selectedDate === new Date().toISOString().split('T')[0];
+    const isPastDay = isPastDate(selectedDate);
+    let isPastSlot = isPastDay;
+
+    if (isToday) {
+      const now = new Date();
+      const currentHour = now.getHours();
+      const currentMin = now.getMinutes();
+      const [slotHour, slotMin] = slot.startTime.split(':').map(Number);
+
+      if (slotHour < currentHour || (slotHour === currentHour && slotMin < currentMin)) {
+        isPastSlot = true;
+      }
+    }
+
+    const isAvailable = slot.available && !isBooked && !isPastSlot;
 
     return (
       <TouchableOpacity
@@ -278,6 +279,7 @@ export function AppointmentScreen() {
           styles.slotButton,
           isSelected && styles.slotButtonSelected,
           !isAvailable && styles.slotButtonDisabled,
+          isBooked && { backgroundColor: '#f3f4f6', borderColor: '#e5e7eb' }
         ]}
         disabled={!isAvailable}
         onPress={() => {
@@ -295,10 +297,10 @@ export function AppointmentScreen() {
           style={[
             styles.slotTime,
             isSelected && styles.slotTimeSelected,
-            !isAvailable && { textDecorationLine: "line-through" },
+            (!isAvailable || isBooked) && { color: '#9ca3af', textDecorationLine: isBooked ? 'line-through' : 'none' },
           ]}
         >
-          {slot.startTime} - {slot.endTime}
+          {slot.startTime} - {slot.endTime} {isBooked ? '(Ocupado)' : ''}
         </Text>
       </TouchableOpacity>
     );
@@ -349,9 +351,10 @@ export function AppointmentScreen() {
           setCurrentMonth={setCurrentMonth}
           selectedDate={selectedDate}
           setSelectedDate={setSelectedDate}
-          hasAppointments={hasAppointments}
+          hasAppointments={hasUserAppointmentOnDate}
           fetchAvailabilityForDate={fetchAvailabilityForDate}
           isPastDate={isPastDate}
+          isInactiveDay={isInactiveDay}
         />
 
         <View style={styles.section}>
@@ -359,13 +362,6 @@ export function AppointmentScreen() {
 
           {loading ? (
             <ActivityIndicator size="large" color="#192126" />
-          ) : isPastDate(selectedDate) ? (
-            <View style={styles.emptyState}>
-              <AlertCircle size={32} color="#d1d5db" />
-              <Text style={styles.emptyStateText}>
-                Não é possível agendar horários em datas anteriores
-              </Text>
-            </View>
           ) : availableSlots.length > 0 ? (
             <View style={styles.slotsContainer}>{availableSlots.map(renderSlot)}</View>
           ) : (
@@ -374,7 +370,6 @@ export function AppointmentScreen() {
               <Text style={styles.emptyStateText}>Nenhum horário disponível para esta data</Text>
             </View>
           )}
-          <Text style={styles.toleranceText}>A tolerância para atrasos é de 15 minutos.</Text>
         </View>
 
         {bookedSlots.length > 0 && (
@@ -482,10 +477,9 @@ const styles = StyleSheet.create({
     fontWeight: "500",
   },
   section: {
-    marginBottom: 16,
+    marginBottom: 30,
     backgroundColor: "#fff",
     borderRadius: 12,
-    padding: 16,
   },
   sectionTitle: {
     fontSize: 16,
@@ -583,8 +577,6 @@ const styles = StyleSheet.create({
     backgroundColor: "#BBF246",
     borderRadius: 12,
     padding: 16,
-    borderWidth: 1,
-    borderColor: "#86efac",
   },
   selectedSlotContent: {
     flexDirection: "row",
@@ -606,7 +598,6 @@ const styles = StyleSheet.create({
     marginBottom: 24,
     backgroundColor: "#fff",
     borderRadius: 12,
-    padding: 16,
   },
   notesTitle: {
     fontSize: 14,
@@ -629,7 +620,7 @@ const styles = StyleSheet.create({
   confirmButtonAdjusted: {
     paddingVertical: 14,
     paddingHorizontal: 16,
-    marginBottom: 20,
+    marginBottom: 80,
     backgroundColor: "#192126",
     borderRadius: 8,
     alignItems: "center",

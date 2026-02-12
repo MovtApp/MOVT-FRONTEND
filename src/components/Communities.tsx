@@ -1,6 +1,6 @@
 import React from "react";
 import { View, Text, TouchableOpacity, ScrollView, StyleSheet } from "react-native";
-import { Users, Dumbbell, Activity, Heart, Globe } from "lucide-react-native";
+import { Users, Dumbbell, Activity } from "lucide-react-native";
 import { useNavigation, NavigationProp } from "@react-navigation/native";
 import { AppStackParamList } from "../@types/routes";
 
@@ -26,7 +26,7 @@ interface CommunitiesProps {
 const Communities: React.FC<CommunitiesProps> = ({
   showSeeAll = true,
   selectedCategory,
-  onSelectCategory
+  onSelectCategory,
 }) => {
   const navigation = useNavigation<NavigationProp<AppStackParamList>>();
 
@@ -56,19 +56,12 @@ const Communities: React.FC<CommunitiesProps> = ({
               }}
               activeOpacity={0.7}
             >
-              <View style={[
-                styles.communityAvatar,
-                isActive && styles.communityAvatarActive
-              ]}>
-                <community.icon
-                  size={24}
-                  color={isActive ? "#000" : "#BBF246"}
-                />
+              <View style={[styles.communityAvatar, isActive && styles.communityAvatarActive]}>
+                <community.icon size={24} color={isActive ? "#000" : "#BBF246"} />
               </View>
-              <Text style={[
-                styles.communityName,
-                isActive && styles.communityNameActive
-              ]}>{community.name}</Text>
+              <Text style={[styles.communityName, isActive && styles.communityNameActive]}>
+                {community.name}
+              </Text>
             </TouchableOpacity>
           );
         })}

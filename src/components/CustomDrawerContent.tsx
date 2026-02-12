@@ -13,7 +13,6 @@ import {
   HelpCircle,
   Info,
   LogOut,
-  Globe,
 } from "lucide-react-native";
 import { AppStackParamList } from "../@types/routes";
 import { useAuth } from "../hooks/useAuth";
@@ -50,8 +49,6 @@ export function CustomDrawerContent(props: DrawerContentComponentProps) {
     {
       name: "Configurações e privacidades",
 
-
-
       icon: Settings,
       route: "ConfigScreen" as keyof AppStackParamList,
     },
@@ -79,8 +76,8 @@ export function CustomDrawerContent(props: DrawerContentComponentProps) {
             user?.photo
               ? { uri: user.photo }
               : {
-                uri: "https://res.cloudinary.com/ditlmzgrh/image/upload/v1767896239/Captura_de_tela_2026-01-08_151542_r3acpt.png",
-              }
+                  uri: "https://res.cloudinary.com/ditlmzgrh/image/upload/v1767896239/Captura_de_tela_2026-01-08_151542_r3acpt.png",
+                }
           }
           style={styles.profileImage}
         />

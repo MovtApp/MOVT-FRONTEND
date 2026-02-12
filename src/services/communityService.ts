@@ -43,4 +43,3 @@ export async function joinCommunity(id: string, sessionId: string) {
     throw error;
   }
 }
-

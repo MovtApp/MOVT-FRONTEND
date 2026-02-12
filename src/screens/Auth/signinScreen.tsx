@@ -16,8 +16,9 @@ import * as Google from "expo-auth-session/providers/google";
 import { api } from "../../services/api";
 
 // URL da sua Edge Function que receberá os tokens dos provedores
-const SOCIAL_SIGN_IN_EDGE_FUNCTION_URL = `${process.env.EXPO_PUBLIC_SUPABASE_URL || "https://ypnpdjgsyzdwsmnxsoqj.supabase.co"
-  }/functions/v1/auth/social-sign-in`;
+const SOCIAL_SIGN_IN_EDGE_FUNCTION_URL = `${
+  process.env.EXPO_PUBLIC_SUPABASE_URL || "https://ypnpdjgsyzdwsmnxsoqj.supabase.co"
+}/functions/v1/auth/social-sign-in`;
 
 // Variáveis de ambiente (usa EXPO_PUBLIC_* e faz fallback)
 const GOOGLE_WEB_CLIENT_ID =
@@ -326,7 +327,7 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: "#fff",
     paddingHorizontal: 20,
-    paddingTop: Platform.OS === 'android' ? 0 : 30, // Inset agora é controlado individualmente ou via SafeArea
+    paddingTop: Platform.OS === "android" ? 0 : 30, // Inset agora é controlado individualmente ou via SafeArea
   },
   title: {
     fontFamily: "Rubik_700Bold",

@@ -97,7 +97,9 @@ const RecoveryScreen = () => {
       return (
         <>
           <Text style={styles.title}>Esqueceu a senha?</Text>
-          <Text style={styles.subtitle}>Não se preocupe! Insira seu e-mail abaixo e enviaremos um código de recuperação.</Text>
+          <Text style={styles.subtitle}>
+            Não se preocupe! Insira seu e-mail abaixo e enviaremos um código de recuperação.
+          </Text>
           <View style={{ marginTop: 30 }}>
             <Text style={styles.inputLabel}>Endereço de e-mail</Text>
             <CustomInput
@@ -116,7 +118,9 @@ const RecoveryScreen = () => {
       return (
         <>
           <Text style={styles.title}>Verifique seu e-mail</Text>
-          <Text style={styles.subtitle}>Enviamos um código de 6 dígitos para <Text style={{ fontWeight: '700' }}>{email}</Text>.</Text>
+          <Text style={styles.subtitle}>
+            Enviamos um código de 6 dígitos para <Text style={{ fontWeight: "700" }}>{email}</Text>.
+          </Text>
           <View style={{ marginTop: 30 }}>
             <Text style={styles.inputLabel}>Código de Verificação</Text>
             <CustomInput
@@ -147,8 +151,15 @@ const RecoveryScreen = () => {
               placeholder="Digite a nova senha"
               secureTextEntry={!showPassword}
               rightIcon={
-                <TouchableOpacity onPress={() => setShowPassword(!showPassword)} style={{ marginRight: 15 }}>
-                  {showPassword ? <EyeOff size={20} color="#666" /> : <Eye size={20} color="#666" />}
+                <TouchableOpacity
+                  onPress={() => setShowPassword(!showPassword)}
+                  style={{ marginRight: 15 }}
+                >
+                  {showPassword ? (
+                    <EyeOff size={20} color="#666" />
+                  ) : (
+                    <Eye size={20} color="#666" />
+                  )}
                 </TouchableOpacity>
               }
             />
@@ -169,7 +180,9 @@ const RecoveryScreen = () => {
         <View style={styles.successContainer}>
           <CheckCircle2 size={80} color="#CBFB5E" />
           <Text style={styles.titleSuccess}>Senha Redefinida!</Text>
-          <Text style={styles.subtitleSuccess}>Sua senha foi alterada com sucesso. Você já pode fazer login com sua nova credencial.</Text>
+          <Text style={styles.subtitleSuccess}>
+            Sua senha foi alterada com sucesso. Você já pode fazer login com sua nova credencial.
+          </Text>
         </View>
       );
     }
@@ -185,10 +198,13 @@ const RecoveryScreen = () => {
       <TouchableOpacity
         style={[styles.mainButton, loading && { opacity: 0.7 }]}
         onPress={
-          step === 1 ? handleRequestCode :
-            step === 2 ? handleVerifyCode :
-              step === 3 ? handleResetPassword :
-                () => navigation.navigate("Auth", { screen: "SignInScreen" })
+          step === 1
+            ? handleRequestCode
+            : step === 2
+              ? handleVerifyCode
+              : step === 3
+                ? handleResetPassword
+                : () => navigation.navigate("Auth", { screen: "SignInScreen" })
         }
         disabled={loading}
       >
@@ -196,10 +212,13 @@ const RecoveryScreen = () => {
           <ActivityIndicator color="#fff" />
         ) : (
           <Text style={styles.mainButtonText}>
-            {step === 1 ? "Enviar Código" :
-              step === 2 ? "Verificar Código" :
-                step === 3 ? "Redefinir Senha" :
-                  "Voltar ao Login"}
+            {step === 1
+              ? "Enviar Código"
+              : step === 2
+                ? "Verificar Código"
+                : step === 3
+                  ? "Redefinir Senha"
+                  : "Voltar ao Login"}
           </Text>
         )}
       </TouchableOpacity>
@@ -244,7 +263,7 @@ const styles = StyleSheet.create({
     color: "#CBFB5E",
     fontFamily: "Rubik_500Medium",
     fontSize: 14,
-    textAlign: 'center',
+    textAlign: "center",
   },
   mainButton: {
     backgroundColor: "#192126",
@@ -253,7 +272,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginBottom: 40,
     height: 56,
-    justifyContent: 'center',
+    justifyContent: "center",
   },
   mainButtonText: {
     color: "#fff",
@@ -262,8 +281,8 @@ const styles = StyleSheet.create({
   },
   successContainer: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
     paddingHorizontal: 10,
   },
   titleSuccess: {
@@ -277,7 +296,7 @@ const styles = StyleSheet.create({
     fontFamily: "Rubik_400Regular",
     fontSize: 16,
     color: "#666",
-    textAlign: 'center',
+    textAlign: "center",
     lineHeight: 22,
-  }
+  },
 });

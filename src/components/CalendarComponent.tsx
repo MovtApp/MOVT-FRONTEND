@@ -10,6 +10,7 @@ interface CalendarComponentProps {
   hasAppointments: (dateStr: string) => boolean;
   fetchAvailabilityForDate: (date: string) => void;
   isPastDate: (dateStr: string) => boolean;
+  isInactiveDay: (dateStr: string) => boolean;
 }
 
 const CalendarComponent: React.FC<CalendarComponentProps> = ({
@@ -20,6 +21,7 @@ const CalendarComponent: React.FC<CalendarComponentProps> = ({
   hasAppointments,
   fetchAvailabilityForDate,
   isPastDate,
+  isInactiveDay,
 }) => {
   const [showMonthSelector, setShowMonthSelector] = useState(false); // Controlar exibição do seletor de mês
 
@@ -78,10 +80,11 @@ const CalendarComponent: React.FC<CalendarComponentProps> = ({
     // Adicionar dias do próximo mês para completar as 6 semanas (42 células)
     const remainingCells = 42 - dates.length; // 6 linhas x 7 colunas
     for (let day = 1; day <= remainingCells; day++) {
+      const dateStr = `${year}-${String(month + 2).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
       dates.push({
         day,
         isCurrentMonth: false,
-        date: `${year}-${String(month + 2).padStart(2, "0")}-${String(day).padStart(2, "0")}`,
+        date: dateStr,
       });
     }
 
@@ -116,46 +119,51 @@ const CalendarComponent: React.FC<CalendarComponentProps> = ({
         </View>
 
         <View style={styles.daysGrid}>
-          {monthDates.map((dateObj, index) => (
-            <View key={index} style={styles.dayCell}>
-              {dateObj ? (
-                <TouchableOpacity
-                  style={[
-                    styles.dayButton,
-                    dateObj.date === selectedDate && styles.selectedDayButton,
-                    dateObj.date === new Date().toISOString().split("T")[0] && styles.todayButton,
-                    hasAppointments(dateObj.date) && styles.appointmentDayButton,
-                    isPastDate(dateObj.date) && styles.pastDayButton,
-                  ]}
-                  onPress={() => {
-                    if (dateObj.isCurrentMonth && !isPastDate(dateObj.date)) {
-                      setSelectedDate(dateObj.date);
-                      // When a date is selected, fetch the availability for that date
-                      fetchAvailabilityForDate(dateObj.date);
-                    }
-                  }}
-                  disabled={isPastDate(dateObj.date)}
-                >
-                  <Text
+          {monthDates.map((dateObj, index) => {
+            const isInactive = dateObj && isInactiveDay(dateObj.date);
+            const isPast = dateObj && isPastDate(dateObj.date);
+            const isClickable = dateObj && dateObj.isCurrentMonth && !isInactive;
+
+            return (
+              <View key={index} style={styles.dayCell}>
+                {dateObj ? (
+                  <TouchableOpacity
                     style={[
-                      styles.dayText,
-                      dateObj.date === selectedDate && styles.selectedDayText,
-                      dateObj.date === new Date().toISOString().split("T")[0] && styles.todayText,
-                      !dateObj.isCurrentMonth && styles.outsideMonthText,
-                      isPastDate(dateObj.date) && styles.pastDayText,
+                      styles.dayButton,
+                      dateObj.date === selectedDate && styles.selectedDayButton,
+                      dateObj.date === new Date().toISOString().split("T")[0] && styles.todayButton,
+                      hasAppointments(dateObj.date) && styles.appointmentDayButton,
+                      (isPast || isInactive) && styles.pastDayButton,
                     ]}
+                    onPress={() => {
+                      if (isClickable) {
+                        setSelectedDate(dateObj.date);
+                        fetchAvailabilityForDate(dateObj.date);
+                      }
+                    }}
+                    disabled={!isClickable}
                   >
-                    {dateObj.day}
-                  </Text>
-                  {!isPastDate(dateObj.date) && hasAppointments(dateObj.date) && (
-                    <View style={styles.appointmentIndicator} />
-                  )}
-                </TouchableOpacity>
-              ) : (
-                <View style={styles.emptyCell} />
-              )}
-            </View>
-          ))}
+                    <Text
+                      style={[
+                        styles.dayText,
+                        dateObj.date === selectedDate && styles.selectedDayText,
+                        dateObj.date === new Date().toISOString().split("T")[0] && styles.todayText,
+                        (!dateObj.isCurrentMonth || isInactive) && styles.outsideMonthText,
+                        isPast && styles.pastDayText,
+                      ]}
+                    >
+                      {dateObj.day}
+                    </Text>
+                    {!isPast && hasAppointments(dateObj.date) && (
+                      <View style={styles.appointmentIndicator} />
+                    )}
+                  </TouchableOpacity>
+                ) : (
+                  <View style={styles.emptyCell} />
+                )}
+              </View>
+            );
+          })}
         </View>
       </View>
 

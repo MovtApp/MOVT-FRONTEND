@@ -1,0 +1,11 @@
+node_modules
+android
+ios
+android_backup
+.expo
+.git
+.vscode
+.idea
+*.log
+web-build
+dist

@@ -9,22 +9,11 @@ import {
   StatusBar,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useRoute, useNavigation, RouteProp } from "@react-navigation/native";
-import {
-  Clock,
-  Flame,
-  Play,
-  Heart,
-  Share2,
-  BookOpen,
-  Pause,
-  SkipBack,
-  SkipForward,
-} from "lucide-react-native";
-import { useSpotify } from "../../../../hooks/useSpotify";
+import { useRoute, RouteProp } from "@react-navigation/native";
+import { Play } from "lucide-react-native";
 import BackButton from "@components/BackButton";
 import { StatsCard } from "@components/StatsCard";
-import { AppStackParamList, Training } from "../../../../@types/routes";
+import { AppStackParamList } from "../../../../@types/routes";
 import { FooterVersion } from "@components/FooterVersion";
 
 type TrainingDetailsRouteProp = RouteProp<AppStackParamList, "TrainingDetails">;
@@ -38,11 +27,7 @@ interface ExerciseVariation {
 
 const TrainingDetails: React.FC = () => {
   const route = useRoute<TrainingDetailsRouteProp>();
-  const navigation = useNavigation();
   const { training } = route.params || {};
-
-  const { isConnected, currentTrack, isPlaying, authenticate, playPause, nextTrack, prevTrack } =
-    useSpotify();
 
   // Mock data para variações do exercício
   const exerciseVariations: ExerciseVariation[] = [
@@ -137,64 +122,6 @@ const TrainingDetails: React.FC = () => {
             style={{ position: "absolute", bottom: -20 }}
           />
         </View>
-
-        {/* Music Player */}
-        {/* <View style={styles.musicPlayer}>
-                    {!isConnected ? (
-                        <TouchableOpacity
-                            style={[styles.musicLeft, { justifyContent: 'center' }]}
-                            onPress={authenticate}
-                        >
-                            <View style={[styles.musicIconContainer, { backgroundColor: '#1DB954' }]}>
-                                <Play size={14} color="#fff" fill="#fff" />
-                            </View>
-                            <View style={styles.musicInfo}>
-                                <Text style={styles.musicTitle}>Conectar ao Spotify</Text>
-                                <Text style={styles.musicArtist}>Toque para iniciar</Text>
-                            </View>
-                        </TouchableOpacity>
-                    ) : (
-                        <>
-                            <View style={styles.musicLeft}>
-                                <View style={styles.musicIconContainer}>
-                                    {currentTrack?.album?.images?.[0]?.url ? (
-                                        <Image
-                                            source={{ uri: currentTrack.album.images[0].url }}
-                                            style={{ width: 36, height: 36, borderRadius: 6 }}
-                                        />
-                                    ) : (
-                                        <Play size={14} color="#BBF246" fill="#BBF246" />
-                                    )}
-                                </View>
-                                <View style={styles.musicInfo}>
-                                    <Text style={styles.musicTitle} numberOfLines={1}>
-                                        {currentTrack?.name || "Nenhuma música tocando"}
-                                    </Text>
-                                    <Text style={styles.musicArtist} numberOfLines={1}>
-                                        {currentTrack?.artists?.[0]?.name || "Spotify"}
-                                    </Text>
-                                </View>
-                            </View>
-                            <View style={styles.musicActions}>
-                                <TouchableOpacity style={styles.musicActionButton} onPress={prevTrack}>
-                                    <SkipBack size={20} color="#fff" strokeWidth={2} />
-                                </TouchableOpacity>
-
-                                <TouchableOpacity style={styles.musicActionButton} onPress={playPause}>
-                                    {isPlaying ? (
-                                        <Pause size={20} color="#fff" fill="#fff" strokeWidth={2} />
-                                    ) : (
-                                        <Play size={20} color="#fff" fill="#fff" strokeWidth={2} />
-                                    )}
-                                </TouchableOpacity>
-
-                                <TouchableOpacity style={styles.musicActionButton} onPress={nextTrack}>
-                                    <SkipForward size={20} color="#fff" strokeWidth={2} />
-                                </TouchableOpacity>
-                            </View>
-                        </>
-                    )}
-                </View> */}
 
         {/* Exercise Name */}
         <Text style={styles.exerciseName}>{training.nome}</Text>
