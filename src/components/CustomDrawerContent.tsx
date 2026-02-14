@@ -59,13 +59,6 @@ export function CustomDrawerContent(props: DrawerContentComponentProps) {
 
   return (
     <DrawerContentScrollView {...props} contentContainerStyle={styles.drawerContent}>
-      <View style={styles.header}>
-        <TouchableOpacity onPress={handleCloseDrawer} style={styles.closeButton}>
-          <X size={24} color="#BBF246" />
-        </TouchableOpacity>
-        <Text style={styles.menuTitle}>Menu</Text>
-      </View>
-
       <TouchableOpacity
         style={styles.profileSection}
         activeOpacity={0.7}
@@ -193,6 +186,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingHorizontal: 20,
     marginBottom: 20,
+    marginTop: 30,
   },
   profileImage: {
     width: 50,

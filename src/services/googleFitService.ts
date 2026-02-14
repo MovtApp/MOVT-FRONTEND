@@ -1,3 +1,4 @@
+import { Platform } from "react-native";
 import GoogleFit, { BucketUnit, Scopes, StepsResponse } from "react-native-google-fit";
 
 const AUTH_OPTIONS = {
@@ -46,6 +47,7 @@ const processStepPayload = (payload: unknown, listener: (steps: number) => void)
 };
 
 export const ensureGoogleFitPermissions = async (): Promise<boolean> => {
+  if (Platform.OS !== "android") return false;
   try {
     await GoogleFit.checkIsAuthorized();
     if (GoogleFit.isAuthorized) {

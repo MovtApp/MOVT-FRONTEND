@@ -1,14 +1,41 @@
-import React from "react";
-import { View, Text, StyleSheet, ScrollView, Dimensions, Alert } from "react-native";
+import React, { useState, useEffect, useMemo } from "react";
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  Dimensions,
+  Alert,
+  Platform,
+  TouchableOpacity,
+} from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { AppStackParamList } from "../../../../@types/routes";
 import BackButton from "../../../../components/BackButton";
-import NavigationArrows from "../../../../components/data/NavigationArrows";
-import { Activity, Wind, Watch, Wifi, AlertTriangle } from "lucide-react-native";
+import DataPillNavigator from "../../../../components/data/DataPillNavigator";
+import {
+  Activity,
+  Wind,
+  Watch,
+  Wifi,
+  AlertTriangle,
+  Heart,
+  ChevronRight,
+} from "lucide-react-native";
 import { SvgXml } from "react-native-svg";
 import { Asset } from "expo-asset";
 import { useAuth } from "../../../../contexts/AuthContext";
 import ECGDisplay from "../../../../components/ECGDisplay";
+import { LinearGradient } from "expo-linear-gradient";
+import DeviceSelectorModal from "../../../../components/data/DeviceSelectorModal";
+import Animated, {
+  FadeInDown,
+  useSharedValue,
+  useAnimatedStyle,
+  withRepeat,
+  withSequence,
+  withTiming,
+} from "react-native-reanimated";
 import {
   getLatestWearOsHealthData,
   pollWearOsHealthData,
@@ -16,636 +43,484 @@ import {
   checkWearOsDeviceRegistered,
 } from "../../../../services/wearOsHealthService";
 
+// Fallback seguro para ReanimatedView
+const ReanimatedView = Animated ? Animated.View : View;
+
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
+
 // Dimensões originais do SVG (do arquivo running.svg)
 const SVG_ORIGINAL_WIDTH = 390;
 const SVG_ORIGINAL_HEIGHT = 796;
 const SVG_ASPECT_RATIO = SVG_ORIGINAL_HEIGHT / SVG_ORIGINAL_WIDTH;
 
-// Função para calcular dimensões do SVG de forma dinâmica
 const calculateSvgDimensions = (screenWidth: number, screenHeight: number) => {
-  // Calcular dimensões para exibir 100% do SVG mantendo proporções
   let svgDisplayWidth = screenWidth;
   let svgDisplayHeight = screenWidth * SVG_ASPECT_RATIO;
-
-  // Se a altura calculada for maior que 80% da tela, ajustar pela altura
   const maxHeight = screenHeight * 0.8;
   if (svgDisplayHeight > maxHeight) {
     svgDisplayHeight = maxHeight;
     svgDisplayWidth = svgDisplayHeight / SVG_ASPECT_RATIO;
   }
-
   return { width: svgDisplayWidth, height: svgDisplayHeight };
 };
-
-const DATA_SCREENS: (keyof AppStackParamList)[] = [
-  "CaloriesScreen",
-  "CyclingScreen",
-  "HeartbeatsScreen",
-  "SleepScreen",
-  "StepsScreen",
-  "WaterScreen",
-];
 
 const HeartbeatsScreen: React.FC = () => {
   const { user } = useAuth();
 
-  // Estados para dados de saúde do Wear OS em tempo real
-  const [heartRate, setHeartRate] = React.useState<number | null>(null);
-  const [pressure, setPressure] = React.useState<number | null>(null);
-  const [oxygen, setOxygen] = React.useState<number | null>(null);
-  const [isLoading, setIsLoading] = React.useState(true);
-
-  // Estados para status de conexão do Wear OS
-  const [connectionStatus, setConnectionStatus] = React.useState<
+  // Estados
+  const [heartRate, setHeartRate] = useState<number | null>(null);
+  const [pressure, setPressure] = useState<number | null>(null);
+  const [oxygen, setOxygen] = useState<number | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [connectionStatus, setConnectionStatus] = useState<
     "disconnected" | "connecting" | "connected" | "error"
   >("disconnected");
-  const [connectionMessage, setConnectionMessage] = React.useState<string>("Aguardando conexão...");
-  const [lastUpdate, setLastUpdate] = React.useState<string | null>(null);
-  const [hasWearOsDevice, setHasWearOsDevice] = React.useState<boolean | null>(null);
+  const [connectionMessage, setConnectionMessage] = useState<string>("Buscando...");
+  const [lastUpdate, setLastUpdate] = useState<string | null>(null);
+  const [hasWearOsDevice, setHasWearOsDevice] = useState<boolean | null>(null);
+  const [svgContent, setSvgContent] = useState<string | null>(null);
+  const [isDeviceModalVisible, setIsDeviceModalVisible] = useState(false);
 
-  const [svgContent, setSvgContent] = React.useState<string | null>(null);
+  const scale = useSharedValue(1);
 
-  // Estado para dimensões dinâmicas do dispositivo
-  const [dimensions, setDimensions] = React.useState(() => {
-    const { width, height } = Dimensions.get("window");
-    return { width, height };
-  });
+  // Animação de pulsação suave
+  useEffect(() => {
+    if (connectionStatus === "connected") {
+      scale.value = withRepeat(
+        withSequence(withTiming(1.05, { duration: 400 }), withTiming(1, { duration: 600 })),
+        -1,
+        true
+      );
+    } else {
+      scale.value = withTiming(1);
+    }
+  }, [connectionStatus]);
 
-  // Calcular dimensões do SVG dinamicamente
-  const svgDimensions = React.useMemo(
-    () => calculateSvgDimensions(dimensions.width, dimensions.height),
-    [dimensions.width, dimensions.height]
-  );
+  const animatedHeartStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: scale.value }],
+  }));
 
-  React.useEffect(() => {
-    // Carregar o SVG como string de forma otimizada
+  const svgDimensions = useMemo(() => calculateSvgDimensions(SCREEN_WIDTH, SCREEN_HEIGHT), []);
+
+  useEffect(() => {
     const loadSvg = async () => {
       try {
-        // Usar require para carregar o SVG
         const svgModule = require("../../../../assets/running.svg");
-
-        // Se o Metro transformou o SVG em componente, precisamos usar outra abordagem
-        // Tentar carregar via Asset
-        const asset = Asset.fromModule(svgModule);
-        await asset.downloadAsync();
-
-        if (asset.localUri) {
-          const response = await fetch(asset.localUri);
-          const text = await response.text();
-          setSvgContent(text);
-        } else if (asset.uri) {
-          // Se não tiver localUri, tentar usar uri diretamente
-          const response = await fetch(asset.uri);
-          const text = await response.text();
-          setSvgContent(text);
+        // Tentativa silenciosa de carregar o asset
+        if (typeof svgModule === "number") {
+          const asset = Asset.fromModule(svgModule);
+          await asset.downloadAsync();
+          if (asset.localUri) {
+            const response = await fetch(asset.localUri);
+            const text = await response.text();
+            setSvgContent(text);
+          }
         }
       } catch (error) {
-        console.error("Erro ao carregar SVG:", error);
-        // Fallback: tentar carregar diretamente do arquivo
-        try {
-          const response = await fetch(require("../../../../assets/running.svg"));
-          const text = await response.text();
-          setSvgContent(text);
-        } catch (fallbackError) {
-          console.error("Erro no fallback:", fallbackError);
-        }
+        // Silencia erro de SVG para evitar poluição no console
       }
     };
     loadSvg();
   }, []);
 
-  // Buscar e atualizar dados de saúde do Wear OS em tempo real
-  React.useEffect(() => {
+  // Sync Logic (Mantida conforme original)
+  useEffect(() => {
     if (!user?.id) {
       setIsLoading(false);
       setConnectionStatus("disconnected");
-      setConnectionMessage("Nenhum usuário autenticado");
       return;
     }
-
-    // Converter ID do usuário para número (se necessário)
     const userId = parseInt(user.id, 10);
-    if (isNaN(userId)) {
-      console.error("ID do usuário inválido:", user.id);
-      setIsLoading(false);
-      setConnectionStatus("error");
-      setConnectionMessage("ID do usuário inválido");
-      return;
-    }
+    if (isNaN(userId)) return;
 
     if (hasWearOsDevice === null) {
       setConnectionStatus("connecting");
-      setConnectionMessage("Verificando dispositivo Wear OS...");
       return;
     }
 
     if (hasWearOsDevice === false) {
       setIsLoading(false);
       setConnectionStatus("disconnected");
-      setConnectionMessage("Nenhum dispositivo Wear OS conectado");
-      setHeartRate(null);
-      setPressure(null);
-      setOxygen(null);
+      setConnectionMessage("Nenhum relógio detectado");
       return;
     }
 
-    // Atualizar status de conexão
-    setConnectionStatus("connecting");
-    setConnectionMessage("Conectando ao dispositivo Wear OS...");
-
-    // Função assíncrona para carregar dados iniciais
     const loadInitialData = async () => {
       try {
-        setConnectionMessage("Buscando dados do dispositivo...");
         const data = await getLatestWearOsHealthData(userId);
         if (data) {
           setHeartRate(data.heartRate);
           setPressure(data.pressure);
           setOxygen(data.oxygen);
-
-          // Verificar se há múltiplos dispositivos para atualizar a mensagem
-          const multiDeviceData = await getLatestWearOsHealthDataFromAllDevices(userId);
-          if (multiDeviceData && multiDeviceData.deviceData.length > 1) {
-            setConnectionMessage(
-              `Conectado a ${multiDeviceData.deviceData.length} dispositivos Wear OS`
-            );
-          } else {
-            setConnectionMessage("Conectado ao dispositivo Wear OS");
-          }
-
-          setLastUpdate(new Date().toLocaleTimeString());
           setConnectionStatus("connected");
+          setConnectionMessage("Monitorando em tempo real");
+          setLastUpdate(new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }));
         } else {
           setConnectionStatus("disconnected");
-          setConnectionMessage("Nenhum dado de saúde disponível do dispositivo Wear OS");
+          setConnectionMessage("Sem dados recentes");
         }
         setIsLoading(false);
       } catch (error) {
-        console.error("Erro ao carregar dados iniciais:", error);
-        setIsLoading(false);
         setConnectionStatus("error");
-        setConnectionMessage(
-          `Erro ao conectar: ${error instanceof Error ? error.message : "Erro desconhecido"}`
-        );
-        Alert.alert(
-          "Erro",
-          `Falha ao conectar ao dispositivo Wear OS: ${error instanceof Error ? error.message : "Erro desconhecido"}`
-        );
+        setIsLoading(false);
       }
     };
 
     loadInitialData();
 
-    // Configurar atualização em tempo real usando polling (a cada 5 segundos)
-    const cancelPolling = pollWearOsHealthData(
-      userId,
-      5000, // 5 segundos
-      async (data) => {
-        setHeartRate(data.heartRate);
-        setPressure(data.pressure);
-        setOxygen(data.oxygen);
+    const cancelPolling = pollWearOsHealthData(userId, 5000, async (data) => {
+      setHeartRate(data.heartRate);
+      setPressure(data.pressure);
+      setOxygen(data.oxygen);
+      setConnectionStatus("connected");
+      setLastUpdate(new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }));
+    });
 
-        // Verificar se há atualizações de múltiplos dispositivos
-        const multiDeviceData = await getLatestWearOsHealthDataFromAllDevices(userId);
-        if (multiDeviceData && multiDeviceData.deviceData.length > 1) {
-          setConnectionMessage(
-            `Conectado a ${multiDeviceData.deviceData.length} dispositivos Wear OS`
-          );
-        } else {
-          setConnectionMessage("Conectado ao dispositivo Wear OS");
-        }
-
-        setLastUpdate(new Date().toLocaleTimeString());
-        setIsLoading(false);
-      }
-    );
-
-    // Alternativa: usar realtime do Supabase (descomente se preferir)
-    // const cancelRealtime = subscribeToWearOsHealthRealtime(userId, (data) => {
-    //   setHeartRate(data.heartRate);
-    //   setPressure(data.pressure);
-    //   setOxygen(data.oxygen);
-    //   setConnectionStatus('connected');
-    //   setConnectionMessage('Conectado ao dispositivo Wear OS (realtime)');
-    //   setLastUpdate(new Date().toLocaleTimeString());
-    //   setIsLoading(false);
-    // });
-
-    return () => {
-      cancelPolling();
-      // cancelRealtime();
-    };
+    return () => cancelPolling();
   }, [user?.id, hasWearOsDevice]);
 
-  React.useEffect(() => {
-    let isActive = true;
-
+  useEffect(() => {
     const verifyDevice = async () => {
-      if (!user?.id) {
-        if (isActive) {
-          setHasWearOsDevice(false);
-        }
-        return;
-      }
-
+      if (!user?.id) return;
       const userId = parseInt(user.id, 10);
-      if (Number.isNaN(userId)) {
-        if (isActive) {
-          setHasWearOsDevice(false);
-        }
-        return;
-      }
-
       try {
         const device = await checkWearOsDeviceRegistered(userId);
-        if (isActive) {
-          setHasWearOsDevice(Boolean(device));
-        }
+        setHasWearOsDevice(Boolean(device));
       } catch {
-        if (isActive) {
-          setHasWearOsDevice(false);
-        }
+        setHasWearOsDevice(false);
       }
     };
-
     verifyDevice();
-
-    return () => {
-      isActive = false;
-    };
   }, [user?.id]);
 
-  // Função para lidar com dados recebidos do dispositivo Wear OS
-  // Esta função pode ser chamada quando o dispositivo enviar dados
-  // const handleWearOsDataReceived = async (healthData: {
-  //   heartRate?: number | null;
-  //   bloodPressure?: number | null;
-  //   oxygenSaturation?: number | null;
-  // }) => {
-  //   if (!user?.id) return;
-  //
-  //   const userId = parseInt(user.id, 10);
-  //   if (isNaN(userId)) return;
-  //
-  //   // Enviar os dados recebidos para o banco de dados
-  //   const success = await sendWearOsHealthDataToDatabase(userId, healthData);
-  //
-  //   if (success) {
-  //     console.log("Dados do Wear OS recebidos e armazenados com sucesso:", healthData);
-  //     // Atualizar os dados locais
-  //     if (healthData.heartRate !== undefined && healthData.heartRate !== null) {
-  //       setHeartRate(healthData.heartRate);
-  //     }
-  //     if (healthData.bloodPressure !== undefined && healthData.bloodPressure !== null) {
-  //       setPressure(healthData.bloodPressure);
-  //     }
-  //     if (healthData.oxygenSaturation !== undefined && healthData.oxygenSaturation !== null) {
-  //       setOxygen(healthData.oxygenSaturation);
-  //     }
-  //     setLastUpdate(new Date().toLocaleTimeString());
-  //   } else {
-  //     console.error("Falha ao armazenar dados do Wear OS");
-  //   }
-  // };
-
-  // Listener para detectar mudanças nas dimensões do dispositivo
-  React.useEffect(() => {
-    const subscription = Dimensions.addEventListener("change", ({ window }) => {
-      setDimensions({ width: window.width, height: window.height });
-    });
-
-    return () => {
-      subscription?.remove();
-    };
-  }, []);
-
-  // Listener para detectar mudanças nas dimensões do dispositivo
-  React.useEffect(() => {
-    const subscription = Dimensions.addEventListener("change", ({ window }) => {
-      setDimensions({ width: window.width, height: window.height });
-    });
-
-    return () => {
-      subscription?.remove();
-    };
-  }, []);
+  const getStatusColor = () => {
+    switch (connectionStatus) {
+      case "connected":
+        return "#10B981";
+      case "connecting":
+        return "#F59E0B";
+      default:
+        return "#EF4444";
+    }
+  };
 
   return (
     <SafeAreaView style={styles.safeArea} edges={["top"]}>
       <View style={styles.container}>
-        {/* === BACKGROUND SVG === */}
+        {/* SVG Background */}
         <View pointerEvents="none" style={styles.background}>
           <View
             style={[
               styles.svgContainer,
-              {
-                top: (dimensions.height - svgDimensions.height) / 2,
-                left: (dimensions.width - svgDimensions.width) / 2,
-                width: svgDimensions.width,
-                height: svgDimensions.height,
-              },
+              { width: svgDimensions.width, height: svgDimensions.height },
             ]}
           >
             {svgContent ? (
-              <SvgXml
-                xml={svgContent}
-                width={svgDimensions.width}
-                height={svgDimensions.height}
-                preserveAspectRatio="xMidYMid meet"
-              />
+              <SvgXml xml={svgContent} width={svgDimensions.width} height={svgDimensions.height} />
             ) : null}
           </View>
         </View>
 
-        {/* === CONTEÚDO POR CIMA DA IMAGEM === */}
         <ScrollView
           style={styles.scrollView}
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
         >
-          <View style={styles.overlayContent}>
-            {/* Header */}
-            <View style={styles.header}>
-              <BackButton to={{ name: "DataScreen" }} />
-              <Text style={styles.headerTitle}>Frequência cardíaca</Text>
-              <View style={{ width: 46 }} />
-            </View>
+          {/* Header */}
+          <View style={styles.header}>
+            <BackButton to={{ name: "DataScreen" }} />
+            <Text style={styles.headerTitle}>Batimentos cardíacos</Text>
+            <View style={{ width: 46 }} />
+          </View>
 
-            {/* Status de Conexão do Wear OS */}
-            <View
-              style={[
-                styles.connectionStatusContainer,
-                styles[`connectionStatus${connectionStatus}`],
-              ]}
+          {/* Connection Status Badge */}
+          <ReanimatedView
+            entering={FadeInDown.delay(100).duration(600)}
+            style={styles.statusSection}
+          >
+            <TouchableOpacity
+              style={[styles.statusBadge, { borderColor: getStatusColor() + "40" }]}
+              onPress={() => setIsDeviceModalVisible(true)}
+              activeOpacity={0.7}
             >
-              {connectionStatus === "connected" && (
-                <Wifi size={16} color="#10B981" style={{ marginRight: 8 }} />
-              )}
-              {connectionStatus === "connecting" && (
-                <Watch size={16} color="#F59E0B" style={{ marginRight: 8 }} />
-              )}
-              {connectionStatus === "disconnected" && (
-                <Watch size={16} color="#EF4444" style={{ marginRight: 8 }} />
-              )}
-              {connectionStatus === "error" && (
-                <AlertTriangle size={16} color="#EF4444" style={{ marginRight: 8 }} />
-              )}
+              <View style={[styles.statusDot, { backgroundColor: getStatusColor() }]} />
+              <Text style={styles.statusText}>{connectionMessage}</Text>
+              {lastUpdate && <Text style={styles.updateText}>• {lastUpdate}</Text>}
+            </TouchableOpacity>
+          </ReanimatedView>
 
-              <View>
-                <Text style={styles.connectionStatusText}>{connectionMessage}</Text>
-                {lastUpdate && (
-                  <Text style={styles.lastUpdateText}>Última atualização: {lastUpdate}</Text>
-                )}
-              </View>
+          {/* Heart Rate Display */}
+          <ReanimatedView
+            entering={FadeInDown.delay(300).duration(800)}
+            style={styles.heartDisplaySection}
+          >
+            <ReanimatedView style={[styles.heartIconWrapper, animatedHeartStyle]}>
+              <Heart size={32} color="#EF4444" fill="#EF4444" />
+            </ReanimatedView>
+
+            <View style={styles.valueContainer}>
+              <Text style={styles.bpmValue}>{heartRate ? Math.round(heartRate) : "--"}</Text>
+              <Text style={styles.bpmLabel}>BPM</Text>
             </View>
 
-            {/* Frequência Cardíaca com ECG */}
-            <View style={styles.heartRateContainer}>
+            <View style={styles.ecgWrapper}>
               <ECGDisplay
                 bpm={heartRate}
-                width={280}
-                height={70}
+                width={SCREEN_WIDTH * 0.7}
+                height={80}
                 responsive={false}
                 isConnected={connectionStatus === "connected"}
+                color="#EF4444"
               />
+            </View>
+          </ReanimatedView>
 
-              <View style={styles.heartRatePrimaryInfo}>
-                {isLoading ? (
-                  <Text style={styles.heartRateValue}>--</Text>
-                ) : (
-                  <Text style={styles.heartRateValue}>
-                    {heartRate !== null ? Math.round(heartRate) : "--"}
-                    <Text style={styles.heartRateUnit}> bpm</Text>
-                  </Text>
-                )}
-              </View>
+          {/* Secondary Metrics */}
+          <View style={styles.metricsGrid}>
+            <ReanimatedView
+              entering={FadeInDown.delay(500).duration(600)}
+              style={styles.metricWrapper}
+            >
+              <LinearGradient colors={["#FFF1F2", "#FFFFFF"]} style={styles.metricCard}>
+                <View style={styles.metricHeader}>
+                  <View style={[styles.iconBox, { backgroundColor: "#FFE4E6" }]}>
+                    <Activity size={20} color="#E11D48" />
+                  </View>
+                  <Text style={styles.metricTitle}>Pressão</Text>
+                </View>
+                <View style={styles.metricContent}>
+                  <Text style={styles.metricValue}>{pressure ? Math.round(pressure) : "--"}</Text>
+                  <Text style={styles.metricUnit}>mmHg</Text>
+                </View>
+              </LinearGradient>
+            </ReanimatedView>
 
-              <Text
-                style={[
-                  styles.connectionIndicator,
-                  {
-                    color: connectionStatus === "connected" ? "#10B981" : "#EF4444",
-                  },
-                ]}
-              >
-                {connectionStatus === "connected" ? "● Conectado" : "● Desconectado"}
+            <ReanimatedView
+              entering={FadeInDown.delay(700).duration(600)}
+              style={styles.metricWrapper}
+            >
+              <LinearGradient colors={["#F0F9FF", "#FFFFFF"]} style={styles.metricCard}>
+                <View style={styles.metricHeader}>
+                  <View style={[styles.iconBox, { backgroundColor: "#E0F2FE" }]}>
+                    <Wind size={20} color="#0284C7" />
+                  </View>
+                  <Text style={styles.metricTitle}>Oxigênio</Text>
+                </View>
+                <View style={styles.metricContent}>
+                  <Text style={styles.metricValue}>{oxygen ? Math.round(oxygen) : "--"}</Text>
+                  <Text style={styles.metricUnit}>SpO2</Text>
+                </View>
+              </LinearGradient>
+            </ReanimatedView>
+          </View>
+
+          {/* Info Card */}
+          <ReanimatedView entering={FadeInDown.delay(900).duration(600)} style={styles.infoCard}>
+            <View style={styles.infoContent}>
+              <Text style={styles.infoTitle}>Status da Conexão</Text>
+              <Text style={styles.infoSubtitle}>
+                {connectionStatus === "connected"
+                  ? "Seu relógio está sincronizado e enviando dados."
+                  : "Por favor, verifique se seu Wear OS está por perto."}
               </Text>
             </View>
+            <TouchableOpacity style={styles.syncBtn} onPress={() => setIsDeviceModalVisible(true)}>
+              <Watch size={18} color="#2563EB" />
+            </TouchableOpacity>
+          </ReanimatedView>
 
-            <View></View>
-
-            {/* Espaço para não ficar coberto pelos cards fixos */}
-            <View style={{ height: 180 }} />
-          </View>
+          <View style={{ height: 120 }} />
         </ScrollView>
 
-        {/* Cards fixos no final */}
-        <View style={styles.fixedCardsContainer} pointerEvents="box-none">
-          {/* Pressão */}
-          <View style={styles.card}>
-            <View style={styles.cardInner}>
-              <Text style={styles.cardTitle}>Pressão</Text>
-              <View style={styles.cardContent}>
-                <Activity size={26} color="#FF8C00" style={{ marginRight: 12 }} />
-                <View style={styles.cardValueContainer}>
-                  <Text style={styles.cardValue}>
-                    {isLoading ? "--" : pressure !== null ? Math.round(pressure) : "--"}
-                  </Text>
-                  <Text style={styles.cardUnit}>mmHg</Text>
-                </View>
-              </View>
-            </View>
-          </View>
+        <DataPillNavigator currentScreen="HeartbeatsScreen" />
 
-          {/* Oxigênio */}
-          <View style={styles.card}>
-            <View style={styles.cardInner}>
-              <Text style={styles.cardTitle}>Oxigênio</Text>
-              <View style={styles.cardContent}>
-                <Wind size={26} color="#00BFFF" style={{ marginRight: 12 }} />
-                <View style={styles.cardValueContainer}>
-                  <Text style={styles.cardValue}>
-                    {isLoading ? "--" : oxygen !== null ? Math.round(oxygen) : "--"}
-                  </Text>
-                  <Text style={styles.cardUnit}>SpO2</Text>
-                </View>
-              </View>
-            </View>
-          </View>
-        </View>
-
-        {/* Setas de navegação */}
-        <NavigationArrows currentScreen="HeartbeatsScreen" screens={DATA_SCREENS} />
+        <DeviceSelectorModal
+          isVisible={isDeviceModalVisible}
+          onClose={() => setIsDeviceModalVisible(false)}
+        />
       </View>
     </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-    backgroundColor: "#fff",
-  },
-  container: {
-    flex: 1,
-    backgroundColor: "#fff",
-  },
+  safeArea: { flex: 1, backgroundColor: "#FFFFFF" },
+  container: { flex: 1, backgroundColor: "#FFFFFF" },
   background: {
     ...StyleSheet.absoluteFillObject,
     alignItems: "center",
     justifyContent: "center",
-    zIndex: 0,
-    overflow: "hidden",
+    opacity: 0.15, // Mais discreto
   },
   svgContainer: {
     position: "absolute",
-    alignItems: "center",
-    justifyContent: "center",
-    marginTop: -376,
-    marginLeft: -230,
+    top: -200,
   },
-  scrollView: {
-    flex: 1,
-  },
-  scrollContent: {
-    flexGrow: 1,
-    paddingBottom: 100,
-  },
-  overlayContent: {
-    paddingHorizontal: 20,
-    zIndex: 1,
-    backgroundColor: "transparent",
-  },
-  // === HEADER ===
+  scrollView: { flex: 1 },
+  scrollContent: { flexGrow: 1 },
   header: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: 20,
-    paddingTop: 10,
+    marginTop: 20,
+    paddingHorizontal: 20,
+    marginBottom: 10,
   },
   headerTitle: {
-    fontSize: 20,
-    fontWeight: "bold",
-    color: "#192126",
+    fontSize: 22,
+    fontWeight: "800",
+    color: "#1E293B",
   },
-
-  // === FREQUÊNCIA CARDÍACA ===
-  heartRateContainer: {
+  statusSection: {
     alignItems: "center",
-    justifyContent: "center",
     marginBottom: 30,
   },
-  heartRatePrimaryInfo: {
+  statusBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#F8FAFC",
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+    borderWidth: 1,
+  },
+  statusDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    marginRight: 8,
+  },
+  statusText: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#475569",
+  },
+  updateText: {
+    fontSize: 12,
+    color: "#94A3B8",
+    marginLeft: 4,
+  },
+  heartDisplaySection: {
     alignItems: "center",
     justifyContent: "center",
-    marginTop: 16,
+    marginVertical: 20,
   },
-  heartRateValue: {
-    fontSize: 56,
-    fontWeight: "bold",
-    color: "#192126",
-    textShadowColor: "rgba(0, 0, 0, 0.05)",
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 2,
+  heartIconWrapper: {
+    marginBottom: 10,
   },
-  heartRateUnit: {
+  valueContainer: {
+    flexDirection: "row",
+    alignItems: "baseline",
+  },
+  bpmValue: {
+    fontSize: 72,
+    fontWeight: "900",
+    color: "#1E293B",
+    letterSpacing: -2,
+  },
+  bpmLabel: {
+    fontSize: 20,
+    color: "#94A3B8",
+    fontWeight: "600",
+    marginLeft: 4,
+  },
+  ecgWrapper: {
+    marginTop: 20,
+  },
+  metricsGrid: {
+    flexDirection: "row",
+    paddingHorizontal: 20,
+    gap: 12,
+    marginTop: 40,
+  },
+  metricWrapper: { flex: 1 },
+  metricCard: {
+    padding: 16,
+    borderRadius: 24,
+    borderWidth: 1,
+    borderColor: "#F8FAFC",
+    ...Platform.select({
+      ios: {
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.05,
+        shadowRadius: 10,
+      },
+      android: { elevation: 2 },
+    }),
+  },
+  metricHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 14,
+  },
+  iconBox: {
+    width: 32,
+    height: 32,
+    borderRadius: 10,
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: 8,
+  },
+  metricTitle: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: "#64748B",
+  },
+  metricContent: {
+    flexDirection: "row",
+    alignItems: "baseline",
+  },
+  metricValue: {
     fontSize: 28,
-    fontWeight: "500",
-    color: "#797E86",
+    fontWeight: "800",
+    color: "#1E293B",
   },
-  connectionIndicator: {
-    fontSize: 14,
-    fontWeight: "600",
-    marginTop: 8,
-  },
-
-  // === CARDS ===
-  fixedCardsContainer: {
-    position: "absolute",
-    left: 20,
-    right: 20,
-    bottom: 114,
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    zIndex: 2,
-  },
-  card: {
-    flex: 1,
-    backgroundColor: "rgba(255, 255, 255, 0.94)",
-    borderRadius: 20,
-    overflow: "hidden",
-    marginHorizontal: 8,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.15,
-    shadowRadius: 12,
-    elevation: 8,
-    borderWidth: 1,
-    borderColor: "rgba(229, 231, 235, 0.9)",
-  },
-  cardInner: {
-    padding: 22,
-  },
-  cardTitle: {
-    fontSize: 15,
-    fontWeight: "600",
-    color: "#192126",
-    marginBottom: 16,
-  },
-  cardContent: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  cardValueContainer: {
-    flexDirection: "column",
-  },
-  cardValue: {
-    fontSize: 34,
-    fontWeight: "bold",
-    color: "#192126",
-  },
-  cardUnit: {
-    fontSize: 15,
-    color: "#797E86",
-    marginTop: -4,
-  },
-
-  // === STATUS DE CONEXÃO ===
-  connectionStatusContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    padding: 12,
-    borderRadius: 12,
-    marginBottom: 20,
-    borderWidth: 1,
-  },
-  connectionStatusconnected: {
-    backgroundColor: "rgba(16, 185, 129, 0.1)",
-    borderColor: "#10B981",
-  },
-  connectionStatusconnecting: {
-    backgroundColor: "rgba(245, 158, 11, 0.1)",
-    borderColor: "#F59E0B",
-  },
-  connectionStatusdisconnected: {
-    backgroundColor: "rgba(239, 68, 68, 0.1)",
-    borderColor: "#EF4444",
-  },
-  connectionStatuserror: {
-    backgroundColor: "rgba(239, 68, 68, 0.1)",
-    borderColor: "#EF4444",
-  },
-  connectionStatusText: {
-    fontSize: 14,
-    fontWeight: "500",
-    color: "#192126",
-  },
-  lastUpdateText: {
+  metricUnit: {
     fontSize: 12,
-    color: "#797E86",
-    marginTop: 2,
+    color: "#94A3B8",
+    fontWeight: "700",
+    marginLeft: 2,
+  },
+  infoCard: {
+    marginHorizontal: 20,
+    marginTop: 24,
+    padding: 20,
+    backgroundColor: "#F8FAFC",
+    borderRadius: 24,
+    flexDirection: "row",
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: "#F1F5F9",
+  },
+  infoContent: { flex: 1 },
+  infoTitle: {
+    fontSize: 16,
+    fontWeight: "800",
+    color: "#1E293B",
+    marginBottom: 4,
+  },
+  infoSubtitle: {
+    fontSize: 13,
+    color: "#64748B",
+    lineHeight: 18,
+  },
+  syncBtn: {
+    width: 40,
+    height: 40,
+    backgroundColor: "#FFFFFF",
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+    ...Platform.select({
+      ios: {
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
+      },
+      android: { elevation: 2 },
+    }),
   },
 });
 

@@ -222,7 +222,7 @@ export const checkWearOsDeviceRegistered = async (
       .eq("id_us", userId)
       .eq("tipo", "Wear OS")
       .eq("status", "ativo")
-      .order("createdAt", { ascending: false }) // Pegar o dispositivo mais recentemente registrado
+      .order("createdat", { ascending: false }) // Pegar o dispositivo mais recentemente registrado
       .limit(1);
 
     if (error) {
@@ -249,7 +249,7 @@ export const getAllWearOsDevices = async (userId: number): Promise<WearOsDeviceD
       .select("*")
       .eq("id_us", userId)
       .eq("tipo", "Wear OS")
-      .order("createdAt", { ascending: false });
+      .order("createdat", { ascending: false });
 
     if (error) {
       console.error("Erro ao buscar dispositivos Wear OS:", error);
@@ -492,10 +492,10 @@ export const registerWearOsDevice = async (
           tipo: deviceInfo.deviceType || "Wear OS",
           status: "ativo",
           modelo: deviceInfo.deviceModel,
-          versao_watchos: deviceInfo.deviceVersion, // Corrigindo o nome da coluna
+          versao_watchos: deviceInfo.deviceVersion,
           token_acesso: deviceInfo.tokenAcesso,
-          createdat: new Date().toISOString(), // Corrigindo o nome da coluna
-          updatedat: new Date().toISOString(), // Corrigindo o nome da coluna
+          createdat: new Date().toISOString(),
+          updatedat: new Date().toISOString(),
         },
       ])
       .select()

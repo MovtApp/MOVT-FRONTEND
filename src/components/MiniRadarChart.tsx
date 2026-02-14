@@ -1,5 +1,5 @@
 import React from "react";
-import { View, Text as RNText } from "react-native";
+import { View, Text as RNText, Platform, Dimensions } from "react-native";
 import { Canvas, Path, vec } from "@shopify/react-native-skia";
 
 interface RadarData {
@@ -46,6 +46,9 @@ const resistenciaData: RadarData = {
 };
 
 const MiniRadarChart: React.FC<MiniRadarChartProps> = ({ size = 150 }) => {
+  const { width } = Dimensions.get("window");
+  const isSmallOrIOS = width < 380 || Platform.OS === "ios";
+
   const center = size / 2;
   const radius = size * 0.32;
   const axisRadius = size * 0.38;
@@ -202,12 +205,25 @@ const MiniRadarChart: React.FC<MiniRadarChartProps> = ({ size = 150 }) => {
           textAlign = "center";
         }
 
+        // Adjust positioning for specific labels on iOS/Small screens
+        // Decrease margin-left (shift left) for specific labels as requested
+        let leftPos = textAlign === "left" ? lx : textAlign === "right" ? lx - 40 : lx - 20;
+
+        if (isSmallOrIOS) {
+          if (["Sono", "Passos"].includes(label)) {
+            leftPos -= 6; // Decrease margin-left (shift left towards center)
+          }
+          if (["Calorias", "IMC"].includes(label)) {
+            leftPos += 6; // Decrease margin-right (shift right towards center)
+          }
+        }
+
         return (
           <RNText
             key={i}
             style={{
               position: "absolute",
-              left: textAlign === "left" ? lx : textAlign === "right" ? lx - 40 : lx - 20,
+              left: leftPos,
               top: ly - 6,
               width: 40,
               textAlign: textAlign,

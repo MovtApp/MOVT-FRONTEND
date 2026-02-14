@@ -1,6 +1,6 @@
 import React, { useRef, useState, useEffect } from "react";
 import { Text, View, TouchableOpacity, StyleSheet, Platform } from "react-native";
-import MapView, { Marker } from "react-native-maps";
+import MapView, { Marker } from "@components/MapComponent";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import TrainingSelector from "@components/TrainingSelector";
 import { DetailsBottomSheet, PersonalTrainer } from "@components/DetailsBottomSheet";
@@ -29,6 +29,8 @@ const CustomGymMarker = React.memo(({ selected }: { selected: boolean }) => {
     </View>
   );
 });
+
+CustomGymMarker.displayName = "CustomGymMarker";
 
 const OptimizedGymMarker = ({
   gym,
@@ -119,6 +121,7 @@ const MapScreen: React.FC = () => {
   const [gyms, setGyms] = useState<Gym[]>([]);
   const [selectedGym, setSelectedGym] = useState<Gym | null>(null);
   const [loadingGyms, setLoadingGyms] = useState(false);
+  const [selectedSpecialtyMap, setSelectedSpecialtyMap] = useState<string | null>(null);
 
   // Timeout para evitar tempo de carregamento infinito
   useEffect(() => {
@@ -131,7 +134,7 @@ const MapScreen: React.FC = () => {
 
   const [isFirstLoad, setIsFirstLoad] = useState(true);
 
-  // Buscar academias próximas quando a localização estiver disponível
+  // Buscar academias próximas quando a localização estiver disponível ou filtro mudar
   useEffect(() => {
     if (location && user?.sessionId) {
       fetchNearbyGyms();
@@ -150,7 +153,7 @@ const MapScreen: React.FC = () => {
         setIsFirstLoad(false);
       }
     }
-  }, [location?.latitude, location?.longitude, user, isFirstLoad]); // Removido displayRadiusKm daqui para ter efeito separado
+  }, [location?.latitude, location?.longitude, user, isFirstLoad, selectedSpecialtyMap]); // Adicionado selectedSpecialtyMap aqui
 
   // Efeito dedicado para atualizar o zoom quando o raio muda
   useEffect(() => {
@@ -176,7 +179,8 @@ const MapScreen: React.FC = () => {
         location.latitude,
         location.longitude,
         displayRadiusKm,
-        user.sessionId
+        user.sessionId,
+        selectedSpecialtyMap
       );
       console.log("📍 Academias próximas encontradas:", response.data?.length || 0);
       setGyms(response.data || []);
@@ -189,6 +193,9 @@ const MapScreen: React.FC = () => {
   };
 
   const handleGymPress = (gym: Gym) => {
+    // Sempre fecha o sheet de detalhes ao clicar em um marcador para garantir estado limpo
+    setIsGymDetailsOpen(false);
+
     if (selectedGym?.id_academia === gym.id_academia) {
       setSelectedGym(null);
     } else {
@@ -346,7 +353,10 @@ const MapScreen: React.FC = () => {
           marginLeft: 10,
         }}
       >
-        <TrainingSelector />
+        <TrainingSelector
+          onSelect={setSelectedSpecialtyMap}
+          selectedSpecialty={selectedSpecialtyMap}
+        />
       </View>
       <View
         style={{
@@ -434,7 +444,14 @@ const MapScreen: React.FC = () => {
 
       {/* Card de Academia */}
       {selectedGym && !isGymDetailsOpen && (
-        <View style={gymCardStyles.container}>
+        <View
+          style={[
+            gymCardStyles.container,
+            Platform.OS === "android" && {
+              bottom: 20 + (insets.bottom > 0 ? insets.bottom : 20) + 40,
+            }, // Ajuste seguro para Android
+          ]}
+        >
           <GymCard gym={selectedGym} onDetailsPress={handleOpenGymDetails} />
         </View>
       )}
@@ -455,7 +472,7 @@ const gymCardStyles = StyleSheet.create({
     position: "absolute",
     bottom: Platform.select({
       ios: 100,
-      android: 120,
+      android: 80,
       default: 90,
     }),
     left: 20,

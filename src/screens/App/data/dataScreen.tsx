@@ -1,4 +1,5 @@
-import React, { useState, useRef, useEffect, useCallback, useMemo } from "react";
+import { StatusBar } from "expo-status-bar";
+import React, { useState, useRef, useEffect } from "react";
 import {
   ScrollView,
   Text,
@@ -7,15 +8,25 @@ import {
   TouchableOpacity,
   FlatList,
   Dimensions,
+  Platform,
 } from "react-native";
-import { useNavigation, CompositeNavigationProp, useFocusEffect } from "@react-navigation/native";
+import { useNavigation, CompositeNavigationProp } from "@react-navigation/native";
 import { DrawerNavigationProp } from "@react-navigation/drawer";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { AppDrawerParamList, AppStackParamList } from "../../../@types/routes";
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import Header from "../../../components/Header";
-import MapView, { LatLng, MapStyleElement, Polyline, Region } from "react-native-maps";
-import { Bike, Footprints } from "lucide-react-native";
+import MapView, { MapStyleElement, Polyline, PROVIDER_GOOGLE } from "react-native-maps";
+import {
+  Bike,
+  Footprints,
+  Flame,
+  Timer,
+  Heart,
+  Moon,
+  Droplets,
+  Activity,
+  ArrowRight,
+} from "lucide-react-native";
 import { useAuth } from "../../../contexts/AuthContext";
 import ECGDisplay from "../../../components/ECGDisplay";
 import MiniRadarChart from "../../../components/MiniRadarChart";
@@ -23,42 +34,100 @@ import WaterWave from "../../../components/WaterWave";
 import StepProgressRing from "../../../components/StepProgressRing";
 import { useHealthTracking } from "../../../hooks/useHealthTracking";
 import { formatTrainingTime } from "../../../utils/formatters";
+import { LinearGradient } from "expo-linear-gradient";
+import Animated, { FadeInDown } from "react-native-reanimated";
 
 const { width } = Dimensions.get("window");
 
 const cyclingMapStyle: MapStyleElement[] = [
   {
     elementType: "geometry",
-    stylers: [{ color: "#f3f4f6" }],
+    stylers: [{ color: "#f5f5f5" }],
   },
   {
-    elementType: "labels",
+    elementType: "labels.icon",
     stylers: [{ visibility: "off" }],
+  },
+  {
+    elementType: "labels.text.fill",
+    stylers: [{ color: "#616161" }],
+  },
+  {
+    elementType: "labels.text.stroke",
+    stylers: [{ color: "#f5f5f5" }],
+  },
+  {
+    featureType: "administrative.land_parcel",
+    elementType: "labels.text.fill",
+    stylers: [{ color: "#bdbdbd" }],
+  },
+  {
+    featureType: "poi",
+    elementType: "geometry",
+    stylers: [{ color: "#eeeeee" }],
+  },
+  {
+    featureType: "poi",
+    elementType: "labels.text.fill",
+    stylers: [{ color: "#757575" }],
+  },
+  {
+    featureType: "poi.park",
+    elementType: "geometry",
+    stylers: [{ color: "#e5e5e5" }],
+  },
+  {
+    featureType: "poi.park",
+    elementType: "labels.text.fill",
+    stylers: [{ color: "#9e9e9e" }],
   },
   {
     featureType: "road",
     elementType: "geometry",
-    stylers: [{ color: "#d1d5db" }],
+    stylers: [{ color: "#ffffff" }],
   },
   {
-    featureType: "road",
-    elementType: "geometry.stroke",
-    stylers: [{ color: "#e5e7eb" }],
+    featureType: "road.arterial",
+    elementType: "labels.text.fill",
+    stylers: [{ color: "#757575" }],
   },
   {
-    featureType: "poi",
-    stylers: [{ visibility: "off" }],
+    featureType: "road.highway",
+    elementType: "geometry",
+    stylers: [{ color: "#dadada" }],
   },
   {
-    featureType: "transit",
-    stylers: [{ visibility: "off" }],
+    featureType: "road.highway",
+    elementType: "labels.text.fill",
+    stylers: [{ color: "#616161" }],
+  },
+  {
+    featureType: "road.local",
+    elementType: "labels.text.fill",
+    stylers: [{ color: "#9e9e9e" }],
+  },
+  {
+    featureType: "transit.line",
+    elementType: "geometry",
+    stylers: [{ color: "#e5e5e5" }],
+  },
+  {
+    featureType: "transit.station",
+    elementType: "geometry",
+    stylers: [{ color: "#eeeeee" }],
   },
   {
     featureType: "water",
     elementType: "geometry",
-    stylers: [{ color: "#e2e8f0" }],
+    stylers: [{ color: "#c9c9c9" }],
+  },
+  {
+    featureType: "water",
+    elementType: "labels.text.fill",
+    stylers: [{ color: "#9e9e9e" }],
   },
 ];
+
 const DataScreen: React.FC = () => {
   type DataScreenNavigationProp = CompositeNavigationProp<
     DrawerNavigationProp<AppDrawerParamList, "HomeStack">,
@@ -104,14 +173,17 @@ const DataScreen: React.FC = () => {
   const stepsStatusText = stepsLoading ? "Sincronizando..." : isWalking ? "Contando agora" : "";
   const formattedTrainingTime = formatTrainingTime(trainingTime);
 
-  const DAY_ITEM_WIDTH = 50 + 4 * 2;
+  const DAY_ITEM_WIDTH = 60; // Increased touch area
 
   const handleFlatListLayout = () => {
     if (flatListRef.current) {
-      const flatListVisibleWidth = width - 20 * 2;
+      const flatListVisibleWidth = width - 40; // 20px padding each side
       const offset =
         (selectedDay - 1) * DAY_ITEM_WIDTH - flatListVisibleWidth / 2 + DAY_ITEM_WIDTH / 2;
-      flatListRef.current.scrollToOffset({ offset: Math.max(0, offset), animated: false });
+      flatListRef.current.scrollToOffset({
+        offset: Math.max(0, offset),
+        animated: false,
+      });
     }
   };
 
@@ -126,9 +198,14 @@ const DataScreen: React.FC = () => {
   };
 
   const getDayOfWeek = (year: number, month: number, day: number) => {
-    const days = ["D", "S", "T", "Q", "Q", "S", "S"];
+    const days = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
     return days[new Date(year, month, day).getDay()];
   };
+
+  /* Dynamic Sizing */
+  const CARD_WIDTH = (width - 40 - 20) / 2; // (Screen - PaddingHorizontal - Gap) / 2
+  const RADAR_SIZE = Math.min(CARD_WIDTH * 0.8, 140); // Max size 140, but scales down
+  const RADAR_MARGIN_TOP = CARD_WIDTH * 0.15;
 
   const RESULTS_CARD_INNER_SIZE = Math.floor(Math.min(202 - 30, 188 - 30) * 0.9);
 
@@ -138,19 +215,21 @@ const DataScreen: React.FC = () => {
   const currentMonth = currentDate.getMonth();
   const currentYear = currentDate.getFullYear();
 
-  const renderDay = ({ item }: { item: number }) => (
-    <TouchableOpacity
-      style={[styles.dayContainer, item === selectedDay && styles.selectedDayContainer]}
-      onPress={() => setSelectedDay(item)}
-    >
-      <Text style={[styles.dayOfWeek, item === selectedDay && styles.selectedDayOfWeek]}>
-        {getDayOfWeek(currentYear, currentMonth, item)}
-      </Text>
-      <Text style={[styles.dayOfMonth, item === selectedDay && styles.selectedDayOfMonth]}>
-        {item}
-      </Text>
-    </TouchableOpacity>
-  );
+  const renderDay = ({ item }: { item: number }) => {
+    const isSelected = item === selectedDay;
+    return (
+      <TouchableOpacity
+        style={[styles.dayContainer, isSelected && styles.selectedDayContainer]}
+        onPress={() => setSelectedDay(item)}
+        activeOpacity={0.7}
+      >
+        <Text style={[styles.dayOfWeek, isSelected && styles.selectedDayText]}>
+          {getDayOfWeek(currentYear, currentMonth, item)}
+        </Text>
+        <Text style={[styles.dayOfMonth, isSelected && styles.selectedDayText]}>{item}</Text>
+      </TouchableOpacity>
+    );
+  };
 
   const getItemLayout = (data: ArrayLike<any> | null | undefined, index: number) => ({
     length: DAY_ITEM_WIDTH,
@@ -160,6 +239,7 @@ const DataScreen: React.FC = () => {
 
   return (
     <View style={styles.container}>
+      <StatusBar style="dark" backgroundColor="#FFFFFF" />
       <Header />
 
       <ScrollView
@@ -167,233 +247,296 @@ const DataScreen: React.FC = () => {
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        <Text style={styles.monthText}>{monthNameAndYear}</Text>
-        <View>
-          <FlatList
-            horizontal
-            ref={flatListRef}
-            data={daysInMonthArray}
-            renderItem={renderDay}
-            keyExtractor={(item) => String(item)}
-            showsHorizontalScrollIndicator={false}
-            style={{ width: "100%", marginBottom: 30, marginTop: 14 }}
-            initialScrollIndex={selectedDay - 1}
-            getItemLayout={getItemLayout}
-            onLayout={handleFlatListLayout}
-          />
-          <Text style={styles.reportTitle}>Relatório de hoje</Text>
+        <View style={styles.dateHeader}>
+          <Text style={styles.monthText}>{monthNameAndYear}</Text>
+        </View>
 
-          <View style={styles.cardsContainer}>
-            <View style={styles.topRowCardsContainer}>
-              {/* Coluna Esquerda: Calorias e Tempo de Treino */}
-              <View style={styles.leftColumn}>
-                {/* Card de Calorias Gastas */}
-                <TouchableOpacity
-                  style={[styles.card, styles.caloriesCard]}
-                  onPress={() =>
-                    navigation.navigate({
-                      name: "CaloriesScreen",
-                      params: {} as never,
-                    })
-                  }
-                >
-                  <Text style={styles.cardCategory}>Calorias gastas</Text>
-                  <Text style={[styles.cardValue, styles.caloriesValue]}>
-                    {Math.round(healthData.calories)} Kcal
-                  </Text>
-                </TouchableOpacity>
+        <FlatList
+          horizontal
+          ref={flatListRef}
+          data={daysInMonthArray}
+          renderItem={renderDay}
+          keyExtractor={(item) => String(item)}
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.daysListContent}
+          style={styles.daysList}
+          initialScrollIndex={Math.max(0, selectedDay - 1)}
+          getItemLayout={getItemLayout}
+          onLayout={handleFlatListLayout}
+        />
 
-                {/* Card de Tempo de Treino */}
-                <TouchableOpacity
-                  style={[styles.card, styles.trainingTimeCard]}
-                  onPress={() =>
-                    navigation.navigate({
-                      name: "TrainingScreen",
-                      params: {} as never,
-                    })
-                  }
-                >
-                  <Text style={[styles.cardCategory, styles.trainingTimeCategory]}>
-                    Tempo de treino
-                  </Text>
-                  <View style={styles.trainingTimeValueContainer}>
-                    <Text style={styles.trainingTimeValue}>{formattedTrainingTime}</Text>
-                  </View>
-                </TouchableOpacity>
-              </View>
+        <Animated.View entering={FadeInDown.delay(100).duration(500)}>
+          <Text style={styles.sectionTitle}>Resumo Diário</Text>
 
-              {/* Coluna Direita Superior: Resultados (mesma estilização do Ciclismo) */}
+          <View style={styles.gridContainer}>
+            {/* Left Column */}
+            <View style={styles.leftColumn}>
+              {/* Calories Card */}
               <TouchableOpacity
-                style={[styles.card, styles.ResultsCard]}
-                onPress={() =>
-                  navigation.navigate({
-                    name: "ResultsScreen",
-                    params: {} as never,
-                  })
-                }
+                activeOpacity={0.8}
+                style={[styles.card, styles.smallCard]}
+                onPress={() => navigation.navigate("CaloriesScreen" as never)}
               >
-                <View style={styles.ResultsContent}>
-                  <View style={styles.ResultsHeader}>
-                    <Text style={styles.ResultsCategory}>Resultados</Text>
+                <LinearGradient
+                  colors={["rgba(255, 140, 0, 0.1)", "rgba(255, 140, 0, 0.05)"]}
+                  style={[StyleSheet.absoluteFill, { borderRadius: 20 }]}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                />
+                <View style={styles.cardHeader}>
+                  <View
+                    style={[styles.iconContainer, { backgroundColor: "rgba(255, 140, 0, 0.15)" }]}
+                  >
+                    <Flame size={18} color="#FF8C00" />
                   </View>
-                  <View style={styles.ResultsGraphPlaceholder}>
-                    <MiniRadarChart size={RESULTS_CARD_INNER_SIZE} />
+                  <ArrowRight size={16} color="#9CA3AF" />
+                </View>
+                <View>
+                  <Text style={styles.cardLabel}>Calorias</Text>
+                  <Text style={styles.cardValueLarge}>
+                    {Math.round(healthData.calories)}
+                    <Text style={styles.unitText}> kcal</Text>
+                  </Text>
+                </View>
+              </TouchableOpacity>
+
+              {/* Training Time Card */}
+              <TouchableOpacity
+                activeOpacity={0.8}
+                style={[styles.card, styles.smallCard]}
+                onPress={() => navigation.navigate("TrainingScreen" as never)}
+              >
+                <LinearGradient
+                  colors={["rgba(138, 43, 226, 0.1)", "rgba(138, 43, 226, 0.05)"]}
+                  style={[StyleSheet.absoluteFill, { borderRadius: 20 }]}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                />
+                <View style={styles.cardHeader}>
+                  <View
+                    style={[styles.iconContainer, { backgroundColor: "rgba(138, 43, 226, 0.15)" }]}
+                  >
+                    <Timer size={18} color="#8A2BE2" />
                   </View>
+                  <ArrowRight size={16} color="#9CA3AF" />
+                </View>
+                <View>
+                  <Text style={styles.cardLabel}>Tempo</Text>
+                  <Text style={styles.cardValueMedium}>{formattedTrainingTime}</Text>
                 </View>
               </TouchableOpacity>
             </View>
 
-            {/* Linha: Batimentos e Passos */}
-            <View style={styles.rowContainer}>
-              {/* Card de Batimentos */}
-              <TouchableOpacity
-                style={[styles.card, styles.heartRateCard]}
-                onPress={() =>
-                  navigation.navigate({
-                    name: "HeartbeatsScreen",
-                    params: {} as never,
-                  })
-                }
-              >
-                <View style={styles.heartRateHeader}>
-                  <Text style={[styles.cardCategory, styles.heartRateCategory]}>Batimentos</Text>
-                  {isWearOsConnected && (
-                    <View style={styles.connectionIndicator}>
-                      <View style={styles.connectionDot} />
-                      <Text style={styles.connectionText}>Conectado</Text>
-                    </View>
-                  )}
+            {/* Right Column - Results (Radar) */}
+            <TouchableOpacity
+              activeOpacity={0.8}
+              style={[styles.card, styles.tallCard]}
+              onPress={() => navigation.navigate("ResultsScreen" as never)}
+            >
+              <LinearGradient
+                colors={["rgba(187, 242, 70, 0.15)", "rgba(187, 242, 70, 0.05)"]}
+                style={[StyleSheet.absoluteFill, { borderRadius: 20 }]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+              />
+              <View style={styles.performanceHeader}>
+                <Text style={styles.performanceTitle}>Performance</Text>
+                <ArrowRight size={16} color="#4B5563" />
+              </View>
+              <View style={[styles.radarContainer, { marginTop: RADAR_MARGIN_TOP }]}>
+                <MiniRadarChart size={RADAR_SIZE} />
+              </View>
+
+              <View style={styles.cardFooter}>
+                <Text style={styles.cardLabel}>Análise completa</Text>
+              </View>
+            </TouchableOpacity>
+          </View>
+
+          {/* Row 2: Steps & Heart Rate */}
+          <View style={styles.rowContainer}>
+            {/* Steps Card */}
+            <TouchableOpacity
+              activeOpacity={0.8}
+              style={[styles.card, styles.mediumCard]}
+              onPress={() => navigation.navigate("StepsScreen" as never)}
+            >
+              <LinearGradient
+                colors={["rgba(34, 197, 94, 0.1)", "rgba(34, 197, 94, 0.02)"]}
+                style={[StyleSheet.absoluteFill, { borderRadius: 20 }]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+              />
+              <View style={styles.cardHeader}>
+                <Text style={styles.cardLabel}>Passos</Text>
+                <Footprints size={18} color="#22C55E" />
+              </View>
+
+              <View style={styles.stepsContent}>
+                <View style={styles.stepsRingWrapper}>
+                  <StepProgressRing progress={stepsProgress} size={60} strokeWidth={6} />
+                  <View style={styles.stepsRingInner}>
+                    <Text style={styles.stepsPercent}>{stepsProgressPercent}%</Text>
+                  </View>
                 </View>
+                <View style={styles.stepsData}>
+                  <Text style={styles.cardValueMove}>{formattedSteps}</Text>
+                  <Text style={styles.cardSubText}>Meta: {stepsGoal.toLocaleString("pt-BR")}</Text>
+                  {isWalking && <Text style={styles.liveTag}>• Andando</Text>}
+                </View>
+              </View>
+            </TouchableOpacity>
+
+            {/* Heart Rate Card */}
+            <TouchableOpacity
+              activeOpacity={0.8}
+              style={[styles.card, styles.mediumCard]}
+              onPress={() => navigation.navigate("HeartbeatsScreen" as never)}
+            >
+              <LinearGradient
+                colors={["rgba(239, 68, 68, 0.1)", "rgba(239, 68, 68, 0.02)"]}
+                style={[StyleSheet.absoluteFill, { borderRadius: 20 }]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+              />
+              <View style={styles.cardHeader}>
+                <Text style={styles.cardLabel}>BPM</Text>
+                <Heart
+                  size={18}
+                  color="#EF4444"
+                  fill={healthData.heartRate > 0 ? "#EF4444" : "transparent"}
+                />
+              </View>
+
+              <View style={styles.ecgContainer}>
                 <ECGDisplay
                   bpm={healthData.heartRate}
-                  width={140}
-                  height={45}
+                  width={width * 0.35}
+                  height={50}
                   responsive={false}
                   isConnected={isWearOsConnected && healthData.heartRate > 0}
+                  color="#EF4444"
                 />
-                <Text style={[styles.cardValue, styles.heartRateValue]}>
-                  {isWearOsConnected && healthData.heartRate > 0
-                    ? `${healthData.heartRate} Bpm`
-                    : "--"}
-                </Text>
-              </TouchableOpacity>
-
-              {/* Card de Passos */}
-              <TouchableOpacity
-                style={[styles.card, styles.stepsCard]}
-                onPress={() =>
-                  navigation.navigate({
-                    name: "StepsScreen",
-                    params: {} as never,
-                  })
-                }
-              >
-                <View style={styles.stepsCardHeader}>
-                  <Text style={[styles.cardCategory, styles.stepsCategory]}>Passos</Text>
-                  <Text style={styles.stepsGoalText}>{stepsGoal.toLocaleString("pt-BR")} meta</Text>
-                </View>
-                <View style={styles.stepsCardBody}>
-                  <View style={styles.stepsRingContainer}>
-                    <StepProgressRing progress={stepsProgress} size={72} />
-                    <View style={styles.stepsRingOverlay}>
-                      <Footprints size={18} color="#FF8C00" />
-                      <Text style={styles.stepsRingPercent}>{stepsProgressPercent}%</Text>
-                    </View>
-                  </View>
-                  <View style={styles.stepsInfoContainer}>
-                    <Text style={styles.stepsCountText}>{formattedSteps}</Text>
-                    <Text style={styles.stepsMetaText}>
-                      de {stepsGoal.toLocaleString("pt-BR")} passos
-                    </Text>
-                    <Text style={styles.stepsStatusText}>{stepsStatusText}</Text>
-                  </View>
-                </View>
-              </TouchableOpacity>
-            </View>
-
-            {/* Linha: Sono e Água */}
-            <View style={styles.rowContainer}>
-              {/* Card de Sono */}
-              <TouchableOpacity
-                style={[styles.card, styles.sleepCard]}
-                onPress={() =>
-                  navigation.navigate({
-                    name: "SleepScreen",
-                    params: {} as never,
-                  })
-                }
-              >
-                <Text style={[styles.cardCategory, styles.sleepCategory]}>Sono</Text>
-                <View style={styles.sleepStatusContainer}>
-                  <Text style={[styles.cardValue, styles.sleepValue]}>
-                    {sleepHours}h {String(sleepMinutes).padStart(2, "0")}m
-                  </Text>
-                </View>
-              </TouchableOpacity>
-
-              {/* Card de Água */}
-              <TouchableOpacity
-                style={[styles.card, styles.waterCard]}
-                onPress={() =>
-                  navigation.navigate({
-                    name: "WaterScreen",
-                    params: {} as never,
-                  })
-                }
-              >
-                <Text style={[styles.cardCategory, styles.waterCategory]}>Água</Text>
-                <View style={styles.waterFillPlaceholder}>
-                  <WaterWave progress={waterProgress} />
-                  <Text style={[styles.cardValue, styles.waterValue]}>{waterConsumedMl} ml</Text>
-                </View>
-              </TouchableOpacity>
-            </View>
-            <TouchableOpacity style={styles.cyclingCard} activeOpacity={0.9}>
-              <View style={styles.cyclingHeader}>
-                <View style={styles.cyclingIcon}>
-                  <Bike size={20} color="#192126" />
-                </View>
-                <Text style={styles.cyclingTitle}>Ciclismo</Text>
               </View>
-              <View style={styles.cyclingMapWrapper}>
-                {cyclingRegion ? (
-                  <MapView
-                    pointerEvents="none"
-                    style={styles.cyclingMap}
-                    region={cyclingRegion}
-                    customMapStyle={cyclingMapStyle}
-                    scrollEnabled={false}
-                    zoomEnabled={false}
-                    rotateEnabled={false}
-                    pitchEnabled={false}
-                    toolbarEnabled={false}
-                    showsCompass={false}
-                    showsBuildings={false}
-                    showsTraffic={false}
-                    showsIndoors={false}
-                    showsIndoorLevelPicker={false}
-                  >
-                    {cyclingRoute.length > 1 && (
-                      <Polyline
-                        coordinates={cyclingRoute}
-                        strokeColor="#BBF246"
-                        strokeWidth={4}
-                        lineCap="round"
-                        lineJoin="round"
-                      />
-                    )}
-                  </MapView>
-                ) : (
-                  <View style={styles.cyclingMapPlaceholder}>
-                    <Text style={styles.cyclingPlaceholderText}>
-                      {locationError ?? "Iniciando rastreamento..."}
-                    </Text>
+              <View style={styles.bpmFooter}>
+                <Text style={[styles.cardValueLarge, { color: "#EF4444" }]}>
+                  {isWearOsConnected && healthData.heartRate > 0 ? healthData.heartRate : "--"}
+                </Text>
+                {isWearOsConnected && (
+                  <View style={styles.connectedBadge}>
+                    <View style={styles.greenDot} />
+                    <Text style={styles.connectedText}>Sync</Text>
                   </View>
                 )}
               </View>
             </TouchableOpacity>
           </View>
-        </View>
+
+          {/* Row 3: Sleep & Water */}
+          <View style={styles.rowContainer}>
+            {/* Sleep Card */}
+            <TouchableOpacity
+              activeOpacity={0.8}
+              style={[styles.card, styles.halfCard]}
+              onPress={() => navigation.navigate("SleepScreen" as never)}
+            >
+              <LinearGradient
+                colors={["rgba(99, 102, 241, 0.15)", "rgba(99, 102, 241, 0.05)"]}
+                style={[StyleSheet.absoluteFill, { borderRadius: 20 }]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+              />
+              <View style={styles.cardHeader}>
+                <Text style={[styles.cardLabel, { color: "#818CF8" }]}>Sono</Text>
+                <Moon size={18} color="#818CF8" />
+              </View>
+              <View style={styles.sleepContent}>
+                <Text style={styles.cardValueLarge}>
+                  {sleepHours}
+                  <Text style={styles.unitText}>h</Text> {String(sleepMinutes).padStart(2, "0")}
+                  <Text style={styles.unitText}>m</Text>
+                </Text>
+              </View>
+            </TouchableOpacity>
+
+            {/* Water Card */}
+            <TouchableOpacity
+              activeOpacity={0.8}
+              style={[styles.card, styles.halfCard]}
+              onPress={() => navigation.navigate("WaterScreen" as never)}
+            >
+              <LinearGradient
+                colors={["rgba(6, 182, 212, 0.15)", "rgba(6, 182, 212, 0.05)"]}
+                style={[StyleSheet.absoluteFill, { borderRadius: 20 }]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+              />
+              <View style={styles.cardHeader}>
+                <Text style={[styles.cardLabel, { color: "#22D3EE" }]}>Hidratação</Text>
+                <Droplets size={18} color="#22D3EE" />
+              </View>
+              <View style={styles.waterContent}>
+                <View style={styles.waterWaveContainer}>
+                  <WaterWave progress={waterProgress} height={40} width={40} />
+                </View>
+                <Text style={styles.cardValueMediumWater}>
+                  {waterConsumedMl}
+                  <Text style={styles.unitTextSmall}>ml</Text>
+                </Text>
+              </View>
+            </TouchableOpacity>
+          </View>
+
+          {/* Cycling Map Card */}
+          <TouchableOpacity activeOpacity={0.9} style={styles.cyclingCard}>
+            <View style={styles.cyclingHeader}>
+              <View style={styles.cyclingIconBox}>
+                <Bike size={20} color="#111827" />
+              </View>
+              <Text style={styles.cyclingTitle}>Atividade de Ciclismo</Text>
+            </View>
+
+            <View style={styles.mapContainer}>
+              {cyclingRegion ? (
+                <MapView
+                  provider={Platform.OS === "android" ? PROVIDER_GOOGLE : undefined}
+                  pointerEvents="none"
+                  style={styles.map}
+                  region={cyclingRegion}
+                  customMapStyle={cyclingMapStyle}
+                  scrollEnabled={false}
+                  zoomEnabled={false}
+                  rotateEnabled={false}
+                  pitchEnabled={false}
+                  toolbarEnabled={false}
+                  showsCompass={false}
+                  showsBuildings={false}
+                  showsTraffic={false}
+                  showsIndoors={false}
+                >
+                  {cyclingRoute.length > 1 && (
+                    <Polyline
+                      coordinates={cyclingRoute}
+                      strokeColor="#BBF246"
+                      strokeWidth={4}
+                      lineCap="round"
+                      lineJoin="round"
+                    />
+                  )}
+                </MapView>
+              ) : (
+                <View style={styles.mapPlaceholder}>
+                  <View style={styles.radarEffect} />
+                  <Text style={styles.mapPlaceholderText}>
+                    {locationError ? "Localização indisponível" : "Aguardando GPS..."}
+                  </Text>
+                </View>
+              )}
+            </View>
+          </TouchableOpacity>
+
+          <View style={{ height: 100 }} />
+        </Animated.View>
       </ScrollView>
     </View>
   );
@@ -402,7 +545,15 @@ const DataScreen: React.FC = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#fff",
+    backgroundColor: "#FFFFFF",
+  },
+  content: {
+    flex: 1,
+    paddingHorizontal: 12,
+    marginTop: 20,
+  },
+  scrollContent: {
+    paddingBottom: 40,
   },
   header: {
     backgroundColor: "#fff",
@@ -412,612 +563,338 @@ const styles = StyleSheet.create({
     position: "relative",
     zIndex: 45,
   },
-  headerTop: {
+  dateHeader: {
     flexDirection: "row",
-    alignItems: "center",
     justifyContent: "space-between",
-    width: "100%",
+    alignItems: "center",
     paddingHorizontal: 20,
     paddingTop: 10,
-  },
-  menuButton: {
-    padding: 10,
-    zIndex: 46,
-    minWidth: 44,
-    minHeight: 44,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  iconButton: {
-    padding: 10,
-    zIndex: 46,
-    minWidth: 44,
-    minHeight: 44,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  notificationButton: {
-    padding: 10,
-  },
-  content: {
-    flex: 1,
-    paddingHorizontal: 20,
-    paddingTop: 20,
-  },
-  scrollContent: {
-    paddingBottom: 100,
+    marginBottom: 10,
   },
   monthText: {
-    color: "#192126",
-    fontSize: 20,
-    fontWeight: "bold",
-    marginTop: 0,
-    marginBottom: 0,
+    color: "#1F2937",
+    fontSize: 22,
+    fontWeight: "700",
+    letterSpacing: 0.5,
+  },
+  daysList: {
+    marginBottom: 20,
+  },
+  daysListContent: {
+    paddingHorizontal: 15,
+    paddingVertical: 10,
   },
   dayContainer: {
     width: 50,
     height: 70,
-    borderRadius: 15,
-    backgroundColor: "#BBF246",
+    borderRadius: 16,
+    backgroundColor: "#FFFFFF",
     justifyContent: "center",
     alignItems: "center",
-    marginHorizontal: 4,
+    marginHorizontal: 5,
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 2,
   },
   selectedDayContainer: {
-    backgroundColor: "#192126",
-    borderColor: "transparent",
-    borderWidth: 0,
+    backgroundColor: "#BBF246",
+    borderColor: "#BBF246",
+    transform: [{ scale: 1.05 }],
+    shadowOpacity: 0.1,
   },
   dayOfWeek: {
-    color: "#192126",
-    fontSize: 14,
-    marginBottom: 5,
-  },
-  selectedDayOfWeek: {
-    color: "#BBF246",
+    color: "#9CA3AF",
+    fontSize: 12,
+    marginBottom: 4,
+    fontWeight: "500",
   },
   dayOfMonth: {
-    color: "#192126",
+    color: "#1F2937",
     fontSize: 20,
-    fontWeight: "bold",
+    fontWeight: "700",
   },
-  selectedDayOfMonth: {
-    color: "#BBF246",
+  selectedDayText: {
+    color: "#111827",
   },
-  reportTitle: {
-    color: "#192126",
-    fontSize: 20,
-    fontWeight: "bold",
-    marginTop: 0,
+  sectionTitle: {
+    color: "#1F2937",
+    fontSize: 18,
+    fontWeight: "600",
     marginBottom: 15,
+    paddingHorizontal: 20,
   },
-  cardsContainer: {
+  gridContainer: {
     flexDirection: "row",
-    flexWrap: "wrap",
+    paddingHorizontal: 20,
     justifyContent: "space-between",
-  },
-  topRowCardsContainer: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    width: "100%",
-    marginBottom: 10,
+    marginBottom: 15,
   },
   leftColumn: {
-    width: 112,
-    flexDirection: "column",
-    justifyContent: "flex-start",
-  },
-  rowContainer: {
-    width: "100%",
-    flexDirection: "row",
-    flexWrap: "wrap",
-    justifyContent: "space-between",
-    marginBottom: 10,
+    width: "48%",
+    gap: 12,
   },
   card: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 20,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: "#F3F4F6",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.18,
+    shadowRadius: 4,
+    elevation: 4,
+  },
+  smallCard: {
+    height: 110,
+    justifyContent: "space-between",
+  },
+  tallCard: {
     width: "48%",
-    backgroundColor: "#3A3A3A",
-    borderRadius: 8,
-    padding: 15,
-    marginBottom: 10,
+    height: 232, // Matches 2 small cards + gap
+    alignItems: "center",
     justifyContent: "center",
   },
-  cardCategory: {
-    color: "#FFF",
-    fontSize: 14,
-    marginTop: -4,
-    marginBottom: 5,
-    fontWeight: "bold",
-  },
-  cardValue: {
-    color: "#fff",
-    fontSize: 14,
-    fontWeight: "bold",
-  },
-  caloriesCard: {
-    backgroundColor: "#192126",
-    height: 70,
-    width: 150,
-    padding: 15,
-    borderRadius: 8,
-    marginBottom: 10,
+  cardHeader: {
+    flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "flex-start",
-  },
-  caloriesValue: {
-    color: "#FFF",
-    fontSize: 14,
-  },
-  ResultsCard: {
-    backgroundColor: "#192126",
-    height: 188,
-    width: 202,
-    flexDirection: "column",
-    justifyContent: "center",
-    alignItems: "center",
-    marginBottom: 10,
-    borderColor: "#192126",
-    borderWidth: 1,
-  },
-  ResultsContent: {
-    flexDirection: "column",
-    alignItems: "center",
-    justifyContent: "center",
-    height: "100%",
+    marginBottom: 8,
     width: "100%",
   },
-  ResultsHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "flex-start",
-    alignSelf: "stretch",
-    width: "100%",
-  },
-  ResultsCategory: {
-    color: "#fff",
-    fontSize: 14,
-    fontWeight: "bold",
-    marginTop: 34,
-    textAlign: "left",
-    alignSelf: "flex-start",
-  },
-  ResultsGraphPlaceholder: {
-    width: "100%",
-    height: "100%",
-    backgroundColor: "transparent",
+  iconContainer: {
+    width: 32,
+    height: 32,
     borderRadius: 10,
     justifyContent: "center",
     alignItems: "center",
-    marginBottom: 20,
   },
-  ResultsGraphLine: {
-    backgroundColor: "#BBF246",
-    height: 2,
-    width: "80%",
-    borderRadius: 1,
-  },
-  trainingTimeCard: {
-    backgroundColor: "#F5EEFB",
-    width: 150,
-    height: 108,
-    padding: 15,
-    borderRadius: 8,
-    marginBottom: 10,
-    justifyContent: "space-between",
-    alignItems: "center",
-  },
-  trainingTimeCategory: {
-    color: "#8A2BE2",
-    fontSize: 14,
-    marginBottom: 5,
-    textAlign: "left",
-    width: "100%",
-    fontWeight: "bold",
-  },
-  trainingTimeValueContainer: {
-    width: 54,
-    height: 54,
-    borderRadius: 35,
-    borderWidth: 5,
-    borderColor: "#D8BFD8",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  trainingTimeValue: {
-    color: "#8A2BE2",
-    fontSize: 16,
-    fontWeight: "bold",
-  },
-  heartRateCard: {
-    backgroundColor: "#FCE7F3",
-    width: "48%",
-    height: 130,
-    padding: 12,
-    borderRadius: 8,
-    marginBottom: 10,
-    justifyContent: "space-between",
-    alignItems: "flex-start",
-  },
-  heartRateHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    width: "100%",
-    marginBottom: 3,
-  },
-  heartRateCategory: {
-    color: "red",
-    fontSize: 14,
-    fontWeight: "bold",
-    marginTop: 2,
-  },
-  connectionIndicator: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-  },
-  connectionDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: "#22C55E",
-  },
-  connectionText: {
-    color: "#22C55E",
-    fontSize: 9,
+  cardLabel: {
+    color: "#94A3B8",
+    fontSize: 10,
     fontWeight: "600",
   },
-  heartRateGraphPlaceholder: {
-    width: "100%",
-    height: 50,
-    justifyContent: "center",
-    alignItems: "center",
-    marginVertical: 4,
-  },
-  heartRateValue: {
-    color: "#FF69B4",
-    fontSize: 16,
-    marginTop: 2,
-  },
-  ResultsValue: {
-    color: "#00C0FF",
-    fontSize: 18,
-    fontWeight: "bold",
-  },
-  stepsCard: {
-    backgroundColor: "#FFF3E0",
-    width: "48%",
-    minHeight: 132,
-    padding: 15,
-    borderRadius: 8,
-    marginBottom: 10,
-    justifyContent: "flex-start",
-    alignItems: "stretch",
-  },
-  stepsCardHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    width: "100%",
-    marginBottom: 8,
-  },
-  stepsGoalText: {
-    color: "#C2410C",
-    fontSize: 12,
-    fontWeight: "600",
-  },
-  stepsCardBody: {
-    flexDirection: "row",
-    alignItems: "center",
-    width: "100%",
-  },
-  stepsRingContainer: {
-    width: 72,
-    height: 72,
-    justifyContent: "center",
-    alignItems: "center",
-    marginRight: 12,
-  },
-  stepsRingOverlay: {
+  performanceHeader: {
     position: "absolute",
-    top: 0,
-    bottom: 0,
+    top: 16,
     left: 0,
     right: 0,
+    paddingHorizontal: 16,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    zIndex: 10,
+  },
+  performanceTitle: {
+    color: "#1F2937",
+    fontSize: 14,
+    fontWeight: "700",
+  },
+  cardValueLarge: {
+    color: "#111827",
+    fontSize: 22,
+    fontWeight: "800",
+  },
+  cardValueMedium: {
+    color: "#111827",
+    fontSize: 18,
+    fontWeight: "700",
+  },
+  cardValueMediumWater: {
+    color: "#111827",
+    fontSize: 18,
+    fontWeight: "700",
+    marginTop: 20,
+  },
+  cardValueMove: {
+    color: "#111827",
+    fontSize: 20,
+    fontWeight: "800",
+  },
+  unitText: {
+    fontSize: 14,
+    color: "#9CA3AF",
+    fontWeight: "500",
+  },
+  unitTextSmall: {
+    fontSize: 12,
+    color: "#9CA3AF",
+    fontWeight: "500",
+  },
+  radarContainer: {
+    transform: [{ scale: 1.0 }],
     alignItems: "center",
     justifyContent: "center",
   },
-  stepsRingPercent: {
-    marginTop: 2,
-    color: "#FF8C00",
-    fontSize: 12,
-    fontWeight: "700",
-  },
-  stepsInfoContainer: {
-    flex: 1,
-  },
-  stepsCountText: {
-    color: "#FF8C00",
-    fontSize: 20,
-    fontWeight: "700",
-  },
-  stepsMetaText: {
-    color: "#B45309",
-    fontSize: 12,
-    marginTop: 2,
-  },
-  stepsStatusText: {
-    color: "#4D7C0F",
-    fontSize: 12,
-    marginTop: 6,
-  },
-  stepsStatusError: {
-    color: "#EF4444",
-    fontSize: 12,
-    marginTop: 6,
-  },
-  stepsTrailContainer: {
-    marginTop: 12,
-    width: "100%",
-    height: 26,
-    borderRadius: 14,
-    backgroundColor: "#FFE8CC",
-    overflow: "hidden",
+  cardFooter: {
+    marginTop: 10,
+    alignItems: "center",
     justifyContent: "center",
-    paddingHorizontal: 8,
+    width: "100%",
   },
-  stepsTrailAnimatedRow: {
+  rowContainer: {
+    flexDirection: "row",
+    paddingHorizontal: 20,
+    justifyContent: "space-between",
+    marginBottom: 15,
+  },
+  mediumCard: {
+    width: "48%",
+    height: 150,
+  },
+  halfCard: {
+    width: "48%",
+    height: 100,
+    justifyContent: "space-between",
+  },
+  stepsContent: {
     flexDirection: "row",
     alignItems: "center",
-  },
-  stepsFootprintIcon: {
-    marginHorizontal: 6,
-  },
-  stepsCategory: {
-    color: "#FF8C00",
-    fontSize: 14,
-    marginBottom: 5,
-    fontWeight: "bold",
-  },
-  stepsValue: {
-    color: "#FF8C00",
-    fontSize: 18,
-  },
-  progressBarPlaceholder: {
-    width: "100%",
-    height: 10,
-    backgroundColor: "#FFE0B2",
-    borderRadius: 5,
     marginTop: 10,
   },
-  progressBarFill: {
-    width: "50%",
-    height: "100%",
-    backgroundColor: "#FFB74D",
-    borderRadius: 5,
-  },
-  sleepCard: {
-    backgroundColor: "#E0F2F7",
-    width: "48%",
-    height: 120,
-    padding: 15,
-    borderRadius: 8,
-    marginBottom: 10,
-    justifyContent: "space-between",
-    alignItems: "flex-start",
-  },
-  sleepCategory: {
-    color: "#1F2937",
-    fontSize: 14,
-    marginBottom: 8,
-    fontWeight: "bold",
-  },
-  sleepStatusContainer: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "flex-start",
-    gap: 8,
-  },
-  sleepValue: {
-    color: "#1F2937",
-    fontSize: 24,
-    fontWeight: "bold",
-  },
-  sleepStatusBadge: {
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 12,
-  },
-  sleepStatusText: {
-    color: "#FFFFFF",
-    fontSize: 11,
-    fontWeight: "bold",
-  },
-  waterCard: {
-    backgroundColor: "#E3F2FD",
-    width: "48%",
-    height: 120,
-    padding: 15,
-    borderRadius: 8,
-    marginBottom: 10,
-    justifyContent: "space-between",
-    alignItems: "flex-start",
-  },
-  waterCategory: {
-    color: "#192126",
-    fontSize: 14,
-    marginBottom: 5,
-    fontWeight: "bold",
-  },
-  waterFillPlaceholder: {
-    width: "100%",
+  stepsRingWrapper: {
+    width: 60,
     height: 60,
-    borderRadius: 10,
     justifyContent: "center",
     alignItems: "center",
-    position: "relative",
-    overflow: "hidden",
-    backgroundColor: "#FFFFFF",
+    marginRight: 10,
   },
-  waterValue: {
-    color: "#192126",
-    paddingBottom: 5,
-    paddingLeft: 5,
-    fontSize: 18,
+  stepsRingInner: {
+    position: "absolute",
+    justifyContent: "center",
+    alignItems: "center",
   },
-  resultsCard: {
-    backgroundColor: "#F3E8FF",
-    width: "100%",
-    height: 120,
-    padding: 15,
-    borderRadius: 8,
-    marginBottom: 15,
+  stepsPercent: {
+    color: "#22C55E",
+    fontSize: 10,
+    fontWeight: "800",
+  },
+  stepsData: {
+    flex: 1,
+    justifyContent: "center",
+  },
+  cardSubText: {
+    color: "#6B7280",
+    fontSize: 10,
+    marginTop: 2,
+  },
+  liveTag: {
+    color: "#22C55E",
+    fontSize: 10,
+    fontWeight: "700",
+    marginTop: 4,
+  },
+  ecgContainer: {
+    marginVertical: 5,
+    height: 40,
+    justifyContent: "center",
+  },
+  bpmFooter: {
+    flexDirection: "row",
     justifyContent: "space-between",
-    alignItems: "flex-start",
+    alignItems: "flex-end",
   },
-  resultsCategory: {
-    color: "#888",
-    fontSize: 12,
-    marginBottom: 5,
+  connectedBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "rgba(34, 197, 94, 0.1)",
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
   },
-  resultsValue: {
-    color: "#7E22CE",
-    fontSize: 18,
+  greenDot: {
+    width: 4,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: "#22C55E",
+    marginRight: 4,
+  },
+  connectedText: {
+    color: "#22C55E",
+    fontSize: 8,
+    fontWeight: "700",
+  },
+  sleepContent: {
+    flexDirection: "row",
+    alignItems: "flex-end",
+  },
+  waterContent: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  waterWaveContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    overflow: "hidden",
+    backgroundColor: "#E0F2FE",
   },
   cyclingCard: {
-    backgroundColor: "#192126",
-    borderRadius: 12,
-    padding: 16,
-    width: "100%",
-    maxWidth: 202,
-    height: 188,
-    alignSelf: "center",
-    marginBottom: 10,
+    marginHorizontal: 20,
+    backgroundColor: "#FFFFFF",
+    borderRadius: 20,
     borderWidth: 1,
-    borderColor: "#192126",
-    justifyContent: "flex-start",
+    borderColor: "#E5E7EB",
+    overflow: "hidden",
+    height: 200,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 3,
   },
   cyclingHeader: {
     flexDirection: "row",
     alignItems: "center",
-    marginBottom: 12,
+    padding: 16,
+    zIndex: 10,
+    backgroundColor: "#FFFFFF",
+    borderBottomWidth: 1,
+    borderBottomColor: "#F3F4F6",
   },
-  cyclingIcon: {
-    width: 30,
-    height: 30,
-    borderRadius: 8,
-    backgroundColor: "#fff",
-    alignItems: "center",
+  cyclingIconBox: {
+    backgroundColor: "#BBF246",
+    width: 32,
+    height: 32,
+    borderRadius: 10,
     justifyContent: "center",
+    alignItems: "center",
     marginRight: 10,
   },
-  cyclingIconText: {
-    color: "#BBF246",
-    fontSize: 12,
-    fontWeight: "bold",
-  },
   cyclingTitle: {
-    color: "#FFFFFF",
+    color: "#111827",
     fontSize: 16,
-    fontWeight: "600",
+    fontWeight: "700",
   },
-  cyclingMapWrapper: {
+  mapContainer: {
     flex: 1,
-    width: "100%",
-    borderRadius: 12,
-    overflow: "hidden",
-    backgroundColor: "#111827",
   },
-  cyclingMap: {
+  map: {
     width: "100%",
     height: "100%",
   },
-  cyclingMapPlaceholder: {
+  mapPlaceholder: {
     flex: 1,
-    width: "100%",
+    backgroundColor: "#F9FAFB",
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: "#111827",
-    paddingHorizontal: 12,
   },
-  cyclingPlaceholderText: {
-    color: "#94A3B8",
-    fontSize: 12,
-    textAlign: "center",
-  },
-  bottomNavigationBar: {
-    flexDirection: "row",
-    justifyContent: "space-around",
-    alignItems: "center",
-    backgroundColor: "#282828",
-    paddingVertical: 10,
-    borderTopLeftRadius: 30,
-    borderTopRightRadius: 30,
-  },
-  navBarItem: {
-    padding: 10,
-    alignItems: "center",
-  },
-  navBarText: {
-    color: "#fff",
+  mapPlaceholderText: {
+    color: "#9CA3AF",
+    marginTop: 10,
     fontSize: 12,
   },
-  navBarIconPlaceholder: {
-    width: 24,
-    height: 24,
-    backgroundColor: "#555",
-    borderRadius: 12,
-    marginBottom: 5,
-  },
-  navBarItemSelected: {
-    backgroundColor: "#8BC34A",
-    borderRadius: 20,
-    paddingHorizontal: 15,
-    paddingVertical: 8,
-  },
-  navBarTextSelected: {
-    color: "#1E1E1E",
-    fontSize: 12,
-    fontWeight: "bold",
-  },
-  navBarIconSelectedPlaceholder: {
-    width: 24,
-    height: 24,
-    backgroundColor: "#1E1E1E",
-    borderRadius: 12,
-    marginBottom: 5,
-  },
-  authorizeButton: {
-    backgroundColor: "#8BC34A",
-    padding: 15,
-    borderRadius: 10,
-    alignItems: "center",
-    marginVertical: 20,
-  },
-  authorizeButtonText: {
-    color: "#fff",
-    fontSize: 18,
-    fontWeight: "bold",
-  },
-  loadingText: {
-    textAlign: "center",
-    fontSize: 16,
-    marginVertical: 20,
-    color: "#666",
-  },
-  errorText: {
-    textAlign: "center",
-    fontSize: 16,
-    marginVertical: 20,
-    color: "#FF0000",
-  },
-  resultsAxisLabel: {
-    color: "#FFFFFF",
-    fontSize: 8,
-    lineHeight: 10,
-    fontWeight: "bold",
-    width: 40,
-    textAlign: "center",
+  radarEffect: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    borderWidth: 2,
+    borderColor: "rgba(187, 242, 70, 0.5)",
   },
 });
 

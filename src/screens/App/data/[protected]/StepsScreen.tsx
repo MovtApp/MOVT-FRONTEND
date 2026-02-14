@@ -1,160 +1,153 @@
 import React, { useState, useEffect } from "react";
-import { View, Text, StyleSheet, ScrollView, useWindowDimensions } from "react-native";
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  useWindowDimensions,
+  Platform,
+  TouchableOpacity,
+  Alert,
+} from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { AppStackParamList } from "../../../../@types/routes";
 import BackButton from "../../../../components/BackButton";
-import NavigationArrows from "../../../../components/data/NavigationArrows";
-import { Flame, MapPin, Clock, Footprints } from "lucide-react-native";
+import DataPillNavigator from "../../../../components/data/DataPillNavigator";
+import { Flame, MapPin, Clock, Footprints, Target, Edit2 } from "lucide-react-native";
 import Svg, { Circle, Defs, LinearGradient, Stop, G } from "react-native-svg";
+import { LinearGradient as ExpoLinearGradient } from "expo-linear-gradient";
 import Animated, {
   useSharedValue,
   withTiming,
   useAnimatedProps,
   Easing,
+  FadeInDown,
 } from "react-native-reanimated";
 
-const DATA_SCREENS: (keyof AppStackParamList)[] = [
-  "CaloriesScreen",
-  "CyclingScreen",
-  "HeartbeatsScreen",
-  "SleepScreen",
-  "StepsScreen",
-  "WaterScreen",
-];
+// Fallback extremamente seguro para Animated.View
+const ReanimatedView = typeof Animated !== "undefined" && Animated?.View ? Animated.View : View;
 
 const AnimatedCircle = Animated.createAnimatedComponent(Circle);
 
 const StepsProgressChart: React.FC<{
   progress: number;
   steps: number;
-}> = ({ progress, steps }) => {
+  goal: number;
+  onEditGoal?: () => void;
+}> = ({ progress, steps, goal, onEditGoal }) => {
   const { width } = useWindowDimensions();
-  const size = Math.min(Math.max(width * 0.85, 260), 340);
+  const size = Math.min(Math.max(width * 0.85, 280), 340);
   const center = size / 2;
-  const radius = center - 40;
+  const strokeWidth = 24;
+  const radius = center - strokeWidth;
   const circumference = 2 * Math.PI * radius;
 
-  const clampedProgress = Math.max(0, Math.min(1, progress));
-  const orangeProgress = 0.65;
-
-  const innerAnim = useSharedValue(0);
-  const orangeAnim = useSharedValue(0);
+  const clampedProgress = Math.max(0.01, Math.min(1, progress));
+  const progressAnim = useSharedValue(0);
 
   useEffect(() => {
-    innerAnim.value = withTiming(clampedProgress, {
-      duration: 1200,
-      easing: Easing.out(Easing.cubic),
+    progressAnim.value = withTiming(clampedProgress, {
+      duration: 1500,
+      easing: Easing.bezier(0.4, 0, 0.2, 1),
     });
-    orangeAnim.value = withTiming(orangeProgress, {
-      duration: 1200,
-      easing: Easing.out(Easing.cubic),
-    });
-  }, [clampedProgress, innerAnim, orangeAnim]);
+  }, [clampedProgress, progressAnim]);
 
-  const innerProps = useAnimatedProps(() => ({
-    strokeDashoffset: circumference * (1 - innerAnim.value),
-  }));
-
-  const orangeProps = useAnimatedProps(() => ({
-    strokeDashoffset: circumference * (1 - orangeAnim.value),
+  const animatedProps = useAnimatedProps(() => ({
+    strokeDashoffset: circumference * (1 - progressAnim.value),
   }));
 
   return (
-    <View style={{ alignItems: "center", justifyContent: "center", position: "relative" }}>
-      <Svg width={size} height={size}>
+    <View style={chartStyles.container}>
+      <Svg width={size} height={size} style={chartStyles.svg}>
         <Defs>
-          <LinearGradient id="blueGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-            <Stop offset="0%" stopColor="#FFFFFF" />
-            <Stop offset="100%" stopColor="#2563EB" />
+          <LinearGradient id="stepsGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+            <Stop offset="0%" stopColor="#2563EB" />
+            <Stop offset="100%" stopColor="#60A5FA" />
+          </LinearGradient>
+          <LinearGradient id="bgGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+            <Stop offset="0%" stopColor="#F3F4F6" />
+            <Stop offset="100%" stopColor="#FFFFFF" />
           </LinearGradient>
         </Defs>
 
         <G rotation="-90" origin={`${center}, ${center}`}>
+          {/* Background Track with soft shadow internal effect */}
           <Circle
             cx={center}
             cy={center}
             r={radius}
-            stroke="#393C43"
-            strokeWidth={22}
+            stroke="#F1F5F9"
+            strokeWidth={strokeWidth}
             fill="none"
           />
 
+          {/* Main Progress Ring */}
           <AnimatedCircle
             cx={center}
             cy={center}
             r={radius}
-            stroke="#F97316"
-            strokeWidth={18}
+            stroke="url(#stepsGrad)"
+            strokeWidth={strokeWidth}
             fill="none"
             strokeDasharray={circumference}
-            animatedProps={orangeProps}
-            strokeLinecap="round"
-          />
-
-          <AnimatedCircle
-            cx={center}
-            cy={center}
-            r={radius}
-            stroke="url(#blueGrad)"
-            strokeWidth={14}
-            fill="none"
-            strokeDasharray={circumference}
-            animatedProps={innerProps}
+            animatedProps={animatedProps}
             strokeLinecap="round"
           />
         </G>
-
-        <Circle cx={center} cy={center} r={50} fill="#FFFFFF" />
       </Svg>
 
-      <View
-        style={{
-          position: "absolute",
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          alignItems: "center",
-          justifyContent: "center",
-        }}
-      >
-        <Footprints size={32} color="#2563EB" />
-        <View style={{ height: 4 }} />
-        <Text
-          style={{
-            fontSize: 28,
-            fontWeight: "600",
-            color: "#1A1A1A",
-          }}
-        >
-          {steps.toLocaleString("pt-BR")}
-        </Text>
-        <Text
-          style={{
-            fontSize: 16,
-            color: "#666666",
-            marginTop: 2,
-            fontWeight: "bold",
-          }}
-        >
-          Total de passos
-        </Text>
+      <View style={chartStyles.contentOverlay}>
+        <View style={chartStyles.iconCircle}>
+          <Footprints size={24} color="#2563EB" />
+        </View>
+        <Text style={chartStyles.stepsValue}>{steps.toLocaleString("pt-BR")}</Text>
+        <Text style={chartStyles.stepsLabel}>passos</Text>
+
+        <TouchableOpacity style={chartStyles.goalBadge} onPress={onEditGoal} activeOpacity={0.7}>
+          <Target size={12} color="#2563EB" style={{ marginRight: 4 }} />
+          <Text style={chartStyles.goalText}>Meta: {goal.toLocaleString("pt-BR")}</Text>
+          <View style={chartStyles.editIconWrapper}>
+            <Edit2 size={10} color="#2563EB" />
+          </View>
+        </TouchableOpacity>
       </View>
     </View>
   );
 };
 
 const StepsScreen: React.FC = () => {
-  // Dados mockados - substituir por dados reais quando disponível
-  const [stepsData] = useState({
-    steps: 140,
+  const [stepsData, setStepsData] = useState({
+    steps: 8432,
     goal: 10000,
-    calories: 100,
-    kilometers: 7.8,
-    minutes: 25,
+    calories: 342,
+    kilometers: 6.2,
+    minutes: 48,
   });
 
-  // Calcular progresso (0 a 1)
+  const handleEditGoal = () => {
+    if (Platform.OS === "ios" || Platform.OS === "android") {
+      Alert.prompt(
+        "Editar Meta",
+        "Defina sua nova meta diária de passos",
+        [
+          { text: "Cancelar", style: "cancel" },
+          {
+            text: "Salvar",
+            onPress: (value?: string) => {
+              const newGoal = parseInt(value || "0", 10);
+              if (newGoal > 0) {
+                setStepsData((prev) => ({ ...prev, goal: newGoal }));
+              }
+            },
+          },
+        ],
+        "plain-text",
+        stepsData.goal.toString(),
+        "number-pad"
+      );
+    }
+  };
+
   const progress = stepsData.steps / stepsData.goal;
 
   return (
@@ -172,57 +165,149 @@ const StepsScreen: React.FC = () => {
             <View style={{ width: 46 }} />
           </View>
 
-          {/* Gráfico de Progresso */}
-          <View style={styles.chartContainer}>
-            <StepsProgressChart progress={progress} steps={stepsData.steps} />
+          {/* Main Chart Area */}
+          <ReanimatedView entering={FadeInDown.duration(800)} style={styles.chartSection}>
+            <StepsProgressChart
+              progress={progress}
+              steps={stepsData.steps}
+              goal={stepsData.goal}
+              onEditGoal={handleEditGoal}
+            />
+          </ReanimatedView>
+
+          {/* Metrics Quick View */}
+          <View style={styles.metricsGrid}>
+            <ReanimatedView
+              entering={FadeInDown.delay(200).duration(600)}
+              style={styles.metricCardWrapper}
+            >
+              <ExpoLinearGradient colors={["#FFF7ED", "#FFFFFF"]} style={styles.metricCard}>
+                <View style={[styles.iconBox, { backgroundColor: "#FFEDD5" }]}>
+                  <Flame size={20} color="#F97316" />
+                </View>
+                <Text style={styles.metricCardValue}>{stepsData.calories}</Text>
+                <Text style={styles.metricCardLabel}>kcal</Text>
+              </ExpoLinearGradient>
+            </ReanimatedView>
+
+            <ReanimatedView
+              entering={FadeInDown.delay(400).duration(600)}
+              style={styles.metricCardWrapper}
+            >
+              <ExpoLinearGradient colors={["#EFF6FF", "#FFFFFF"]} style={styles.metricCard}>
+                <View style={[styles.iconBox, { backgroundColor: "#DBEAFE" }]}>
+                  <MapPin size={20} color="#2563EB" />
+                </View>
+                <Text style={styles.metricCardValue}>{stepsData.kilometers.toFixed(1)}</Text>
+                <Text style={styles.metricCardLabel}>km</Text>
+              </ExpoLinearGradient>
+            </ReanimatedView>
+
+            <ReanimatedView
+              entering={FadeInDown.delay(600).duration(600)}
+              style={styles.metricCardWrapper}
+            >
+              <ExpoLinearGradient colors={["#F8FAFC", "#FFFFFF"]} style={styles.metricCard}>
+                <View style={[styles.iconBox, { backgroundColor: "#F1F5F9" }]}>
+                  <Clock size={20} color="#64748B" />
+                </View>
+                <Text style={styles.metricCardValue}>{stepsData.minutes}</Text>
+                <Text style={styles.metricCardLabel}>min</Text>
+              </ExpoLinearGradient>
+            </ReanimatedView>
           </View>
 
-          {/* Contador de Passos */}
-          <View style={styles.stepsCounterContainer}>
-            <Text style={styles.stepsValue}>{stepsData.steps.toLocaleString("pt-BR")}</Text>
-            <Text style={styles.stepsLabel}>Total de passos</Text>
-          </View>
-
-          {/* Cartões de Métricas */}
-          <View style={styles.metricsContainer}>
-            {/* Card Kcal */}
-            <View style={[styles.metricCard]}>
-              <View style={styles.metricIconContainerKcal}>
-                <Flame size={24} color="#FFFFFF" />
-              </View>
-              <Text style={styles.metricValue}>{stepsData.calories}</Text>
-              <Text style={styles.metricUnit}>Kcal</Text>
+          {/* Insight Section */}
+          <ReanimatedView entering={FadeInDown.delay(800).duration(600)} style={styles.insightCard}>
+            <View style={styles.insightIcon}>
+              <Footprints size={20} color="#2563EB" />
             </View>
-
-            {/* Card Kilometro */}
-            <View style={[styles.metricCard]}>
-              <View style={styles.metricIconContainerKm}>
-                <MapPin size={24} color="#FFFFFF" />
-              </View>
-              <Text style={styles.metricValue}>{stepsData.kilometers.toFixed(1)}</Text>
-              <Text style={styles.metricUnit}>Kilometro</Text>
+            <View style={styles.insightContent}>
+              <Text style={styles.insightTitle}>Bom trabalho!</Text>
+              <Text style={styles.insightText}>
+                Você já completou {Math.round(progress * 100)}% da sua meta diária de passos.
+              </Text>
             </View>
+          </ReanimatedView>
 
-            {/* Card Minutos */}
-            <View style={[styles.metricCard]}>
-              <View style={styles.metricIconContainerMinutes}>
-                <Clock size={24} color="#FFFFFF" />
-              </View>
-              <Text style={styles.metricValue}>{stepsData.minutes}</Text>
-              <Text style={styles.metricUnit}>Minutos</Text>
-            </View>
-          </View>
-
-          {/* Espaço para não ficar coberto pelas setas */}
-          <View style={{ height: 100 }} />
+          <View style={{ height: 120 }} />
         </ScrollView>
 
-        {/* Setas de navegação */}
-        <NavigationArrows currentScreen="StepsScreen" screens={DATA_SCREENS} />
+        <DataPillNavigator currentScreen="StepsScreen" />
       </View>
     </SafeAreaView>
   );
 };
+
+const chartStyles = StyleSheet.create({
+  container: {
+    alignItems: "center",
+    justifyContent: "center",
+    position: "relative",
+    marginVertical: 20,
+  },
+  svg: {
+    ...Platform.select({
+      ios: {
+        shadowColor: "#2563EB",
+        shadowOffset: { width: 0, height: 10 },
+        shadowOpacity: 0.1,
+        shadowRadius: 15,
+      },
+      android: {
+        elevation: 4,
+      },
+    }),
+  },
+  contentOverlay: {
+    position: "absolute",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  iconCircle: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: "#EFF6FF",
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 8,
+  },
+  stepsValue: {
+    fontSize: 42,
+    fontWeight: "800",
+    color: "#1E293B",
+    letterSpacing: -1,
+  },
+  stepsLabel: {
+    fontSize: 16,
+    color: "#64748B",
+    fontWeight: "600",
+    marginTop: -4,
+  },
+  goalBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#EFF6FF",
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 20,
+    marginTop: 16,
+    borderWidth: 1,
+    borderColor: "#DBEAFE",
+  },
+  goalText: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#2563EB",
+  },
+  editIconWrapper: {
+    marginLeft: 6,
+    paddingLeft: 6,
+    borderLeftWidth: 1,
+    borderLeftColor: "#DBEAFE",
+  },
+});
 
 const styles = StyleSheet.create({
   safeArea: {
@@ -238,100 +323,116 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     flexGrow: 1,
-    paddingBottom: 100,
+    paddingBottom: 40,
   },
   header: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: 20,
-    paddingTop: 10,
+    marginBottom: 10,
+    marginTop: 20,
     paddingHorizontal: 20,
   },
   headerTitle: {
-    fontSize: 20,
-    fontWeight: "bold",
-    color: "#192126",
+    fontSize: 22,
+    fontWeight: "800",
+    color: "#1E293B",
   },
-  chartContainer: {
+  chartSection: {
     alignItems: "center",
-    justifyContent: "center",
     paddingHorizontal: 20,
   },
-  stepsCounterContainer: {
-    alignItems: "center",
-    justifyContent: "center",
-    marginVertical: 20,
-  },
-  stepsValue: {
-    fontSize: 50,
-    fontWeight: "bold",
-    color: "#192126",
-  },
-  stepsLabel: {
-    fontSize: 22,
-    color: "#797E86",
-    fontWeight: "bold",
-  },
-  metricsContainer: {
+  metricsGrid: {
     flexDirection: "row",
-    justifyContent: "center",
-    alignItems: "center",
-    gap: 16,
+    justifyContent: "space-between",
+    paddingHorizontal: 20,
     marginTop: 30,
-    alignSelf: "center",
-    width: "100%",
-    maxWidth: 320, // controla a largura total, mantendo tudo centralizado
+    gap: 12,
+  },
+  metricCardWrapper: {
+    flex: 1,
   },
   metricCard: {
-    width: "30%", // ocupa apenas 30% da largura do container limitado
-    minWidth: 90,
-    paddingVertical: 18,
-    paddingHorizontal: 12,
-    borderRadius: 16,
-    backgroundColor: "#F8F9FB",
+    padding: 16,
+    borderRadius: 24,
     alignItems: "center",
+    borderWidth: 1,
+    borderColor: "#F8FAFC",
+    ...Platform.select({
+      ios: {
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.05,
+        shadowRadius: 10,
+      },
+      android: {
+        elevation: 2,
+      },
+    }),
   },
-  metricIconContainerKcal: {
-    width: 60,
-    height: 60,
-    borderRadius: 8,
-    backgroundColor: "#F97316",
-    alignItems: "center",
-    justifyContent: "center",
-    marginBottom: 8,
-  },
-  metricIconContainerKm: {
-    width: 60,
-    height: 60,
-    borderRadius: 8,
-    backgroundColor: "#2563EB",
-    alignItems: "center",
-    justifyContent: "center",
-    marginBottom: 8,
-  },
-  metricIconContainerMinutes: {
-    width: 60,
-    height: 60,
-    borderRadius: 8,
-    backgroundColor: "#393C43",
+  iconBox: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
     alignItems: "center",
     justifyContent: "center",
-    marginBottom: 8,
+    marginBottom: 12,
   },
-  metricValue: {
-    fontSize: 24,
-    fontWeight: "bold",
-    color: "#192126",
-    marginTop: 6,
-    textAlign: "center",
+  metricCardValue: {
+    fontSize: 20,
+    fontWeight: "800",
+    color: "#1E293B",
   },
-  metricUnit: {
-    fontSize: 16,
-    color: "#797E86",
+  metricCardLabel: {
+    fontSize: 12,
+    color: "#64748B",
+    fontWeight: "700",
     marginTop: 2,
-    textAlign: "center",
-    fontWeight: "bold",
+  },
+  insightCard: {
+    marginHorizontal: 20,
+    marginTop: 24,
+    padding: 20,
+    backgroundColor: "#F8FAFC",
+    borderRadius: 24,
+    flexDirection: "row",
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: "#F1F5F9",
+  },
+  insightIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 14,
+    backgroundColor: "#FFFFFF",
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: 16,
+    ...Platform.select({
+      ios: {
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
+      },
+      android: {
+        elevation: 2,
+      },
+    }),
+  },
+  insightContent: {
+    flex: 1,
+  },
+  insightTitle: {
+    fontSize: 16,
+    fontWeight: "800",
+    color: "#1E293B",
+    marginBottom: 4,
+  },
+  insightText: {
+    fontSize: 14,
+    color: "#64748B",
+    lineHeight: 20,
   },
 });
 

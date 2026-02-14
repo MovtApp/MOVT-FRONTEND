@@ -1,11 +1,13 @@
-import React, { useState, useEffect } from "react";
-import { View, Text, StyleSheet, ScrollView, Dimensions, RefreshControl } from "react-native";
+import React, { useState, useEffect, useMemo, useRef, useCallback } from "react";
+import { View, Text, StyleSheet, ScrollView, Dimensions, RefreshControl, TouchableOpacity } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { AppStackParamList } from "../../../../@types/routes";
 import TimeSelector, { type TimeframeType } from "../../../../components/TimeSelector";
 import BackButton from "../../../../components/BackButton";
-import NavigationArrows from "../../../../components/data/NavigationArrows";
 import { Canvas, Path, vec, Circle } from "@shopify/react-native-skia";
+import { Info, ShieldCheck, Trophy, Target, Activity, TrendingUp, Zap, HelpCircle, Brain, Droplets, Flame, User, Footprints } from "lucide-react-native";
+import { LinearGradient } from "expo-linear-gradient";
+import BottomSheet, { BottomSheetView, BottomSheetBackdrop } from "@gorhom/bottom-sheet";
 
 const { width } = Dimensions.get("window");
 
@@ -23,38 +25,38 @@ interface RadarData {
 
 const ResultsScreen: React.FC = () => {
   const [selectedTimeframe, setSelectedTimeframe] = useState<TimeframeType>("1m");
-  // Dados para Força (laranja) - MAIOR (primeiro, renderizado como fundo)
   const [forcaData, setForcaData] = useState<RadarData>({
-    water: 95,
-    sleep: 90,
-    steps: 95,
-    bpm: 90,
-    imc: 92,
-    calories: 95,
+    water: 95, sleep: 90, steps: 95, bpm: 90, imc: 92, calories: 95,
   });
-  // Dados para Agilidade (azul/preto) - MÉDIO (segundo)
   const [agilidadeData, setAgilidadeData] = useState<RadarData>({
-    water: 70,
-    sleep: 75,
-    steps: 80,
-    bpm: 75,
-    imc: 85,
-    calories: 75,
+    water: 70, sleep: 75, steps: 80, bpm: 75, imc: 85, calories: 75,
   });
-  // Dados para Resistência (roxo) - MENOR (terceiro, renderizado em cima)
   const [resistenciaData, setResistenciaData] = useState<RadarData>({
-    water: 60,
-    sleep: 55,
-    steps: 65,
-    bpm: 65,
-    imc: 70,
-    calories: 60,
+    water: 60, sleep: 55, steps: 65, bpm: 65, imc: 70, calories: 60,
   });
   const [centralScore, setCentralScore] = useState(88);
   const [lineData, setLineData] = useState<number[]>([]);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
-  // === GERAÇÃO DE DADOS ===
+  const bottomSheetRef = useRef<BottomSheet>(null);
+  const snapPoints = useMemo(() => ["60%", "90%"], []);
+
+  const handleOpenInfo = useCallback(() => {
+    bottomSheetRef.current?.expand();
+  }, []);
+
+  const renderBackdrop = useCallback(
+    (props: any) => (
+      <BottomSheetBackdrop
+        {...props}
+        disappearsOnIndex={-1}
+        appearsOnIndex={0}
+        opacity={0.5}
+      />
+    ),
+    []
+  );
+
   const generateLineData = (points: number): number[] => {
     const data: number[] = [];
     let base = 750;
@@ -69,7 +71,6 @@ const ResultsScreen: React.FC = () => {
   useEffect(() => {
     const points = selectedTimeframe === "1m" ? 30 : selectedTimeframe === "1s" ? 7 : 12;
     setLineData(generateLineData(points));
-    // Atualiza dados para Força (laranja) - MAIOR (85-100)
     setForcaData({
       water: Math.round(90 + Math.random() * 10),
       sleep: Math.round(85 + Math.random() * 10),
@@ -78,7 +79,6 @@ const ResultsScreen: React.FC = () => {
       imc: Math.round(88 + Math.random() * 10),
       calories: Math.round(90 + Math.random() * 10),
     });
-    // Atualiza dados para Agilidade (azul/preto) - MÉDIO (65-80)
     setAgilidadeData({
       water: Math.round(65 + Math.random() * 15),
       sleep: Math.round(70 + Math.random() * 15),
@@ -87,7 +87,6 @@ const ResultsScreen: React.FC = () => {
       imc: Math.round(75 + Math.random() * 10),
       calories: Math.round(70 + Math.random() * 15),
     });
-    // Atualiza dados para Resistência (roxo) - MENOR (55-70)
     setResistenciaData({
       water: Math.round(55 + Math.random() * 15),
       sleep: Math.round(50 + Math.random() * 15),
@@ -99,7 +98,6 @@ const ResultsScreen: React.FC = () => {
   }, [selectedTimeframe]);
 
   useEffect(() => {
-    // Calcula a média dos três conjuntos de dados
     const allValues = [
       ...Object.values(forcaData),
       ...Object.values(agilidadeData),
@@ -109,15 +107,8 @@ const ResultsScreen: React.FC = () => {
     setCentralScore(Math.round(avg));
   }, [forcaData, agilidadeData, resistenciaData]);
 
-  // === NAVEGAÇÃO ===
   const DATA_SCREENS: (keyof AppStackParamList)[] = [
-    "CaloriesScreen",
-    "CyclingScreen",
-    "HeartbeatsScreen",
-    "SleepScreen",
-    "StepsScreen",
-    "WaterScreen",
-    "ResultsScreen",
+    "CaloriesScreen", "CyclingScreen", "HeartbeatsScreen", "SleepScreen", "StepsScreen", "WaterScreen", "ResultsScreen",
   ];
 
   const onRefresh = () => {
@@ -364,12 +355,6 @@ const ResultsScreen: React.FC = () => {
           })}
         </View>
 
-        {/* Score e mensagem abaixo do gráfico e acima da legenda */}
-        <View style={styles.scoreContainer}>
-          <Text style={styles.scoreText}>{centralScore}</Text>
-          <Text style={styles.scoreMessage}>Você é um indivíduo saudável.</Text>
-        </View>
-
         <View style={styles.legendContainer}>
           <View style={styles.legendItem}>
             <View style={[styles.legendColor, { backgroundColor: "#FB923C" }]} />
@@ -388,163 +373,392 @@ const ResultsScreen: React.FC = () => {
     );
   };
 
-  // === LINE CHART ===
   const LineChart = () => {
-    const chartWidth = width * 0.9;
-    const chartHeight = 80;
-    const padding = 20;
-    const values = lineData;
-    if (values.length === 0) return null;
-
-    const min = Math.min(...values);
-    const max = Math.max(...values);
+    const chartWidth = width * 0.8;
+    const chartHeight = 60;
+    const padding = 10;
+    if (lineData.length === 0) return null;
+    const min = Math.min(...lineData); const max = Math.max(...lineData);
     const range = max - min || 1;
-
-    const points = values.map((val, i) => {
-      const x = padding + (i / (values.length - 1)) * (chartWidth - padding * 2);
-      const y = chartHeight - padding - ((val - min) / range) * (chartHeight - padding * 2);
-      return { x, y };
-    });
-
-    const path = points.reduce(
-      (p, pt, i) => (i === 0 ? `M ${pt.x} ${pt.y}` : `${p} L ${pt.x} ${pt.y}`),
-      ""
-    );
+    const points = lineData.map((val, i) => ({
+      x: padding + (i / (lineData.length - 1)) * (chartWidth - padding * 2),
+      y: chartHeight - padding - ((val - min) / range) * (chartHeight - padding * 2),
+    }));
+    const path = points.reduce((p, pt, i) => (i === 0 ? `M ${pt.x} ${pt.y}` : `${p} L ${pt.x} ${pt.y}`), "");
 
     return (
-      <View style={styles.lineChartContainer}>
+      <View style={styles.lineChartHolder}>
         <Canvas style={{ width: chartWidth, height: chartHeight }}>
-          <Path path={path} color="#FB923C" style="stroke" strokeWidth={2} />
-          {points.map((pt, i) => (
-            <Circle key={i} cx={pt.x} cy={pt.y} r={3} color="#FB923C" />
-          ))}
+          <Path path={path} color="#F97316" style="stroke" strokeWidth={2} />
+          {points.map((pt, i) => i % 5 === 0 && <Circle key={i} cx={pt.x} cy={pt.y} r={2.5} color="#F97316" />)}
         </Canvas>
-        <Text style={styles.lineChartValue}>{values[values.length - 1]}</Text>
+        <View style={styles.lineChartInfo}>
+          <Activity size={12} color="#94A3B8" />
+          <Text style={styles.lineChartValue}>{lineData[lineData.length - 1]} <Text style={{ fontSize: 10, color: "#94A3B8" }}>pts</Text></Text>
+        </View>
       </View>
     );
   };
 
-  const styles = StyleSheet.create({
-    safeArea: { flex: 1, backgroundColor: "#fff" },
-    scrollView: { flex: 1 },
-    scrollContent: { flexGrow: 1, paddingBottom: 20 },
-    container: { flex: 1, paddingHorizontal: 20 },
-    header: {
-      flexDirection: "row",
-      justifyContent: "space-between",
-      alignItems: "center",
-      marginBottom: 20,
-    },
-    headerTitle: { fontSize: 20, fontWeight: "bold", color: "#192126" },
-    radarContainer: { alignItems: "center", marginVertical: 20 },
-    scoreContainer: {
-      alignItems: "center",
-      justifyContent: "center",
-      marginTop: 8,
-      marginBottom: 8,
-    },
-    scoreText: {
-      fontSize: 48,
-      fontWeight: "bold",
-      color: "#1A202C",
-      textAlign: "center",
-    },
-    scoreMessage: {
-      fontSize: 18,
-      fontWeight: "bold",
-      color: "#192126",
-      textAlign: "center",
-      marginTop: 4,
-    },
-    legendContainer: {
-      flexDirection: "row",
-      justifyContent: "center",
-      marginTop: 16,
-      gap: 16,
-    },
-    legendItem: { flexDirection: "row", alignItems: "center", gap: 6 },
-    legendColor: { width: 12, height: 12, borderRadius: 6 },
-    legendText: { fontSize: 14, color: "#192126", fontWeight: "bold" },
-    axisLabel: {
-      fontSize: 14,
-      fontWeight: "bold",
-      color: "#192126",
-      width: 60,
-      textAlign: "center",
-    },
-    timeSelectorContainer: { marginBottom: 20 },
-    lineChartContainer: { alignItems: "center", marginVertical: 20 },
-    lineChartValue: {
-      position: "absolute",
-      right: 10,
-      top: 10,
-      fontSize: 14,
-      fontWeight: "bold",
-      color: "#FB923C",
-    },
-    infoContainer: {
-      marginTop: 10,
-      padding: 15,
-      backgroundColor: "#F9FAFB",
-      borderRadius: 12,
-      marginBottom: 50,
-    },
-    infoTitle: {
-      fontSize: 16,
-      fontWeight: "bold",
-      color: "#192126",
-      marginBottom: 8,
-    },
-    infoText: { fontSize: 14, color: "#6B7280", lineHeight: 20 },
-  });
-
   return (
     <SafeAreaView style={styles.safeArea}>
+      <LinearGradient colors={["#FFFFFF", "#F8FAFC"]} style={StyleSheet.absoluteFill} />
+
+      <View style={styles.header}>
+        <BackButton to={{ name: "DataScreen" }} />
+        <Text style={styles.headerTitle}>Resultados</Text>
+        <TouchableOpacity style={styles.infoIcon} onPress={handleOpenInfo}>
+          <Info size={20} color="#64748B" />
+        </TouchableOpacity>
+      </View>
+
       <ScrollView
-        style={styles.scrollView}
+        showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
-        refreshControl={<RefreshControl refreshing={isRefreshing} onRefresh={onRefresh} />}
+        refreshControl={<RefreshControl refreshing={isRefreshing} onRefresh={onRefresh} tintColor="#F97316" />}
       >
-        <View style={styles.container}>
-          <View style={styles.header}>
-            <BackButton to={{ name: "DataScreen" }} />
-            <Text style={styles.headerTitle}>Resultados</Text>
-            <View style={{ width: 46 }} />
-          </View>
+        <View style={styles.timeSelectorBox}>
+          <TimeSelector selectedTimeframe={selectedTimeframe} onTimeframeChange={setSelectedTimeframe} />
+        </View>
 
+        <View style={styles.chartSection}>
           <RadarChart />
+        </View>
 
-          <View style={styles.timeSelectorContainer}>
-            <TimeSelector
-              selectedTimeframe={selectedTimeframe}
-              onTimeframeChange={setSelectedTimeframe}
-            />
+        <View style={styles.premiumScoreCard}>
+          <View style={styles.scoreHeaderRow}>
+            <View>
+              <Text style={styles.premiumScoreLabel}>Health Score</Text>
+              <Text style={styles.premiumScoreDate}>Atualizado em tempo real</Text>
+            </View>
+            <View style={styles.statusPill}>
+              <Activity size={12} color="#10B981" />
+              <Text style={styles.statusPillText}>Excelente</Text>
+            </View>
           </View>
 
-          <LineChart />
+          <View style={styles.scoreMainSection}>
+            <View style={styles.scoreDisplay}>
+              <Text style={styles.premiumScoreNumber}>{centralScore}</Text>
+              <View style={styles.scoreMetricInfo}>
+                <Text style={styles.scoreMax}>/100</Text>
+                <View style={styles.trendContainer}>
+                  <TrendingUp size={14} color="#10B981" />
+                  <Text style={styles.trendText}>12%</Text>
+                </View>
+              </View>
+            </View>
 
-          <View style={styles.infoContainer}>
-            <Text style={styles.infoTitle}>Sobre seus resultados</Text>
-            <Text style={styles.infoText}>
-              Este gráfico mostra sua evolução nos últimos{" "}
-              {selectedTimeframe === "1d"
-                ? "dias"
-                : selectedTimeframe === "1s"
-                  ? "semanas"
-                  : selectedTimeframe === "1m"
-                    ? "meses"
-                    : selectedTimeframe === "1a"
-                      ? "anos"
-                      : "período"}
-              . Continue com seu plano de treino e nutrição para alcançar sua meta.
+            <View style={styles.scoreProgressWrapper}>
+              <View style={styles.progressBarBase}>
+                <LinearGradient
+                  colors={["#F97316", "#FB923C"]}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 0 }}
+                  style={[styles.progressBarFill, { width: `${centralScore}%` }]}
+                />
+              </View>
+              <View style={styles.progressMarkers}>
+                <Text style={styles.markerText}>0</Text>
+                <Text style={styles.markerText}>50</Text>
+                <Text style={styles.markerText}>100</Text>
+              </View>
+            </View>
+          </View>
+
+          <View style={styles.scoreFooterCard}>
+            <Trophy size={16} color="#F59E0B" />
+            <Text style={styles.scoreFooterMsg}>
+              Você superou <Text style={{ fontWeight: '700', color: '#0F172A' }}>92%</Text> dos usuários no seu perfil.
             </Text>
           </View>
         </View>
+
+        <View style={styles.historySection}>
+          <View style={styles.sectionHeader}>
+            <Activity size={18} color="#F97316" />
+            <Text style={styles.sectionTitle}>Histórico de Progresso</Text>
+          </View>
+
+          <View style={styles.lineChartCard}>
+            <LineChart />
+          </View>
+        </View>
+
+        <View style={styles.insightCard}>
+          <View style={styles.insightHeader}>
+            <ShieldCheck size={20} color="#10B981" />
+            <Text style={styles.insightTitle}>Insight de Saúde</Text>
+          </View>
+          <Text style={styles.insightText}>
+            Seus níveis de <Text style={{ fontWeight: '700', color: '#0F172A' }}>Hidratação</Text> e <Text style={{ fontWeight: '700', color: '#0F172A' }}>Sono</Text> estão otimizados.
+            Mantenha a consistência nos próximos {selectedTimeframe === '1m' ? '30 dias' : 'período'} para consolidar seus ganhos em <Text style={{ fontWeight: '700', color: '#0F172A' }}>Força</Text>.
+          </Text>
+        </View>
       </ScrollView>
 
-      <NavigationArrows currentScreen="ResultsScreen" screens={DATA_SCREENS} />
+      <BottomSheet
+        ref={bottomSheetRef}
+        index={-1}
+        snapPoints={snapPoints}
+        enablePanDownToClose
+        backdropComponent={renderBackdrop}
+        backgroundStyle={{ borderRadius: 32 }}
+      >
+        <BottomSheetView style={styles.bsView}>
+          <ScrollView showsVerticalScrollIndicator={false}>
+            <View style={styles.bsHeader}>
+              <View style={styles.bsIconContainer}>
+                <Zap size={24} color="#F97316" />
+              </View>
+              <View>
+                <Text style={styles.bsTitle}>O que é o Health Score?</Text>
+                <Text style={styles.bsSubtitle}>Entenda como calculamos seus resultados</Text>
+              </View>
+            </View>
+
+            <View style={styles.bsSection}>
+              <Text style={styles.bsSectionTitle}>O Algoritmo</Text>
+              <Text style={styles.bsText}>
+                Seu score é uma métrica ponderada que analisa a consistência dos seus hábitos.
+                Nós cruzamos dados de <Text style={{ fontWeight: '700' }}>biometria e performance</Text> para gerar uma nota de 0 a 100.
+              </Text>
+            </View>
+
+            <View style={styles.bsSection}>
+              <Text style={styles.bsSectionTitle}>Dimensões do Radar</Text>
+
+              <View style={styles.metricGuideHorizontal}>
+                <View style={styles.metricCard}>
+                  <View style={styles.metricIconBox}><Flame size={16} color="#F97316" /></View>
+                  <Text style={styles.metricLabelCard}>Força</Text>
+                  <Text style={styles.metricDescCard}>Calorias e esforço.</Text>
+                </View>
+
+                <View style={styles.metricCard}>
+                  <View style={styles.metricIconBox}><Zap size={16} color="#0F172A" /></View>
+                  <Text style={styles.metricLabelCard}>Agilidade</Text>
+                  <Text style={styles.metricDescCard}>Velocidade e BPM.</Text>
+                </View>
+
+                <View style={styles.metricCard}>
+                  <View style={styles.metricIconBox}><ShieldCheck size={16} color="#3B82F6" /></View>
+                  <Text style={styles.metricLabelCard}>Resistência</Text>
+                  <Text style={styles.metricDescCard}>Tempo e foco.</Text>
+                </View>
+              </View>
+            </View>
+
+            <View style={styles.bsSection}>
+              <Text style={styles.bsSectionTitle}>Métricas Analisadas</Text>
+              <View style={styles.tagsContainerRow}>
+                <View style={styles.tagCompact}><Droplets size={10} color="#3B82F6" /><Text style={styles.tagTextCompact}>Água</Text></View>
+                <View style={styles.tagCompact}><Brain size={10} color="#8B5CF6" /><Text style={styles.tagTextCompact}>Sono</Text></View>
+                <View style={styles.tagCompact}><Footprints size={10} color="#10B981" /><Text style={styles.tagTextCompact}>Passos</Text></View>
+                <View style={styles.tagCompact}><Activity size={10} color="#EF4444" /><Text style={styles.tagTextCompact}>BPM</Text></View>
+                <View style={styles.tagCompact}><User size={10} color="#6366F1" /><Text style={styles.tagTextCompact}>IMC</Text></View>
+              </View>
+            </View>
+
+            <View style={styles.bsFooter}>
+              <HelpCircle size={16} color="#94A3B8" />
+              <Text style={styles.bsFooterText}>Dados sincronizados com o seu dispositivo vestível.</Text>
+            </View>
+          </ScrollView>
+        </BottomSheetView>
+      </BottomSheet>
     </SafeAreaView>
   );
 };
+
+const styles = StyleSheet.create({
+  safeArea: { flex: 1, backgroundColor: "#fff" },
+  scrollContent: { paddingHorizontal: 20, paddingBottom: 100, paddingTop: 10 },
+  header: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingHorizontal: 20,
+    paddingVertical: 15,
+  },
+  headerTitle: { fontSize: 18, fontWeight: "700", color: "#0F172A" },
+  infoIcon: { width: 40, height: 40, alignItems: 'flex-end', justifyContent: 'center' },
+
+  premiumScoreCard: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 24,
+    padding: 24,
+    marginBottom: 20,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.05,
+    shadowRadius: 12,
+    elevation: 3,
+    borderWidth: 1,
+    borderColor: "#F1F5F9",
+  },
+  scoreHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 20,
+  },
+  premiumScoreLabel: { fontSize: 20, fontWeight: "800", color: "#0F172A" },
+  premiumScoreDate: { fontSize: 12, color: "#64748B", marginTop: 4 },
+  statusPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: "#ECFDF5",
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+  },
+  statusPillText: { color: "#10B981", fontSize: 12, fontWeight: "700" },
+  scoreMainSection: { marginBottom: 20 },
+  scoreDisplay: { flexDirection: 'row', alignItems: 'flex-end', gap: 4, marginBottom: 15 },
+  premiumScoreNumber: { fontSize: 48, fontWeight: "800", color: "#0F172A", lineHeight: 48 },
+  scoreMetricInfo: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingBottom: 6 },
+  scoreMax: { fontSize: 16, fontWeight: "600", color: "#94A3B8" },
+  trendContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 2,
+    backgroundColor: "#DCFCE7",
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  trendText: { color: "#10B981", fontSize: 12, fontWeight: "700" },
+  scoreProgressWrapper: { width: '100%' },
+  progressBarBase: {
+    height: 8,
+    backgroundColor: "#F1F5F9",
+    borderRadius: 4,
+    overflow: 'hidden',
+    marginBottom: 6,
+  },
+  progressBarFill: { height: '100%', borderRadius: 4 },
+  progressMarkers: { flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 2 },
+  markerText: { fontSize: 10, color: "#94A3B8", fontWeight: "600" },
+  scoreFooterCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    backgroundColor: "#F8FAFC",
+    padding: 14,
+    borderRadius: 16,
+  },
+  scoreFooterMsg: { fontSize: 13, color: "#64748B", flex: 1, lineHeight: 18 },
+
+  chartSection: { marginBottom: 25 },
+  sectionHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 20 },
+  sectionTitle: { fontSize: 16, fontWeight: "700", color: "#0F172A" },
+
+  radarContainer: { alignItems: 'center' },
+  axisLabel: {
+    fontSize: 14,
+    fontWeight: "bold",
+    color: "#192126",
+    width: 60,
+    textAlign: "center",
+  },
+  legendContainer: { flexDirection: 'row', gap: 20, marginTop: 30 },
+  legendItem: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  legendColor: { width: 12, height: 12, borderRadius: 4 },
+  legendDot: { width: 8, height: 8, borderRadius: 4 },
+  legendText: { fontSize: 13, fontWeight: "600", color: "#475569" },
+
+  historySection: { marginBottom: 25 },
+  timeSelectorBox: { marginBottom: 15 },
+  lineChartCard: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 20,
+    padding: 15,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: "#F1F5F9",
+  },
+  lineChartHolder: { width: '100%', alignItems: 'center' },
+  lineChartInfo: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 10, width: '100%', justifyContent: 'flex-end' },
+  lineChartValue: { fontSize: 16, fontWeight: "700", color: "#0F172A" },
+
+  insightCard: {
+    backgroundColor: "#ECFDF5",
+    borderRadius: 20,
+    padding: 20,
+    borderWidth: 1,
+    borderColor: "#D1FAE5",
+  },
+  insightHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 10 },
+  insightTitle: { fontSize: 15, fontWeight: "700", color: "#065F46" },
+  insightText: { fontSize: 14, color: "#065F46", lineHeight: 22, opacity: 0.8 },
+
+  // Bottom Sheet Styles
+  bsView: { flex: 1, padding: 24 },
+  bsHeader: { flexDirection: 'row', alignItems: 'center', gap: 16, marginBottom: 25 },
+  bsIconContainer: {
+    width: 48,
+    height: 48,
+    borderRadius: 16,
+    backgroundColor: '#FFF7ED',
+    alignItems: 'center',
+    justifyContent: 'center'
+  },
+  bsTitle: { fontSize: 20, fontWeight: '800', color: '#0F172A' },
+  bsSubtitle: { fontSize: 13, color: '#64748B', marginTop: 2 },
+  bsSection: { marginBottom: 25 },
+  bsSectionTitle: { fontSize: 14, fontWeight: '700', color: '#94A3B8', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 12 },
+  bsText: { fontSize: 15, color: '#475569', lineHeight: 22 },
+  metricGuideHorizontal: { flexDirection: 'row', gap: 8 },
+  metricCard: {
+    flex: 1,
+    backgroundColor: '#F8FAFC',
+    borderRadius: 16,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: '#F1F5F9',
+    alignItems: 'center'
+  },
+  metricIconBox: {
+    width: 32,
+    height: 32,
+    borderRadius: 10,
+    backgroundColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 8,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 1
+  },
+  metricLabelCard: { fontSize: 12, fontWeight: '700', color: '#0F172A', marginBottom: 2 },
+  metricDescCard: { fontSize: 10, color: '#64748B', lineHeight: 14, textAlign: 'center' },
+  tagsContainerRow: { flexDirection: 'row', gap: 6 },
+  tagCompact: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+    backgroundColor: '#F1F5F9',
+    paddingVertical: 10,
+    paddingHorizontal: 4,
+    borderRadius: 10
+  },
+  tagTextCompact: { fontSize: 9, fontWeight: '700', color: '#475569' },
+  bsFooter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 10,
+    paddingTop: 20,
+    borderTopWidth: 1,
+    borderTopColor: '#F1F5F9'
+  },
+  bsFooterText: { fontSize: 12, color: '#94A3B8', fontWeight: '500' },
+});
 
 export default ResultsScreen;

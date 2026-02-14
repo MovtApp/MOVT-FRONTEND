@@ -8,8 +8,10 @@ import {
   ScrollView,
   Animated,
   Dimensions,
+  Platform,
   TouchableWithoutFeedback,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Bell, X, CheckCircle, AlertCircle, Info } from "lucide-react-native";
 import { useNotifications } from "../contexts/NotificationContext";
 import { formatTime } from "../utils/formatters";
@@ -27,6 +29,7 @@ const NotificationModal: React.FC<NotificationModalProps> = ({
   onClose,
   sheetHeight = "100%",
 }) => {
+  const insets = useSafeAreaInsets();
   const { notifications, markAsRead, markAllAsRead } = useNotifications();
   const [slideAnimation] = useState(new Animated.Value(width));
 
@@ -74,10 +77,23 @@ const NotificationModal: React.FC<NotificationModalProps> = ({
                   backgroundColor: "#FFFFFF",
                   borderTopLeftRadius: 20,
                   borderBottomLeftRadius: 20,
+                  // Shadow for elevation
+                  elevation: 15,
+                  shadowColor: "#000",
+                  shadowOffset: { width: -10, height: 0 },
+                  shadowOpacity: 0.15,
+                  shadowRadius: 15,
                 },
               ]}
             >
-              <View style={modalStyles.header}>
+              <View
+                style={[
+                  modalStyles.header,
+                  {
+                    paddingTop: Platform.OS === "ios" ? Math.max(insets.top, 20) : 20,
+                  },
+                ]}
+              >
                 <View style={modalStyles.headerLeft}>
                   <Text style={modalStyles.title}>Notificações</Text>
                   <View style={modalStyles.badgeContainer}>
@@ -94,7 +110,7 @@ const NotificationModal: React.FC<NotificationModalProps> = ({
                 </TouchableOpacity>
               </View>
 
-              <ScrollView style={modalStyles.content}>
+              <ScrollView style={modalStyles.content} contentContainerStyle={{ flexGrow: 1 }}>
                 {notifications.length === 0 ? (
                   <View style={modalStyles.emptyContainer}>
                     <Bell size={48} color="#D1D5DB" />
@@ -146,7 +162,7 @@ const NotificationModal: React.FC<NotificationModalProps> = ({
 const modalStyles = StyleSheet.create({
   overlay: {
     flex: 1,
-    backgroundColor: "transparent",
+    backgroundColor: "rgba(0, 0, 0, 0.45)",
     justifyContent: "flex-end",
     alignItems: "flex-end",
   },
@@ -155,7 +171,6 @@ const modalStyles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
     padding: 20,
-    paddingTop: 10,
     borderBottomWidth: 1,
     borderBottomColor: "#E5E7EB",
   },

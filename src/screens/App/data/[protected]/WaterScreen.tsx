@@ -16,7 +16,7 @@ import {
 } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import BackButton from "../../../../components/BackButton";
-import NavigationArrows from "../../../../components/data/NavigationArrows";
+import DataPillNavigator from "../../../../components/data/DataPillNavigator";
 import { AppStackParamList } from "../../../../@types/routes";
 import ConfettiCannon from "react-native-confetti-cannon";
 import { CirclePlus, SquarePen, RotateCcw, Plus } from "lucide-react-native";
@@ -140,94 +140,95 @@ const WaterScreen: React.FC = () => {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <ScrollView contentContainerStyle={styles.scrollContent}>
-        <View style={styles.header}>
-          <BackButton to={{ name: "DataScreen" }} />
-          <Text style={styles.headerTitle}>Hidratação</Text>
-          <View style={{ width: 46 }} />
-        </View>
-
-        {showConfetti && (
-          <ConfettiCannon
-            key={`confetti-${consumedMl}`}
-            count={150}
-            origin={{ x: SCREEN_WIDTH / 2, y: -10 }}
-            fadeOut
-            autoStart
-            explosionSpeed={400}
-            fallSpeed={2500}
-            onAnimationEnd={() => setShowConfetti(false)}
-          />
-        )}
-
-        <View style={styles.summaryCard}>
-          <View style={styles.heroRow}>
-            <Text style={styles.dropIcon}>💧</Text>
-            <Text style={styles.summaryAmount}>
-              {consumedMl}
-              <Text style={styles.summaryUnit}> ml</Text>
-            </Text>
-          </View>
-          <Text style={styles.summarySub}>Faltam mais {remainingMl} ml para hoje.</Text>
-
-          <View style={styles.actionsRow}>
-            <TouchableOpacity
-              style={styles.actionIconButton}
-              accessibilityRole="button"
-              accessibilityLabel="Zerar consumo"
-              onPress={handleReset}
-              activeOpacity={0.85}
-            >
-              <RotateCcw size={20} color="#192126" />
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.actionIconButton}
-              accessibilityRole="button"
-              accessibilityLabel="Editar meta diária"
-              onPress={handleEditGoal}
-              activeOpacity={0.85}
-            >
-              <SquarePen size={20} color="#192126" />
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.actionIconButton}
-              accessibilityRole="button"
-              accessibilityLabel={`Adicionar ${cupMl} ml`}
-              onPress={handleAddCup}
-              activeOpacity={0.85}
-            >
-              <CirclePlus size={20} color="#192126" />
-            </TouchableOpacity>
-          </View>
-        </View>
-
-        {/* Área métrica empilhada: cinza (meta) como fundo e azul crescendo de baixo para cima */}
-        <View style={styles.metricStack}>
-          {/* Fundo cinza (meta) ocupando toda a área */}
-          <View style={styles.metricGreyBackground}>
-            <Text style={styles.metricGreyLabel}>Meta</Text>
-            <Text style={styles.metricGreyValue}>{goalMl}ml</Text>
+      <View style={{ flex: 1 }}>
+        <ScrollView contentContainerStyle={styles.scrollContent}>
+          <View style={styles.header}>
+            <BackButton to={{ name: "DataScreen" }} />
+            <Text style={styles.headerTitle}>Hidratação</Text>
+            <View style={{ width: 46 }} />
           </View>
 
-          {/* Azul dinâmico ancorado no bottom */}
-          <Animated.View style={[styles.metricBlueFill, { height: animatedBlueHeight }]}>
-            <View style={styles.metricTopRightGroup}>
-              <Text style={styles.metricBlueTopRight}>Até agora</Text>
-              <Text style={styles.metricMl}>{consumedMl} ml</Text>
+          {showConfetti && (
+            <ConfettiCannon
+              key={`confetti-${consumedMl}`}
+              count={150}
+              origin={{ x: SCREEN_WIDTH / 2, y: -10 }}
+              fadeOut
+              autoStart
+              explosionSpeed={400}
+              fallSpeed={2500}
+              onAnimationEnd={() => setShowConfetti(false)}
+            />
+          )}
+
+          <View style={styles.summaryCard}>
+            <View style={styles.heroRow}>
+              <Text style={styles.dropIcon}>💧</Text>
+              <Text style={styles.summaryAmount}>
+                {consumedMl}
+                <Text style={styles.summaryUnit}> ml</Text>
+              </Text>
             </View>
-            <TouchableOpacity
-              onPress={handleAddCup}
-              accessibilityRole="button"
-              accessibilityLabel={`Adicionar ${cupMl} ml`}
-              style={styles.plusButton}
-            >
-              <Plus size={20} color="#192126" />
-            </TouchableOpacity>
-          </Animated.View>
-        </View>
-      </ScrollView>
+            <Text style={styles.summarySub}>Faltam mais {remainingMl} ml para hoje.</Text>
 
-      <NavigationArrows currentScreen="WaterScreen" screens={DATA_SCREENS} />
+            <View style={styles.actionsRow}>
+              <TouchableOpacity
+                style={styles.actionIconButton}
+                accessibilityRole="button"
+                accessibilityLabel="Zerar consumo"
+                onPress={handleReset}
+                activeOpacity={0.85}
+              >
+                <RotateCcw size={20} color="#192126" />
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.actionIconButton}
+                accessibilityRole="button"
+                accessibilityLabel="Editar meta diária"
+                onPress={handleEditGoal}
+                activeOpacity={0.85}
+              >
+                <SquarePen size={20} color="#192126" />
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.actionIconButton}
+                accessibilityRole="button"
+                accessibilityLabel={`Adicionar ${cupMl} ml`}
+                onPress={handleAddCup}
+                activeOpacity={0.85}
+              >
+                <CirclePlus size={20} color="#192126" />
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          {/* Área métrica empilhada: cinza (meta) como fundo e azul crescendo de baixo para cima */}
+          <View style={styles.metricStack}>
+            {/* Fundo cinza (meta) ocupando toda a área */}
+            <View style={styles.metricGreyBackground}>
+              <Text style={styles.metricGreyLabel}>Meta</Text>
+              <Text style={styles.metricGreyValue}>{goalMl}ml</Text>
+            </View>
+
+            {/* Azul dinâmico ancorado no bottom */}
+            <Animated.View style={[styles.metricBlueFill, { height: animatedBlueHeight }]}>
+              <View style={styles.metricTopRightGroup}>
+                <Text style={styles.metricBlueTopRight}>Até agora</Text>
+                <Text style={styles.metricMl}>{consumedMl} ml</Text>
+              </View>
+              <TouchableOpacity
+                onPress={handleAddCup}
+                accessibilityRole="button"
+                accessibilityLabel={`Adicionar ${cupMl} ml`}
+                style={styles.plusButton}
+              >
+                <Plus size={20} color="#192126" />
+              </TouchableOpacity>
+            </Animated.View>
+          </View>
+        </ScrollView>
+        <DataPillNavigator currentScreen="WaterScreen" />
+      </View>
 
       <Modal
         visible={showEditGoalModal}
@@ -292,7 +293,7 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "center",
     paddingHorizontal: 20,
-    paddingTop: 20,
+    marginTop: 20,
   },
   headerTitle: {
     fontSize: 24,

@@ -12,10 +12,15 @@ const AnimatedSvgCircle = Animated.createAnimatedComponent(Circle);
 interface StepProgressRingProps {
   progress: number;
   size?: number;
+  strokeWidth?: number;
 }
 
-const StepProgressRing: React.FC<StepProgressRingProps> = ({ progress, size = 78 }) => {
-  const radius = size / 2 - 8;
+const StepProgressRing: React.FC<StepProgressRingProps> = ({
+  progress,
+  size = 78,
+  strokeWidth = 10,
+}) => {
+  const radius = size / 2 - strokeWidth / 2 - 2; // Adjusted radius calculation
   const circumference = 2 * Math.PI * radius;
   const clamped = Math.max(0, Math.min(1, progress));
   const animatedProgress = useSharedValue(0);
@@ -44,7 +49,7 @@ const StepProgressRing: React.FC<StepProgressRingProps> = ({ progress, size = 78
         cy={size / 2}
         r={radius}
         stroke="#FFE0B2"
-        strokeWidth={10}
+        strokeWidth={strokeWidth}
         fill="none"
       />
       <AnimatedSvgCircle
@@ -52,7 +57,7 @@ const StepProgressRing: React.FC<StepProgressRingProps> = ({ progress, size = 78
         cy={size / 2}
         r={radius}
         stroke="url(#stepsGradient)"
-        strokeWidth={10}
+        strokeWidth={strokeWidth}
         fill="none"
         strokeDasharray={circumference}
         animatedProps={animatedProps}

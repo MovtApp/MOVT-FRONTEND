@@ -16,7 +16,8 @@ api.interceptors.request.use(
     if (sessionId) {
       config.headers.Authorization = `Bearer ${sessionId}`;
     }
-    console.log("🚀 Requisição enviada:", config.method?.toUpperCase(), config.url);
+    const fullUrl = `${config.baseURL}${config.url}`;
+    console.log("🚀 Requisição enviada:", config.method?.toUpperCase(), fullUrl);
     return config;
   },
   (error) => {

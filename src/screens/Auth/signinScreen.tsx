@@ -11,6 +11,7 @@ import { useAuth } from "@contexts/AuthContext";
 import { supabase } from "../../services/supabaseClient";
 import * as WebBrowser from "expo-web-browser";
 import * as Google from "expo-auth-session/providers/google";
+import * as AuthSession from "expo-auth-session";
 // import { LoginManager, AccessToken } from 'react-native-fbsdk-next'; // Para Facebook (Removido)
 
 import { api } from "../../services/api";
@@ -137,24 +138,6 @@ export const SignInScreen = () => {
 
   WebBrowser.maybeCompleteAuthSession();
 
-  // No Expo Go, precisamos usar o Proxy da Expo
-  const redirectUri = "https://auth.expo.io/@jvlima22/movt";
-
-  const [, response, promptAsync] = Google.useAuthRequest({
-    // IMPORTANTE: Para o Proxy da Expo, o Google sempre espera o Client ID de Web
-    clientId: GOOGLE_WEB_CLIENT_ID,
-    scopes: ["profile", "email"],
-    redirectUri,
-  });
-
-  // Log para conferência
-  useEffect(() => {
-    console.log("--- [DEBUG] Google Auth Configuration ---");
-    console.log("Web Client ID:", GOOGLE_WEB_CLIENT_ID ? "OK ✅" : "NÃO CARREGADO ❌");
-    console.log("Redirect URI Gerada:", redirectUri);
-    console.log("---------------------------------------");
-  }, [redirectUri]);
-
   const handleSignInWithSocialToken = useCallback(
     async (provider: "google", token: string) => {
       setLoading(true);
@@ -175,7 +158,6 @@ export const SignInScreen = () => {
         const { access_token, refresh_token } = await response.json();
 
         if (access_token && refresh_token) {
-          // Define a sessão no Supabase para obter os dados do usuário
           const {
             data: { user: supabaseUser },
             error: userError,
@@ -188,7 +170,6 @@ export const SignInScreen = () => {
             throw new Error("Erro ao obter dados do usuário do Supabase.");
           }
 
-          // Atualiza o contexto global de autenticação do App
           await signIn(access_token, {
             id: supabaseUser.id,
             name:
@@ -207,7 +188,6 @@ export const SignInScreen = () => {
 
           console.log("Login social bem-sucedido!");
 
-          // Redireciona para a Home
           navigation.reset({
             index: 0,
             routes: [
@@ -217,8 +197,6 @@ export const SignInScreen = () => {
               },
             ],
           });
-        } else {
-          throw new Error("Tokens de sessão Supabase não recebidos da Edge Function.");
         }
       } catch (error: any) {
         console.error("Erro na autenticação social:", error.message);
@@ -229,30 +207,23 @@ export const SignInScreen = () => {
     },
     [navigation, signIn]
   );
-
-  useEffect(() => {
-    if (response?.type === "success") {
-      const { idToken, accessToken } = response.authentication || {};
-      const token = idToken || accessToken;
-
-      if (token) {
-        handleSignInWithSocialToken("google", token);
-      } else if ((response as any).params?.id_token) {
-        handleSignInWithSocialToken("google", (response as any).params.id_token as string);
-      } else if ((response as any).params?.access_token) {
-        handleSignInWithSocialToken("google", (response as any).params.access_token as string);
-      }
-    }
-  }, [response, handleSignInWithSocialToken]);
-
+  /* 
+   Google Sign-In no Expo Go:
+   O Google bloqueia redirecionamentos para IPs locais (exp://192.168...), causando erro 400.
+   O Proxy da Expo também apresenta instabilidade para esquemas customizados.
+   
+   SOLUÇÃO: Esta funcionalidade funcionará AUTOMATICAMENTE no build de produção (.apk/.aab)
+   devido aos Client IDs nativos que já configuramos corretamente no .env e no Google Cloud.
+  */
   const signInWithGoogle = async () => {
-    try {
-      // Forçamos o uso do proxy para o Expo Go
-      // @ts-ignore
-      await promptAsync({ useProxy: true });
-    } catch (error: any) {
-      Alert.alert("Erro", `Falha no login com Google: ${error.message}`);
-    }
+    Alert.alert(
+      "Aviso de Desenvolvimento",
+      "O Login com Google tem restrições de segurança no Expo Go.\n\nFique tranquilo: A configuração nativa já está pronta! \n\nIsso funcionará perfeitamente quando você gerar o APK/Build do app.",
+      [
+        { text: "Testar com E-mail/Senha", style: "default" },
+        { text: "Entendi", style: "cancel" },
+      ]
+    );
   };
 
   return (

@@ -88,7 +88,8 @@ const ProfilePJScreen = () => {
   const trainerDescription = trainerData?.description || trainer?.description;
   const trainerRating = trainerData?.avaliacoesCount || trainer?.rating || 0;
   const trainerVerificado = trainerData?.verificado === true;
-  const trainerAddress = trainerData?.address || (trainer as any)?.location || "Endereço não informado";
+  const trainerAddress =
+    trainerData?.address || (trainer as any)?.location || "Endereço não informado";
 
   // Standard padding calculation
   const paddingTop =
@@ -107,7 +108,9 @@ const ProfilePJScreen = () => {
         name: trainerName || "Personal Trainer",
         username: trainerData?.username || (trainer?.name || "").toLowerCase().replace(/\s+/g, "_"),
         photo: trainerImageUrl || "",
-        banner: trainerData?.banner_url || "https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?w=800&h=400&fit=crop",
+        banner:
+          trainerData?.banner_url ||
+          "https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?w=800&h=400&fit=crop",
         location: trainerData?.address || "São Paulo",
         job_title: "Personal Trainer",
         bio: trainerDescription || "",
@@ -136,7 +139,7 @@ const ProfilePJScreen = () => {
           {/* Imagem como parte do conteúdo do ScrollView */}
           <View style={styles.imageSection}>
             <Image
-              source={{ uri: trainerImageUrl || 'https://via.placeholder.com/400' }}
+              source={{ uri: trainerImageUrl || "https://via.placeholder.com/400" }}
               style={styles.topImage}
               resizeMode="cover"
             />
@@ -147,7 +150,7 @@ const ProfilePJScreen = () => {
             <View style={styles.mainContent}>
               {/* Nome e descrição */}
               <View style={styles.textLeft}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
                   <Text style={styles.nameText}>{trainerName}</Text>
                 </View>
                 <Text style={styles.titleText}>{trainerDescription}</Text>
@@ -198,8 +201,10 @@ const ProfilePJScreen = () => {
                     <View style={styles.infoRow}>
                       <Dumbbell size={20} color="#192126" style={{ marginRight: 8 }} />
                       <Text style={styles.infoText}>
-                        {trainerData?.especialidades ?
-                          (Array.isArray(trainerData.especialidades) ? trainerData.especialidades[0] : trainerData.especialidades.split(',')[0])
+                        {trainerData?.especialidades
+                          ? Array.isArray(trainerData.especialidades)
+                            ? trainerData.especialidades[0]
+                            : trainerData.especialidades.split(",")[0]
                           : "Musculação"}
                       </Text>
                     </View>
@@ -239,9 +244,7 @@ const ProfilePJScreen = () => {
                         {trainerData.gym.nome}
                       </Text>
                     )}
-                    <Text style={styles.contactText}>
-                      {trainerAddress}
-                    </Text>
+                    <Text style={styles.contactText}>{trainerAddress}</Text>
                   </View>
                 </View>
               </View>
@@ -402,7 +405,7 @@ const styles = StyleSheet.create({
     color: "#192126",
     textAlign: "center",
     justifyContent: "center",
-    marginLeft: 10
+    marginLeft: 10,
   },
   sectionHeader: {
     flexDirection: "row",

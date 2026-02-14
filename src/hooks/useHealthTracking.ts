@@ -2,7 +2,7 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import { useFocusEffect } from "@react-navigation/native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as Location from "expo-location";
-import { LatLng, Region } from "react-native-maps";
+import { LatLng, Region } from "@components/MapComponent";
 import {
   ensureGoogleFitPermissions,
   fetchTodayStepCount,
@@ -221,7 +221,13 @@ export const useHealthTracking = (userId: string | undefined) => {
       let unsubscribeSteps: (() => void) | null = null;
       const start = async () => {
         setStepsLoading(true);
-        const authorized = await ensureGoogleFitPermissions();
+        let authorized = false;
+        try {
+          authorized = await ensureGoogleFitPermissions();
+        } catch (err) {
+          console.warn("Google Fit not available or permission denied:", err);
+        }
+
         if (!authorized) {
           if (isMounted) setStepsLoading(false);
           return;

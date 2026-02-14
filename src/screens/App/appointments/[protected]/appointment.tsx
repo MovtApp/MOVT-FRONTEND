@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   Alert,
+  Dimensions,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAuth } from "@contexts/AuthContext";
@@ -14,6 +15,8 @@ import { listAppointments, cancelAppointment } from "@services/appointmentServic
 import Header from "@components/Header";
 import CalendarComponent from "@components/CalendarComponent";
 import AppointmentCard from "@components/AppointmentCard";
+import RatingModal from "@components/RatingModal";
+import { API_BASE_URL } from "@/config/api";
 import { Flame } from "lucide-react-native";
 interface Appointment {
   id: string;
@@ -30,25 +33,40 @@ interface Appointment {
   statusText?: string;
   weekday?: string;
   absoluteDate?: string;
+  id_trainer?: string;
+  id_usuario?: string;
+  avaliado?: boolean;
 }
 
 export function Appointment() {
+  const getLocalDateString = () => {
+    const date = new Date();
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
+    return `${year}-${month}-${day}`;
+  };
+
   const { user } = useAuth();
   const insets = useSafeAreaInsets();
   // Função para verificar se uma data é anterior à data atual
   const isPastDate = (dateStr: string) => {
     const currentDate = new Date();
-    const currentDateString = currentDate.toISOString().split("T")[0];
+    const currentDateString = getLocalDateString();
     // Comparar datas no formato YYYY-MM-DD
     return dateStr < currentDateString;
   };
-  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split("T")[0]); // Data atual
+  const [selectedDate, setSelectedDate] = useState(getLocalDateString()); // Data atual
   const [currentMonth, setCurrentMonth] = useState(new Date()); // Mês atual
   const [showMonthSelector, setShowMonthSelector] = useState(false); // Controlar exibição do seletor de mês
   const [newAppointments, setNewAppointments] = useState<Appointment[]>([]);
   const [pastTrainings, setPastTrainings] = useState<Appointment[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // Estados para o Modal de Avaliação
+  const [isRatingModalVisible, setIsRatingModalVisible] = useState(false);
+  const [appointmentToRate, setAppointmentToRate] = useState<Appointment | null>(null);
   useEffect(() => {
     if (user?.sessionId) {
       fetchAppointments();
@@ -71,18 +89,25 @@ export function Appointment() {
       const completedAppointments: Appointment[] = [];
       if (Array.isArray(appointments)) {
         appointments.forEach((apt: any) => {
-          const appointmentDate = new Date(apt.data_agendamento);
+          // Safe date parsing to avoid timezone issues
+          // Assuming data_agendamento is "YYYY-MM-DD" or ISO string
+          const rawDate = apt.data_agendamento || "";
+          const [y, m, d] = rawDate.split("T")[0].split("-").map(Number);
+          // Create date object using local time constructor: new Date(year, monthIndex, day)
+          const appointmentDate = new Date(y, m - 1, d);
+
           const today = new Date();
           today.setHours(0, 0, 0, 0);
+
           const appointment: Appointment = {
-            id: apt.id_agendamento.toString(), // converter para string
+            id: apt.id_agendamento.toString(),
             time: formatTime(apt.hora_inicio),
             title: role === "trainer" ? "Musculação" : apt.trainer_name || "Treinador",
             subtitle:
               role === "trainer"
                 ? `${apt.client_name || "Cliente"}, 25 anos`
                 : getStatusSubtitle(apt.status),
-            value: `Ø 0,00`, // valor não está disponível na resposta do backend
+            value: `Ø 0,00`,
             status: apt.status,
             appointment_date: apt.data_agendamento,
             type: "Musculação",
@@ -91,6 +116,9 @@ export function Appointment() {
             statusText: getStatusSubtitle(apt.status),
             weekday: getWeekday(appointmentDate),
             absoluteDate: getAbsoluteDate(appointmentDate),
+            id_trainer: apt.id_trainer?.toString(),
+            id_usuario: apt.id_usuario?.toString(),
+            avaliado: apt.avaliado,
           };
           if (appointmentDate >= today) {
             upcomingAppointments.push(appointment);
@@ -234,6 +262,46 @@ export function Appointment() {
   // Dummy function to prevent errors in CalendarComponent
   const isInactiveDay = (dateStr: string) => false;
 
+  const handleOpenRating = (appointment: Appointment) => {
+    setAppointmentToRate(appointment);
+    setIsRatingModalVisible(true);
+  };
+
+  const handleSubmitRating = async (data: {
+    ratingProfessional: number;
+    ratingTraining: number;
+    comment: string;
+  }) => {
+    if (!appointmentToRate || !user?.sessionId) return;
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/appointments/${appointmentToRate.id}/rate`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${user.sessionId}`,
+        },
+        body: JSON.stringify({
+          ...data,
+          trainerId: appointmentToRate.id_trainer,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(
+          errorData.error || errorData.message || errorData.details || "Erro ao enviar avaliação"
+        );
+      }
+
+      Alert.alert("Sucesso", "Obrigado por sua avaliação!");
+      fetchAppointments();
+    } catch (error) {
+      console.error("Erro ao avaliar:", error);
+      throw error;
+    }
+  };
+
   // Mostrar loading enquanto carrega os dados
   if (loading) {
     return (
@@ -273,6 +341,9 @@ export function Appointment() {
             horizontal
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={styles.horizontalScroll}
+            snapToInterval={SNAP_INTERVAL}
+            decelerationRate="fast"
+            snapToAlignment="start"
           >
             {newAppointments.length > 0 ? (
               newAppointments.map((appointment) => (
@@ -281,6 +352,7 @@ export function Appointment() {
                   appointment={appointment}
                   isPast={false}
                   onCancel={handleCancelAppointment}
+                  onRate={handleOpenRating}
                 />
               ))
             ) : (
@@ -297,6 +369,9 @@ export function Appointment() {
             horizontal
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={styles.horizontalScroll}
+            snapToInterval={SNAP_INTERVAL}
+            decelerationRate="fast"
+            snapToAlignment="start"
           >
             {pastTrainings.length > 0 ? (
               pastTrainings.map((training) => (
@@ -305,6 +380,7 @@ export function Appointment() {
                   appointment={training}
                   isPast={true}
                   onCancel={handleCancelAppointment}
+                  onRate={handleOpenRating}
                 />
               ))
             ) : (
@@ -384,6 +460,13 @@ export function Appointment() {
             </View>
           </View>
         )}
+
+        <RatingModal
+          isVisible={isRatingModalVisible}
+          onClose={() => setIsRatingModalVisible(false)}
+          trainerName={appointmentToRate?.userWhoBooked || "o Treinador"}
+          onSubmit={handleSubmitRating}
+        />
       </ScrollView>
     </View>
   );
@@ -410,10 +493,12 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     color: "#111827",
     flex: 1,
+    marginTop: 10,
     marginBottom: 20,
+    paddingHorizontal: 10,
   },
   contentHeader: {
-    paddingHorizontal: 16,
+    paddingHorizontal: 0,
     paddingVertical: 12,
     backgroundColor: "#FFFFFF",
   },
@@ -547,7 +632,7 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     flex: 1,
-    paddingHorizontal: 16,
+    paddingHorizontal: 20,
   },
   calendarContainer: {
     marginBottom: 24,
@@ -613,97 +698,14 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
     color: "#111827",
     marginBottom: 12,
+    paddingHorizontal: 10,
   },
   horizontalScroll: {
     paddingVertical: 8,
-  },
-  appointmentCard: {
-    width: 350,
-    height: 174,
-    backgroundColor: "#FFFFFF",
-    borderRadius: 12,
-    flexDirection: "row",
-    marginRight: 16,
-    borderWidth: 1,
-    borderColor: "#E5E7EB",
-  },
-  greenPart: {
-    width: 100,
-    backgroundColor: "#BBF246",
-    borderTopLeftRadius: 12,
-    borderBottomLeftRadius: 12,
-    padding: 16,
-    justifyContent: "space-between",
-    alignItems: "flex-start",
-  },
-  dateInfo: {
-    alignItems: "flex-start",
-  },
-  relativeContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  iconCircle: {
-    backgroundColor: "#FFFFFF",
-    borderRadius: 6,
-    padding: 8,
-    marginRight: 20,
-    flexDirection: "row",
-  },
-  relativeText: {
-    fontSize: 12,
-    color: "#192126",
-  },
-  absoluteText: {
-    fontSize: 12,
-    color: "#192126",
-  },
-  whitePart: {
-    flex: 1,
-    backgroundColor: "#FFFFFF",
-    borderTopRightRadius: 12,
-    borderBottomRightRadius: 12,
-    padding: 16,
-    flexDirection: "column",
-    justifyContent: "space-between",
-  },
-  leftContent: {
-    flex: 1,
-  },
-  timeText: {
-    fontSize: 22,
-    fontWeight: "bold",
-    color: "#192126",
-    marginBottom: 4,
-  },
-  titleText: {
-    fontSize: 22,
-    fontWeight: "600",
-    color: "#111827",
-  },
-  subtitleText: {
-    fontSize: 14,
-    color: "#192126",
-  },
-  bottomRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-  },
-  valueText: {
-    fontSize: 12,
-    color: "#6B7280",
-  },
-  cancelButton: {
-    backgroundColor: "#111827",
-    borderRadius: 8,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    marginTop: 8, // Add margin from the content above
-  },
-  cancelButtonText: {
-    fontSize: 12,
-    fontWeight: "600",
-    color: "#FFFFFF",
+    paddingHorizontal: 10,
   },
 });
+
+const { width: SCREEN_WIDTH } = Dimensions.get("window");
+const CARD_WIDTH = SCREEN_WIDTH * 0.82;
+const SNAP_INTERVAL = CARD_WIDTH + 16; // Card + margin

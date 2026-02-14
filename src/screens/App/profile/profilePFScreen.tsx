@@ -530,7 +530,7 @@ const ProfilePFScreen = () => {
               <Image
                 source={{ uri: imageUri }}
                 style={styles.gridImage}
-              // defaultSource removed
+                // defaultSource removed
               />
             </TouchableOpacity>
           );

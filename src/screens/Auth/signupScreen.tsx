@@ -36,10 +36,6 @@ interface Props {
 }
 
 export const SignUpScreen = ({ navigation }: Props) => {
-  function handleLogin() {
-    navigation.navigate("SignInScreen");
-  }
-
   const [tab, setTab] = useState<"CPF" | "CNPJ">("CPF");
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [showPassword, setShowPassword] = useState(false);

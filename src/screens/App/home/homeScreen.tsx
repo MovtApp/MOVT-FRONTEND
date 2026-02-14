@@ -84,6 +84,43 @@ const HomeScreen: React.FC = () => {
   const [isSearching, setIsSearching] = useState(false);
   const searchTimeout = useRef<NodeJS.Timeout | null>(null);
 
+  const [selectedSpecialty, setSelectedSpecialty] = useState<string | null>(null);
+  const [trainings, setTrainings] = useState<ExerciseItem[]>(exerciseData);
+  const [loadingTrainings, setLoadingTrainings] = useState(false);
+
+  useEffect(() => {
+    const fetchTrainings = async () => {
+      if (!user?.sessionId) return;
+      try {
+        setLoadingTrainings(true);
+        const { api } = await import("@services/api");
+        const resp = await api.get("/treinos", {
+          params: { specialty: selectedSpecialty },
+          headers: { Authorization: `Bearer ${user.sessionId}` },
+        });
+        if (resp.data?.data) {
+          const apiTrainings = resp.data.data.map((t: any) => ({
+            id: String(t.id),
+            title: t.title,
+            calories: t.calories,
+            minutes: t.minutes,
+            imageUrl:
+              t.image_url ||
+              "https://res.cloudinary.com/ditlmzgrh/image/upload/v1757229915/image_71_jntmsv.jpg",
+          }));
+          setTrainings(apiTrainings.length > 0 ? apiTrainings : exerciseData);
+        }
+      } catch (err) {
+        console.error("Erro ao buscar treinos:", err);
+        setTrainings(exerciseData);
+      } finally {
+        setLoadingTrainings(false);
+      }
+    };
+
+    fetchTrainings();
+  }, [selectedSpecialty, user?.sessionId]);
+
   const performSearch = useCallback(
     async (query: string) => {
       if (!query.trim()) {
@@ -261,16 +298,26 @@ const HomeScreen: React.FC = () => {
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         <PromotionalBanner gender={selectedGender} />
-        <TrainingSelector title="Selecione seu treino" containerStyle={{ marginBottom: 24 }} />
+        <TrainingSelector
+          title="Selecione seu treino"
+          containerStyle={{ marginBottom: 24 }}
+          onSelect={setSelectedSpecialty}
+          selectedSpecialty={selectedSpecialty}
+        />
         <Communities />
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Exercícios populares</Text>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>
+              {selectedSpecialty ? `Treinos de ${selectedSpecialty}` : "Exercícios populares"}
+            </Text>
+            {loadingTrainings && <ActivityIndicator size="small" color="#BBF246" />}
+          </View>
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
             style={styles.exercisesList}
           >
-            {exerciseData.map((exercise) => (
+            {trainings.map((exercise) => (
               <ImageBackground
                 key={exercise.id}
                 source={{ uri: exercise.imageUrl }}

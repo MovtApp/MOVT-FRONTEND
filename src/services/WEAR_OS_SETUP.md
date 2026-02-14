@@ -1,6 +1,7 @@
 # Configuração Wear OS - Guia Completo
 
 ## 📋 Índice
+
 1. [Visão Geral](#visão-geral)
 2. [Instalação](#instalação)
 3. [Como Usar](#como-usar)
@@ -49,15 +50,15 @@ npm list react-native google-fit
 ### Opção 1: Função Simples
 
 ```typescript
-import { requestWearOsAuthorization } from '@/services/wearOsPermissions';
+import { requestWearOsAuthorization } from "@/services/wearOsPermissions";
 
 const handleAuthorize = async (userId: number) => {
   const result = await requestWearOsAuthorization(userId);
-  
+
   if (result.success) {
-    console.log('Autorizado!', result.deviceInfo);
+    console.log("Autorizado!", result.deviceInfo);
   } else {
-    console.log('Erro:', result.message);
+    console.log("Erro:", result.message);
   }
 };
 ```
@@ -65,7 +66,7 @@ const handleAuthorize = async (userId: number) => {
 ### Opção 2: Com UI (Recomendado)
 
 ```typescript
-import { requestWearOsAuthorizationWithUI } from '@/services/wearOsPermissions';
+import { requestWearOsAuthorizationWithUI } from "@/services/wearOsPermissions";
 
 const handleAuthorize = async (userId: number) => {
   const result = await requestWearOsAuthorizationWithUI(userId);
@@ -76,7 +77,7 @@ const handleAuthorize = async (userId: number) => {
 ### Opção 3: Inicialização Completa (Recomendado para primeira vez)
 
 ```typescript
-import { initializeWearOsAuthorization } from '@/services/wearOsPermissions';
+import { initializeWearOsAuthorization } from "@/services/wearOsPermissions";
 
 // Na tela de bem-vindo ou primeira inicialização
 const handleInitialize = async (userId: number) => {
@@ -91,7 +92,7 @@ const handleInitialize = async (userId: number) => {
 import { useWearOsAuthorization } from '@/hooks/useWearOsAuthorization';
 
 function MyComponent() {
-  const { isAuthorized, isLoading, error, requestAuthorization } = 
+  const { isAuthorized, isLoading, error, requestAuthorization } =
     useWearOsAuthorization();
 
   return (
@@ -185,7 +186,7 @@ import { TouchableOpacity, Text } from 'react-native';
 import { useWearOsAuthorization } from '@/hooks/useWearOsAuthorization';
 
 export function WearOsAuthButton() {
-  const { isAuthorized, isLoading, requestAuthorization } = 
+  const { isAuthorized, isLoading, requestAuthorization } =
     useWearOsAuthorization();
 
   if (isAuthorized) {
@@ -193,8 +194,8 @@ export function WearOsAuthButton() {
   }
 
   return (
-    <TouchableOpacity 
-      onPress={requestAuthorization} 
+    <TouchableOpacity
+      onPress={requestAuthorization}
       disabled={isLoading}
     >
       <Text>{isLoading ? 'Carregando...' : 'Autorizar Wear OS'}</Text>
@@ -258,6 +259,7 @@ Após autorização, o app coleta:
 - **Sono**
 
 Todos armazenados em:
+
 - Banco de dados: tabela `healthkit`
 - Dispositivos: tabela `dispositivos`
 
@@ -269,7 +271,7 @@ Todos armazenados em:
 
 ```typescript
 // Verificar quais permissões foram negadas
-const { requestWearOsAuthorization } = require('@/services/wearOsPermissions');
+const { requestWearOsAuthorization } = require("@/services/wearOsPermissions");
 
 const result = await requestWearOsAuthorization(userId);
 console.log(result.message); // Mostra quais permissões faltam
@@ -300,9 +302,9 @@ Possíveis causas:
 Para receber dados em tempo real após autorização:
 
 ```typescript
-import { subscribeToWearOsHealthRealtime } from '@/services/wearOsHealthService';
-import { useAuth } from '@/hooks/useAuth';
-import { useEffect, useState } from 'react';
+import { subscribeToWearOsHealthRealtime } from "@/services/wearOsHealthService";
+import { useAuth } from "@/hooks/useAuth";
+import { useEffect, useState } from "react";
 
 export function MonitorWearOS() {
   const { user } = useAuth();
@@ -312,13 +314,10 @@ export function MonitorWearOS() {
     if (!user?.id) return;
 
     // Inscrever-se para atualizações em tempo real
-    const unsubscribe = subscribeToWearOsHealthRealtime(
-      user.id,
-      (data) => {
-        console.log('Novos dados:', data);
-        setHealthData(data);
-      }
-    );
+    const unsubscribe = subscribeToWearOsHealthRealtime(user.id, (data) => {
+      console.log("Novos dados:", data);
+      setHealthData(data);
+    });
 
     return unsubscribe;
   }, [user?.id]);
@@ -354,7 +353,7 @@ export function MonitorWearOS() {
 ## Suporte
 
 Para dúvidas:
+
 - Verificar logs: `adb logcat | grep WearOS`
 - Testar permissões: `adb shell pm grant <package> <permission>`
 - Documentação oficial: https://developer.android.com/wear/build
-

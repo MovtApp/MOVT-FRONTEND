@@ -8,6 +8,7 @@ interface ECGDisplayProps {
   height?: number;
   isConnected?: boolean;
   responsive?: boolean;
+  color?: string;
 }
 
 const ECGDisplay: React.FC<ECGDisplayProps> = ({
@@ -16,6 +17,7 @@ const ECGDisplay: React.FC<ECGDisplayProps> = ({
   height,
   isConnected = false,
   responsive = true,
+  color = "#FF0000",
 }) => {
   // Responsividade automática
   const screenWidth = Dimensions.get("window").width;
@@ -142,7 +144,7 @@ const ECGDisplay: React.FC<ECGDisplayProps> = ({
         {/* Linha ECG */}
         <Path
           path={pathData}
-          color="#FF0000"
+          color={color}
           style="stroke"
           strokeWidth={1.5}
           strokeLineCap="round"

@@ -15,18 +15,18 @@ export const API_CONFIG = {
 
 // Determina qual URL usar
 export const getApiBaseUrl = (): string => {
-  // 1. Sempre respeita a variável de ambiente se ela estiver definida explicitamente
-  if (process.env.EXPO_PUBLIC_API_URL) {
-    const url = process.env.EXPO_PUBLIC_API_URL;
-    return url.endsWith('/api') ? url : `${url}/api`;
-  }
-
-  // 2. Se estiver em produção (ex: rodando na Vercel Web), usa a URL de produção automaticamente
-  if (process.env.NODE_ENV === 'production' || !__DEV__) {
+  // 1. Se estiver rodando o build de produção ou não estiver em modo DEV
+  if (!__DEV__) {
     return API_CONFIG.PRODUCTION;
   }
 
-  // 3. Em desenvolvimento local, usa o localhost
+  // 2. Em modo desenvolvimento, verifica se há uma URL manual no .env
+  if (process.env.EXPO_PUBLIC_API_URL) {
+    const url = process.env.EXPO_PUBLIC_API_URL;
+    return url.endsWith("/api") ? url : `${url}/api`;
+  }
+
+  // 3. Fallback padrão para desenvolvimento local
   return API_CONFIG.LOCAL;
 };
 

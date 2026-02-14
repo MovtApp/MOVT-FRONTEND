@@ -1,26 +1,20 @@
-import React, { useState, useEffect } from "react";
-import { View, Text, StyleSheet, ScrollView, useWindowDimensions } from "react-native";
+import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import { View, Text, StyleSheet, ScrollView, useWindowDimensions, Platform, TouchableOpacity } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { AppStackParamList } from "../../../../@types/routes";
 import BackButton from "../../../../components/BackButton";
-import NavigationArrows from "../../../../components/data/NavigationArrows";
-import { Moon, Clock } from "lucide-react-native";
-import Svg, { Circle, Defs, LinearGradient, Stop, G } from "react-native-svg";
+import DataPillNavigator from "../../../../components/data/DataPillNavigator";
+import { Moon, Clock, Zap, Star, Brain, ShieldCheck, ChevronRight, Info, HelpCircle, Sun, Activity } from "lucide-react-native";
+import Svg, { Circle, Defs, LinearGradient as SvgLinearGradient, Stop, G } from "react-native-svg";
+import { LinearGradient } from "expo-linear-gradient";
+import BottomSheet, { BottomSheetView, BottomSheetBackdrop } from "@gorhom/bottom-sheet";
 import Animated, {
   useSharedValue,
   withTiming,
   useAnimatedProps,
   Easing,
+  FadeInDown,
 } from "react-native-reanimated";
-
-const DATA_SCREENS: (keyof AppStackParamList)[] = [
-  "CaloriesScreen",
-  "CyclingScreen",
-  "HeartbeatsScreen",
-  "SleepScreen",
-  "StepsScreen",
-  "WaterScreen",
-];
 
 const AnimatedCircle = Animated.createAnimatedComponent(Circle);
 
@@ -32,385 +26,552 @@ interface SleepDay {
 
 const SleepProgressChart: React.FC<{
   totalSleep: { hours: number; minutes: number };
+  deepSleep: { hours: number; minutes: number };
   goalHours: number;
-}> = ({ totalSleep, goalHours }) => {
+}> = ({ totalSleep, deepSleep, goalHours }) => {
   const { width } = useWindowDimensions();
-  const size = Math.min(Math.max(width * 0.85, 260), 340);
+  const size = Math.min(Math.max(width * 0.85, 280), 340);
   const center = size / 2;
-  const radius = center - 40;
-  const strokeWidth = 20;
-  const circumference = 2 * Math.PI * radius;
+
+  // Outer Ring (Total Sleep)
+  const outerRadius = center - 30;
+  const outerStrokeWidth = 14;
+  const outerCircumference = 2 * Math.PI * outerRadius;
+
+  // Inner Ring (Deep Sleep)
+  const innerRadius = outerRadius - 25;
+  const innerStrokeWidth = 10;
+  const innerCircumference = 2 * Math.PI * innerRadius;
 
   const totalMinutes = totalSleep.hours * 60 + totalSleep.minutes;
+  const deepMinutes = deepSleep.hours * 60 + deepSleep.minutes;
   const maxMinutes = goalHours * 60;
-  const progress = Math.min(totalMinutes / maxMinutes, 1);
 
-  const progressAnim = useSharedValue(0);
+  const totalProgress = Math.min(totalMinutes / maxMinutes, 1);
+  const deepProgress = Math.min(deepMinutes / totalMinutes, 0.6); // Deep sleep is a fraction of total
+
+  const totalProgressAnim = useSharedValue(0);
+  const deepProgressAnim = useSharedValue(0);
 
   useEffect(() => {
-    progressAnim.value = withTiming(progress, {
-      duration: 1200,
-      easing: Easing.out(Easing.cubic),
+    totalProgressAnim.value = withTiming(totalProgress, {
+      duration: 1500,
+      easing: Easing.bezier(0.4, 0, 0.2, 1),
     });
-  }, [progress, progressAnim]);
+    deepProgressAnim.value = withTiming(deepProgress, {
+      duration: 2000,
+      easing: Easing.bezier(0.4, 0, 0.2, 1),
+    });
+  }, [totalProgress, deepProgress]);
 
-  const animatedProps = useAnimatedProps(() => ({
-    strokeDashoffset: circumference * (1 - progressAnim.value),
+  const totalAnimatedProps = useAnimatedProps(() => ({
+    strokeDashoffset: outerCircumference * (1 - totalProgressAnim.value),
   }));
 
-  const startAngle = -90;
-  const endAngle = startAngle + 360 * progress;
-
-  const getIconPosition = (angle: number) => {
-    const rad = (angle * Math.PI) / 180;
-    const x = center + radius * Math.cos(rad);
-    const y = center + radius * Math.sin(rad);
-    return { x, y };
-  };
-
-  const startPos = getIconPosition(startAngle);
-  const endPos = getIconPosition(endAngle);
+  const deepAnimatedProps = useAnimatedProps(() => ({
+    strokeDashoffset: innerCircumference * (1 - deepProgressAnim.value),
+  }));
 
   return (
-    <View style={{ alignItems: "center", justifyContent: "center", position: "relative" }}>
+    <View style={chartStyles.container}>
       <Svg width={size} height={size}>
         <Defs>
-          <LinearGradient id="sleepGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-            <Stop offset="0%" stopColor="#3B82F6" />
-            <Stop offset="100%" stopColor="#FB923C" />
-          </LinearGradient>
+          <SvgLinearGradient id="totalGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+            <Stop offset="0%" stopColor="#818CF8" />
+            <Stop offset="100%" stopColor="#C084FC" />
+          </SvgLinearGradient>
+          <SvgLinearGradient id="deepGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+            <Stop offset="0%" stopColor="#38BDF8" />
+            <Stop offset="100%" stopColor="#2DD4BF" />
+          </SvgLinearGradient>
         </Defs>
 
         <G rotation="-90" origin={`${center}, ${center}`}>
+          {/* Background Outer */}
           <Circle
             cx={center}
             cy={center}
-            r={radius}
-            stroke="#E5E7EB"
-            strokeWidth={strokeWidth}
+            r={outerRadius}
+            stroke="#F1F5F9"
+            strokeWidth={outerStrokeWidth}
             fill="none"
           />
-
+          {/* Total Progress */}
           <AnimatedCircle
             cx={center}
             cy={center}
-            r={radius}
-            stroke="url(#sleepGrad)"
-            strokeWidth={strokeWidth}
+            r={outerRadius}
+            stroke="url(#totalGrad)"
+            strokeWidth={outerStrokeWidth}
             fill="none"
-            strokeDasharray={circumference}
-            animatedProps={animatedProps}
+            strokeDasharray={outerCircumference}
+            animatedProps={totalAnimatedProps}
+            strokeLinecap="round"
+          />
+
+          {/* Background Inner */}
+          <Circle
+            cx={center}
+            cy={center}
+            r={innerRadius}
+            stroke="#F1F5F9"
+            strokeWidth={innerStrokeWidth}
+            fill="none"
+          />
+          {/* Deep Progress */}
+          <AnimatedCircle
+            cx={center}
+            cy={center}
+            r={innerRadius}
+            stroke="url(#deepGrad)"
+            strokeWidth={innerStrokeWidth}
+            fill="none"
+            strokeDasharray={innerCircumference}
+            animatedProps={deepAnimatedProps}
             strokeLinecap="round"
           />
         </G>
-
-        <Circle cx={center} cy={center} r={55} fill="#FFFFFF" />
       </Svg>
 
-      <View
-        style={{
-          position: "absolute",
-          left: startPos.x - 23,
-          top: startPos.y - 23,
-          width: 46,
-          height: 46,
-          borderRadius: 23,
-          backgroundColor: "#3B82F6",
-          alignItems: "center",
-          justifyContent: "center",
-        }}
-      >
-        <View
-          style={{
-            width: 38,
-            height: 38,
-            borderRadius: 19,
-            backgroundColor: "#FFFFFF",
-            alignItems: "center",
-            justifyContent: "center",
-          }}
-        >
-          <View
-            style={{
-              width: 30,
-              height: 30,
-              borderRadius: 15,
-              backgroundColor: "#3B82F6",
-              alignItems: "center",
-              justifyContent: "center",
-            }}
-          >
-            <Moon size={18} color="#FFFFFF" fill="#FFFFFF" />
-          </View>
-        </View>
-      </View>
-
-      {progress > 0 && (
-        <View
-          style={{
-            position: "absolute",
-            left: endPos.x - 23,
-            top: endPos.y - 23,
-            width: 46,
-            height: 46,
-            borderRadius: 23,
-            backgroundColor: "#FB923C",
-            alignItems: "center",
-            justifyContent: "center",
-          }}
-        >
-          <View
-            style={{
-              width: 38,
-              height: 38,
-              borderRadius: 19,
-              backgroundColor: "#FFFFFF",
-              alignItems: "center",
-              justifyContent: "center",
-            }}
-          >
-            <View
-              style={{
-                width: 30,
-                height: 30,
-                borderRadius: 15,
-                backgroundColor: "#FB923C",
-                alignItems: "center",
-                justifyContent: "center",
-              }}
-            >
-              <Clock size={18} color="#FFFFFF" />
-            </View>
-          </View>
-        </View>
-      )}
-
-      <View
-        style={{
-          position: "absolute",
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          alignItems: "center",
-          justifyContent: "center",
-        }}
-      >
-        <Text
-          style={{
-            fontSize: 32,
-            fontWeight: "600",
-            color: "#1F2937",
-          }}
-        >
-          {totalSleep.hours}h {totalSleep.minutes.toString().padStart(2, "0")}min
-        </Text>
-        <Text
-          style={{
-            fontSize: 16,
-            color: "#6B7280",
-            marginTop: 4,
-            fontWeight: "bold",
-          }}
-        >
-          Duração do sono
-        </Text>
+      <View style={chartStyles.centerContent}>
+        <Moon size={24} color="#818CF8" fill="rgba(129, 140, 248, 0.1)" />
+        <Text style={chartStyles.timeValue}>{totalSleep.hours}h {totalSleep.minutes}m</Text>
+        <Text style={chartStyles.timeLabel}>Qualidade Excelente</Text>
       </View>
     </View>
   );
 };
+
+interface SleepInsightCardProps {
+  title: string;
+  value: string;
+  icon: any;
+  color: string;
+  desc: string;
+  onPress?: () => void;
+}
+
+const SleepInsightCard: React.FC<SleepInsightCardProps> = ({ title, value, icon: Icon, color, desc, onPress }) => (
+  <TouchableOpacity activeOpacity={0.7} style={styles.insightCard} onPress={onPress}>
+    <View style={[styles.insightIconContainer, { backgroundColor: color + "10" }]}>
+      <Icon size={20} color={color} />
+    </View>
+    <View style={styles.insightTextContainer}>
+      <Text style={styles.insightTitle}>{title}</Text>
+      <Text style={styles.insightValue}>{value}</Text>
+      <Text style={styles.insightDesc}>{desc}</Text>
+    </View>
+    <ChevronRight size={18} color="#CBD5E1" />
+  </TouchableOpacity>
+);
 
 const SleepHeatmap: React.FC<{ weeklyData: SleepDay[] }> = ({ weeklyData }) => {
   const days = ["S", "T", "Q", "Q", "S", "S", "D"];
   const { width } = useWindowDimensions();
-
-  const horizontalPadding = 20;
-  const availableWidth = width - horizontalPadding * 2;
-  const maxWidth = 300;
-  const containerWidth = Math.min(availableWidth, maxWidth);
-
-  const gap = 6;
-  const totalGaps = (7 - 1) * gap;
-  const cellSize = Math.floor((containerWidth - totalGaps) / 7);
+  const cellSize = (width - 64) / 7;
 
   return (
-    <View style={[styles.heatmapContainer, { alignItems: "center" }]}>
-      <View style={{ width: containerWidth }}>
-        <View style={[styles.daysHeader, { justifyContent: "space-around" }]}>
-          {days.map((d, i) => (
-            <Text key={i} style={[styles.dayText, { width: cellSize }]}>
-              {d}
-            </Text>
-          ))}
-        </View>
-
-        <View
-          style={[
-            styles.heatmapGrid,
-            {
-              gap,
-              justifyContent: "flex-start",
-            },
-          ]}
-        >
-          {weeklyData.map((day, i) => {
-            let backgroundColor = "#F3F4F6";
-            if (day.quality === "deep") backgroundColor = "#3B82F6";
-            if (day.quality === "light") backgroundColor = "#FB923C";
-
-            return (
-              <View
-                key={i}
-                style={[
-                  styles.heatmapCell,
-                  {
-                    backgroundColor,
-                    opacity: day.duration > 0 ? 1 : 0.3,
-                    width: cellSize,
-                    height: cellSize,
-                  },
-                ]}
-              />
-            );
-          })}
-        </View>
+    <View style={styles.heatmapSection}>
+      <View style={styles.sectionHeader}>
+        <Star size={18} color="#FACC15" />
+        <Text style={styles.sectionTitle}>Tendência de Consistência</Text>
+      </View>
+      <View style={styles.heatmapGrid}>
+        {days.map((d, i) => (
+          <View key={i} style={{ alignItems: 'center', width: cellSize }}>
+            <Text style={styles.dayLabel}>{d}</Text>
+            <View
+              style={[
+                styles.heatmapCell,
+                {
+                  width: cellSize - 8,
+                  height: cellSize - 8,
+                  backgroundColor: weeklyData[i]?.quality === 'deep' ? '#818CF8' :
+                    weeklyData[i]?.quality === 'light' ? '#38BDF8' : '#F1F5F9'
+                }
+              ]}
+            />
+          </View>
+        ))}
       </View>
     </View>
   );
 };
 
-const SleepScreen: React.FC = () => {
+export const SleepScreen: React.FC = () => {
   const [sleepData] = useState({
-    totalSleep: { hours: 7, minutes: 30 },
+    totalSleep: { hours: 7, minutes: 42 },
+    deepSleep: { hours: 2, minutes: 15 },
     goalHours: 8,
-    weeklyData: Array.from({ length: 35 }, (_, i) => ({
-      date: `2025-04-${String((i % 30) + 1).padStart(2, "0")}`,
-      duration: Math.random() > 0.2 ? Math.floor(Math.random() * 480) : 0,
-      quality: (Math.random() > 0.6 ? "deep" : Math.random() > 0.3 ? "light" : "none") as
-        | "light"
-        | "deep"
-        | "none",
+    efficiency: 94,
+    startTime: "22:30",
+    restfulness: "Alta",
+    weeklyData: Array.from({ length: 7 }, (_, i) => ({
+      date: `Day ${i}`,
+      duration: Math.random() * 480,
+      quality: Math.random() > 0.5 ? "deep" : "light" as "deep" | "light",
     })),
   });
 
+  const [bottomSheetType, setBottomSheetType] = useState<"info" | "card">("info");
+  const [selectedTopic, setSelectedTopic] = useState<{
+    title: string;
+    description: string;
+    icon: any;
+    color: string;
+    details: string[];
+  } | null>(null);
+
+  const bottomSheetRef = useRef<BottomSheet>(null);
+  const snapPoints = useMemo(() => ["60%", "90%"], []);
+
+  const handleOpenInfo = useCallback(() => {
+    setBottomSheetType("info");
+    bottomSheetRef.current?.expand();
+  }, []);
+
+  const handleOpenCardDetails = useCallback((title: string, color: string, icon: any, details: string[]) => {
+    setBottomSheetType("card");
+    setSelectedTopic({
+      title,
+      description: "Análise detalhada da sua métrica de hoje.",
+      icon,
+      color,
+      details
+    });
+    bottomSheetRef.current?.expand();
+  }, []);
+
+  const renderBackdrop = useCallback(
+    (props: any) => (
+      <BottomSheetBackdrop
+        {...props}
+        disappearsOnIndex={-1}
+        appearsOnIndex={0}
+        opacity={0.5}
+      />
+    ),
+    []
+  );
+
   return (
-    <SafeAreaView style={styles.safeArea} edges={["top"]}>
-      <View style={styles.container}>
+    <View style={styles.mainContainer}>
+      <SafeAreaView style={styles.safeArea} edges={["top"]}>
+        <View style={styles.header}>
+          <BackButton to={{ name: "DataScreen" }} />
+          <Text style={styles.headerTitle}>Otimização do Sono</Text>
+          <TouchableOpacity style={styles.infoBtn} onPress={handleOpenInfo}>
+            <Info size={20} color="#94A3B8" />
+          </TouchableOpacity>
+        </View>
+
         <ScrollView
           style={styles.scrollView}
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
         >
-          <View style={styles.header}>
-            <BackButton to={{ name: "DataScreen" }} />
-            <Text style={styles.headerTitle}>Sono</Text>
-            <View style={{ width: 46 }} />
+          <Animated.View entering={FadeInDown.delay(100).duration(800)} style={styles.chartWrapper}>
+            <SleepProgressChart
+              totalSleep={sleepData.totalSleep}
+              deepSleep={sleepData.deepSleep}
+              goalHours={sleepData.goalHours}
+            />
+          </Animated.View>
+
+          <View style={styles.quickStatsRow}>
+            <View style={styles.quickStatItem}>
+              <Text style={styles.quickStatLabel}>DEITOU ÀS</Text>
+              <Text style={styles.quickStatValue}>{sleepData.startTime}</Text>
+            </View>
+            <View style={styles.divider} />
+            <View style={styles.quickStatItem}>
+              <Text style={styles.quickStatLabel}>EFICIÊNCIA</Text>
+              <Text style={styles.quickStatValue}>{sleepData.efficiency}%</Text>
+            </View>
+            <View style={styles.divider} />
+            <View style={styles.quickStatItem}>
+              <Text style={styles.quickStatLabel}>RECUPERAÇÃO</Text>
+              <Text style={styles.quickStatValue}>{sleepData.restfulness}</Text>
+            </View>
           </View>
 
-          <View style={styles.chartContainer}>
-            <SleepProgressChart totalSleep={sleepData.totalSleep} goalHours={sleepData.goalHours} />
-          </View>
-
-          <View style={styles.legendContainer}>
-            <View style={styles.legendItem}>
-              <View style={[styles.legendDot, { backgroundColor: "#FB923C" }]} />
-              <Text style={styles.legendText}>Interrupções ou Sono Leve</Text>
-            </View>
-            <View style={styles.legendItem}>
-              <View style={[styles.legendDot, { backgroundColor: "#3B82F6" }]} />
-              <Text style={styles.legendText}>Duração do Sono</Text>
-            </View>
+          <View style={styles.cardsSection}>
+            <SleepInsightCard
+              title="Sono Profundo"
+              value="2h 15m"
+              icon={Brain}
+              color="#38BDF8"
+              desc="Sua mente descansou significativamente hoje."
+              onPress={() => handleOpenCardDetails("Sono Profundo", "#38BDF8", Brain, [
+                "Você atingiu 25% do sono total em fase profunda, o que é excelente.",
+                "O sono profundo consolida memórias e restaura tecidos musculares.",
+                "Evite cafeína após as 14h para manter esses índices estáveis."
+              ])}
+            />
+            <SleepInsightCard
+              title="Pontuação de Prontidão"
+              value="88"
+              icon={Zap}
+              color="#FACC15"
+              desc="Você está pronto para atividades de alta performance."
+              onPress={() => handleOpenCardDetails("Prontidão", "#FACC15", Zap, [
+                "Seu sistema nervoso está bem recuperado.",
+                "Sua variabilidade da frequência cardíaca indica boa adaptação ao estresse.",
+                "Hoje é um dia ideal para treinos de alta intensidade."
+              ])}
+            />
+            <SleepInsightCard
+              title="Saúde Cardiovascular"
+              value="Otimizada"
+              icon={ShieldCheck}
+              color="#2DD4BF"
+              desc="Frequência cardíaca basal estável durante a noite."
+              onPress={() => handleOpenCardDetails("Saúde Cardio", "#2DD4BF", ShieldCheck, [
+                "Sua frequência cardíaca de repouso atingiu o ponto mais baixo às 3h da manhã.",
+                "Isso indica que seu corpo teve tempo suficiente para descompressão.",
+                "Seu índice de oxigenação permaneceu estável acima de 98%."
+              ])}
+            />
           </View>
 
           <SleepHeatmap weeklyData={sleepData.weeklyData} />
 
-          <View style={{ height: 100 }} />
+          <View style={{ height: 120 }} />
         </ScrollView>
+        <DataPillNavigator currentScreen="SleepScreen" />
+      </SafeAreaView>
 
-        <NavigationArrows currentScreen="SleepScreen" screens={DATA_SCREENS} />
-      </View>
-    </SafeAreaView>
+      <BottomSheet
+        ref={bottomSheetRef}
+        index={-1}
+        snapPoints={snapPoints}
+        enablePanDownToClose
+        backdropComponent={renderBackdrop}
+        backgroundStyle={bsStyles.bsBackground}
+        handleIndicatorStyle={bsStyles.bsIndicator}
+      >
+        <BottomSheetView style={bsStyles.bsContainer}>
+          <ScrollView showsVerticalScrollIndicator={false}>
+            {bottomSheetType === "info" ? (
+              <View>
+                <View style={bsStyles.bsHeader}>
+                  <View style={bsStyles.bsIconHeaderBox}>
+                    <Moon size={24} color="#818CF8" />
+                  </View>
+                  <View>
+                    <Text style={bsStyles.bsTitle}>Ciência do Sono</Text>
+                    <Text style={bsStyles.bsSubtitle}>Descubra o segredo de uma noite perfeita</Text>
+                  </View>
+                </View>
+
+                <View style={bsStyles.richSection}>
+                  <Text style={bsStyles.richSectionTitle}>Ciclos do Sono</Text>
+                  <Text style={bsStyles.richText}>
+                    O sono humano não é linear. Ele é composto por ciclos de aproximadamente 90 minutos
+                    que se repetem, alternando entre fases essenciais para o <Text style={{ fontWeight: '700', color: '#818CF8' }}>cérebro e o corpo</Text>.
+                  </Text>
+                </View>
+
+                <View style={bsStyles.richSection}>
+                  <Text style={bsStyles.richSectionTitle}>Fases da Noite</Text>
+                  <View style={bsStyles.horizontalGuide}>
+                    <View style={bsStyles.guideCard}>
+                      <View style={bsStyles.guideIconBox}><Brain size={16} color="#38BDF8" /></View>
+                      <Text style={bsStyles.guideLabel}>Leve</Text>
+                      <Text style={bsStyles.guideDesc}>Recuperação mental.</Text>
+                    </View>
+                    <View style={bsStyles.guideCard}>
+                      <View style={bsStyles.guideIconBox}><Zap size={16} color="#FACC15" /></View>
+                      <Text style={bsStyles.guideLabel}>Profundo</Text>
+                      <Text style={bsStyles.guideDesc}>Cura física.</Text>
+                    </View>
+                    <View style={bsStyles.guideCard}>
+                      <View style={bsStyles.guideIconBox}><Star size={16} color="#2DD4BF" /></View>
+                      <Text style={bsStyles.guideLabel}>REM</Text>
+                      <Text style={bsStyles.guideDesc}>Memórias.</Text>
+                    </View>
+                  </View>
+                </View>
+
+                <View style={bsStyles.richSection}>
+                  <Text style={bsStyles.richSectionTitle}>Impacto Diário</Text>
+                  <View style={bsStyles.tagsRow}>
+                    <View style={bsStyles.tag}><Brain size={10} color="#818CF8" /><Text style={bsStyles.tagText}>Foco</Text></View>
+                    <View style={bsStyles.tag}><Sun size={10} color="#FACC15" /><Text style={bsStyles.tagText}>Humor</Text></View>
+                    <View style={bsStyles.tag}><Zap size={10} color="#38BDF8" /><Text style={bsStyles.tagText}>Energia</Text></View>
+                    <View style={bsStyles.tag}><ShieldCheck size={10} color="#2DD4BF" /><Text style={bsStyles.tagText}>Imunidade</Text></View>
+                  </View>
+                </View>
+
+                <View style={bsStyles.bsFooter}>
+                  <HelpCircle size={16} color="#94A3B8" />
+                  <Text style={bsStyles.bsFooterText}>Otimize sua rotina para despertar o seu melhor eu.</Text>
+                </View>
+              </View>
+            ) : (
+              selectedTopic && (
+                <View>
+                  <View style={bsStyles.bsHeader}>
+                    <View style={[bsStyles.bsIconContainer, { backgroundColor: selectedTopic.color + '15' }]}>
+                      <selectedTopic.icon size={24} color={selectedTopic.color} />
+                    </View>
+                    <View>
+                      <Text style={bsStyles.bsTitle}>{selectedTopic.title}</Text>
+                      <Text style={bsStyles.bsSubtitle}>{selectedTopic.description}</Text>
+                    </View>
+                  </View>
+
+                  <View style={bsStyles.detailsGrid}>
+                    {selectedTopic.details.map((detail, index) => (
+                      <View key={index} style={bsStyles.detailItem}>
+                        <View style={[bsStyles.detailDot, { backgroundColor: selectedTopic.color }]} />
+                        <Text style={bsStyles.detailText}>{detail}</Text>
+                      </View>
+                    ))}
+                  </View>
+                </View>
+              )
+            )}
+
+            <TouchableOpacity
+              style={[bsStyles.closeBtn, { backgroundColor: selectedTopic?.color || '#818CF8' }]}
+              onPress={() => bottomSheetRef.current?.close()}
+            >
+              <Text style={bsStyles.closeBtnText}>Entendido</Text>
+            </TouchableOpacity>
+          </ScrollView>
+        </BottomSheetView>
+      </BottomSheet>
+    </View>
   );
 };
 
-const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-    backgroundColor: "#FFFFFF",
-  },
+const bsStyles = StyleSheet.create({
+  bsBackground: { backgroundColor: '#FFFFFF', borderRadius: 32 },
+  bsIndicator: { backgroundColor: '#E2E8F0', width: 40 },
+  bsContainer: { flex: 1, padding: 24 },
+  bsHeader: { flexDirection: 'row', alignItems: 'center', gap: 16, marginBottom: 25 },
+  bsIconHeaderBox: { width: 48, height: 48, borderRadius: 16, backgroundColor: '#F1F5F9', alignItems: 'center', justifyContent: 'center' },
+  bsIconContainer: { width: 48, height: 48, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
+  bsTitle: { fontSize: 22, fontWeight: '800', color: '#1E293B' },
+  bsSubtitle: { fontSize: 13, color: '#64748B', marginTop: 2 },
+
+  richSection: { marginBottom: 25 },
+  richSectionTitle: { fontSize: 16, fontWeight: '700', color: '#1E293B', marginBottom: 12 },
+  richText: { fontSize: 15, color: '#64748B', lineHeight: 22 },
+
+  horizontalGuide: { flexDirection: 'row', gap: 10 },
+  guideCard: { flex: 1, backgroundColor: '#F8FAFC', borderRadius: 20, padding: 12, borderWidth: 1, borderColor: '#F1F5F9' },
+  guideIconBox: { width: 32, height: 32, borderRadius: 10, backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center', marginBottom: 8 },
+  guideLabel: { fontSize: 13, fontWeight: '700', color: '#1E293B', marginBottom: 4 },
+  guideDesc: { fontSize: 10, color: '#94A3B8', lineHeight: 14 },
+
+  tagsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  tag: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#F8FAFC', paddingVertical: 6, paddingHorizontal: 12, borderRadius: 12 },
+  tagText: { fontSize: 12, fontWeight: '600', color: '#64748B' },
+
+  bsFooter: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 10, paddingVertical: 15, borderTopWidth: 1, borderTopColor: '#F1F5F9' },
+  bsFooterText: { fontSize: 11, color: '#94A3B8', flex: 1 },
+
+  detailsGrid: { gap: 16, marginBottom: 30 },
+  detailItem: { flexDirection: 'row', gap: 12 },
+  detailDot: { width: 4, height: 4, borderRadius: 2, marginTop: 8 },
+  detailText: { flex: 1, fontSize: 15, color: '#64748B', lineHeight: 22 },
+  closeBtn: { height: 50, borderRadius: 16, alignItems: 'center', justifyContent: 'center', marginTop: 10 },
+  closeBtnText: { color: '#FFFFFF', fontWeight: '800', fontSize: 16 },
+});
+
+const chartStyles = StyleSheet.create({
   container: {
-    flex: 1,
-    backgroundColor: "#FFFFFF",
+    alignItems: "center",
+    justifyContent: "center",
+    position: "relative",
   },
-  scrollView: {
-    flex: 1,
+  centerContent: {
+    position: "absolute",
+    alignItems: "center",
   },
-  scrollContent: {
-    flexGrow: 1,
-    paddingBottom: 100,
+  timeValue: {
+    fontSize: 32,
+    fontWeight: "800",
+    color: '#1E293B',
+    marginTop: 8,
   },
+  timeLabel: {
+    fontSize: 14,
+    color: "#818CF8",
+    fontWeight: "600",
+    marginTop: 4,
+  }
+});
+
+const styles = StyleSheet.create({
+  mainContainer: { flex: 1, backgroundColor: "#FFFFFF" },
+  safeArea: { flex: 1, backgroundColor: "#FFFFFF" },
+  scrollView: { flex: 1 },
+  scrollContent: { paddingHorizontal: 20 },
   header: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: 20,
-    paddingTop: 10,
-    paddingHorizontal: 20,
+    paddingVertical: 15,
+    paddingHorizontal: 20
   },
-  headerTitle: {
-    fontSize: 20,
-    fontWeight: "bold",
-    color: "#192126",
+  headerTitle: { fontSize: 18, fontWeight: "700", color: '#1E293B' },
+  infoBtn: { width: 40, height: 40, alignItems: 'flex-end', justifyContent: 'center' },
+  chartWrapper: { marginVertical: 20, alignItems: 'center' },
+  quickStatsRow: {
+    flexDirection: 'row',
+    backgroundColor: '#F8FAFC',
+    borderRadius: 24,
+    padding: 20,
+    marginBottom: 25,
+    borderWidth: 1,
+    borderColor: '#F1F5F9'
   },
-  chartContainer: {
-    alignItems: "center",
-    justifyContent: "center",
-    marginVertical: 30,
-    paddingHorizontal: 20,
+  quickStatItem: { flex: 1, alignItems: 'center' },
+  quickStatLabel: { fontSize: 10, fontWeight: '800', color: '#94A3B8', letterSpacing: 1, marginBottom: 8 },
+  quickStatValue: { fontSize: 18, fontWeight: '700', color: '#1E293B' },
+  divider: { width: 1, height: '60%', backgroundColor: '#E2E8F0', alignSelf: 'center' },
+  cardsSection: { gap: 15, marginBottom: 30 },
+  insightCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 24,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#F1F5F9',
+    ...Platform.select({
+      ios: {
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.05,
+        shadowRadius: 10,
+      },
+      android: {
+        elevation: 2,
+      },
+    }),
   },
-  heatmapContainer: {
-    marginTop: 30,
-    width: "100%",
+  insightIconContainer: {
+    width: 48,
+    height: 48,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 15
   },
-  daysHeader: {
-    flexDirection: "row",
-    marginBottom: 12,
-  },
-  dayText: {
-    fontSize: 12,
-    color: "#9CA3AF",
-    textAlign: "center",
-    fontWeight: "500",
-  },
-  heatmapGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-  },
-  heatmapCell: {
-    borderRadius: 8,
-  },
-  legendContainer: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 16,
-    marginBottom: 6,
-    paddingHorizontal: 20,
-    justifyContent: "center",
-  },
-  legendItem: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-  },
-  legendDot: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-  },
-  legendText: {
-    fontSize: 13,
-    color: "#6B7280",
-  },
+  insightTextContainer: { flex: 1 },
+  insightTitle: { fontSize: 12, fontWeight: '700', color: '#94A3B8', textTransform: 'uppercase', letterSpacing: 0.5 },
+  insightValue: { fontSize: 18, fontWeight: '800', color: '#1E293B', marginVertical: 2 },
+  insightDesc: { fontSize: 12, color: '#64748B', lineHeight: 16 },
+  heatmapSection: { marginBottom: 20 },
+  sectionHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 15 },
+  sectionTitle: { fontSize: 16, fontWeight: '700', color: '#1E293B' },
+  heatmapGrid: { flexDirection: 'row', justifyContent: 'space-between' },
+  dayLabel: { fontSize: 10, color: '#94A3B8', marginBottom: 10, fontWeight: '700' },
+  heatmapCell: { borderRadius: 10 },
 });
 
 export default SleepScreen;

@@ -5,11 +5,14 @@ import { Canvas, Path } from "@shopify/react-native-skia";
 interface WaterWaveProps {
   progress: number;
   height?: number;
+  width?: number;
 }
 
 const WaterWave: React.FC<WaterWaveProps> = React.memo(function WaterWave({
   progress,
   height = 60,
+
+  width,
 }) {
   const [phase, setPhase] = useState<number>(0);
   const [size, setSize] = useState<{ width: number; height: number }>({ width: 0, height });

@@ -68,7 +68,8 @@ export async function getNearbyGyms(
   latitude: number,
   longitude: number,
   radius: number,
-  sessionId: string
+  sessionId: string,
+  specialty?: string | null
 ) {
   try {
     const response = await api.get("/academias/nearby", {
@@ -76,6 +77,7 @@ export async function getNearbyGyms(
         lat: latitude,
         lng: longitude,
         raio: radius,
+        specialty: specialty || undefined,
       },
       headers: { Authorization: `Bearer ${sessionId}` },
     });

@@ -95,7 +95,7 @@ export const createAppointment = async (
       try {
         errorData = await response.json();
         console.log("[createAppointment] Erro detalhado do servidor:", errorData);
-      } catch (parseError) {
+      } catch {
         // Se não for possível parsear o JSON, usar o status como fallback
         errorData = {
           error: `Erro ao criar agendamento: ${response.status} - ${response.statusText}`,

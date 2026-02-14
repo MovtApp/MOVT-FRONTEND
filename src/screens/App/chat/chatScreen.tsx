@@ -164,7 +164,15 @@ const ChatScreen = () => {
   const renderChat = ({ item }: { item: Chat }) => {
     const unreadCount = item.unread_count || 0;
     const pName = getParticipantName(item);
-    const isMeLastSender = item.last_sender_id === supabaseUserId;
+
+    // Identificação segura do remetente
+    const isMeLastSender =
+      item.last_sender_id && supabaseUserId
+        ? String(item.last_sender_id).toLowerCase() === String(supabaseUserId).toLowerCase()
+        : false;
+
+    // Só mostra badge se tiver mensagens e NÃO for o usuário que enviou
+    const showUnread = unreadCount > 0 && !isMeLastSender;
 
     return (
       <TouchableOpacity
@@ -187,27 +195,27 @@ const ChatScreen = () => {
         />
         <View style={styles.chatContent}>
           <View style={styles.chatHeader}>
-            <Text style={[styles.chatName, unreadCount > 0 && styles.unreadText]} numberOfLines={1}>
+            <Text style={[styles.chatName, showUnread && styles.unreadText]} numberOfLines={1}>
               {pName}
             </Text>
             <Text style={styles.chatTime}>
               {item.last_timestamp
                 ? new Date(item.last_timestamp).toLocaleTimeString([], {
-                  hour: "2-digit",
-                  minute: "2-digit",
-                })
+                    hour: "2-digit",
+                    minute: "2-digit",
+                  })
                 : "Agora"}
             </Text>
           </View>
           <View style={styles.chatFooter}>
             <Text
-              style={[styles.chatMessage, unreadCount > 0 && styles.unreadMessage]}
+              style={[styles.chatMessage, showUnread && styles.unreadMessage]}
               numberOfLines={1}
             >
               {isMeLastSender ? "Você: " : ""}
               {item.last_message || "Iniciar nova conversa..."}
             </Text>
-            {unreadCount > 0 && (
+            {showUnread && (
               <View style={styles.unreadBadge}>
                 <Text style={styles.unreadBadgeText}>{unreadCount > 99 ? "99+" : unreadCount}</Text>
               </View>

@@ -1,20 +1,24 @@
 # Documentação: Sistema de Follow de Múltiplos Trainers
 
 ## Overview
+
 Este sistema implementa a funcionalidade de seguir/deixar de seguir múltiplos trainers de uma vez, tanto no frontend quanto no backend.
 
 ## Backend - Rotas Implementadas
 
 ### 1. Seguir Múltiplos Trainers
+
 **Endpoint:** `POST /api/trainers/follow-multiple`
 
 **Headers:**
+
 ```
 Authorization: Bearer <session_token>
 Content-Type: application/json
 ```
 
 **Request Body:**
+
 ```json
 {
   "trainerIds": [1, 2, 3, 4, 5]
@@ -22,6 +26,7 @@ Content-Type: application/json
 ```
 
 **Response (Success):**
+
 ```json
 {
   "success": true,
@@ -31,6 +36,7 @@ Content-Type: application/json
 ```
 
 **Response (Error):**
+
 ```json
 {
   "error": "trainerIds deve ser um array não vazio."
@@ -38,6 +44,7 @@ Content-Type: application/json
 ```
 
 **Validações:**
+
 - `trainerIds` deve ser um array
 - Array deve ter pelo menos 1 elemento
 - Máximo de 100 trainers por requisição
@@ -46,15 +53,18 @@ Content-Type: application/json
 ---
 
 ### 2. Deixar de Seguir Múltiplos Trainers
+
 **Endpoint:** `POST /api/trainers/unfollow-multiple`
 
 **Headers:**
+
 ```
 Authorization: Bearer <session_token>
 Content-Type: application/json
 ```
 
 **Request Body:**
+
 ```json
 {
   "trainerIds": [1, 2, 3]
@@ -62,6 +72,7 @@ Content-Type: application/json
 ```
 
 **Response (Success):**
+
 ```json
 {
   "success": true,
@@ -79,58 +90,62 @@ Content-Type: application/json
 #### Funções Disponíveis:
 
 ##### 1. `followTrainer(trainerId, sessionToken)`
+
 Segue um único trainer.
 
 ```typescript
-import { followTrainer } from '@services/followService'
+import { followTrainer } from "@services/followService";
 
 try {
-  const result = await followTrainer('123', sessionToken)
-  console.log('Seguindo:', result.following)
+  const result = await followTrainer("123", sessionToken);
+  console.log("Seguindo:", result.following);
 } catch (error) {
-  console.error('Erro:', error.message)
+  console.error("Erro:", error.message);
 }
 ```
 
 ##### 2. `unfollowTrainer(trainerId, sessionToken)`
+
 Para de seguir um único trainer.
 
 ```typescript
-import { unfollowTrainer } from '@services/followService'
+import { unfollowTrainer } from "@services/followService";
 
 try {
-  const result = await unfollowTrainer('123', sessionToken)
-  console.log('Deixou de seguir:', !result.following)
+  const result = await unfollowTrainer("123", sessionToken);
+  console.log("Deixou de seguir:", !result.following);
 } catch (error) {
-  console.error('Erro:', error.message)
+  console.error("Erro:", error.message);
 }
 ```
 
 ##### 3. `followMultipleTrainers(trainerIds, sessionToken)`
+
 Segue múltiplos trainers de uma vez.
 
 ```typescript
-import { followMultipleTrainers } from '@services/followService'
+import { followMultipleTrainers } from "@services/followService";
 
 try {
-  const result = await followMultipleTrainers([1, 2, 3, 4, 5], sessionToken)
-  console.log(`Seguindo ${result.followedCount} trainers!`)
+  const result = await followMultipleTrainers([1, 2, 3, 4, 5], sessionToken);
+  console.log(`Seguindo ${result.followedCount} trainers!`);
 } catch (error) {
-  console.error('Erro:', error.message)
+  console.error("Erro:", error.message);
 }
 ```
 
 ##### 4. `unfollowMultipleTrainers(trainerIds, sessionToken)`
+
 Para de seguir múltiplos trainers de uma vez.
 
 ```typescript
-import { unfollowMultipleTrainers } from '@services/followService'
+import { unfollowMultipleTrainers } from "@services/followService";
 
 try {
-  const result = await unfollowMultipleTrainers([1, 2, 3], sessionToken)
-  console.log(`Deixou de seguir ${result.unfollowedCount} trainers!`)
+  const result = await unfollowMultipleTrainers([1, 2, 3], sessionToken);
+  console.log(`Deixou de seguir ${result.unfollowedCount} trainers!`);
 } catch (error) {
-  console.error('Erro:', error.message)
+  console.error("Erro:", error.message);
 }
 ```
 
@@ -166,7 +181,7 @@ export function MinhaTelaComSeguidores() {
       <TouchableOpacity onPress={handleSeguidoresEmMassa} disabled={isLoading}>
         <Text>Seguir Múltiplos ({isLoading ? 'Carregando...' : 'Pronto'})</Text>
       </TouchableOpacity>
-      
+
       <TouchableOpacity onPress={handleDeseguidoresEmMassa} disabled={isLoading}>
         <Text>Deixar de Seguir Múltiplos ({isLoading ? 'Carregando...' : 'Pronto'})</Text>
       </TouchableOpacity>
@@ -182,28 +197,28 @@ export function MinhaTelaComSeguidores() {
 O arquivo `TrainerProfileScreen.tsx` foi atualizado para usar o novo serviço de follow:
 
 ```typescript
-import { followTrainer, unfollowTrainer } from '../../../services/followService'
+import { followTrainer, unfollowTrainer } from "../../../services/followService";
 
 // Na função toggleFollow:
 const toggleFollow = async () => {
   if (!trainerId || !user?.sessionId) {
-    Alert.alert('Erro', 'ID do trainer ou sessão não disponível')
-    return
+    Alert.alert("Erro", "ID do trainer ou sessão não disponível");
+    return;
   }
   try {
     if (!isFollowing) {
-      await followTrainer(trainerId, user.sessionId)
-      setIsFollowing(true)
-      Alert.alert('Sucesso', 'Você está seguindo este trainer!')
+      await followTrainer(trainerId, user.sessionId);
+      setIsFollowing(true);
+      Alert.alert("Sucesso", "Você está seguindo este trainer!");
     } else {
-      await unfollowTrainer(trainerId, user.sessionId)
-      setIsFollowing(false)
-      Alert.alert('Sucesso', 'Você deixou de seguir este trainer.')
+      await unfollowTrainer(trainerId, user.sessionId);
+      setIsFollowing(false);
+      Alert.alert("Sucesso", "Você deixou de seguir este trainer.");
     }
   } catch (err: any) {
-    Alert.alert('Erro', err?.message || 'Erro ao processar ação')
+    Alert.alert("Erro", err?.message || "Erro ao processar ação");
   }
-}
+};
 ```
 
 ---
@@ -269,7 +284,7 @@ export function RecomendadosScreen() {
           </TouchableOpacity>
         )}
       />
-      
+
       <TouchableOpacity
         onPress={handleSeguirTodos}
         disabled={isLoading || selectedTrainers.length === 0}
@@ -318,14 +333,14 @@ Todos os serviços incluem tratamento de erros:
 
 ```typescript
 try {
-  await followMultipleTrainers([1, 2, 3], token)
+  await followMultipleTrainers([1, 2, 3], token);
 } catch (error) {
   // Erros comuns:
   // - "trainerIds deve ser um array não vazio."
   // - "Máximo de 100 trainers por vez"
   // - "Nenhum ID de trainer válido fornecido."
   // - "Erro interno ao seguir múltiplos trainers."
-  console.error(error.message)
+  console.error(error.message);
 }
 ```
 

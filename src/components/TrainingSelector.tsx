@@ -1,48 +1,55 @@
 import { View, Text, TouchableOpacity, ScrollView, StyleSheet } from "react-native";
 import React, { useState } from "react";
-import { Dumbbell, BicepsFlexed, Target, Activity } from "lucide-react-native";
+import {
+  Dumbbell,
+  Target,
+  Activity,
+  Scale,
+  TrendingUp,
+  Flame,
+  HeartPulse,
+  Medal,
+  Waves,
+  ShieldPlus,
+} from "lucide-react-native";
 
 interface TrainingSelectorProps {
   title?: string;
   containerStyle?: object;
+  onSelect?: (specialty: string | null) => void;
+  selectedSpecialty?: string | null;
 }
 
 const workoutItems = [
-  {
-    name: "Musculação",
-    icon: Dumbbell,
-  },
-  {
-    name: "Funcional",
-    icon: BicepsFlexed,
-  },
-  {
-    name: "Reabilitação física",
-    icon: Activity,
-  },
-  {
-    name: "Emagrecimento",
-    icon: Target,
-  },
-  {
-    name: "Condicionamento físico",
-    icon: Target,
-  },
-  {
-    name: "Gravidez",
-    icon: Activity,
-  },
-  {
-    name: "Performance esportiva",
-    icon: Activity,
-  },
+  { name: "Musculação", icon: Dumbbell },
+  { name: "Emagrecimento", icon: Scale },
+  { name: "Hipertrofia", icon: TrendingUp },
+  { name: "Treinamento Funcional", icon: Activity },
+  { name: "HIIT", icon: Flame },
+  { name: "Condicionamento Físico", icon: HeartPulse },
+  { name: "CrossFit", icon: Medal },
+  { name: "Pilates", icon: Waves },
+  { name: "Reabilitação Física", icon: ShieldPlus },
+  { name: "Performance Esportiva", icon: Target },
 ];
 
-const TrainingSelector: React.FC<TrainingSelectorProps> = ({ title, containerStyle }) => {
-  const [selectedWorkout, setSelectedWorkout] = useState<string | null>("Musculação");
+const TrainingSelector: React.FC<TrainingSelectorProps> = ({
+  title,
+  containerStyle,
+  onSelect,
+  selectedSpecialty,
+}) => {
+  const [internalSelected, setInternalSelected] = useState<string | null>(null);
+
+  const activeSpecialty = selectedSpecialty !== undefined ? selectedSpecialty : internalSelected;
 
   const handleSelectWorkout = (workoutName: string) => {
-    setSelectedWorkout(workoutName);
+    const newVal = activeSpecialty === workoutName ? null : workoutName;
+    if (onSelect) {
+      onSelect(newVal);
+    } else {
+      setInternalSelected(newVal);
+    }
   };
 
   return (
@@ -54,7 +61,7 @@ const TrainingSelector: React.FC<TrainingSelectorProps> = ({ title, containerSty
         contentContainerStyle={styles.workoutTypes}
       >
         {workoutItems.map((item) => {
-          const isActive = selectedWorkout === item.name;
+          const isActive = activeSpecialty === item.name;
           return (
             <TouchableOpacity
               key={item.name}

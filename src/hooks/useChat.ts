@@ -169,30 +169,30 @@ export const useMessages = (chatId: string, userId: string) => {
                 prev.length === 0 || !isSilent
                   ? formatted
                   : (() => {
-                    // Merge inteligente: Atualiza status de leitura e insere novas
-                    const prevMap = new Map(prev.map((m) => [String(m._id), m]));
-                    let hasChanges = false;
+                      // Merge inteligente: Atualiza status de leitura e insere novas
+                      const prevMap = new Map(prev.map((m) => [String(m._id), m]));
+                      let hasChanges = false;
 
-                    const merged = formatted.map((newMsg) => {
-                      const existing = prevMap.get(String(newMsg._id));
-                      if (existing) {
-                        if (existing.read !== newMsg.read) {
-                          hasChanges = true;
-                          return { ...existing, read: newMsg.read };
+                      const merged = formatted.map((newMsg) => {
+                        const existing = prevMap.get(String(newMsg._id));
+                        if (existing) {
+                          if (existing.read !== newMsg.read) {
+                            hasChanges = true;
+                            return { ...existing, read: newMsg.read };
+                          }
+                          return existing;
                         }
-                        return existing;
+                        hasChanges = true;
+                        return newMsg;
+                      });
+                      // CORREÇÃO: Se a lista da API for menor, algo foi deletado
+                      if (formatted.length < prev.length) {
+                        console.log("[Chat Realtime] Mensagem deletada!");
+                        return formatted;
                       }
-                      hasChanges = true;
-                      return newMsg;
-                    });
-                    // CORREÇÃO: Se a lista da API for menor, algo foi deletado
-                    if (formatted.length < prev.length) {
-                      console.log("[Chat Realtime] Mensagem deletada!");
-                      return formatted;
-                    }
 
-                    return hasChanges || formatted.length !== prev.length ? merged : prev;
-                  })();
+                      return hasChanges || formatted.length !== prev.length ? merged : prev;
+                    })();
 
               globalChatCache.messages[chatId] = newMessages;
               return newMessages;
@@ -281,13 +281,13 @@ export const useMessages = (chatId: string, userId: string) => {
           prev.map((m) =>
             String(m._id) === String(tempId)
               ? {
-                ...m,
-                _id: savedMsg.id,
-                text: savedMsg.text ? savedMsg.text : msg.text,
-                createdAt: new Date(savedMsg.created_at),
-                image: savedMsg.image_url,
-                read: !!savedMsg.is_read,
-              }
+                  ...m,
+                  _id: savedMsg.id,
+                  text: savedMsg.text ? savedMsg.text : msg.text,
+                  createdAt: new Date(savedMsg.created_at),
+                  image: savedMsg.image_url,
+                  read: !!savedMsg.is_read,
+                }
               : m
           )
         );

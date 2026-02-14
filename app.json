@@ -2,7 +2,6 @@
   "expo": {
     "name": "MOVT",
     "slug": "movt",
-    "owner": "jvlima22",
     "scheme": "movt",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -14,14 +13,20 @@
     },
     "userInterfaceStyle": "light",
     "ios": {
-      "bundleIdentifier": "com.dsvmTecnology.movtapp",
+      "bundleIdentifier": "com.dsvmTechnology.movtapp",
       "supportsTablet": false,
       "infoPlist": {
         "UIBackgroundModes": [
           "background-fetch",
-          "background-processing"
+          "background-processing",
+          "location",
+          "bluetooth-central"
         ],
-        "NSLocationWhenInUseUsageDescription": "Este aplicativo precisa de acesso à sua localização para mostrar você no mapa."
+        "NSLocationWhenInUseUsageDescription": "Este aplicativo precisa de acesso à sua localização para mostrar você no mapa e rastrear atividades de ciclismo.",
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "Este aplicativo precisa de acesso à localização em segundo plano para rastrear suas rotas de exercício.",
+        "NSHealthShareUsageDescription": "Este aplicativo precisa de acesso aos seus dados de saúde para mostrar seu progresso fitness.",
+        "NSHealthUpdateUsageDescription": "Este aplicativo precisa registrar seus dados de saúde para rastrear suas atividades.",
+        "NSBluetoothAlwaysUsageDescription": "Este aplicativo usa Bluetooth para conectar e sincronizar dados com seu relógio inteligente."
       }
     },
     "android": {
@@ -30,27 +35,46 @@
           "apiKey": "AIzaSyCDr92TX5erQLKKXVQQ9aOLER2XTpxD7CY"
         }
       },
-      "package": "com.dsvmTecnology.movtapp",
+      "package": "com.dsvmTechnology.movtapp",
       "edgeToEdgeEnabled": true,
       "permissions": [
         "android.permission.ACCESS_COARSE_LOCATION",
-        "android.permission.ACCESS_FINE_LOCATION"
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.ACCESS_BACKGROUND_LOCATION",
+        "android.permission.ACTIVITY_RECOGNITION",
+        "android.permission.BODY_SENSORS",
+        "android.permission.WAKE_LOCK",
+        "android.permission.FOREGROUND_SERVICE",
+        "android.permission.BLUETOOTH",
+        "android.permission.BLUETOOTH_ADMIN",
+        "android.permission.BLUETOOTH_CONNECT",
+        "android.permission.BLUETOOTH_SCAN"
       ]
-    },
-    "extra": {
-      "eas": {
-        "projectId": "06c0d00e-747e-498a-944c-8cafd9e468dc"
-      }
-    },
-    "updates": {
-      "url": "https://u.expo.dev/06c0d00e-747e-498a-944c-8cafd9e468dc"
     },
     "runtimeVersion": "1.0.0",
     "web": {
       "favicon": "./assets/icon.png"
     },
     "plugins": [
-      "expo-localization"
-    ]
+      "expo-localization",
+      "expo-web-browser",
+      [
+        "react-native-ble-plx",
+        {
+          "isBackgroundEnabled": true,
+          "modes": [
+            "peripheral",
+            "central"
+          ],
+          "bluetoothAlwaysPermission": "Este aplicativo usa Bluetooth para conectar e sincronizar dados com seu relógio inteligente."
+        }
+      ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "2d73320b-52df-4407-83d5-c827a5a55f27"
+      }
+    },
+    "owner": "movtapp"
   }
 }

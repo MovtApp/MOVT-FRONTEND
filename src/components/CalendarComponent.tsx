@@ -13,6 +13,14 @@ interface CalendarComponentProps {
   isInactiveDay: (dateStr: string) => boolean;
 }
 
+const getLocalDateString = () => {
+  const date = new Date();
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
+
 const CalendarComponent: React.FC<CalendarComponentProps> = ({
   currentMonth,
   setCurrentMonth,
@@ -131,7 +139,7 @@ const CalendarComponent: React.FC<CalendarComponentProps> = ({
                     style={[
                       styles.dayButton,
                       dateObj.date === selectedDate && styles.selectedDayButton,
-                      dateObj.date === new Date().toISOString().split("T")[0] && styles.todayButton,
+                      dateObj.date === getLocalDateString() && styles.todayButton,
                       hasAppointments(dateObj.date) && styles.appointmentDayButton,
                       (isPast || isInactive) && styles.pastDayButton,
                     ]}
@@ -147,7 +155,7 @@ const CalendarComponent: React.FC<CalendarComponentProps> = ({
                       style={[
                         styles.dayText,
                         dateObj.date === selectedDate && styles.selectedDayText,
-                        dateObj.date === new Date().toISOString().split("T")[0] && styles.todayText,
+                        dateObj.date === getLocalDateString() && styles.todayText,
                         (!dateObj.isCurrentMonth || isInactive) && styles.outsideMonthText,
                         isPast && styles.pastDayText,
                       ]}
@@ -239,11 +247,11 @@ export default CalendarComponent;
 const styles = StyleSheet.create({
   calendarContainer: {
     marginBottom: 24,
-    marginTop: 16,
     borderWidth: 1,
     borderColor: "#E5E7EB",
     borderRadius: 8,
-    padding: 16,
+    paddingVertical: 16,
+    paddingHorizontal: 0,
     backgroundColor: "#F9FAFB",
   },
   calendarHeader: {
@@ -253,8 +261,9 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     backgroundColor: "#FFFFFF",
     borderRadius: 8,
-    paddingHorizontal: 12,
+    paddingHorizontal: 10,
     paddingVertical: 8,
+    marginHorizontal: 10,
   },
   monthText: {
     fontSize: 16,

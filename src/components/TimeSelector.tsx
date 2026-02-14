@@ -52,28 +52,30 @@ const TimeSelector: React.FC<TimeSelectorProps> = ({
 // Valores proporcionais à largura da tela (responsivos)
 const styles = StyleSheet.create({
   wrapper: {
-    flex: 1,
+    width: "100%",
     justifyContent: "center",
     alignItems: "center",
+    marginVertical: 10,
   },
 
   timeSelectorContainer: {
     flexDirection: "row",
-    justifyContent: "space-around",
+    justifyContent: "space-between",
     alignItems: "center",
     backgroundColor: "#F0F0F0",
-    borderRadius: 10,
-    paddingVertical: screenWidth * 0.02, // padding vertical proporcional
-    paddingHorizontal: screenWidth * 0.03, // padding horizontal proporcional
-    marginBottom: screenWidth * 0.05, // margem inferior responsiva
-    height: 50,
-    width: screenWidth * 0.8, // largura ocupa 80% da tela
+    borderRadius: 12,
+    paddingVertical: 7,
+    paddingHorizontal: 12,
+    marginBottom: 20,
+    width: "80%",
   },
 
   timeButton: {
-    paddingVertical: screenWidth * 0.015,
-    paddingHorizontal: screenWidth * 0.03,
-    borderRadius: 10,
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    borderRadius: 8,
+    minHeight: 36,
+    justifyContent: "center",
   },
 
   selectedTimeButton: {
@@ -83,7 +85,7 @@ const styles = StyleSheet.create({
   timeButtonText: {
     color: "#666",
     fontWeight: "bold",
-    fontSize: screenWidth * 0.04, // tamanho de texto também responsivo
+    fontSize: 14,
   },
 
   selectedTimeButtonText: {

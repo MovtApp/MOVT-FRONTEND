@@ -330,15 +330,15 @@ const Chat = () => {
           },
           isMyMessage
             ? {
-              backgroundColor: "#192126",
-              color: "#fff",
-              borderBottomRightRadius: 4,
-            }
+                backgroundColor: "#192126",
+                color: "#fff",
+                borderBottomRightRadius: 4,
+              }
             : {
-              backgroundColor: "#F2F2F7",
-              color: "#000",
-              borderBottomLeftRadius: 4,
-            },
+                backgroundColor: "#F2F2F7",
+                color: "#000",
+                borderBottomLeftRadius: 4,
+              },
         ]}
         onLongPress={() => onLongPress(null, currentMessage)}
       >

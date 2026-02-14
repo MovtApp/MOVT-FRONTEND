@@ -9,14 +9,25 @@ import {
   ScrollView,
   Dimensions,
   InteractionManager,
+  useWindowDimensions,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { AppStackParamList } from "../../../../@types/routes";
 import BackButton from "../../../../components/BackButton";
 import TimeSelector from "../../../../components/TimeSelector";
-import NavigationArrows from "../../../../components/data/NavigationArrows";
-import { CartesianChart, Area, Line } from "victory-native";
-import { G, Text as SvgText, Circle } from "react-native-svg";
+import DataPillNavigator from "../../../../components/data/DataPillNavigator";
+import {
+  Svg,
+  Defs,
+  LinearGradient,
+  Stop,
+  Path,
+  Rect,
+  Line as SvgLine,
+  Text as SvgText,
+  G,
+} from "react-native-svg";
+import * as shape from "d3-shape";
 import {
   getCaloriesData,
   type TimeframeType,
@@ -30,24 +41,7 @@ type GraphDataItem = {
   rawDate: string;
 };
 
-interface CustomLabelProps {
-  x: number;
-  y: number;
-  datum: GraphDataItem;
-}
-
 const { width } = Dimensions.get("window");
-
-const CustomLabel: React.FC<CustomLabelProps> = ({ x, y, datum }) => {
-  if (!datum.label) return null;
-  if (x == null || y == null) return null;
-
-  return (
-    <SvgText x={x} y={y - 15} fontSize={10} fill="#FF7D00" textAnchor="middle" fontWeight="bold">
-      {String(datum.label)}
-    </SvgText>
-  );
-};
 
 // Lista ordenada das telas de dados para navegação
 const DATA_SCREENS: (keyof AppStackParamList)[] = [
@@ -71,10 +65,7 @@ const CaloriesScreen: React.FC = () => {
 
   // Busca dados do backend
   const fetchCaloriesData = async (timeframe: TimeframeType) => {
-    // Previne múltiplas chamadas simultâneas
-    if (isLoadingRef.current) {
-      return;
-    }
+    if (isLoadingRef.current) return;
 
     try {
       isLoadingRef.current = true;
@@ -82,30 +73,24 @@ const CaloriesScreen: React.FC = () => {
 
       const data = await getCaloriesData(timeframe);
 
-      // Para o gráfico, mostra os valores de calorias conforme coletados
-      // No timeframe "1d", cada ponto representa as calorias gastas até aquele momento do dia
-      // Os valores já vêm do backend como progressão acumulada ao longo do tempo
       const processedData = data.data.map((item, index) => ({
         value: item.calories,
-        label: "", // Será definido depois na preparação dos dados
+        label: "",
         index,
         rawDate: item.date,
       }));
 
-      // Domínio com base nos valores reais do eixo Y
       const dailyGoal = data.dailyGoal || 2000;
-      const maxValue =
-        processedData.length > 0 ? Math.max(...processedData.map((d) => d.value)) : dailyGoal;
-      // Define o domínio com base nos valores reais dos dados
-      const maxDomain = Math.max(dailyGoal, maxValue + 100);
+      const processedValues = processedData.map((d) => d.value);
+      const maxValue = processedValues.length > 0 ? Math.max(...processedValues) : dailyGoal;
+      // Ajuste o domínio para ter um pouco de respiro acima do maior valor
+      const maxDomain = Math.max(dailyGoal, maxValue * 1.1);
       const newDomain: [number, number] = [0, maxDomain];
 
-      // Atualiza estados de forma agrupada para evitar renderizações múltiplas
       setCaloriesStats(data);
       setGraphData(processedData);
       setChartDomain(newDomain);
 
-      // Agenda renderização do gráfico após todas as interações/atualizações
       InteractionManager.runAfterInteractions(() => {
         setIsChartReady(true);
       });
@@ -118,22 +103,18 @@ const CaloriesScreen: React.FC = () => {
     }
   };
 
-  // Busca inicial
   useEffect(() => {
     setIsChartReady(false);
     let isMounted = true;
-
     if (isMounted && !isLoadingRef.current) {
       fetchCaloriesData(selectedTimeframe);
     }
-
     return () => {
       isMounted = false;
       setIsChartReady(false);
     };
   }, [selectedTimeframe]);
 
-  // Pull to refresh
   const onRefresh = async () => {
     if (isLoadingRef.current) {
       setIsRefreshing(false);
@@ -144,23 +125,16 @@ const CaloriesScreen: React.FC = () => {
     setIsRefreshing(false);
   };
 
-  // Preparação dos dados do gráfico - mostra todos os pontos com labels nos principais
   const displayGraphData = useMemo(() => {
-    if (graphData.length === 0) {
-      return [];
-    }
-
+    if (graphData.length === 0) return [];
     return graphData.map((item, index, array) => {
-      // Mostra labels nos pontos principais: primeiro, último, e alguns pontos estratégicos
       const totalPoints = array.length;
-
-      // Determina quais pontos devem mostrar labels
+      // Lógica para decidir se mostra o label (primeiro, último, meio, picos)
+      // Para simplificar e igualar a imagem: mostra picos ou espaçados
       const shouldShowLabel =
         index === 0 ||
         index === totalPoints - 1 ||
-        (totalPoints > 3 && index === Math.floor(totalPoints / 2)) ||
-        (totalPoints > 6 && index === Math.floor(totalPoints / 3)) ||
-        (totalPoints > 6 && index === Math.floor((totalPoints * 2) / 3));
+        (totalPoints > 4 && index % Math.ceil(totalPoints / 4) === 0);
 
       return {
         ...item,
@@ -170,101 +144,145 @@ const CaloriesScreen: React.FC = () => {
     });
   }, [graphData]);
 
-  // Componente memoizado do gráfico para evitar re-renderizações desnecessárias
+  const { width: windowWidth, height: windowHeight } = useWindowDimensions();
+
+  const CHART_HEIGHT = useMemo(() => {
+    // O objetivo é preencher o restante da tela (Full Height)
+    // Subtraímos o espaço aproximado do topo: Header (~80) + Info (~120) + Filtros (~80) + Margens (~40)
+    // Isso evita que o gráfico empurre os filtros para fora da visão e ocupa o máximo de espaço.
+    const fixedSpace = 320;
+    const available = windowHeight - fixedSpace;
+    return Math.max(450, available); // Garante um mínimo de 450px para não quebrar o visual em telas muito pequenas
+  }, [windowHeight]);
+
   const ChartComponent = useMemo(() => {
-    if (!isChartReady || displayGraphData.length === 0 || chartDomain[1] <= 0) {
-      return null;
-    }
+    if (!isChartReady || displayGraphData.length === 0) return null;
+
+    const PADDING_HORIZONTAL = 0; // Largura total sem padding interno para a linha
+    const PADDING_TOP = 40;
+    const PADDING_BOTTOM = 30;
+    const GRAPH_WIDTH = windowWidth;
+    const GRAPH_HEIGHT = CHART_HEIGHT - PADDING_TOP - PADDING_BOTTOM;
+
+    const maxVal = chartDomain[1];
+
+    // Escalas
+    const scaleX = (index: number) => {
+      return (
+        (index / (displayGraphData.length - 1)) * (GRAPH_WIDTH - PADDING_HORIZONTAL * 2) +
+        PADDING_HORIZONTAL
+      );
+    };
+
+    const scaleY = (value: number) => {
+      return GRAPH_HEIGHT - (value / maxVal) * GRAPH_HEIGHT + PADDING_TOP;
+    };
+
+    // Gerador de linhas d3-shape
+    const lineGenerator = shape
+      .line<GraphDataItem>()
+      .x((d: GraphDataItem) => scaleX(d.index))
+      .y((d: GraphDataItem) => scaleY(d.value))
+      .curve(shape.curveNatural); // Curva suave como na imagem
+
+    const pathD = lineGenerator(displayGraphData) || "";
+
+    // Área fechada para o gradiente
+    const areaGenerator = shape
+      .area<GraphDataItem>()
+      .x((d: GraphDataItem) => scaleX(d.index))
+      .y0(GRAPH_HEIGHT + PADDING_TOP)
+      .y1((d: GraphDataItem) => scaleY(d.value))
+      .curve(shape.curveNatural);
+
+    const areaD = areaGenerator(displayGraphData) || "";
+
+    // Linhas de Grade (Grid Lines)
+    const gridLines = [0, 0.25, 0.5, 0.75, 1].map((percent) => {
+      const val = maxVal * percent;
+      const y = scaleY(val);
+      return { val, y };
+    });
 
     return (
-      <CartesianChart
-        data={displayGraphData}
-        xKey="index"
-        yKeys={["value"]}
-        padding={{ top: 40, right: 20, bottom: 20, left: 50 }}
-        domainPadding={{
-          left: 20,
-          right: 20,
-        }}
-        axisOptions={{
-          tickCount: 5, // Define fixed number of Y-axis ticks
-          formatXLabel: (value) => {
-            // Formata os labels do eixo X conforme necessário
-            const index = Number(value);
-            if (index >= 0 && index < displayGraphData.length) {
-              return displayGraphData[index]?.rawDate || "";
-            }
-            return value.toString();
-          },
-          formatYLabel: (value) => {
-            // Formata os labels do eixo Y para exibir os valores reais
-            return Math.round(Number(value)).toString();
-          },
-        }}
-        domain={{
-          y: chartDomain,
-        }}
-      >
-        {({ points, yScale }) => {
-          if (!points || !points.value || points.value.length === 0 || !yScale) {
-            return null;
-          }
-          try {
-            const bottomY = yScale(chartDomain[0]);
-            if (typeof bottomY !== "number" || isNaN(bottomY)) {
-              return null;
-            }
-            return (
-              <G>
-                <Area
-                  points={points.value}
-                  color="rgba(255, 125, 0, 0.2)"
-                  curveType="catmullRom"
-                  y0={bottomY}
-                />
-                <Line
-                  points={points.value}
-                  color="#FF7D00"
-                  strokeWidth={4}
-                  curveType="catmullRom"
-                />
-                {/* Renderiza pontos com labels */}
-                {displayGraphData.map((datum, index) => {
-                  const point = points.value[index];
-                  if (
-                    !point ||
-                    !datum.label ||
-                    datum.label === "" ||
-                    typeof point.x !== "number" ||
-                    typeof point.y !== "number"
-                  ) {
-                    return null;
-                  }
-                  return (
-                    <G key={`label-${index}`}>
-                      <CustomLabel x={point.x} y={point.y} datum={datum} />
-                      {/* Círculo no ponto */}
-                      <Circle
-                        cx={point.x}
-                        cy={point.y}
-                        r={4}
-                        fill="#FF7D00"
-                        stroke="#fff"
-                        strokeWidth={2}
-                      />
-                    </G>
-                  );
-                })}
-              </G>
-            );
-          } catch (error) {
-            console.error("Erro ao renderizar gráfico:", error);
-            return null;
-          }
-        }}
-      </CartesianChart>
+      <Svg width={GRAPH_WIDTH} height={CHART_HEIGHT}>
+        <Defs>
+          <LinearGradient id="gradient" x1="0" y1="0" x2="0" y2="1">
+            <Stop offset="0" stopColor="#FF7D00" stopOpacity="0.4" />
+            <Stop offset="1" stopColor="#FF7D00" stopOpacity="0.05" />
+          </LinearGradient>
+        </Defs>
+
+        {/* Linhas de Grade Horizontais */}
+        {gridLines.map((grid, i) => (
+          <G key={`grid-${i}`}>
+            <SvgLine
+              x1={PADDING_HORIZONTAL}
+              y1={grid.y}
+              x2={GRAPH_WIDTH - PADDING_HORIZONTAL}
+              y2={grid.y}
+              stroke="#E5E7EB"
+              strokeWidth="1"
+              strokeDasharray="5, 5" // Tracejado
+            />
+            {/* Valor da grade na direita */}
+            <SvgText
+              x={GRAPH_WIDTH - 10}
+              y={grid.y + 4} // Ajuste fino vertical
+              fill="#9CA3AF"
+              fontSize="10"
+              textAnchor="end"
+            >
+              {Math.round(grid.val)}
+            </SvgText>
+          </G>
+        ))}
+
+        {/* Área Preenchida */}
+        <Path d={areaD} fill="url(#gradient)" />
+
+        {/* Linha do Gráfico */}
+        <Path d={pathD} stroke="#FF7D00" strokeWidth="6" fill="none" />
+
+        {/* Marcadores e Labels */}
+        {displayGraphData.map((d, i) => {
+          if (!d.label) return null;
+          const x = scaleX(d.index);
+          const y = scaleY(d.value);
+          const boxSize = 14;
+
+          return (
+            <G key={`point-${i}`}>
+              {/* Label acima do ponto */}
+              <SvgText
+                x={x}
+                y={y - 12}
+                fill="#111827"
+                fontSize="12"
+                fontWeight="bold"
+                textAnchor="middle"
+              >
+                {d.value}
+              </SvgText>
+
+              {/* Marcador Quadrado */}
+              <Rect
+                x={x - boxSize / 2}
+                y={y - boxSize / 2}
+                width={boxSize}
+                height={boxSize}
+                rx={4}
+                ry={4}
+                fill="#FFFFFF"
+                stroke="#FF7D00"
+                strokeWidth={3}
+              />
+            </G>
+          );
+        })}
+      </Svg>
     );
-  }, [isChartReady, displayGraphData, chartDomain]);
+  }, [isChartReady, displayGraphData, chartDomain, CHART_HEIGHT, windowWidth]);
 
   if (isLoading && !caloriesStats) {
     return (
@@ -292,14 +310,12 @@ const CaloriesScreen: React.FC = () => {
         refreshControl={<RefreshControl refreshing={isRefreshing} onRefresh={onRefresh} />}
       >
         <View style={styles.container}>
-          {/* Header */}
           <View style={styles.header}>
             <BackButton to={{ name: "DataScreen" }} />
             <Text style={styles.headerTitle}>Calorias (Kcal)</Text>
             <View style={{ width: 46 }} />
           </View>
 
-          {/* Calorie Info */}
           <View style={styles.calorieInfoContainer}>
             <View style={styles.caloriesPrimaryInfo}>
               <Image
@@ -317,44 +333,34 @@ const CaloriesScreen: React.FC = () => {
             </Text>
           </View>
 
-          {/* Time Selector */}
-          <TimeSelector
-            selectedTimeframe={selectedTimeframe}
-            onTimeframeChange={setSelectedTimeframe}
-            isLoading={isLoading}
-          />
+          <View style={styles.timeSelectorWrapper}>
+            <TimeSelector
+              selectedTimeframe={selectedTimeframe}
+              onTimeframeChange={setSelectedTimeframe}
+              isLoading={isLoading}
+            />
+          </View>
 
-          {/* Graph Section - Posicionado na parte inferior */}
           <View style={styles.graphSection}>
             {isLoading ? (
               <View style={styles.graphLoadingContainer}>
                 <ActivityIndicator size="small" color="#FF7D00" />
               </View>
             ) : (
-              <View style={styles.graphContainer}>
-                <View
-                  style={{
-                    alignItems: "center",
-                    justifyContent: "center",
-                    flex: 1,
-                  }}
-                >
-                  <View style={styles.graphPlaceholder}>
-                    {ChartComponent || (
-                      <View style={styles.noDataContainer}>
-                        <Text style={styles.noDataText}>Nenhum dado disponível</Text>
-                      </View>
-                    )}
+              <View style={[styles.graphContainer, { height: CHART_HEIGHT }]}>
+                {ChartComponent ? (
+                  ChartComponent
+                ) : (
+                  <View style={[styles.noDataContainer, { height: CHART_HEIGHT }]}>
+                    <Text style={styles.noDataText}>Nenhum dado disponível</Text>
                   </View>
-                </View>
+                )}
               </View>
             )}
           </View>
         </View>
       </ScrollView>
-
-      {/* Setas de navegação fixas nas laterais (pílulas) */}
-      <NavigationArrows currentScreen="CaloriesScreen" screens={DATA_SCREENS} />
+      <DataPillNavigator currentScreen="CaloriesScreen" />
     </SafeAreaView>
   );
 };
@@ -369,12 +375,11 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     flexGrow: 1,
-    paddingBottom: 10,
+    paddingBottom: 20,
   },
   container: {
     flex: 1,
     backgroundColor: "#fff",
-    paddingHorizontal: 20,
     paddingBottom: 20,
   },
   header: {
@@ -382,7 +387,8 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "center",
     marginBottom: 20,
-    paddingHorizontal: 0,
+    marginTop: 20,
+    paddingHorizontal: 20,
   },
   headerTitle: {
     fontSize: 20,
@@ -395,6 +401,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     gap: 10,
     marginBottom: 30,
+    paddingHorizontal: 20,
   },
   caloriesPrimaryInfo: {
     flexDirection: "row",
@@ -415,53 +422,24 @@ const styles = StyleSheet.create({
     color: "#666",
     marginTop: -10,
   },
-  timeSelectorContainer: {
-    flexDirection: "row",
-    justifyContent: "space-around",
-    backgroundColor: "#F0F0F0",
-    borderRadius: 10,
-    padding: 5,
+  timeSelectorWrapper: {
     marginBottom: 20,
-  },
-  timeButton: {
-    paddingVertical: 8,
-    paddingHorizontal: 15,
-    borderRadius: 10,
-  },
-  selectedTimeButton: {
-    backgroundColor: "#192126",
-  },
-  timeButtonText: {
-    color: "#666",
-    fontWeight: "bold",
-  },
-  selectedTimeButtonText: {
-    color: "#fff",
+    paddingHorizontal: 20,
   },
   graphSection: {
     flex: 1,
     alignItems: "center",
     justifyContent: "center",
-    marginTop: 10,
-    marginBottom: 10,
   },
-
   graphContainer: {
     width: "100%",
     alignItems: "center",
     justifyContent: "center",
   },
-
-  graphPlaceholder: {
-    width: width * 0.95, // 90% da largura do dispositivo
-    height: width * 1.4, // altura proporcional
-    alignSelf: "center",
+  graphLoadingContainer: {
+    height: 400, // Fallback fixo para loading inicial
     justifyContent: "center",
-    borderRadius: 12,
-    overflow: "hidden",
-    backgroundColor: "#fff",
-    alignContent: "center",
-    marginRight: 34,
+    alignItems: "center",
   },
   loadingContainer: {
     flex: 1,
@@ -473,13 +451,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: "#666",
   },
-  graphLoadingContainer: {
-    height: 250,
-    justifyContent: "center",
-    alignItems: "center",
-  },
   noDataContainer: {
-    flex: 1,
     justifyContent: "center",
     alignItems: "center",
   },

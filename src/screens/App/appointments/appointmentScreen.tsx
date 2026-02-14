@@ -43,13 +43,21 @@ export function AppointmentScreen() {
 
   const trainerId = (route.params as any)?.trainerId;
 
-  const [selectedDate, setSelectedDate] = useState<string>(new Date().toISOString().split("T")[0]);
+  const getLocalDateString = (date?: Date) => {
+    const d = date || new Date();
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, "0");
+    const day = String(d.getDate()).padStart(2, "0");
+    return `${year}-${month}-${day}`;
+  };
+
+  const [selectedDate, setSelectedDate] = useState<string>(getLocalDateString());
   const [currentMonth, setCurrentMonth] = useState(new Date()); // Mês atual
 
   // Função para verificar se uma data é anterior à data atual
   const isPastDate = (dateStr: string) => {
     const currentDate = new Date();
-    const currentDateString = currentDate.toISOString().split("T")[0];
+    const currentDateString = getLocalDateString();
 
     // Comparar datas no formato YYYY-MM-DD
     return dateStr < currentDateString;
@@ -114,9 +122,10 @@ export function AppointmentScreen() {
       const resp = await api.get(`/appointments?role=client`);
       if (resp.data && Array.isArray(resp.data.data)) {
         // Filtrar apenas agendamentos com este trainer
-        const filtered = resp.data.data.filter((a: any) =>
-          (String(a.id_trainer) === String(trainerId) || String(a.id_pj) === String(trainerId)) &&
-          a.status !== 'cancelado'
+        const filtered = resp.data.data.filter(
+          (a: any) =>
+            (String(a.id_trainer) === String(trainerId) || String(a.id_pj) === String(trainerId)) &&
+            a.status !== "cancelado"
         );
         setUserAppointments(filtered);
       }
@@ -139,7 +148,12 @@ export function AppointmentScreen() {
   // Verificar se uma data tem agendamentos DO USUÁRIO (para o indicador verde)
   const hasUserAppointmentOnDate = (dateStr: string) => {
     return userAppointments.some((a: any) => {
-      const appDate = a.data ? new Date(a.data).toISOString().split('T')[0] : '';
+      // Usar a mesma lógica para garantir consistência
+      const rawDate = a.data_agendamento || a.data;
+      const dateObj = rawDate ? new Date(rawDate) : null;
+      // Se a data vier do banco como UTC (ex: T00:00:00.000Z), new Date() converte para local
+      // getLocalDateString pega o ano/mes/dia local
+      const appDate = dateObj ? getLocalDateString(dateObj) : "";
       return appDate === dateStr;
     });
   };
@@ -255,7 +269,7 @@ export function AppointmentScreen() {
     );
 
     // Lógica para desabilitar horários passados se a data for hoje
-    const isToday = selectedDate === new Date().toISOString().split('T')[0];
+    const isToday = selectedDate === getLocalDateString();
     const isPastDay = isPastDate(selectedDate);
     let isPastSlot = isPastDay;
 
@@ -263,7 +277,7 @@ export function AppointmentScreen() {
       const now = new Date();
       const currentHour = now.getHours();
       const currentMin = now.getMinutes();
-      const [slotHour, slotMin] = slot.startTime.split(':').map(Number);
+      const [slotHour, slotMin] = slot.startTime.split(":").map(Number);
 
       if (slotHour < currentHour || (slotHour === currentHour && slotMin < currentMin)) {
         isPastSlot = true;
@@ -279,7 +293,7 @@ export function AppointmentScreen() {
           styles.slotButton,
           isSelected && styles.slotButtonSelected,
           !isAvailable && styles.slotButtonDisabled,
-          isBooked && { backgroundColor: '#f3f4f6', borderColor: '#e5e7eb' }
+          isBooked && { backgroundColor: "#f3f4f6", borderColor: "#e5e7eb" },
         ]}
         disabled={!isAvailable}
         onPress={() => {
@@ -297,10 +311,13 @@ export function AppointmentScreen() {
           style={[
             styles.slotTime,
             isSelected && styles.slotTimeSelected,
-            (!isAvailable || isBooked) && { color: '#9ca3af', textDecorationLine: isBooked ? 'line-through' : 'none' },
+            (!isAvailable || isBooked) && {
+              color: "#9ca3af",
+              textDecorationLine: isBooked ? "line-through" : "none",
+            },
           ]}
         >
-          {slot.startTime} - {slot.endTime} {isBooked ? '(Ocupado)' : ''}
+          {slot.startTime} - {slot.endTime} {isBooked ? "(Ocupado)" : ""}
         </Text>
       </TouchableOpacity>
     );

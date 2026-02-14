@@ -8,7 +8,6 @@ import {
   LayoutAnimation,
   Platform,
   UIManager,
-  Image,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Plus, Minus } from "lucide-react-native";
