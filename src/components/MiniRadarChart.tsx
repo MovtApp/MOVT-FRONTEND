@@ -2,7 +2,7 @@ import React from "react";
 import { View, Text as RNText, Platform, Dimensions } from "react-native";
 import { Canvas, Path, vec } from "@shopify/react-native-skia";
 
-interface RadarData {
+export interface RadarData {
   water: number;
   sleep: number;
   steps: number;
@@ -13,12 +13,15 @@ interface RadarData {
 
 interface MiniRadarChartProps {
   size?: number;
+  forcaData?: RadarData;
+  agilidadeData?: RadarData;
+  resistenciaData?: RadarData;
 }
 
 const RADAR_LABELS = ["Água", "Sono", "Passos", "BPM", "IMC", "Calorias"] as const;
 const MAX_VALUE = 100;
 
-const forcaData: RadarData = {
+const DEFAULT_FORCA: RadarData = {
   water: 92,
   sleep: 88,
   steps: 93,
@@ -27,7 +30,7 @@ const forcaData: RadarData = {
   calories: 94,
 };
 
-const agilidadeData: RadarData = {
+const DEFAULT_AGILIDADE: RadarData = {
   water: 74,
   sleep: 72,
   steps: 78,
@@ -36,7 +39,7 @@ const agilidadeData: RadarData = {
   calories: 75,
 };
 
-const resistenciaData: RadarData = {
+const DEFAULT_RESISTENCIA: RadarData = {
   water: 62,
   sleep: 58,
   steps: 65,
@@ -45,7 +48,12 @@ const resistenciaData: RadarData = {
   calories: 61,
 };
 
-const MiniRadarChart: React.FC<MiniRadarChartProps> = ({ size = 150 }) => {
+const MiniRadarChart: React.FC<MiniRadarChartProps> = ({
+  size = 150,
+  forcaData = DEFAULT_FORCA,
+  agilidadeData = DEFAULT_AGILIDADE,
+  resistenciaData = DEFAULT_RESISTENCIA,
+}) => {
   const { width } = Dimensions.get("window");
   const isSmallOrIOS = width < 380 || Platform.OS === "ios";
 

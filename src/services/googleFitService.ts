@@ -47,9 +47,9 @@ const processStepPayload = (payload: unknown, listener: (steps: number) => void)
 };
 
 export const ensureGoogleFitPermissions = async (): Promise<boolean> => {
-  if (Platform.OS !== "android") return false;
+  if (Platform.OS !== "android" || !GoogleFit) return false;
   try {
-    await GoogleFit.checkIsAuthorized();
+    const isAvailable = await GoogleFit.checkIsAuthorized();
     if (GoogleFit.isAuthorized) {
       return true;
     }
@@ -57,7 +57,7 @@ export const ensureGoogleFitPermissions = async (): Promise<boolean> => {
     const authResult = await GoogleFit.authorize(AUTH_OPTIONS);
     return Boolean(authResult.success);
   } catch (error) {
-    console.warn("Falha ao solicitar permissões do Google Fit", error);
+    // Silencia o warning em ambientes sem o módulo nativo
     return false;
   }
 };
@@ -65,6 +65,8 @@ export const ensureGoogleFitPermissions = async (): Promise<boolean> => {
 export const fetchTodayStepCount = async (): Promise<number> => {
   try {
     const { startDate, endDate } = getTodayRange();
+    if (!GoogleFit?.getDailyStepCountSamples) return 0;
+
     const results = await GoogleFit.getDailyStepCountSamples({
       startDate,
       endDate,
@@ -91,12 +93,12 @@ export const fetchTodayStepCount = async (): Promise<number> => {
     const latestEntry = today.steps[today.steps.length - 1];
     return Number(latestEntry.value) || 0;
   } catch (error) {
-    console.warn("Falha ao buscar passos no Google Fit", error);
     return 0;
   }
 };
 
 export const subscribeToStepUpdates = (listener: (steps: number) => void): (() => void) => {
+  if (!GoogleFit?.startRecording || !GoogleFit?.observeSteps) return () => { };
   try {
     GoogleFit.startRecording(() => {
       // Apenas garante que o Google Fit está gravando dados de atividade

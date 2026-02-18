@@ -1,13 +1,38 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from "react";
-import { View, Text, StyleSheet, ScrollView, Dimensions, RefreshControl, TouchableOpacity } from "react-native";
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  Dimensions,
+  RefreshControl,
+  TouchableOpacity,
+  Platform,
+} from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { AppStackParamList } from "../../../../@types/routes";
 import TimeSelector, { type TimeframeType } from "../../../../components/TimeSelector";
 import BackButton from "../../../../components/BackButton";
 import { Canvas, Path, vec, Circle } from "@shopify/react-native-skia";
-import { Info, ShieldCheck, Trophy, Target, Activity, TrendingUp, Zap, HelpCircle, Brain, Droplets, Flame, User, Footprints } from "lucide-react-native";
+import {
+  Info,
+  ShieldCheck,
+  Trophy,
+  Target,
+  Activity,
+  TrendingUp,
+  Zap,
+  HelpCircle,
+  Brain,
+  Droplets,
+  Flame,
+  User,
+  Footprints,
+} from "lucide-react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import BottomSheet, { BottomSheetView, BottomSheetBackdrop } from "@gorhom/bottom-sheet";
+import { useAuth } from "../../../../hooks/useAuth";
+import { useHealthTracking } from "../../../../hooks/useHealthTracking";
 
 const { width } = Dimensions.get("window");
 
@@ -24,15 +49,30 @@ interface RadarData {
 }
 
 const ResultsScreen: React.FC = () => {
-  const [selectedTimeframe, setSelectedTimeframe] = useState<TimeframeType>("1m");
+  const [selectedTimeframe, setSelectedTimeframe] = useState<TimeframeType>("1d");
   const [forcaData, setForcaData] = useState<RadarData>({
-    water: 95, sleep: 90, steps: 95, bpm: 90, imc: 92, calories: 95,
+    water: 95,
+    sleep: 90,
+    steps: 95,
+    bpm: 90,
+    imc: 92,
+    calories: 95,
   });
   const [agilidadeData, setAgilidadeData] = useState<RadarData>({
-    water: 70, sleep: 75, steps: 80, bpm: 75, imc: 85, calories: 75,
+    water: 70,
+    sleep: 75,
+    steps: 80,
+    bpm: 75,
+    imc: 85,
+    calories: 75,
   });
   const [resistenciaData, setResistenciaData] = useState<RadarData>({
-    water: 60, sleep: 55, steps: 65, bpm: 65, imc: 70, calories: 60,
+    water: 60,
+    sleep: 55,
+    steps: 65,
+    bpm: 65,
+    imc: 70,
+    calories: 60,
   });
   const [centralScore, setCentralScore] = useState(88);
   const [lineData, setLineData] = useState<number[]>([]);
@@ -47,12 +87,7 @@ const ResultsScreen: React.FC = () => {
 
   const renderBackdrop = useCallback(
     (props: any) => (
-      <BottomSheetBackdrop
-        {...props}
-        disappearsOnIndex={-1}
-        appearsOnIndex={0}
-        opacity={0.5}
-      />
+      <BottomSheetBackdrop {...props} disappearsOnIndex={-1} appearsOnIndex={0} opacity={0.5} />
     ),
     []
   );
@@ -68,34 +103,54 @@ const ResultsScreen: React.FC = () => {
     return data;
   };
 
+  const { user } = useAuth();
+  const { getHistoricalStats } = useHealthTracking(user?.id);
+
+  const fetchRealData = useCallback(async () => {
+    setIsRefreshing(true);
+    try {
+      const stats = await getHistoricalStats(selectedTimeframe);
+
+      setLineData(stats.dailyScores);
+
+      // Mapeamento real para as 3 camadas do radar
+      // Mantendo as proporções originais mas alimentando com dados reais
+      setForcaData({
+        water: Math.min(100, (stats.totalWater / (stats.dailyScores.length * 2000)) * 100),
+        sleep: Math.min(100, (stats.avgSleep / 480) * 100),
+        steps: stats.radar.forca,
+        bpm: Math.min(100, (stats.avgHeartRate / 120) * 100),
+        imc: 92, // IMC é mais estático
+        calories: Math.min(100, (stats.totalCalories / (stats.dailyScores.length * 500)) * 100),
+      });
+
+      setAgilidadeData({
+        water: Math.min(100, (stats.totalWater / (stats.dailyScores.length * 1500)) * 100),
+        sleep: Math.min(100, (stats.avgSleep / 420) * 100),
+        steps: Math.min(100, (stats.totalSteps / (stats.dailyScores.length * 5000)) * 100),
+        bpm: stats.avgHeartRate > 0 ? 80 : 0,
+        imc: 85,
+        calories: stats.radar.agilidade,
+      });
+
+      setResistenciaData({
+        water: Math.min(100, (stats.totalWater / (stats.dailyScores.length * 1000)) * 100),
+        sleep: stats.radar.resistencia,
+        steps: Math.min(100, (stats.totalSteps / (stats.dailyScores.length * 3000)) * 100),
+        bpm: stats.avgHeartRate > 0 ? 60 : 0,
+        imc: 70,
+        calories: Math.min(100, (stats.totalCalories / (stats.dailyScores.length * 300)) * 100),
+      });
+    } catch (error) {
+      console.error("Erro ao carregar dados reais:", error);
+    } finally {
+      setIsRefreshing(false);
+    }
+  }, [selectedTimeframe, getHistoricalStats]);
+
   useEffect(() => {
-    const points = selectedTimeframe === "1m" ? 30 : selectedTimeframe === "1s" ? 7 : 12;
-    setLineData(generateLineData(points));
-    setForcaData({
-      water: Math.round(90 + Math.random() * 10),
-      sleep: Math.round(85 + Math.random() * 10),
-      steps: Math.round(90 + Math.random() * 10),
-      bpm: Math.round(85 + Math.random() * 10),
-      imc: Math.round(88 + Math.random() * 10),
-      calories: Math.round(90 + Math.random() * 10),
-    });
-    setAgilidadeData({
-      water: Math.round(65 + Math.random() * 15),
-      sleep: Math.round(70 + Math.random() * 15),
-      steps: Math.round(75 + Math.random() * 15),
-      bpm: Math.round(70 + Math.random() * 15),
-      imc: Math.round(75 + Math.random() * 10),
-      calories: Math.round(70 + Math.random() * 15),
-    });
-    setResistenciaData({
-      water: Math.round(55 + Math.random() * 15),
-      sleep: Math.round(50 + Math.random() * 15),
-      steps: Math.round(60 + Math.random() * 10),
-      bpm: Math.round(60 + Math.random() * 10),
-      imc: Math.round(65 + Math.random() * 10),
-      calories: Math.round(55 + Math.random() * 15),
-    });
-  }, [selectedTimeframe]);
+    fetchRealData();
+  }, [fetchRealData]);
 
   useEffect(() => {
     const allValues = [
@@ -108,16 +163,17 @@ const ResultsScreen: React.FC = () => {
   }, [forcaData, agilidadeData, resistenciaData]);
 
   const DATA_SCREENS: (keyof AppStackParamList)[] = [
-    "CaloriesScreen", "CyclingScreen", "HeartbeatsScreen", "SleepScreen", "StepsScreen", "WaterScreen", "ResultsScreen",
+    "CaloriesScreen",
+    "CyclingScreen",
+    "HeartbeatsScreen",
+    "SleepScreen",
+    "StepsScreen",
+    "WaterScreen",
+    "ResultsScreen",
   ];
 
   const onRefresh = () => {
-    setIsRefreshing(true);
-    setTimeout(() => {
-      const points = selectedTimeframe === "1m" ? 30 : selectedTimeframe === "1s" ? 7 : 12;
-      setLineData(generateLineData(points));
-      setIsRefreshing(false);
-    }, 1000);
+    fetchRealData();
   };
 
   // === RADAR CHART ===
@@ -378,23 +434,32 @@ const ResultsScreen: React.FC = () => {
     const chartHeight = 60;
     const padding = 10;
     if (lineData.length === 0) return null;
-    const min = Math.min(...lineData); const max = Math.max(...lineData);
+    const min = Math.min(...lineData);
+    const max = Math.max(...lineData);
     const range = max - min || 1;
     const points = lineData.map((val, i) => ({
       x: padding + (i / (lineData.length - 1)) * (chartWidth - padding * 2),
       y: chartHeight - padding - ((val - min) / range) * (chartHeight - padding * 2),
     }));
-    const path = points.reduce((p, pt, i) => (i === 0 ? `M ${pt.x} ${pt.y}` : `${p} L ${pt.x} ${pt.y}`), "");
+    const path = points.reduce(
+      (p, pt, i) => (i === 0 ? `M ${pt.x} ${pt.y}` : `${p} L ${pt.x} ${pt.y}`),
+      ""
+    );
 
     return (
       <View style={styles.lineChartHolder}>
         <Canvas style={{ width: chartWidth, height: chartHeight }}>
           <Path path={path} color="#F97316" style="stroke" strokeWidth={2} />
-          {points.map((pt, i) => i % 5 === 0 && <Circle key={i} cx={pt.x} cy={pt.y} r={2.5} color="#F97316" />)}
+          {points.map(
+            (pt, i) => i % 5 === 0 && <Circle key={i} cx={pt.x} cy={pt.y} r={2.5} color="#F97316" />
+          )}
         </Canvas>
         <View style={styles.lineChartInfo}>
           <Activity size={12} color="#94A3B8" />
-          <Text style={styles.lineChartValue}>{lineData[lineData.length - 1]} <Text style={{ fontSize: 10, color: "#94A3B8" }}>pts</Text></Text>
+          <Text style={styles.lineChartValue}>
+            {lineData[lineData.length - 1]}{" "}
+            <Text style={{ fontSize: 10, color: "#94A3B8" }}>pts</Text>
+          </Text>
         </View>
       </View>
     );
@@ -415,10 +480,15 @@ const ResultsScreen: React.FC = () => {
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
-        refreshControl={<RefreshControl refreshing={isRefreshing} onRefresh={onRefresh} tintColor="#F97316" />}
+        refreshControl={
+          <RefreshControl refreshing={isRefreshing} onRefresh={onRefresh} tintColor="#F97316" />
+        }
       >
         <View style={styles.timeSelectorBox}>
-          <TimeSelector selectedTimeframe={selectedTimeframe} onTimeframeChange={setSelectedTimeframe} />
+          <TimeSelector
+            selectedTimeframe={selectedTimeframe}
+            onTimeframeChange={setSelectedTimeframe}
+          />
         </View>
 
         <View style={styles.chartSection}>
@@ -469,7 +539,8 @@ const ResultsScreen: React.FC = () => {
           <View style={styles.scoreFooterCard}>
             <Trophy size={16} color="#F59E0B" />
             <Text style={styles.scoreFooterMsg}>
-              Você superou <Text style={{ fontWeight: '700', color: '#0F172A' }}>92%</Text> dos usuários no seu perfil.
+              Você superou <Text style={{ fontWeight: "700", color: "#0F172A" }}>92%</Text> dos
+              usuários no seu perfil.
             </Text>
           </View>
         </View>
@@ -491,8 +562,11 @@ const ResultsScreen: React.FC = () => {
             <Text style={styles.insightTitle}>Insight de Saúde</Text>
           </View>
           <Text style={styles.insightText}>
-            Seus níveis de <Text style={{ fontWeight: '700', color: '#0F172A' }}>Hidratação</Text> e <Text style={{ fontWeight: '700', color: '#0F172A' }}>Sono</Text> estão otimizados.
-            Mantenha a consistência nos próximos {selectedTimeframe === '1m' ? '30 dias' : 'período'} para consolidar seus ganhos em <Text style={{ fontWeight: '700', color: '#0F172A' }}>Força</Text>.
+            Seus níveis de <Text style={{ fontWeight: "700", color: "#0F172A" }}>Hidratação</Text> e{" "}
+            <Text style={{ fontWeight: "700", color: "#0F172A" }}>Sono</Text> estão otimizados.
+            Mantenha a consistência nos próximos{" "}
+            {selectedTimeframe === "1m" ? "30 dias" : "período"} para consolidar seus ganhos em{" "}
+            <Text style={{ fontWeight: "700", color: "#0F172A" }}>Força</Text>.
           </Text>
         </View>
       </ScrollView>
@@ -520,8 +594,9 @@ const ResultsScreen: React.FC = () => {
             <View style={styles.bsSection}>
               <Text style={styles.bsSectionTitle}>O Algoritmo</Text>
               <Text style={styles.bsText}>
-                Seu score é uma métrica ponderada que analisa a consistência dos seus hábitos.
-                Nós cruzamos dados de <Text style={{ fontWeight: '700' }}>biometria e performance</Text> para gerar uma nota de 0 a 100.
+                Seu score é uma métrica ponderada que analisa a consistência dos seus hábitos. Nós
+                cruzamos dados de <Text style={{ fontWeight: "700" }}>biometria e performance</Text>{" "}
+                para gerar uma nota de 0 a 100.
               </Text>
             </View>
 
@@ -530,19 +605,25 @@ const ResultsScreen: React.FC = () => {
 
               <View style={styles.metricGuideHorizontal}>
                 <View style={styles.metricCard}>
-                  <View style={styles.metricIconBox}><Flame size={16} color="#F97316" /></View>
+                  <View style={styles.metricIconBox}>
+                    <Flame size={16} color="#F97316" />
+                  </View>
                   <Text style={styles.metricLabelCard}>Força</Text>
                   <Text style={styles.metricDescCard}>Calorias e esforço.</Text>
                 </View>
 
                 <View style={styles.metricCard}>
-                  <View style={styles.metricIconBox}><Zap size={16} color="#0F172A" /></View>
+                  <View style={styles.metricIconBox}>
+                    <Zap size={16} color="#0F172A" />
+                  </View>
                   <Text style={styles.metricLabelCard}>Agilidade</Text>
                   <Text style={styles.metricDescCard}>Velocidade e BPM.</Text>
                 </View>
 
                 <View style={styles.metricCard}>
-                  <View style={styles.metricIconBox}><ShieldCheck size={16} color="#3B82F6" /></View>
+                  <View style={styles.metricIconBox}>
+                    <ShieldCheck size={16} color="#3B82F6" />
+                  </View>
                   <Text style={styles.metricLabelCard}>Resistência</Text>
                   <Text style={styles.metricDescCard}>Tempo e foco.</Text>
                 </View>
@@ -552,17 +633,34 @@ const ResultsScreen: React.FC = () => {
             <View style={styles.bsSection}>
               <Text style={styles.bsSectionTitle}>Métricas Analisadas</Text>
               <View style={styles.tagsContainerRow}>
-                <View style={styles.tagCompact}><Droplets size={10} color="#3B82F6" /><Text style={styles.tagTextCompact}>Água</Text></View>
-                <View style={styles.tagCompact}><Brain size={10} color="#8B5CF6" /><Text style={styles.tagTextCompact}>Sono</Text></View>
-                <View style={styles.tagCompact}><Footprints size={10} color="#10B981" /><Text style={styles.tagTextCompact}>Passos</Text></View>
-                <View style={styles.tagCompact}><Activity size={10} color="#EF4444" /><Text style={styles.tagTextCompact}>BPM</Text></View>
-                <View style={styles.tagCompact}><User size={10} color="#6366F1" /><Text style={styles.tagTextCompact}>IMC</Text></View>
+                <View style={styles.tagCompact}>
+                  <Droplets size={10} color="#3B82F6" />
+                  <Text style={styles.tagTextCompact}>Água</Text>
+                </View>
+                <View style={styles.tagCompact}>
+                  <Brain size={10} color="#8B5CF6" />
+                  <Text style={styles.tagTextCompact}>Sono</Text>
+                </View>
+                <View style={styles.tagCompact}>
+                  <Footprints size={10} color="#10B981" />
+                  <Text style={styles.tagTextCompact}>Passos</Text>
+                </View>
+                <View style={styles.tagCompact}>
+                  <Activity size={10} color="#EF4444" />
+                  <Text style={styles.tagTextCompact}>BPM</Text>
+                </View>
+                <View style={styles.tagCompact}>
+                  <User size={10} color="#6366F1" />
+                  <Text style={styles.tagTextCompact}>IMC</Text>
+                </View>
               </View>
             </View>
 
             <View style={styles.bsFooter}>
               <HelpCircle size={16} color="#94A3B8" />
-              <Text style={styles.bsFooterText}>Dados sincronizados com o seu dispositivo vestível.</Text>
+              <Text style={styles.bsFooterText}>
+                Dados sincronizados com o seu dispositivo vestível.
+              </Text>
             </View>
           </ScrollView>
         </BottomSheetView>
@@ -582,7 +680,7 @@ const styles = StyleSheet.create({
     paddingVertical: 15,
   },
   headerTitle: { fontSize: 18, fontWeight: "700", color: "#0F172A" },
-  infoIcon: { width: 40, height: 40, alignItems: 'flex-end', justifyContent: 'center' },
+  infoIcon: { width: 40, height: 40, alignItems: "flex-end", justifyContent: "center" },
 
   premiumScoreCard: {
     backgroundColor: "#FFFFFF",
@@ -598,16 +696,16 @@ const styles = StyleSheet.create({
     borderColor: "#F1F5F9",
   },
   scoreHeaderRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
     marginBottom: 20,
   },
   premiumScoreLabel: { fontSize: 20, fontWeight: "800", color: "#0F172A" },
   premiumScoreDate: { fontSize: 12, color: "#64748B", marginTop: 4 },
   statusPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 6,
     backgroundColor: "#ECFDF5",
     paddingHorizontal: 12,
@@ -616,13 +714,13 @@ const styles = StyleSheet.create({
   },
   statusPillText: { color: "#10B981", fontSize: 12, fontWeight: "700" },
   scoreMainSection: { marginBottom: 20 },
-  scoreDisplay: { flexDirection: 'row', alignItems: 'flex-end', gap: 4, marginBottom: 15 },
+  scoreDisplay: { flexDirection: "row", alignItems: "flex-end", gap: 4, marginBottom: 15 },
   premiumScoreNumber: { fontSize: 48, fontWeight: "800", color: "#0F172A", lineHeight: 48 },
-  scoreMetricInfo: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingBottom: 6 },
+  scoreMetricInfo: { flexDirection: "row", alignItems: "center", gap: 10, paddingBottom: 6 },
   scoreMax: { fontSize: 16, fontWeight: "600", color: "#94A3B8" },
   trendContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 2,
     backgroundColor: "#DCFCE7",
     paddingHorizontal: 6,
@@ -630,20 +728,20 @@ const styles = StyleSheet.create({
     borderRadius: 6,
   },
   trendText: { color: "#10B981", fontSize: 12, fontWeight: "700" },
-  scoreProgressWrapper: { width: '100%' },
+  scoreProgressWrapper: { width: "100%" },
   progressBarBase: {
     height: 8,
     backgroundColor: "#F1F5F9",
     borderRadius: 4,
-    overflow: 'hidden',
+    overflow: "hidden",
     marginBottom: 6,
   },
-  progressBarFill: { height: '100%', borderRadius: 4 },
-  progressMarkers: { flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 2 },
+  progressBarFill: { height: "100%", borderRadius: 4 },
+  progressMarkers: { flexDirection: "row", justifyContent: "space-between", paddingHorizontal: 2 },
   markerText: { fontSize: 10, color: "#94A3B8", fontWeight: "600" },
   scoreFooterCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 10,
     backgroundColor: "#F8FAFC",
     padding: 14,
@@ -652,19 +750,19 @@ const styles = StyleSheet.create({
   scoreFooterMsg: { fontSize: 13, color: "#64748B", flex: 1, lineHeight: 18 },
 
   chartSection: { marginBottom: 25 },
-  sectionHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 20 },
+  sectionHeader: { flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 20 },
   sectionTitle: { fontSize: 16, fontWeight: "700", color: "#0F172A" },
 
-  radarContainer: { alignItems: 'center' },
+  radarContainer: { alignItems: "center" },
   axisLabel: {
-    fontSize: 14,
+    fontSize: Platform.OS === "android" ? 12 : 14,
     fontWeight: "bold",
     color: "#192126",
     width: 60,
     textAlign: "center",
   },
-  legendContainer: { flexDirection: 'row', gap: 20, marginTop: 30 },
-  legendItem: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  legendContainer: { flexDirection: "row", gap: 20, marginTop: 30 },
+  legendItem: { flexDirection: "row", alignItems: "center", gap: 6 },
   legendColor: { width: 12, height: 12, borderRadius: 4 },
   legendDot: { width: 8, height: 8, borderRadius: 4 },
   legendText: { fontSize: 13, fontWeight: "600", color: "#475569" },
@@ -675,12 +773,19 @@ const styles = StyleSheet.create({
     backgroundColor: "#FFFFFF",
     borderRadius: 20,
     padding: 15,
-    alignItems: 'center',
+    alignItems: "center",
     borderWidth: 1,
     borderColor: "#F1F5F9",
   },
-  lineChartHolder: { width: '100%', alignItems: 'center' },
-  lineChartInfo: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 10, width: '100%', justifyContent: 'flex-end' },
+  lineChartHolder: { width: "100%", alignItems: "center" },
+  lineChartInfo: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    marginTop: 10,
+    width: "100%",
+    justifyContent: "flex-end",
+  },
   lineChartValue: { fontSize: 16, fontWeight: "700", color: "#0F172A" },
 
   insightCard: {
@@ -690,75 +795,82 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#D1FAE5",
   },
-  insightHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 10 },
+  insightHeader: { flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 10 },
   insightTitle: { fontSize: 15, fontWeight: "700", color: "#065F46" },
   insightText: { fontSize: 14, color: "#065F46", lineHeight: 22, opacity: 0.8 },
 
   // Bottom Sheet Styles
   bsView: { flex: 1, padding: 24 },
-  bsHeader: { flexDirection: 'row', alignItems: 'center', gap: 16, marginBottom: 25 },
+  bsHeader: { flexDirection: "row", alignItems: "center", gap: 16, marginBottom: 25 },
   bsIconContainer: {
     width: 48,
     height: 48,
     borderRadius: 16,
-    backgroundColor: '#FFF7ED',
-    alignItems: 'center',
-    justifyContent: 'center'
+    backgroundColor: "#FFF7ED",
+    alignItems: "center",
+    justifyContent: "center",
   },
-  bsTitle: { fontSize: 20, fontWeight: '800', color: '#0F172A' },
-  bsSubtitle: { fontSize: 13, color: '#64748B', marginTop: 2 },
+  bsTitle: { fontSize: 20, fontWeight: "800", color: "#0F172A" },
+  bsSubtitle: { fontSize: 13, color: "#64748B", marginTop: 2 },
   bsSection: { marginBottom: 25 },
-  bsSectionTitle: { fontSize: 14, fontWeight: '700', color: '#94A3B8', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 12 },
-  bsText: { fontSize: 15, color: '#475569', lineHeight: 22 },
-  metricGuideHorizontal: { flexDirection: 'row', gap: 8 },
+  bsSectionTitle: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: "#94A3B8",
+    textTransform: "uppercase",
+    letterSpacing: 1,
+    marginBottom: 12,
+  },
+  bsText: { fontSize: 15, color: "#475569", lineHeight: 22 },
+  metricGuideHorizontal: { flexDirection: "row", gap: 8 },
   metricCard: {
     flex: 1,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: "#F8FAFC",
     borderRadius: 16,
     padding: 12,
     borderWidth: 1,
-    borderColor: '#F1F5F9',
-    alignItems: 'center'
+    borderColor: "#F1F5F9",
+    alignItems: "center",
   },
   metricIconBox: {
     width: 32,
     height: 32,
     borderRadius: 10,
-    backgroundColor: '#FFFFFF',
-    alignItems: 'center',
-    justifyContent: 'center',
+    backgroundColor: "#FFFFFF",
+    alignItems: "center",
+    justifyContent: "center",
     marginBottom: 8,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
     shadowRadius: 4,
-    elevation: 1
+    elevation: 1,
   },
-  metricLabelCard: { fontSize: 12, fontWeight: '700', color: '#0F172A', marginBottom: 2 },
-  metricDescCard: { fontSize: 10, color: '#64748B', lineHeight: 14, textAlign: 'center' },
-  tagsContainerRow: { flexDirection: 'row', gap: 6 },
+  metricLabelCard: { fontSize: 12, fontWeight: "700", color: "#0F172A", marginBottom: 2 },
+  metricDescCard: { fontSize: 10, color: "#64748B", lineHeight: 14, textAlign: "center" },
+  tagsContainerRow: { flexDirection: "row", gap: 6 },
   tagCompact: {
     flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
     gap: 4,
-    backgroundColor: '#F1F5F9',
+    backgroundColor: "#F1F5F9",
     paddingVertical: 10,
     paddingHorizontal: 4,
-    borderRadius: 10
+    borderRadius: 10,
   },
-  tagTextCompact: { fontSize: 9, fontWeight: '700', color: '#475569' },
+  tagTextCompact: { fontSize: 9, fontWeight: "700", color: "#475569" },
   bsFooter: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 8,
     marginTop: 10,
     paddingTop: 20,
     borderTopWidth: 1,
-    borderTopColor: '#F1F5F9'
+    borderTopColor: "#F1F5F9",
   },
-  bsFooterText: { fontSize: 12, color: '#94A3B8', fontWeight: '500' },
+  bsFooterText: { fontSize: 12, color: "#94A3B8", fontWeight: "500" },
 });
 
 export default ResultsScreen;

@@ -1,12 +1,10 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { View, Text, StyleSheet, ScrollView, useWindowDimensions, Platform, TouchableOpacity } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { AppStackParamList } from "../../../../@types/routes";
 import BackButton from "../../../../components/BackButton";
 import DataPillNavigator from "../../../../components/data/DataPillNavigator";
-import { Moon, Clock, Zap, Star, Brain, ShieldCheck, ChevronRight, Info, HelpCircle, Sun, Activity } from "lucide-react-native";
+import { Moon, Zap, Star, Brain, ShieldCheck, ChevronRight, Info, HelpCircle, Sun } from "lucide-react-native";
 import Svg, { Circle, Defs, LinearGradient as SvgLinearGradient, Stop, G } from "react-native-svg";
-import { LinearGradient } from "expo-linear-gradient";
 import BottomSheet, { BottomSheetView, BottomSheetBackdrop } from "@gorhom/bottom-sheet";
 import Animated, {
   useSharedValue,

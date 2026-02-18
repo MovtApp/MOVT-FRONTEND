@@ -4,21 +4,19 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as Location from "expo-location";
 import { LatLng, Region } from "@components/MapComponent";
 import {
-  ensureGoogleFitPermissions,
-  fetchTodayStepCount,
-  subscribeToStepUpdates,
-} from "../services/googleFitService";
-import {
   getLatestWearOsHealthDataFromAllDevices,
   pollWearOsHealthData,
   checkWearOsDeviceRegistered,
 } from "../services/wearOsHealthService";
+import { NativeHealthManager } from "../services/nativeHealthManager";
 import { getTodayKey } from "../utils/formatters";
+import { Platform } from "react-native";
 
 const STEPS_INACTIVITY_TIMEOUT = 6000;
 const DEFAULT_STEPS_GOAL = 10000;
 
-export const useHealthTracking = (userId: string | undefined) => {
+export const useHealthTracking = (userId: string | undefined, targetDate?: Date) => {
+  const isToday = !targetDate || targetDate.toDateString() === new Date().toDateString();
   // Wear OS State
   const [heartRate, setHeartRate] = useState<number | null>(null);
   const [isWearOsConnected, setIsWearOsConnected] = useState(false);
@@ -60,6 +58,7 @@ export const useHealthTracking = (userId: string | undefined) => {
 
   // Calculation for calories
   const calculateAndSaveCalories = useCallback(async () => {
+    if (!isToday) return; // Never recalculate for past days
     try {
       let calories = 0;
       calories += stepsToday * 0.05;
@@ -73,12 +72,13 @@ export const useHealthTracking = (userId: string | undefined) => {
       }
       const roundedCalories = Math.round(calories * 100) / 100;
       setDailyCalories(roundedCalories);
-      const key = getTodayKey("calories");
+
+      const key = getTodayKey("calories", targetDate);
       await AsyncStorage.setItem(key, JSON.stringify({ calories: roundedCalories }));
     } catch (error) {
       console.error("Erro ao calcular/salvar calorias:", error);
     }
-  }, [stepsToday, heartRate, trainingTime]);
+  }, [stepsToday, heartRate, trainingTime, isToday, targetDate]);
 
   useEffect(() => {
     calculateAndSaveCalories();
@@ -87,33 +87,71 @@ export const useHealthTracking = (userId: string | undefined) => {
   // Load static daily data
   const loadDailyData = useCallback(async () => {
     try {
-      const waterKey = getTodayKey("water");
-      const calKey = getTodayKey("calories");
-      const sleepKey = getTodayKey("sleep");
+      const waterKey = getTodayKey("water", targetDate);
+      const calKey = getTodayKey("calories", targetDate);
+      const sleepKey = getTodayKey("sleep", targetDate);
+      const stepsKey = getTodayKey("steps", targetDate);
+      const trainingKey = getTodayKey("training", targetDate);
+      const hrKey = getTodayKey("heartRate", targetDate);
 
-      const [waterRaw, calRaw, sleepRaw] = await Promise.all([
+      const [waterRaw, calRaw, sleepRaw, stepsRaw, trainingRaw, hrRaw] = await Promise.all([
         AsyncStorage.getItem(waterKey),
         AsyncStorage.getItem(calKey),
         AsyncStorage.getItem(sleepKey),
+        AsyncStorage.getItem(stepsKey),
+        AsyncStorage.getItem(trainingKey),
+        AsyncStorage.getItem(hrKey),
       ]);
 
       if (waterRaw) {
         const parsed = JSON.parse(waterRaw);
         setWaterConsumedMl(parsed.consumedMl || 0);
+      } else {
+        setWaterConsumedMl(0);
       }
+
       if (calRaw) {
         const parsed = JSON.parse(calRaw);
         setDailyCalories(parsed.calories || 0);
+      } else {
+        setDailyCalories(0);
       }
+
       if (sleepRaw) {
         const parsed = JSON.parse(sleepRaw);
         setSleepHours(parsed.hours || 0);
         setSleepMinutes(parsed.minutes || 0);
+      } else {
+        setSleepHours(0);
+        setSleepMinutes(0);
+      }
+
+      if (!isToday) {
+        if (stepsRaw) {
+          const parsed = JSON.parse(stepsRaw);
+          setStepsToday(parsed.steps || 0);
+        } else {
+          setStepsToday(0);
+        }
+
+        if (trainingRaw) {
+          const parsed = JSON.parse(trainingRaw);
+          setTrainingTime(parsed.duration || 0);
+        } else {
+          setTrainingTime(0);
+        }
+
+        if (hrRaw) {
+          const parsed = JSON.parse(hrRaw);
+          setHeartRate(parsed.heartRate || 0);
+        } else {
+          setHeartRate(0);
+        }
       }
     } catch (e) {
       console.error("Error loading daily health data:", e);
     }
-  }, []);
+  }, [targetDate, isToday]);
 
   useFocusEffect(
     useCallback(() => {
@@ -123,7 +161,7 @@ export const useHealthTracking = (userId: string | undefined) => {
 
   // Training Timer Logic
   useEffect(() => {
-    if (isWalking) {
+    if (isWalking && isToday) {
       if (!trainingIntervalRef.current) {
         trainingIntervalRef.current = setInterval(() => {
           setTrainingTime((prev) => prev + 1);
@@ -141,42 +179,29 @@ export const useHealthTracking = (userId: string | undefined) => {
         trainingIntervalRef.current = null;
       }
     };
-  }, [isWalking]);
+  }, [isWalking, isToday]);
 
-  // Wear OS Verification
+  // Native Health Verification (Google Fit/HealthKit)
   useFocusEffect(
     useCallback(() => {
-      let isActive = true;
-      const verifyWearDevice = async () => {
-        if (!userId) {
-          setHasWearOsDevice(false);
-          return;
-        }
-        const parsedId = parseInt(userId, 10);
-        if (isNaN(parsedId)) {
-          setHasWearOsDevice(false);
-          return;
-        }
-        try {
-          const device = await checkWearOsDeviceRegistered(parsedId);
-          if (isActive) setHasWearOsDevice(Boolean(device));
-        } catch {
-          if (isActive) setHasWearOsDevice(false);
-        }
-      };
-      verifyWearDevice();
-      return () => {
-        isActive = false;
-      };
-    }, [userId])
+      NativeHealthManager.authorize();
+    }, [])
   );
 
   // Wear OS Real-time Polling
   useFocusEffect(
     useCallback(() => {
-      if (!userId || hasWearOsDevice !== true) {
+      if (Platform.OS === "ios") {
+        // No iOS, podemos tentar buscar dados do HealthKit se não houver WearOS
+        if (!heartRate) {
+          NativeHealthManager.fetchHeartRate().then((rate) => {
+            if (rate > 0) setHeartRate(rate);
+          });
+        }
+      }
+
+      if (!userId || hasWearOsDevice !== true || !isToday) {
         setIsWearOsConnected(false);
-        setHeartRate(null);
         return;
       }
       const uId = parseInt(userId, 10);
@@ -217,15 +242,17 @@ export const useHealthTracking = (userId: string | undefined) => {
   // Steps Tracking
   useFocusEffect(
     useCallback(() => {
+      if (!isToday) return;
+
       let isMounted = true;
       let unsubscribeSteps: (() => void) | null = null;
       const start = async () => {
         setStepsLoading(true);
         let authorized = false;
         try {
-          authorized = await ensureGoogleFitPermissions();
+          authorized = await NativeHealthManager.authorize();
         } catch (err) {
-          console.warn("Google Fit not available or permission denied:", err);
+          console.warn("Plataforma de saúde não disponível ou permissão negada:", err);
         }
 
         if (!authorized) {
@@ -233,7 +260,7 @@ export const useHealthTracking = (userId: string | undefined) => {
           return;
         }
         try {
-          const initialSteps = await fetchTodayStepCount();
+          const initialSteps = await NativeHealthManager.fetchSteps();
           if (isMounted) {
             lastStepCountRef.current = initialSteps;
             setStepsToday(initialSteps);
@@ -241,7 +268,7 @@ export const useHealthTracking = (userId: string | undefined) => {
         } finally {
           if (isMounted) setStepsLoading(false);
         }
-        unsubscribeSteps = subscribeToStepUpdates((value) => {
+        unsubscribeSteps = NativeHealthManager.subscribeSteps((value) => {
           if (!isMounted) return;
           const numericValue = Number(value);
           if (!Number.isFinite(numericValue)) return;
@@ -266,6 +293,8 @@ export const useHealthTracking = (userId: string | undefined) => {
   // Cycling Tracking
   useFocusEffect(
     useCallback(() => {
+      if (!isToday) return;
+
       let isActive = true;
       const startCyclingTracking = async () => {
         try {
@@ -324,6 +353,107 @@ export const useHealthTracking = (userId: string | undefined) => {
     }, [])
   );
 
+  const getHistoricalStats = useCallback(
+    async (timeframe: string) => {
+      let daysToFetch = 1;
+      if (timeframe === "1s") daysToFetch = 7;
+      else if (timeframe === "1m") daysToFetch = 30;
+      else if (timeframe === "1a") daysToFetch = 365;
+      else if (timeframe === "Tudo") daysToFetch = 1095; // 3 anos
+
+      const end = targetDate || new Date();
+      const prefixes = ["water", "calories", "sleep", "steps", "training", "heartRate"];
+      const allKeys: string[] = [];
+      const dateList: Date[] = [];
+
+      for (let i = 0; i < daysToFetch; i++) {
+        const d = new Date(end);
+        d.setDate(d.getDate() - i);
+        dateList.push(d);
+
+        const yyyy = d.getFullYear();
+        const mm = String(d.getMonth() + 1).padStart(2, "0");
+        const dd = String(d.getDate()).padStart(2, "0");
+        const dateStr = `${yyyy}-${mm}-${dd}`;
+
+        prefixes.forEach((p) => allKeys.push(`${p}:${dateStr}`));
+      }
+
+      const results = await AsyncStorage.multiGet(allKeys);
+      const dataMap: { [key: string]: any } = {};
+      results.forEach(([key, val]) => {
+        if (val) dataMap[key] = JSON.parse(val);
+      });
+
+      // Agregação
+      const stats = {
+        water: 0,
+        calories: 0,
+        sleep: 0,
+        steps: 0,
+        training: 0,
+        heartRate: 0,
+        hrCount: 0,
+        daysWithData: 0,
+        dailyScores: [] as number[],
+      };
+
+      for (let i = 0; i < daysToFetch; i++) {
+        const d = dateList[i];
+        const yyyy = d.getFullYear();
+        const mm = String(d.getMonth() + 1).padStart(2, "0");
+        const dd = String(d.getDate()).padStart(2, "0");
+        const dateStr = `${yyyy}-${mm}-${dd}`;
+
+        const dayWater = dataMap[`water:${dateStr}`]?.consumedMl || 0;
+        const dayCal = dataMap[`calories:${dateStr}`]?.calories || 0;
+        const daySleep =
+          (dataMap[`sleep:${dateStr}`]?.hours || 0) * 60 +
+          (dataMap[`sleep:${dateStr}`]?.minutes || 0);
+        const daySteps = dataMap[`steps:${dateStr}`]?.steps || 0;
+        const dayTrain = dataMap[`training:${dateStr}`]?.duration || 0;
+        const dayHR = dataMap[`heartRate:${dateStr}`]?.heartRate || 0;
+
+        stats.water += dayWater;
+        stats.calories += dayCal;
+        stats.sleep += daySleep;
+        stats.steps += daySteps;
+        stats.training += dayTrain;
+        if (dayHR > 0) {
+          stats.heartRate += dayHR;
+          stats.hrCount++;
+        }
+
+        // Pontuação diária simples para o gráfico de linha (0-100)
+        let dayScore = 0;
+        if (daySteps > 0 || dayWater > 0 || daySleep > 0) {
+          dayScore = Math.min(
+            100,
+            (daySteps / 10000) * 40 + (dayWater / 2000) * 30 + (daySleep / 480) * 30
+          );
+        }
+        stats.dailyScores.unshift(Math.round(dayScore));
+      }
+
+      return {
+        totalWater: stats.water,
+        totalCalories: stats.calories,
+        avgSleep: stats.hrCount > 0 ? stats.sleep / daysToFetch : stats.sleep, // min/day
+        totalSteps: stats.steps,
+        totalTraining: stats.training,
+        avgHeartRate: stats.hrCount > 0 ? stats.heartRate / stats.hrCount : 0,
+        dailyScores: stats.dailyScores,
+        // Radar Mapping (0-100)
+        radar: {
+          forca: Math.min(100, (stats.steps / (daysToFetch * 8000)) * 100),
+          agilidade: Math.min(100, (stats.training / (daysToFetch * 30 * 60)) * 100), // 30min/dia meta
+          resistencia: Math.min(100, (stats.sleep / (daysToFetch * 420)) * 100), // 7h/dia meta
+        },
+      };
+    },
+    [targetDate]
+  );
+
   return {
     heartRate,
     isWearOsConnected,
@@ -341,5 +471,7 @@ export const useHealthTracking = (userId: string | undefined) => {
     sleepMinutes,
     waterConsumedMl,
     loadDailyData,
+    getHistoricalStats,
+    isToday,
   };
 };

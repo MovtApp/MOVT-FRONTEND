@@ -1,5 +1,5 @@
 import { StatusBar } from "expo-status-bar";
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, useMemo } from "react";
 import {
   ScrollView,
   Text,
@@ -29,7 +29,7 @@ import {
 } from "lucide-react-native";
 import { useAuth } from "../../../contexts/AuthContext";
 import ECGDisplay from "../../../components/ECGDisplay";
-import MiniRadarChart from "../../../components/MiniRadarChart";
+import MiniRadarChart, { RadarData } from "../../../components/MiniRadarChart";
 import WaterWave from "../../../components/WaterWave";
 import StepProgressRing from "../../../components/StepProgressRing";
 import { useHealthTracking } from "../../../hooks/useHealthTracking";
@@ -136,6 +136,15 @@ const DataScreen: React.FC = () => {
   const navigation = useNavigation<DataScreenNavigationProp>();
   const { user } = useAuth();
 
+  const [currentDate] = useState(new Date());
+  const [selectedDay, setSelectedDay] = useState(new Date().getDate());
+
+  const targetDate = useMemo(() => {
+    const d = new Date(currentDate);
+    d.setDate(selectedDay);
+    return d;
+  }, [currentDate, selectedDay]);
+
   const {
     heartRate,
     isWearOsConnected,
@@ -151,7 +160,52 @@ const DataScreen: React.FC = () => {
     sleepHours,
     sleepMinutes,
     waterConsumedMl,
-  } = useHealthTracking(user?.id);
+    getHistoricalStats,
+    isToday,
+  } = useHealthTracking(user?.id, targetDate);
+
+  const [forcaData, setForcaData] = useState<RadarData | undefined>();
+  const [agilidadeData, setAgilidadeData] = useState<RadarData | undefined>();
+  const [resistenciaData, setResistenciaData] = useState<RadarData | undefined>();
+
+  useEffect(() => {
+    const fetchRadarData = async () => {
+      try {
+        const stats = await getHistoricalStats("1d");
+
+        setForcaData({
+          water: Math.min(100, (stats.totalWater / 2000) * 100),
+          sleep: Math.min(100, (stats.avgSleep / 480) * 100),
+          steps: stats.radar.forca,
+          bpm: Math.min(100, (stats.avgHeartRate / 120) * 100),
+          imc: 92,
+          calories: Math.min(100, (stats.totalCalories / 500) * 100),
+        });
+
+        setAgilidadeData({
+          water: Math.min(100, (stats.totalWater / 1500) * 100),
+          sleep: Math.min(100, (stats.avgSleep / 420) * 100),
+          steps: Math.min(100, (stats.totalSteps / 5000) * 100),
+          bpm: stats.avgHeartRate > 0 ? 80 : 0,
+          imc: 85,
+          calories: stats.radar.agilidade,
+        });
+
+        setResistenciaData({
+          water: Math.min(100, (stats.totalWater / 1000) * 100),
+          sleep: stats.radar.resistencia,
+          steps: Math.min(100, (stats.totalSteps / 3000) * 100),
+          bpm: stats.avgHeartRate > 0 ? 60 : 0,
+          imc: 70,
+          calories: Math.min(100, (stats.totalCalories / 300) * 100),
+        });
+      } catch (error) {
+        console.error("Error fetching radar data in dataScreen:", error);
+      }
+    };
+
+    fetchRadarData();
+  }, [getHistoricalStats, targetDate]);
 
   const healthData = {
     calories: dailyCalories,
@@ -161,8 +215,6 @@ const DataScreen: React.FC = () => {
     water: waterConsumedMl / 250,
   };
 
-  const [currentDate] = useState(new Date());
-  const [selectedDay, setSelectedDay] = useState(new Date().getDate());
   const flatListRef = useRef<FlatList>(null);
 
   const waterGoalMl = 2000;
@@ -177,9 +229,9 @@ const DataScreen: React.FC = () => {
 
   const handleFlatListLayout = () => {
     if (flatListRef.current) {
-      const flatListVisibleWidth = width - 40; // 20px padding each side
-      const offset =
-        (selectedDay - 1) * DAY_ITEM_WIDTH - flatListVisibleWidth / 2 + DAY_ITEM_WIDTH / 2;
+      const flatListVisibleWidth = width - 40; // 20px padding cada lado
+      // Scroll para que o dia selecionado fique alinhado à direita
+      const offset = selectedDay * DAY_ITEM_WIDTH - flatListVisibleWidth;
       flatListRef.current.scrollToOffset({
         offset: Math.max(0, offset),
         animated: false,
@@ -211,22 +263,54 @@ const DataScreen: React.FC = () => {
 
   const monthNameAndYear = getMonthAndYear(currentDate);
   const totalDaysInMonth = getDaysInMonth(currentDate);
-  const daysInMonthArray = Array.from({ length: totalDaysInMonth }, (_, i) => i + 1);
+  const today = new Date();
   const currentMonth = currentDate.getMonth();
   const currentYear = currentDate.getFullYear();
 
+  const isCurrentMonth = currentYear === today.getFullYear() && currentMonth === today.getMonth();
+  const displayEndDay = isCurrentMonth ? today.getDate() : totalDaysInMonth;
+
+  const daysInMonthArray = Array.from({ length: displayEndDay }, (_, i) => i + 1);
+
   const renderDay = ({ item }: { item: number }) => {
     const isSelected = item === selectedDay;
+    const today = new Date();
+    const isFuture =
+      currentYear > today.getFullYear() ||
+      (currentYear === today.getFullYear() && currentMonth > today.getMonth()) ||
+      (currentYear === today.getFullYear() &&
+        currentMonth === today.getMonth() &&
+        item > today.getDate());
+
     return (
       <TouchableOpacity
-        style={[styles.dayContainer, isSelected && styles.selectedDayContainer]}
-        onPress={() => setSelectedDay(item)}
-        activeOpacity={0.7}
+        style={[
+          styles.dayContainer,
+          isSelected && styles.selectedDayContainer,
+          isFuture && styles.disabledDayContainer,
+        ]}
+        onPress={() => !isFuture && setSelectedDay(item)}
+        activeOpacity={isFuture ? 1 : 0.7}
+        disabled={isFuture}
       >
-        <Text style={[styles.dayOfWeek, isSelected && styles.selectedDayText]}>
+        <Text
+          style={[
+            styles.dayOfWeek,
+            isSelected && styles.selectedDayText,
+            isFuture && styles.disabledDayText,
+          ]}
+        >
           {getDayOfWeek(currentYear, currentMonth, item)}
         </Text>
-        <Text style={[styles.dayOfMonth, isSelected && styles.selectedDayText]}>{item}</Text>
+        <Text
+          style={[
+            styles.dayOfMonth,
+            isSelected && styles.selectedDayText,
+            isFuture && styles.disabledDayText,
+          ]}
+        >
+          {item}
+        </Text>
       </TouchableOpacity>
     );
   };
@@ -266,7 +350,7 @@ const DataScreen: React.FC = () => {
         />
 
         <Animated.View entering={FadeInDown.delay(100).duration(500)}>
-          <Text style={styles.sectionTitle}>Resumo Diário</Text>
+          <Text style={styles.sectionTitle}>Resumo diário</Text>
 
           <View style={styles.gridContainer}>
             {/* Left Column */}
@@ -344,7 +428,12 @@ const DataScreen: React.FC = () => {
                 <ArrowRight size={16} color="#4B5563" />
               </View>
               <View style={[styles.radarContainer, { marginTop: RADAR_MARGIN_TOP }]}>
-                <MiniRadarChart size={RADAR_SIZE} />
+                <MiniRadarChart
+                  size={RADAR_SIZE}
+                  forcaData={forcaData}
+                  agilidadeData={agilidadeData}
+                  resistenciaData={resistenciaData}
+                />
               </View>
 
               <View style={styles.cardFooter}>
@@ -420,7 +509,7 @@ const DataScreen: React.FC = () => {
               </View>
               <View style={styles.bpmFooter}>
                 <Text style={[styles.cardValueLarge, { color: "#EF4444" }]}>
-                  {isWearOsConnected && healthData.heartRate > 0 ? healthData.heartRate : "--"}
+                  {healthData.heartRate > 0 ? healthData.heartRate : "--"}
                 </Text>
                 {isWearOsConnected && (
                   <View style={styles.connectedBadge}>
@@ -488,7 +577,11 @@ const DataScreen: React.FC = () => {
           </View>
 
           {/* Cycling Map Card */}
-          <TouchableOpacity activeOpacity={0.9} style={styles.cyclingCard}>
+          <TouchableOpacity
+            activeOpacity={0.9}
+            style={styles.cyclingCard}
+            onPress={() => navigation.navigate("CyclingScreen" as never)}
+          >
             <View style={styles.cyclingHeader}>
               <View style={styles.cyclingIconBox}>
                 <Bike size={20} color="#111827" />
@@ -528,7 +621,11 @@ const DataScreen: React.FC = () => {
                 <View style={styles.mapPlaceholder}>
                   <View style={styles.radarEffect} />
                   <Text style={styles.mapPlaceholderText}>
-                    {locationError ? "Localização indisponível" : "Aguardando GPS..."}
+                    {!isToday
+                      ? "Sem rota registrada"
+                      : locationError
+                        ? "Localização indisponível"
+                        : "Aguardando GPS..."}
                   </Text>
                 </View>
               )}
@@ -599,6 +696,14 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.05,
     shadowRadius: 2,
     elevation: 2,
+  },
+  disabledDayContainer: {
+    backgroundColor: "#F3F4F6",
+    borderColor: "#E5E7EB",
+    opacity: 0.5,
+  },
+  disabledDayText: {
+    color: "#D1D5DB",
   },
   selectedDayContainer: {
     backgroundColor: "#BBF246",
