@@ -1,16 +1,24 @@
 import React from "react";
-import { View, Text, Image, StyleSheet, ViewStyle } from "react-native";
-import MVLogo from "@assets/MV.png";
+import { View, Text, Image, StyleSheet, ViewStyle, Platform } from "react-native";
+import Constants from "expo-constants";
+
 
 interface Props {
   style?: ViewStyle;
 }
 
 export const FooterVersion: React.FC<Props> = ({ style }) => {
+  // Busca a versão definida no app.json de forma automática
+  const version = Constants.expoConfig?.version || "1.0.0";
+
   return (
     <View style={[styles.footer, style]}>
-      <Image source={MVLogo} style={styles.logoImage} resizeMode="contain" />
-      <Text style={styles.versionText}>Versão 1.0.0</Text>
+      <Image
+        source={{ uri: "https://res.cloudinary.com/dgxavefbh/image/upload/v1771958920/Component_13_cwktao.png" }}
+        style={styles.logoImage}
+        resizeMode="contain"
+      />
+      <Text style={styles.versionText}>Versão {version}</Text>
     </View>
   );
 };
@@ -22,9 +30,9 @@ const styles = StyleSheet.create({
     marginBottom: 30,
   },
   logoImage: {
-    width: 60,
-    height: 30,
-    marginBottom: 4,
+    width: Platform.select({ ios: 90, android: 100 }),
+    height: Platform.select({ ios: 45, android: 50 }),
+    marginBottom: -6,
   },
   versionText: {
     fontSize: 14,

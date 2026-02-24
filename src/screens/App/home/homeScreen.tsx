@@ -19,6 +19,7 @@ import SearchInput from "../../../components/SearchInput";
 import Communities from "@components/Communities";
 import TheBestForYou from "@components/TheBestForYou";
 import ChallengesSection from "../../../components/ChallengesSection";
+import PopularExercises from "../../../components/PopularExercises";
 import HeatingScreen from "../../../components/Heating";
 import Header from "@components/Header";
 import { useNavigation } from "@react-navigation/native";
@@ -87,6 +88,8 @@ const HomeScreen: React.FC = () => {
   const [selectedSpecialty, setSelectedSpecialty] = useState<string | null>(null);
   const [trainings, setTrainings] = useState<ExerciseItem[]>(exerciseData);
   const [loadingTrainings, setLoadingTrainings] = useState(false);
+  const [dailyPlans, setDailyPlans] = useState<any[]>([]);
+  const [loadingPlans, setLoadingPlans] = useState(false);
 
   useEffect(() => {
     const fetchTrainings = async () => {
@@ -120,6 +123,40 @@ const HomeScreen: React.FC = () => {
 
     fetchTrainings();
   }, [selectedSpecialty, user?.sessionId]);
+
+  useEffect(() => {
+    const fetchDailyPlans = async () => {
+      if (!user?.sessionId) return;
+      try {
+        setLoadingPlans(true);
+        const { api } = await import("@services/api");
+        // Ajuste o endpoint conforme sua tabela (ex: /daily-plans ou /treinos/daily)
+        const resp = await api.get("/treinos", {
+          params: { isDaily: true },
+          headers: { Authorization: `Bearer ${user.sessionId}` },
+        });
+
+        if (resp.data?.data) {
+          const apiPlans = resp.data.data.map((t: any) => ({
+            id: String(t.id),
+            title: t.title,
+            description: t.description || t.minutes,
+            sets: t.sets || "3 séries",
+            calories: t.calories,
+            category: t.category || "Fitness",
+            imageUrl: t.image_url || "https://res.cloudinary.com/ditlmzgrh/image/upload/v1757513125/prancha_g1v30x.png",
+          }));
+          setDailyPlans(apiPlans);
+        }
+      } catch (err) {
+        console.error("Erro ao buscar planos diários:", err);
+      } finally {
+        setLoadingPlans(false);
+      }
+    };
+
+    fetchDailyPlans();
+  }, [user?.sessionId]);
 
   const performSearch = useCallback(
     async (query: string) => {
@@ -305,56 +342,16 @@ const HomeScreen: React.FC = () => {
           selectedSpecialty={selectedSpecialty}
         />
         <Communities />
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>
-              {selectedSpecialty ? `Treinos de ${selectedSpecialty}` : "Exercícios populares"}
-            </Text>
-            {loadingTrainings && <ActivityIndicator size="small" color="#BBF246" />}
-          </View>
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            style={styles.exercisesList}
-          >
-            {trainings.map((exercise) => (
-              <ImageBackground
-                key={exercise.id}
-                source={{ uri: exercise.imageUrl }}
-                style={styles.exerciseCard}
-                imageStyle={{ borderRadius: 16 }}
-              >
-                <View style={styles.imageOverlay}>
-                  <View style={styles.exerciseCardContent}>
-                    <Text style={styles.exerciseTitle}>{exercise.title}</Text>
-                    <View style={styles.exerciseInfo}>
-                      <View style={styles.tagsContainer}>
-                        <View style={styles.calorieTag}>
-                          <Text style={styles.calorieText}>{exercise.calories}</Text>
-                        </View>
-                        <View style={styles.MinutesTag}>
-                          <Text style={styles.MinutesText}>{exercise.minutes}</Text>
-                        </View>
-                      </View>
-                      <TouchableOpacity
-                        style={styles.playButton}
-                        activeOpacity={0.7}
-                        onPress={() => {}}
-                      >
-                        <Play size={12} fill={"#192126"} />
-                      </TouchableOpacity>
-                    </View>
-                  </View>
-                </View>
-              </ImageBackground>
-            ))}
-          </ScrollView>
-        </View>
-        <PlanCardTraining />
+        <PopularExercises
+          trainings={trainings}
+          selectedSpecialty={selectedSpecialty}
+          loadingTrainings={loadingTrainings}
+        />
+        <PlanCardTraining planData={dailyPlans} />
         <TrainingBanner
           title="Melhor treino de superiores"
           imageUrl="https://img.freepik.com/free-photo/view-woman-helping-man-exercise-gym_52683-98092.jpg?t=st=1758297406~exp=1758301006~hmac=66860a69d0b54e22b28d0831392e01278764d6b6d47e956a9576e041c9e016c2&w=1480"
-          onPress={() => {}}
+          onPress={() => { }}
         />
         <TheBestForYou />
         <ChallengesSection />
@@ -488,7 +485,6 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: "bold",
     color: "#000",
-    marginBottom: 16,
   },
   seeAllText: {
     fontSize: 14,

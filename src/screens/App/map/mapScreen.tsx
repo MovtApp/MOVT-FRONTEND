@@ -443,7 +443,7 @@ const MapScreen: React.FC = () => {
       />
 
       {/* Card de Academia */}
-      {selectedGym && !isGymDetailsOpen && (
+      {selectedGym && !isGymDetailsOpen && !isSheetOpen && !isMapSheetOpen && (
         <View
           style={[
             gymCardStyles.container,

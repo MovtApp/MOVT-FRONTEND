@@ -33,7 +33,10 @@ const Communities: React.FC<CommunitiesProps> = ({
   return (
     <View style={styles.section}>
       <View style={styles.sectionHeader}>
-        <Text style={styles.sectionTitle}>Comunidades</Text>
+        <View>
+          <Text style={styles.sectionTitle}>Comunidades</Text>
+          <View style={styles.activeIndicator} />
+        </View>
         {showSeeAll && (
           <TouchableOpacity onPress={() => navigation.navigate("CommunityScreen")}>
             <Text style={styles.seeAllText}>Ver todas</Text>
@@ -77,24 +80,31 @@ const styles = StyleSheet.create({
   sectionHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 16,
+    alignItems: "flex-end",
+    marginBottom: 20,
+    paddingHorizontal: 4,
   },
   sectionTitle: {
-    fontSize: 20,
-    fontWeight: "bold",
-    color: "#000",
-    marginBottom: 16,
+    fontSize: 22,
+    fontWeight: "800",
+    color: "#111827",
+    letterSpacing: -0.5,
+  },
+  activeIndicator: {
+    width: 30,
+    height: 4,
+    backgroundColor: "#BBF246",
+    borderRadius: 2,
+    marginTop: 4,
   },
   seeAllText: {
     fontSize: 14,
-    color: "#666",
-    textDecorationLine: "underline",
-    marginTop: -18,
+    color: "#4B5563",
+    fontWeight: "600",
+    marginTop: -24,
   },
   communitiesList: {
     marginLeft: -4,
-    marginTop: -18,
   },
   communityItem: {
     alignItems: "center",

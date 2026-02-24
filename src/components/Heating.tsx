@@ -1,18 +1,29 @@
-import React from "react";
-import { Text, TouchableOpacity, View, Image, StyleSheet } from "react-native";
+import React, { useRef } from "react";
+import {
+  Text,
+  TouchableOpacity,
+  View,
+  Image,
+  StyleSheet,
+  Animated,
+  Pressable,
+  Platform,
+} from "react-native";
+import { Clock, Play, ChevronRight, Activity } from "lucide-react-native";
+import { LinearGradient } from "expo-linear-gradient";
 
 export interface Heating {
   imageUrl: string;
   title: string;
   level: string;
   minutes: string;
-  id: string; // Adicionado o id para usar como key
+  id: string;
 }
 
 const heatingData: Heating[] = [
   {
     id: "1",
-    title: "Mobilidade",
+    title: "Mobilidade Articular",
     level: "Iniciante",
     minutes: "10 min",
     imageUrl:
@@ -28,48 +39,110 @@ const heatingData: Heating[] = [
   },
   {
     id: "3",
-    title: "Elevação de pernas",
-    level: "3 séries por dia",
-    minutes: "12 - 18 Kcal",
+    title: "Elevação de Pernas",
+    level: "Modo Ativo",
+    minutes: "12 min",
     imageUrl:
       "https://img.freepik.com/free-photo/side-view-determined-young-woman-holding-slam-ball-with-her-legs-doing-abdominal-crunches-have-flat-abs_662251-1367.jpg?t=st=1758304715~exp=1758308315~hmac=28cd720f804c7bf649b7d575084bd3812f74fb786d8df1daf0da95a43b182eef&w=1480",
   },
-  {
-    id: "4",
-    title: "Alongamento de Tronco",
-    level: "Iniciante",
-    minutes: "8 min",
-    imageUrl:
-      "https://img.freepik.com/free-photo/sportswoman-stretching-muscles-making-functional-training-makes-slope_1153-6338.jpg?t=st=1758304747~exp=1758308347~hmac=1821798d962d2806fbbdc5c1d71c754040724c29b67b564041bd4e9f247e08bd&w=1480",
-  },
-  {
-    id: "5",
-    title: "Rotação de Braços",
-    level: "Iniciante",
-    minutes: "7 min",
-    imageUrl:
-      "https://img.freepik.com/free-photo/woman-training-athletics_52683-151583.jpg?t=st=1758304782~exp=1758308382~hmac=5e8a066b793881320834eafcef5101f37b41c0bdec6b069bac02759b3828c825&w=1480",
-  },
 ];
+
+const HeatingCard: React.FC<{ item: Heating; onPress?: () => void }> = ({ item, onPress }) => {
+  const scale = useRef(new Animated.Value(1)).current;
+  const translateY = useRef(new Animated.Value(0)).current;
+
+  const handlePressIn = () => {
+    Animated.parallel([
+      Animated.spring(scale, { toValue: 0.98, useNativeDriver: true }),
+      Animated.spring(translateY, { toValue: 2, useNativeDriver: true }),
+    ]).start();
+  };
+
+  const handlePressOut = () => {
+    Animated.parallel([
+      Animated.spring(scale, { toValue: 1, useNativeDriver: true }),
+      Animated.spring(translateY, { toValue: 0, useNativeDriver: true }),
+    ]).start();
+  };
+
+  return (
+    <Animated.View style={[styles.cardWrapper, { transform: [{ scale }, { translateY }] }]}>
+      <Pressable onPressIn={handlePressIn} onPressOut={handlePressOut} onPress={onPress}>
+        <LinearGradient
+          colors={["#FFFFFF", "#F9FAFB"]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.card}
+        >
+          {/* Seção da Imagem (100% de Altura) */}
+          <View style={styles.imageContainer}>
+            <Image source={{ uri: item.imageUrl }} style={styles.cardImage} resizeMode="cover" />
+            <LinearGradient
+              colors={["transparent", "rgba(0,0,0,0.04)"]}
+              style={StyleSheet.absoluteFill}
+            />
+          </View>
+
+          {/* Conteúdo do Texto */}
+          <View style={styles.cardContent}>
+            <View style={styles.headerRow}>
+              <View style={styles.typeBadge}>
+                <Activity size={10} color="#BBF246" />
+                <Text style={styles.typeBadgeText}>AQUECIMENTO</Text>
+              </View>
+            </View>
+
+            <Text style={styles.cardTitle} numberOfLines={1}>
+              {item.title}
+            </Text>
+
+            <View style={styles.infoRow}>
+              <View style={styles.infoItem}>
+                <Clock size={12} color="#9CA3AF" />
+                <Text style={styles.infoText}>{item.minutes}</Text>
+              </View>
+              <View style={styles.separator} />
+              <View style={styles.infoItem}>
+                <Text style={styles.infoText}>{item.level}</Text>
+              </View>
+            </View>
+
+            <View style={styles.actionRow}>
+              <Text style={styles.actionText}>Ver detalhes</Text>
+              <ChevronRight size={14} color="#6B7280" />
+            </View>
+          </View>
+
+          {/* Botão de Navegação Lateral */}
+          <TouchableOpacity style={styles.navButton} activeOpacity={0.7}>
+            <Play size={14} fill="#192126" color="#192126" />
+          </TouchableOpacity>
+        </LinearGradient>
+      </Pressable>
+    </Animated.View>
+  );
+};
 
 interface HeatingScreenProps {
   heatingData?: Heating[];
+  onPressItem?: (item: Heating) => void;
 }
 
-const HeatingScreen: React.FC<HeatingScreenProps> = ({ heatingData: _propheatingData }) => {
+const HeatingScreen: React.FC<HeatingScreenProps> = ({ heatingData: propData, onPressItem }) => {
+  const data = propData || heatingData;
+
   return (
     <View style={styles.section}>
-      <Text style={styles.sectionTitle}>Aquecimento rápido</Text>
-      <View style={styles.heatingCardsContainer}>
-        {heatingData.map((heating) => (
-          <TouchableOpacity key={heating.id} style={styles.heatingCard}>
-            <Image source={{ uri: heating.imageUrl }} style={styles.heatingCardImage} />
-            <View style={styles.heatingCardContent}>
-              <Text style={styles.heatingCardTitle}>{heating.title}</Text>
-              <Text style={styles.heatingCardText}>{heating.level}</Text>
-              <Text style={styles.heatingCardText}>{heating.minutes}</Text>
-            </View>
-          </TouchableOpacity>
+      <View style={styles.header}>
+        <View>
+          <Text style={styles.sectionTitle}>Aquecimento rápido</Text>
+          <View style={styles.activeIndicator} />
+        </View>
+      </View>
+
+      <View style={styles.cardsList}>
+        {data.map((item) => (
+          <HeatingCard key={item.id} item={item} onPress={() => onPressItem?.(item)} />
         ))}
       </View>
     </View>
@@ -78,53 +151,128 @@ const HeatingScreen: React.FC<HeatingScreenProps> = ({ heatingData: _propheating
 
 const styles = StyleSheet.create({
   section: {
+    paddingVertical: 10,
     marginBottom: 100,
   },
-  sectionTitle: {
-    fontSize: 20,
-    fontWeight: "bold",
-    color: "#000",
-    marginBottom: 16,
+  header: {
+    marginBottom: 10,
+    paddingHorizontal: 4,
   },
-  heatingCardsContainer: {
+  sectionTitle: {
+    fontSize: 22,
+    fontWeight: "800",
+    color: "#111827",
+    letterSpacing: -0.5,
+  },
+  activeIndicator: {
+    width: 30,
+    height: 4,
+    backgroundColor: "#BBF246",
+    borderRadius: 2,
+    marginTop: 4,
+  },
+  cardsList: {
+    gap: 16,
     marginTop: 10,
   },
-  heatingCard: {
-    flexDirection: "row",
+  cardWrapper: {
     backgroundColor: "#fff",
-    borderRadius: 16,
-    padding: 15,
-    marginBottom: 15,
-    alignItems: "center",
+    borderRadius: 24,
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 3.84,
-    elevation: 3,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
+    elevation: 4,
   },
-  heatingCardImage: {
-    width: 100,
-    height: 100,
-    borderRadius: 12,
-    marginRight: 15,
+  card: {
+    flexDirection: "row",
+    alignItems: "center",
+    borderRadius: 24,
+    borderWidth: 1,
+    borderColor: "#F3F4F6",
+    overflow: "hidden",
+    height: 120,
   },
-  heatingCardContent: {
+  imageContainer: {
+    width: 110,
+    height: "100%",
+    backgroundColor: "#F3F4F6",
+  },
+  cardImage: {
+    width: "100%",
+    height: "100%",
+  },
+  cardContent: {
     flex: 1,
+    marginLeft: 16,
+    paddingVertical: 12,
+    justifyContent: "center",
   },
-  heatingCardTitle: {
-    fontSize: 16,
-    fontWeight: "bold",
-    color: "#000",
-    marginBottom: 5,
+  headerRow: {
+    marginBottom: 4,
   },
-  heatingCardDescription: {
-    fontSize: 14,
-    color: "#666",
-    marginBottom: 3,
+  typeBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
   },
-  heatingCardText: {
-    fontSize: 14,
-    color: "#666",
+  typeBadgeText: {
+    fontSize: 9,
+    fontWeight: "900",
+    color: "#BBF246",
+    letterSpacing: 0.5,
+  },
+  cardTitle: {
+    fontSize: Platform.select({ ios: 17, android: 16 }),
+    fontWeight: "800",
+    color: "#192126",
+    marginBottom: 6,
+  },
+  infoRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 12,
+  },
+  infoItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+  },
+  separator: {
+    width: 4,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: "#E5E7EB",
+    marginHorizontal: 8,
+  },
+  infoText: {
+    fontSize: Platform.select({ ios: 11, android: 9 }),
+    color: "#9CA3AF",
+    fontWeight: "600",
+  },
+  actionRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 2,
+  },
+  actionText: {
+    fontSize: Platform.select({ ios: 12, android: 10 }),
+    fontWeight: "700",
+    color: "#4B5563",
+  },
+  navButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: "#BBF246",
+    justifyContent: "center",
+    alignItems: "center",
+    marginRight: 15,
+    shadowColor: "#BBF246",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 5,
+    elevation: 3,
   },
 });
 

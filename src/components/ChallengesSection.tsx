@@ -70,14 +70,19 @@ const challengeData: Challenge[] = [
 const ChallengesSection: React.FC = () => {
   return (
     <View style={styles.section}>
-      <Text style={styles.sectionTitle}>Desafios</Text>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.challengesList}>
+      <View style={styles.header}>
+        <View>
+          <Text style={styles.sectionTitle}>Desafios</Text>
+          <View style={styles.activeIndicator} />
+        </View>
+      </View>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false}>
         {challengeData.map((challenge) => (
           <ChallengeCard
             key={challenge.id}
             image={challenge.image}
             title={challenge.title}
-            onPress={() => {}} // Removido console.log
+            onPress={() => { }} // Removido console.log
           />
         ))}
       </ScrollView>
@@ -89,14 +94,22 @@ const styles = StyleSheet.create({
   section: {
     marginBottom: 30,
   },
-  sectionTitle: {
-    fontSize: 20,
-    fontWeight: "bold",
-    color: "#000",
-    marginBottom: 16,
+  header: {
+    marginBottom: 20,
+    paddingHorizontal: 4,
   },
-  challengesList: {
-    marginLeft: -4,
+  sectionTitle: {
+    fontSize: 22,
+    fontWeight: "800",
+    color: "#111827",
+    letterSpacing: -0.5,
+  },
+  activeIndicator: {
+    width: 30,
+    height: 4,
+    backgroundColor: "#BBF246",
+    borderRadius: 2,
+    marginTop: 4,
   },
 });
 
