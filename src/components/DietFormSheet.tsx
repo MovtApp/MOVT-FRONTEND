@@ -215,7 +215,7 @@ const DietFormSheet: React.FC<DietFormSheetProps> = ({
     if (imageUrlToUpload && imageUrlToUpload.startsWith("file://")) {
       console.log("📤 Fazendo upload da imagem para Supabase...");
       try {
-        const publicUrl = await uploadImageToSupabase(imageUrlToUpload);
+        const publicUrl = await uploadImageToSupabase(imageUrlToUpload, "diet-images");
         if (publicUrl) {
           imageUrlToUpload = publicUrl;
           console.log("✅ Upload da imagem concluído:", publicUrl);

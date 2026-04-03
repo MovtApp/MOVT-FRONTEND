@@ -1,0 +1,45 @@
+ext {
+    ndkVersion = "23.1.7779620"
+}
+
+subprojects {
+    afterEvaluate { project ->
+        if (project.plugins.hasPlugin("com.android.application") || project.plugins.hasPlugin("com.android.library")) {
+            project.android {
+                try {
+                    externalNativeBuild {
+                        cmake {
+                            cppFlags "-fexceptions", "-frtti", "-std=c++17", "-DFOLLY_MOBILE=1", "-DFOLLY_USE_LIBCPP=1", "-D_DISABLE_EXTENDED_ALIGNED_STORAGE", "-D_LIBCPP_ENABLE_CXX17_REMOVED_FEATURES"
+                        }
+                    }
+                } catch (Exception e) {
+                    // Ignora se o módulo não tiver suporte a CMake nativo
+                }
+            }
+        }
+    }
+}
+
+
+buildscript {
+  repositories {
+    google()
+    mavenCentral()
+  }
+  dependencies {
+    classpath('com.android.tools.build:gradle')
+    classpath('com.facebook.react:react-native-gradle-plugin')
+    classpath('org.jetbrains.kotlin:kotlin-gradle-plugin')
+  }
+}
+
+allprojects {
+  repositories {
+    google()
+    mavenCentral()
+    maven { url 'https://www.jitpack.io' }
+  }
+}
+
+apply plugin: "expo-root-project"
+apply plugin: "com.facebook.react.rootproject"

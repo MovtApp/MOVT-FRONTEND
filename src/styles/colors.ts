@@ -26,4 +26,5 @@ export const COLORS = {
     90: "#1A1A1A",
     100: "#000000",
   },
+  primary_green: "#BBF246",
 };

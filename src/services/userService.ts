@@ -119,7 +119,7 @@ export const userService = {
   },
   updatePost: async (postId: string, legenda: string) => {
     const headers = await getAuthHeaders();
-    const response = await api.put(`/user/posts/${postId}`, { legenda }, headers);
+    const response = await api.patch(`/user/posts/${postId}`, { legenda }, headers);
     return response.data;
   },
   toggleLike: async (postId: string) => {
@@ -140,6 +140,11 @@ export const userService = {
   deleteComment: async (commentId: string) => {
     const headers = await getAuthHeaders();
     const response = await api.delete(`/user/posts/comments/${commentId}`, headers);
+    return response.data;
+  },
+  archivePost: async (postId: string) => {
+    const headers = await getAuthHeaders();
+    const response = await api.post(`/user/posts/${postId}/archive`, {}, headers);
     return response.data;
   },
 };

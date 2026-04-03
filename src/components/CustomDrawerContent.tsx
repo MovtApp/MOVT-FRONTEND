@@ -13,6 +13,7 @@ import {
   HelpCircle,
   Info,
   LogOut,
+  Layout,
 } from "lucide-react-native";
 import { AppStackParamList } from "../@types/routes";
 import { useAuth } from "../hooks/useAuth";
@@ -41,6 +42,7 @@ export function CustomDrawerContent(props: DrawerContentComponentProps) {
 
   const panelItems = [
     { name: "Agendamentos", icon: Calendar, route: "Appointments" },
+    { name: "Feed", icon: Layout, route: "FeedScreen" },
     { name: "Comunidades", icon: Users, route: "CommunityScreen" },
     { name: "Planos", icon: Users, route: "PlanScreen" },
   ];

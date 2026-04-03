@@ -98,6 +98,7 @@ export type AppStackParamList = {
         };
       }
     | undefined;
+  FeedScreen: undefined;
 };
 
 export interface Community {

@@ -30,7 +30,7 @@ const auth_login = async (unidade: string, login: string, senha: string) => {
   });
 };
 
-async function uploadImageToSupabase(imageUri: string): Promise<string | null> {
+async function uploadImageToSupabase(imageUri: string, bucketName: string = "diet-images"): Promise<string | null> {
   if (!imageUri) {
     console.warn("Image URI is empty, skipping upload.");
     return null;
@@ -40,8 +40,8 @@ async function uploadImageToSupabase(imageUri: string): Promise<string | null> {
   const fileExtension = fileName.split(".").pop();
   const newFileName = `${Date.now()}.${fileExtension}`;
 
-  let contentType = "image/jpeg"; // Default content type, will try to infer more accurately
-  switch (fileExtension) {
+  let contentType = "image/jpeg"; 
+  switch (fileExtension?.toLowerCase()) {
     case "png":
       contentType = "image/png";
       break;
@@ -52,73 +52,51 @@ async function uploadImageToSupabase(imageUri: string): Promise<string | null> {
     case "gif":
       contentType = "image/gif";
       break;
-    // Add more types as needed
   }
 
   console.log("Detected file extension:", fileExtension);
   console.log("Inferred content type:", contentType);
+  console.log("Target bucket:", bucketName);
 
   try {
-    const fileInfo = await FileSystem.getInfoAsync(imageUri);
-    if (!fileInfo.exists) {
-      console.error("❌ Arquivo de imagem não encontrado:", imageUri);
-      throw new Error("Arquivo de imagem não encontrado."); // Lançar erro para ser capturado no DietFormSheet
-    }
-
-    // Read the image file as a Base64 string
-    const base64 = await FileSystem.readAsStringAsync(imageUri, {
-      encoding: "base64",
-    });
-
-    // Convert Base64 to ArrayBuffer
-    const binaryString = atob(base64);
-    const len = binaryString.length;
-    const bytes = new Uint8Array(len);
-    for (let i = 0; i < len; i++) {
-      bytes[i] = binaryString.charCodeAt(i);
-    }
-    const arrayBuffer = bytes.buffer;
-
     // 1. Obter uma URL de upload assinada do Supabase
     const { data: signedUploadData, error: signedUploadError } = await supabase.storage
-      .from("diet-images") // Certifique-se de que este é o nome correto do seu bucket
+      .from(bucketName)
       .createSignedUploadUrl(newFileName);
 
     if (signedUploadError) {
       console.error("❌ Erro ao obter URL de upload assinada do Supabase:", signedUploadError);
-      console.error(
-        "Detalhes do erro do createSignedUploadUrl:",
-        JSON.stringify(signedUploadError, null, 2)
-      );
-      throw signedUploadError; // Rejeitar a Promise
+      throw signedUploadError;
     }
 
-    const { signedUrl, path } = signedUploadData; // 'path' vem de signedUploadData, não é mais data.path
+    const { signedUrl, path } = signedUploadData;
 
-    // 2. Usar fetch para fazer o upload diretamente para a URL assinada
+    // 2. Converter imagem para Blob de forma eficiente no React Native
+    const response = await fetch(imageUri);
+    const blob = await response.blob();
+
+    // 3. Fazer o upload para a URL assinada
     const uploadResponse = await fetch(signedUrl, {
       method: "PUT",
       headers: {
         "Content-Type": contentType,
-        "Cache-Control": "3600",
-        "x-upsert": "true", // Garante que o arquivo seja sobrescrito se já existir
+        "x-upsert": "true",
       },
-      body: arrayBuffer,
+      body: blob,
     });
 
     if (!uploadResponse.ok) {
       const errorText = await uploadResponse.text();
-      console.error(`❌ Erro HTTP no upload direto (${uploadResponse.status}):`, errorText);
-      throw new Error(`Falha no upload direto da imagem: ${uploadResponse.status} - ${errorText}`);
+      console.error(`❌ Erro no upload direto (${uploadResponse.status}):`, errorText);
+      throw new Error(`Falha no upload direto da imagem: ${uploadResponse.status}`);
     }
 
-    console.log("✅ Upload direto concluído com sucesso para a URL assinada.");
+    console.log("✅ Upload concluído com sucesso.");
 
-    // 3. Obter a URL pública (usamos o 'path' que obtivemos da URL assinada)
-    const { data: publicUrlData } = supabase.storage.from("diet-images").getPublicUrl(path); // Usar o 'path' do signedUploadData
+    // 4. Obter a URL pública
+    const { data: publicUrlData } = supabase.storage.from(bucketName).getPublicUrl(path);
 
     if (!publicUrlData.publicUrl) {
-      console.error("❌ Não foi possível obter a URL pública da imagem após upload direto");
       throw new Error("Falha ao obter a URL pública da imagem");
     }
 
@@ -126,7 +104,6 @@ async function uploadImageToSupabase(imageUri: string): Promise<string | null> {
     return publicUrlData.publicUrl;
   } catch (err: any) {
     console.error("❌ Erro no processamento ou upload da imagem:", err.message);
-    // O erro já foi lançado e tratado em DietFormSheet, aqui só registramos
     return null;
   }
 }

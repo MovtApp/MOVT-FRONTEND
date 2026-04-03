@@ -42,6 +42,16 @@ export interface Message {
   image?: string;
   pending?: boolean;
   read?: boolean;
+  shareData?: {
+    type: string;
+    post_id: string | number;
+    image_url: string;
+    caption: string;
+    author_name: string;
+    author_avatar: string;
+    likes_count?: number;
+    comments_count?: number;
+  };
 }
 
 export const useChats = (userId: string) => {
@@ -151,18 +161,47 @@ export const useMessages = (chatId: string, userId: string) => {
           });
           if (resp.status === 200) {
             const data = resp.data.data || [];
-            const formatted: Message[] = data.map((msg: any) => ({
-              _id: msg.id,
-              text: msg.text || "",
-              image: msg.image_url,
-              createdAt: new Date(msg.created_at),
-              user: {
-                _id: msg.sender_id,
-                name: String(msg.sender_id) === String(userId) ? "Eu" : "Participante",
-                avatar: `https://i.pravatar.cc/150?u=${msg.sender_id}`,
-              },
-              read: !!msg.is_read,
-            }));
+            const formatted: Message[] = data.map((msg: any) => {
+              let text = msg.text || "";
+              let shareData = undefined;
+              let image = msg.image_url;
+
+              try {
+                if (text && text.includes('"type":"shared_post"')) {
+                  // Tenta extrair o JSON puro caso haja lixo em volta
+                  const startIdx = text.indexOf('{"');
+                  const endIdx = text.lastIndexOf('}') + 1;
+                  const jsonStr = text.substring(startIdx, endIdx);
+                  
+                  const parsed = JSON.parse(jsonStr);
+                  if (parsed.type === "shared_post") {
+                    shareData = {
+                      ...parsed,
+                      likes_count: parsed.likes_count || 0,
+                      comments_count: parsed.comments_count || 0
+                    };
+                    text = parsed.caption || "Compartilhou um post";
+                    image = null;
+                  }
+                }
+              } catch (e) {
+                // Not a valid JSON or not a shared post
+              }
+
+              return {
+                _id: msg.id,
+                text: text,
+                image: image,
+                createdAt: new Date(msg.created_at),
+                user: {
+                  _id: msg.sender_id,
+                  name: String(msg.sender_id) === String(userId) ? "Eu" : "Participante",
+                  avatar: `https://i.pravatar.cc/150?u=${msg.sender_id}`,
+                },
+                read: !!msg.is_read,
+                shareData: shareData
+              };
+            });
 
             setMessages((prev) => {
               const newMessages =
@@ -278,18 +317,45 @@ export const useMessages = (chatId: string, userId: string) => {
 
         // Substituir a otimista pela real do banco
         setMessages((prev) =>
-          prev.map((m) =>
-            String(m._id) === String(tempId)
-              ? {
-                  ...m,
-                  _id: savedMsg.id,
-                  text: savedMsg.text ? savedMsg.text : msg.text,
-                  createdAt: new Date(savedMsg.created_at),
-                  image: savedMsg.image_url,
-                  read: !!savedMsg.is_read,
+          prev.map((m) => {
+            if (String(m._id) === String(tempId)) {
+              // Prioriza o texto local (limpo) sobre o do banco (que pode vir criptografado no POST inicial)
+              let text = msg.text || savedMsg.text;
+              let shareData = undefined;
+              let image = savedMsg.image_url;
+
+              try {
+                if (text && text.includes('"type":"shared_post"')) {
+                  // Tenta extrair o JSON puro caso haja lixo em volta
+                  const startIdx = text.indexOf('{"');
+                  const endIdx = text.lastIndexOf('}') + 1;
+                  const jsonStr = text.substring(startIdx, endIdx);
+
+                  const parsed = JSON.parse(jsonStr);
+                  if (parsed.type === "shared_post") {
+                    shareData = {
+                      ...parsed,
+                      likes_count: parsed.likes_count || 0,
+                      comments_count: parsed.comments_count || 0
+                    };
+                    text = parsed.caption || "Compartilhou um post";
+                    image = null;
+                  }
                 }
-              : m
-          )
+              } catch (e) {}
+
+              return {
+                ...m,
+                _id: savedMsg.id,
+                text,
+                createdAt: new Date(savedMsg.created_at),
+                image,
+                read: !!savedMsg.is_read,
+                shareData
+              };
+            }
+            return m;
+          })
         );
       } else {
         setMessages((prev) => prev.filter((m) => String(m._id) !== String(tempId)));
@@ -451,17 +517,45 @@ export const usePreloadChat = () => {
               // Preload mensagens
               const mResp = await api.get(`/chat/${chat.id}/messages`, { params: { limit: 20 } });
               if (mResp.status === 200) {
-                globalChatCache.messages[chat.id] = mResp.data.data.map((msg: any) => ({
-                  _id: msg.id,
-                  text: msg.text || "",
-                  createdAt: new Date(msg.created_at),
-                  user: {
-                    _id: msg.sender_id,
-                    name: String(msg.sender_id) === String(effectiveUserId) ? "Eu" : "Participante",
-                    avatar: `https://i.pravatar.cc/150?u=${msg.sender_id}`,
-                  },
-                  read: !!msg.is_read,
-                }));
+                globalChatCache.messages[chat.id] = mResp.data.data.map((msg: any) => {
+                  let text = msg.text || "";
+                  let shareData = undefined;
+                  let image = msg.image_url;
+
+                  try {
+                    if (text && text.includes('"type":"shared_post"')) {
+                      // Tenta extrair o JSON puro caso haja lixo em volta
+                      const startIdx = text.indexOf('{"');
+                      const endIdx = text.lastIndexOf('}') + 1;
+                      const jsonStr = text.substring(startIdx, endIdx);
+
+                      const parsed = JSON.parse(jsonStr);
+                      if (parsed.type === "shared_post") {
+                        shareData = {
+                          ...parsed,
+                          likes_count: parsed.likes_count || 0,
+                          comments_count: parsed.comments_count || 0
+                        };
+                        text = parsed.caption || "Compartilhou um post";
+                        image = null;
+                      }
+                    }
+                  } catch (e) {}
+
+                  return {
+                    _id: msg.id,
+                    text: text,
+                    image: image,
+                    createdAt: new Date(msg.created_at),
+                    user: {
+                      _id: msg.sender_id,
+                      name: String(msg.sender_id) === String(effectiveUserId) ? "Eu" : "Participante",
+                      avatar: `https://i.pravatar.cc/150?u=${msg.sender_id}`,
+                    },
+                    read: !!msg.is_read,
+                    shareData
+                  };
+                });
               }
 
               // Preload perfil completo do participante

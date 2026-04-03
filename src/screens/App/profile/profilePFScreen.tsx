@@ -12,6 +12,7 @@ import {
   ActivityIndicator,
   Modal,
   TextInput,
+  Share,
 } from "react-native";
 import { useAuth } from "@contexts/AuthContext";
 import {
@@ -31,6 +32,7 @@ import { userService } from "@services/userService";
 import BackButton from "@components/BackButton";
 import FollowListModal from "@components/FollowListModal";
 import PostFormSheet from "@components/PostFormSheet";
+import SharePostSheet from "@components/SharePostSheet";
 import { useRoute, RouteProp, useNavigation } from "@react-navigation/native";
 import { AppStackParamList } from "../../../@types/routes";
 import { useProfileCache } from "@/hooks/useChat";
@@ -91,6 +93,7 @@ const ProfilePFScreen = () => {
 
   // Post setup
   const [isPostSheetOpen, setIsPostSheetOpen] = useState(false);
+  const shareSheetRef = useRef<any>(null);
 
   // Stats and modal states
   const [stats, setStats] = useState(
@@ -472,6 +475,11 @@ const ProfilePFScreen = () => {
     setIsPostSheetOpen(true);
   };
 
+  const handleOpenShare = (post: any) => {
+    setSelectedPost(post);
+    shareSheetRef.current?.present();
+  };
+
   if (loadingProfile && !fetchedUser && !route.params?.user) {
     return (
       <View style={[styles.container, { justifyContent: "center", alignItems: "center" }]}>
@@ -748,6 +756,20 @@ const ProfilePFScreen = () => {
           setSheetIndex={setPostSheetIndex}
           onSuccess={fetchPosts}
         />
+
+        <SharePostSheet
+          postData={selectedPost ? {
+            id: selectedPost.id || selectedPost.post_id,
+            url: selectedPost.url || selectedPost.image_url || selectedPost.media?.[0]?.media_url || selectedPost.media_url,
+            legenda: selectedPost.legenda || selectedPost.caption || "",
+            author_id: profileData.id,
+            author_name: profileData.username,
+            author_avatar: profileData.photo,
+            likes_count: selectedPost.likes_count || 0,
+            comments_count: selectedPost.comments_count || 0
+          } : null}
+          bottomSheetRef={shareSheetRef}
+        />
       </View>
 
       {/* Modal de Visualização de Post */}
@@ -810,12 +832,16 @@ const ProfilePFScreen = () => {
                     color={selectedPost?.is_liked ? "#EF4444" : "#1E293B"}
                     fill={selectedPost?.is_liked ? "#EF4444" : "none"}
                   />
-                  <Text style={styles.viewerActionText}>{selectedPost?.likes_count || 0}</Text>
                 </TouchableOpacity>
                 <View style={styles.viewerActionItem}>
                   <MessageCircle size={22} color="#1E293B" />
-                  <Text style={styles.viewerActionText}>{selectedPost?.comments_count || 0}</Text>
                 </View>
+                <TouchableOpacity 
+                   style={styles.viewerActionItem}
+                   onPress={() => handleOpenShare(selectedPost)}
+                >
+                  <Send size={22} color="#1E293B" />
+                </TouchableOpacity>
               </View>
 
               <View style={styles.viewerCaptionRow}>
@@ -920,6 +946,7 @@ const ProfilePFScreen = () => {
           navigation.push("ProfilePFScreen", { user });
         }}
       />
+
     </View>
   );
 };

@@ -45,6 +45,7 @@ const HIDDEN_SCREENS = [
   "PoliciesScreen",
   "CommunityDetails",
   "TrainingDetails",
+  "FeedScreen"
 ];
 // ============================================================================
 

@@ -1,3 +1,4 @@
+import "react-native-url-polyfill/auto";
 import "./global.css";
 import "./src/i18n";
 import React from "react";
@@ -9,6 +10,7 @@ import { usePreloadChat } from "@/hooks/useChat";
 import { LocationProvider } from "@contexts/LocationContext";
 import { NotificationProvider } from "@contexts/NotificationContext";
 import { BottomNavProvider } from "@contexts/BottomNavContext";
+import { BottomSheetModalProvider } from "@gorhom/bottom-sheet";
 import { StatusBar, ActivityIndicator, View } from "react-native";
 import {
   useFonts,
@@ -71,10 +73,12 @@ export default function App() {
           flex: 1,
         }}
       >
-        <StatusBar barStyle={"light-content"} translucent />
-        <AuthProvider>
-          <AppContent />
-        </AuthProvider>
+        <StatusBar barStyle={"dark-content"} />
+        <BottomSheetModalProvider>
+          <AuthProvider>
+            <AppContent />
+          </AuthProvider>
+        </BottomSheetModalProvider>
       </GestureHandlerRootView>
     </SafeAreaProvider>
   );

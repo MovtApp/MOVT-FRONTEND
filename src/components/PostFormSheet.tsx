@@ -144,7 +144,7 @@ const PostFormSheet: React.FC<PostFormSheetProps> = ({
 
     try {
       if (finalImageUrl.startsWith("file://")) {
-        const publicUrl = await uploadImageToSupabase(finalImageUrl);
+        const publicUrl = await uploadImageToSupabase(finalImageUrl, "diet-images");
         if (publicUrl) {
           finalImageUrl = publicUrl;
         } else {

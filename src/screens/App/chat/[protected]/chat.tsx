@@ -12,6 +12,9 @@ import {
   Animated,
   TouchableOpacity,
   ActionSheetIOS,
+  Modal,
+  TextInput,
+  FlatList,
 } from "react-native";
 import {
   GiftedChat,
@@ -21,10 +24,11 @@ import {
   Actions,
   ActionsProps,
   Composer,
+  Message,
 } from "react-native-gifted-chat";
 import { useMessages, useProfileCache } from "@/hooks/useChat";
 import { useRoute, useNavigation } from "@react-navigation/native";
-import { Send as SendIcon, CheckCheck, Plus } from "lucide-react-native";
+import { Send as SendIcon, CheckCheck, Plus, Heart, MessageCircle } from "lucide-react-native";
 import { useAuth } from "@/contexts/AuthContext";
 import * as ImagePicker from "expo-image-picker";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -59,6 +63,88 @@ const Chat = () => {
 
   const { profile: cachedProfile, updateProfileCache } = useProfileCache(participantId);
   const [keyboardOffset] = useState(new Animated.Value(0));
+  const [isKeyboardOpen, setIsKeyboardOpen] = useState(false);
+  const [inputText, setInputText] = useState("");
+
+  // Post detail states (cloned from profilePFScreen)
+  const [selectedPost, setSelectedPost] = useState<any>(null);
+  const [viewPostVisible, setViewPostVisible] = useState(false);
+  const [comments, setComments] = useState<any[]>([]);
+  const [loadingComments, setLoadingComments] = useState(false);
+  const [isLiking, setIsLiking] = useState(false);
+  const [newComment, setNewComment] = useState("");
+  const [isSendingComment, setIsSendingComment] = useState(false);
+
+  const handleOpenPostDetails = async (post: any) => {
+    setSelectedPost(post);
+    setViewPostVisible(true);
+    setLoadingComments(true);
+    try {
+      const res = await userService.getComments(String(post.id));
+      if (res.success) {
+        setComments(res.data);
+      }
+    } catch (error) {
+      console.error("Erro ao buscar comentários do post compartilhado:", error);
+    } finally {
+      setLoadingComments(false);
+    }
+  };
+
+  const handleToggleLike = async () => {
+    if (!selectedPost || isLiking) return;
+    setIsLiking(true);
+    const originalPost = { ...selectedPost };
+    const newIsLiked = !selectedPost.is_liked;
+    const newLikesCount = newIsLiked
+      ? Number(selectedPost.likes_count || 0) + 1
+      : Math.max(0, Number(selectedPost.likes_count || 0) - 1);
+
+    setSelectedPost((prev: any) => ({
+      ...prev,
+      is_liked: newIsLiked,
+      likes_count: newLikesCount,
+    }));
+
+    try {
+      await userService.toggleLike(String(selectedPost.id));
+    } catch (error) {
+      setSelectedPost(originalPost);
+    } finally {
+      setIsLiking(false);
+    }
+  };
+
+  const handleSendComment = async () => {
+    if (!newComment.trim() || !selectedPost || isSendingComment) return;
+    setIsSendingComment(true);
+    try {
+      const res = await userService.addComment(String(selectedPost.id), newComment);
+      if (res.success) {
+        console.log("👤 Dados do usuário logado para comentário:", user?.name, user?.username, user?.photo);
+        
+        // Injeta os dados do usuário atual para que o comentário apareça corretamente na UI
+        const newCommentWithUser = {
+          ...res.data,
+          comment_user_id: effectiveUserId,
+          nome: user?.name,
+          username: user?.username,
+          photo: user?.photo
+        };
+        
+        setComments((prev) => [...prev, newCommentWithUser]);
+        setNewComment("");
+        setSelectedPost((prev: any) => ({
+          ...prev,
+          comments_count: (Number(prev.comments_count) || 0) + 1,
+        }));
+      }
+    } catch (error) {
+      Alert.alert("Erro", "Não foi possível enviar o comentário.");
+    } finally {
+      setIsSendingComment(false);
+    }
+  };
 
   useEffect(() => {
     async function prefetchParticipant() {
@@ -95,19 +181,28 @@ const Chat = () => {
   }, [participantId]);
 
   useEffect(() => {
-    if (Platform.OS !== "android") return;
+    // Lidamos com as margens de forma reativa a ambos os sistemas
+    const showEvent = Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow";
+    const hideEvent = Platform.OS === "ios" ? "keyboardWillHide" : "keyboardDidHide";
 
-    const showSubscription = Keyboard.addListener("keyboardDidShow", (e) => {
-      Animated.spring(keyboardOffset, {
-        toValue: e.endCoordinates.height - (insets.bottom || 0) - 180,
-        useNativeDriver: false,
-      }).start();
+    const showSubscription = Keyboard.addListener(showEvent, (e) => {
+      setIsKeyboardOpen(true);
+      if (Platform.OS === "ios") {
+        Animated.spring(keyboardOffset, {
+          toValue: e.endCoordinates.height - (insets.bottom || 0),
+          useNativeDriver: false,
+        }).start();
+      }
     });
-    const hideSubscription = Keyboard.addListener("keyboardDidHide", () => {
-      Animated.spring(keyboardOffset, {
-        toValue: 0,
-        useNativeDriver: false,
-      }).start();
+
+    const hideSubscription = Keyboard.addListener(hideEvent, () => {
+      setIsKeyboardOpen(false);
+      if (Platform.OS === "ios") {
+        Animated.spring(keyboardOffset, {
+          toValue: 0,
+          useNativeDriver: false,
+        }).start();
+      }
     });
 
     return () => {
@@ -170,6 +265,7 @@ const Chat = () => {
     (newMessages: any[]) => {
       if (newMessages.length > 0) {
         sendMessage(newMessages);
+        setInputText(""); // Limpa o estado manual de texto
       }
     },
     [sendMessage]
@@ -249,33 +345,45 @@ const Chat = () => {
   };
 
   const renderBubble = (props: any) => {
-    const isLastMessage = !props.nextMessage || !props.nextMessage._id;
-    const marginBottom = isLastMessage ? (Platform.OS === "ios" ? 10 : 40) : 2;
+    const isMyMessage = props.currentMessage.user._id === effectiveUserId;
+    const isSharedPost = !!props.currentMessage.shareData;
+
+    if (isSharedPost) return null; // O post é renderizado pelo renderMessage
 
     return (
       <Bubble
         {...props}
-        containerStyle={{
-          left: { alignItems: "flex-start", width: "100%" },
-          right: { alignItems: "flex-end", width: "100%" },
-        }}
         wrapperStyle={{
           right: {
-            backgroundColor: "transparent",
-            marginBottom: marginBottom,
-            maxWidth: "100%",
-            minWidth: 0,
-            paddingHorizontal: 0,
+            backgroundColor: "#F3F4F6", // Cinza neutro e minimalista
+            borderRadius: 15,
+            padding: 2,
+            maxWidth: "82%",
+            borderWidth: 0,
           },
           left: {
-            backgroundColor: "transparent",
-            marginBottom: marginBottom,
-            maxWidth: "100%",
-            minWidth: 0,
-            paddingHorizontal: 0,
+            backgroundColor: "#F1F5F9",
+            borderRadius: 15,
+            padding: 2,
+            maxWidth: "82%",
           },
         }}
-        renderTime={() => null}
+        textStyle={{
+          right: { color: "#000", fontSize: 15 },
+          left: { color: "#000", fontSize: 15 },
+        }}
+        containerStyle={{
+          right: { 
+            marginBottom: props.nextMessage?._id 
+              ? 2 
+              : (Platform.OS === "android" ? 5 : (isKeyboardOpen ? 10 : 40)) 
+          },
+          left: { 
+            marginBottom: props.nextMessage?._id 
+              ? 2 
+              : (Platform.OS === "android" ? 5 : (isKeyboardOpen ? 10 : 40)) 
+          },
+        }}
         renderTicks={() => null}
       />
     );
@@ -308,6 +416,71 @@ const Chat = () => {
     const current = dayjs(currentMessage.createdAt);
     const previous = dayjs(previousMessage.createdAt);
     return current.isSame(previous, "day");
+  };
+
+  const renderMessage = (props: any) => {
+    const { currentMessage } = props;
+    const isMyMessage = currentMessage.user._id === effectiveUserId;
+    const isSharedPost = currentMessage.shareData;
+
+    if (isSharedPost) {
+      const data = currentMessage.shareData;
+      const normalizedPost = {
+        id: data.post_id,
+        url: data.image_url,
+        legenda: data.caption,
+        likes_count: data.likes_count || 0,
+        comments_count: data.comments_count || 0,
+        author: {
+          username: data.author_name,
+          avatar_url: data.author_avatar
+        }
+      };
+
+      return (
+        <View style={{ 
+          width: "100%", 
+          alignItems: isMyMessage ? "flex-end" : "flex-start",
+          paddingHorizontal: 15,
+          marginVertical: 0,
+          marginBottom: props.nextMessage?._id ? 2 : (Platform.OS === 'android' ? 8 : (isKeyboardOpen ? 10 : 40))
+        }}>
+          <View style={[
+            styles.shareContainer,
+            { width: 280, maxWidth: "85%" }
+          ]}>
+            <TouchableOpacity 
+              activeOpacity={0.9} 
+              onPress={() => handleOpenPostDetails(normalizedPost)}
+              style={styles.shareContent}
+            >
+              {/* Header do Card */}
+              <View style={styles.shareHeader}>
+                <Image source={{ uri: data.author_avatar }} style={styles.shareAvatar} />
+                <Text style={styles.shareUsername} numberOfLines={1}>{data.author_name}</Text>
+              </View>
+              
+              {/* Imagem do Post */}
+              <Image 
+                source={{ uri: data.image_url }} 
+                style={[styles.shareImage, { height: 280 }]} 
+                resizeMode="cover"
+              />
+              
+              {/* Footer com legenda */}
+              <View style={styles.shareFooter}>
+                <Text style={styles.shareCaption} numberOfLines={2}>
+                  <Text style={{ fontWeight: "700" }}>{data.author_name}</Text> {data.caption}
+                </Text>
+              </View>
+            </TouchableOpacity>
+          </View>
+        </View>
+      );
+    }
+
+    const { key, ...rest } = props;
+    return <Message {...rest} key={currentMessage._id} />;
   };
 
   const renderMessageText = (props: any) => {
@@ -367,60 +540,91 @@ const Chat = () => {
   );
 
   const renderInputToolbar = useCallback(
-    (props: any) => (
-      <Animated.View
-        style={{
-          transform: [{ translateY: Animated.multiply(keyboardOffset, -1) }],
-          position: "absolute",
-          bottom: 0,
-          width: "100%",
-          zIndex: 10,
-        }}
-      >
-        <InputToolbar
-          {...props}
-          containerStyle={[
-            styles.inputToolbar,
-            {
-              marginBottom: Platform.OS === "ios" ? 20 : insets.bottom > 0 ? insets.bottom : 0,
-              position: "relative", // Override absolute from styles since parent is now absolute
-            },
-          ]}
-          primaryStyle={styles.inputToolbarPrimary}
-        />
-      </Animated.View>
-    ),
-    [insets.bottom, keyboardOffset]
+    (props: any) => {
+      if (Platform.OS === "android") {
+        return (
+          <InputToolbar
+            {...props}
+            containerStyle={[
+              styles.inputToolbar,
+              {
+                paddingBottom: insets.bottom > 0 ? insets.bottom : 0,
+                borderTopWidth: 1,
+                borderTopColor: "#f0f0f0",
+              },
+            ]}
+            primaryStyle={styles.inputToolbarPrimary}
+            renderComposer={renderComposer}
+            renderSend={renderSend}
+            renderActions={renderActions}
+          />
+        );
+      }
+
+      return (
+        <Animated.View
+          style={{
+            transform: [{ translateY: Animated.multiply(keyboardOffset, -1) }],
+            width: "100%",
+            zIndex: 10,
+            position: "absolute",
+            bottom: 0,
+            minHeight: 60,
+          }}
+        >
+          <InputToolbar
+            {...props}
+            containerStyle={[
+              styles.inputToolbar,
+              {
+                paddingBottom: insets.bottom,
+              },
+            ]}
+            primaryStyle={styles.inputToolbarPrimary}
+          />
+        </Animated.View>
+      );
+    },
+    [keyboardOffset, insets.bottom]
   );
 
-  const renderComposer = (props: any) => <Composer {...props} textInputStyle={styles.textInput} />;
-
-  const renderActions = (props: ActionsProps) => (
-    <Actions
-      {...props}
-      onPressActionButton={handlePickImage}
-      icon={() => (
-        <View style={styles.actionIconContainer}>
-          <Plus color="#fff" size={24} />
-        </View>
-      )}
-    />
+  const renderComposer = useCallback(
+    (props: any) => <Composer {...props} textInputStyle={styles.textInput} />,
+    []
   );
 
-  const renderSend = (props: any) => (
-    <Send
-      {...props}
-      disabled={!props.text?.trim() && !isUploading}
-      containerStyle={styles.sendLayout}
-    >
-      <View style={styles.sendButton}>
-        {isUploading ? (
-          <ActivityIndicator size="small" color="#192126" />
-        ) : (
-          <SendIcon color="#192126" size={24} />
+  const renderActions = useCallback(
+    (props: ActionsProps) => (
+      <Actions
+        {...props}
+        onPressActionButton={handlePickImage}
+        icon={() => (
+          <View style={styles.actionIconContainer}>
+            <Plus color="#fff" size={24} />
+          </View>
         )}
-      </View>
-    </Send>
+      />
+    ),
+    []
+  );
+
+  const renderSend = useCallback(
+    (props: any) => (
+      <Send
+        {...props}
+        disabled={!props.text?.trim() && !isUploading}
+        containerStyle={styles.sendLayout}
+      >
+        <View style={styles.sendButton}>
+          {isUploading ? (
+            <ActivityIndicator size="small" color="#192126" />
+          ) : (
+            <SendIcon color="#192126" size={24} />
+          )}
+        </View>
+      </Send>
+    ),
+    [isUploading]
   );
 
   if (!user || !effectiveUserId) {
@@ -435,27 +639,209 @@ const Chat = () => {
     <View style={styles.container}>
       <KeyboardAvoidingView
         style={styles.keyboardAvoidingView}
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
-        keyboardVerticalOffset={Platform.OS === "ios" ? 90 : 0}
+        behavior={Platform.OS === "ios" ? undefined : undefined}
+        keyboardVerticalOffset={0}
       >
         <GiftedChat
           messages={messages}
           onSend={onSend}
+          text={inputText}
+          onInputTextChanged={setInputText}
           user={{ _id: effectiveUserId }}
           renderAvatar={null}
           renderBubble={renderBubble}
-          renderInputToolbar={renderInputToolbar}
-          renderComposer={renderComposer}
+          renderInputToolbar={
+            Platform.OS === "android"
+              ? renderInputToolbar
+              : (props) => <View style={{ height: (60 + (insets.bottom || 0)) }} />
+          }
+          renderComposer={Platform.OS === "android" ? renderComposer : undefined}
           renderSend={renderSend}
           renderActions={renderActions}
           renderMessageText={renderMessageText}
           renderDay={renderDay}
+          renderMessage={renderMessage}
+          renderTime={(props: any) => (props.currentMessage?.shareData ? null : undefined)}
+          textInputProps={{
+            autoFocus: false,
+            style: {
+              color: "#000",
+              fontSize: 15,
+              minHeight: 44,
+              flex: 1,
+              marginTop: 8,
+              marginBottom: 8,
+              paddingHorizontal: 16,
+            },
+            multiline: true,
+          }}
           locale="pt-br"
           minInputToolbarHeight={60}
-          messagesContainerStyle={{ paddingBottom: 60 }}
+          bottomOffset={0}
+          messagesContainerStyle={{ paddingBottom: 10 }}
           renderFooter={renderFooter}
+          keyboardShouldPersistTaps="always"
+          extraData={isKeyboardOpen}
         />
       </KeyboardAvoidingView>
+
+      {/* Input de Mensagem Real para iOS (Separado para evitar bugs de visibilidade) */}
+      {Platform.OS === "ios" && (
+        <Animated.View
+          pointerEvents="box-none"
+          style={{
+            transform: [{ translateY: Animated.multiply(keyboardOffset, -1) }],
+            width: "100%",
+            zIndex: 99,
+            position: "absolute",
+            bottom: 0,
+            backgroundColor: "#fff",
+          }}
+        >
+          <InputToolbar
+            {...{
+              onSend: (msgs: any) => onSend(msgs),
+            } as any}
+            text={inputText}
+            onTextChanged={setInputText}
+            containerStyle={[
+              styles.inputToolbar,
+              {
+                paddingBottom: insets.bottom,
+                borderTopWidth: 1,
+                borderTopColor: "#f0f0f0", // Mesmo tom do Android
+              },
+            ]}
+            primaryStyle={styles.inputToolbarPrimary}
+            renderComposer={renderComposer}
+            renderSend={() => (
+              <TouchableOpacity
+                onPress={() => {
+                  if (inputText.trim()) {
+                    onSend([{
+                      text: inputText.trim(),
+                      user: { _id: effectiveUserId },
+                      createdAt: new Date(),
+                      _id: Math.random().toString(),
+                    }]);
+                  }
+                }}
+                disabled={!inputText.trim()}
+                style={[styles.sendLayout, { opacity: inputText.trim() ? 1 : 0.5 }]}
+              >
+                <View style={styles.sendButton}>
+                  <SendIcon color="#000" size={24} />
+                </View>
+              </TouchableOpacity>
+            )}
+            renderActions={renderActions}
+          />
+        </Animated.View>
+      )}
+
+      {/* Modal de Detalhes do Post (Clonado do profilePFScreen) */}
+      <Modal
+        visible={viewPostVisible}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setViewPostVisible(false)}
+      >
+        <View style={styles.viewerOverlay}>
+          <TouchableOpacity
+            style={styles.viewerCloseArea}
+            activeOpacity={1}
+            onPress={() => setViewPostVisible(false)}
+          />
+          <View style={styles.viewerContent}>
+            <View style={styles.viewerHeader}>
+              <View style={styles.viewerUserInfo}>
+                <Image
+                  source={{ uri: selectedPost?.author?.avatar_url || "https://i.pravatar.cc/150" }}
+                  style={styles.viewerAvatar}
+                />
+                <Text style={styles.viewerUsername}>
+                  {selectedPost?.author?.username || "usuario"}
+                </Text>
+              </View>
+              <TouchableOpacity onPress={() => setViewPostVisible(false)}>
+                 <Plus color="#000" size={24} style={{ transform: [{ rotate: "45deg" }] }} />
+              </TouchableOpacity>
+            </View>
+
+            <Image
+              source={{ uri: selectedPost?.url || selectedPost?.image_url }}
+              style={styles.viewerImage}
+              resizeMode="cover"
+            />
+
+            <View style={styles.viewerActions}>
+              <TouchableOpacity style={styles.viewerAction} onPress={handleToggleLike}>
+                <Heart
+                  size={24}
+                  color={selectedPost?.is_liked ? "#EF4444" : "#000"}
+                  fill={selectedPost?.is_liked ? "#EF4444" : "none"}
+                />
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.viewerAction}>
+                <MessageCircle color="#000" size={24} />
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.viewerDetails}>
+              <Text style={styles.viewerCaption}>
+                <Text style={{ fontWeight: "700" }}>{selectedPost?.author?.username}</Text>{" "}
+                {selectedPost?.legenda || selectedPost?.caption}
+              </Text>
+            </View>
+
+            {/* Seção de Comentários */}
+            <View style={styles.commentsSection}>
+              {loadingComments ? (
+                <ActivityIndicator color="#CBFB5E" style={{ marginTop: 20 }} />
+              ) : (
+                <FlatList
+                  data={comments}
+                  keyExtractor={(item, index) => String(item.id || index)}
+                  renderItem={({ item }) => (
+                    <View style={styles.commentItem}>
+                      <Image
+                        source={{ uri: item.photo || "https://i.pravatar.cc/150" }}
+                        style={styles.commentAvatar}
+                      />
+                      <View style={styles.commentContent}>
+                        <Text style={styles.commentUser}>{item.nome || item.username || "Usuário"}</Text>
+                        <Text style={styles.commentText}>{item.comentario}</Text>
+                      </View>
+                    </View>
+                  )}
+                  contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 20 }}
+                  ListEmptyComponent={
+                    <Text style={styles.emptyComments}>Nenhum comentário ainda</Text>
+                  }
+                />
+              )}
+            </View>
+
+            {/* Input de Comentário */}
+            <View style={styles.commentInputWrapper}>
+              <TextInput
+                style={styles.commentInput}
+                placeholder="Adicionar comentário..."
+                value={newComment}
+                onChangeText={setNewComment}
+                placeholderTextColor="#94A3B8"
+              />
+              <TouchableOpacity onPress={handleSendComment} disabled={isSendingComment}>
+                {isSendingComment ? (
+                  <ActivityIndicator size="small" color="#000" />
+                ) : (
+                  <SendIcon color="#000" size={20} />
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 };
@@ -487,13 +873,9 @@ const styles = StyleSheet.create({
     backgroundColor: "#fff",
     borderTopWidth: 1,
     borderTopColor: "#f0f0f0",
-    paddingTop: 0,
-    paddingBottom: 0,
-    marginBottom: 0,
-    position: "absolute",
-    bottom: 0,
+    paddingTop: 4,
+    paddingBottom: 4,
     width: "100%",
-    zIndex: 1,
   },
   inputToolbarPrimary: {
     flexDirection: "row",
@@ -586,6 +968,162 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
     borderRadius: 10,
     overflow: "hidden",
+  },
+
+  // Share Card Styles
+  shareContainer: {
+    maxWidth: 260,
+    borderRadius: 12,
+    overflow: "hidden",
+    marginVertical: 0,
+    borderWidth: 0.5,
+    borderColor: "#E2E8F0",
+    backgroundColor: "#fff",
+  },
+  myShare: {
+    alignSelf: "flex-end",
+    marginRight: 10,
+  },
+  otherShare: {
+    alignSelf: "flex-start",
+    marginLeft: 10,
+  },
+  shareContent: {
+    width: "100%",
+  },
+  shareHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: 8,
+    gap: 8,
+  },
+  shareAvatar: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: "#F1F5F9",
+  },
+  shareUsername: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: "#0F172A",
+    flex: 1,
+  },
+  shareImage: {
+    width: "100%",
+    aspectRatio: 1,
+    backgroundColor: "#F8FAFC",
+  },
+  shareFooter: {
+    padding: 8,
+  },
+  shareCaption: {
+    fontSize: 13,
+    color: "#1E293B",
+  },
+
+  // Viewer Modal Styles
+  viewerOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.8)",
+    justifyContent: "flex-end",
+  },
+  viewerCloseArea: {
+    flex: 1,
+  },
+  viewerContent: {
+    backgroundColor: "#fff",
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    height: "85%",
+  },
+  viewerHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    padding: 16,
+    borderBottomWidth: 0.5,
+    borderBottomColor: "#E2E8F0",
+  },
+  viewerUserInfo: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+  viewerAvatar: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+  },
+  viewerUsername: {
+    fontSize: 15,
+    fontWeight: "700",
+  },
+  viewerImage: {
+    width: "100%",
+    height: 300,
+  },
+  viewerActions: {
+    flexDirection: "row",
+    padding: 12,
+    gap: 16,
+  },
+  viewerAction: {
+    padding: 4,
+  },
+  viewerDetails: {
+    paddingHorizontal: 16,
+    paddingBottom: 16,
+  },
+  viewerCaption: {
+    fontSize: 14,
+    lineHeight: 20,
+  },
+  commentsSection: {
+    flex: 1,
+  },
+  commentItem: {
+    flexDirection: "row",
+    marginBottom: 16,
+    gap: 12,
+  },
+  commentAvatar: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+  },
+  commentContent: {
+    flex: 1,
+  },
+  commentUser: {
+    fontSize: 13,
+    fontWeight: "700",
+  },
+  commentText: {
+    fontSize: 13,
+    color: "#475569",
+    marginTop: 2,
+  },
+  emptyComments: {
+    textAlign: "center",
+    marginTop: 20,
+    color: "#94A3B8",
+  },
+  commentInputWrapper: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: 16,
+    borderTopWidth: 0.5,
+    borderTopColor: "#E2E8F0",
+    paddingBottom: Platform.OS === "ios" ? 32 : 16,
+  },
+  commentInput: {
+    flex: 1,
+    height: 40,
+    backgroundColor: "#F8FAFC",
+    borderRadius: 20,
+    paddingHorizontal: 16,
+    marginRight: 12,
   },
 });
 

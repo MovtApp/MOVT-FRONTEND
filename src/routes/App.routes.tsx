@@ -44,6 +44,7 @@ import CommunityDetails from "../screens/App/communities/[protected]/community";
 import TrainingScreen from "../screens/App/training/trainingScreen";
 import TrainingDetails from "../screens/App/training/[protected]/training";
 import ExplorerScreen from "../screens/App/explorer/explorerScreen";
+import FeedScreen from "../screens/Feed/FeedScreen";
 
 const Stack = createNativeStackNavigator<AppStackParamList>();
 const Drawer = createDrawerNavigator(); // Definir o Drawer Navigator
@@ -94,6 +95,7 @@ function AppLayout() {
         <Stack.Screen name="PoliciesScreen" component={PoliciesScreen} />
         <Stack.Screen name="AboutScreen" component={AboutScreen} />
         <Stack.Screen name="PlatformRulesScreen" component={PlatformRulesScreen} />
+        <Stack.Screen name="FeedScreen" component={FeedScreen} />
       </Stack.Navigator>
       <BottomNavigationBar />
     </View>
