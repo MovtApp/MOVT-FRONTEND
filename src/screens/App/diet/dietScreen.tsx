@@ -77,29 +77,28 @@ const DietScreen: React.FC<NativeStackScreenProps<AppStackParamList, "DietScreen
         },
         params: {
           categoria: selectedCategory === "all" ? undefined : selectedCategory,
+          mine: "true",
         },
       });
-      const mappedMeals: DietMeal[] = response.data.data.map((backendMeal: any) => {
-        console.log("🖼️ Mapeando dieta:", backendMeal.nome, "ImageURL:", backendMeal.imageurl);
+      const mappedMeals: DietMeal[] = (response.data.data || []).map((backendMeal: any) => {
+        console.log("🖼️ Mapeando dieta:", backendMeal.title, "ImageURL:", backendMeal.imageUrl);
         return {
           id: String(backendMeal.id_dieta),
           id_dieta: String(backendMeal.id_dieta),
-          title: backendMeal.nome,
-          calories: `${backendMeal.calorias || 0} kcal`,
-          minutes: `${backendMeal.tempo_preparo || 0} min`,
-          imageUrl: backendMeal.imageurl || "https://via.placeholder.com/150",
-          authorName: backendMeal.nome_autor || "Desconhecido",
+          title: backendMeal.title || "Sem título",
+          calories: backendMeal.calories || "0 kcal",
+          minutes: backendMeal.minutes || "0 min",
+          imageUrl: backendMeal.imageUrl || "https://via.placeholder.com/150",
+          authorName: backendMeal.nome_autor || "Você",
           authorAvatar: backendMeal.avatar_autor_url || "https://via.placeholder.com/30",
-          description: backendMeal.descricao || "",
-          fat: `${backendMeal.gordura || 0} g`,
-          protein: `${backendMeal.proteina || 0} g`,
-          carbs: `${backendMeal.carboidratos || 0} g`,
+          description: backendMeal.description || "",
+          fat: backendMeal.fat || "0 g",
+          protein: backendMeal.protein || "0 g",
+          carbs: backendMeal.carbs || "0 g",
           categoria: backendMeal.categoria || undefined,
-          calorias: backendMeal.calorias || undefined,
-          tempo_preparo: backendMeal.tempo_preparo || undefined,
-          gordura: backendMeal.gordura || undefined,
-          proteina: backendMeal.proteina || undefined,
-          carboidratos: backendMeal.carboidratos || undefined,
+          id_us: backendMeal.id_us,
+          calorias: backendMeal.calories ? parseInt(backendMeal.calories) : undefined,
+          tempo_preparo: backendMeal.minutes ? parseInt(backendMeal.minutes) : undefined,
         };
       });
       const uniqueMeals = Array.from(new Map(mappedMeals.map((meal) => [meal.id, meal])).values());

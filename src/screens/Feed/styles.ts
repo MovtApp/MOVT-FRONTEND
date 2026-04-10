@@ -1,7 +1,7 @@
-import { StyleSheet, Dimensions, Platform } from 'react-native';
-import { COLORS } from '../../styles/colors';
+import { StyleSheet, Dimensions, Platform } from "react-native";
+import { COLORS } from "../../styles/colors";
 
-const { width } = Dimensions.get('window');
+const { width } = Dimensions.get("window");
 
 export const styles = StyleSheet.create({
   container: {
@@ -9,9 +9,9 @@ export const styles = StyleSheet.create({
     backgroundColor: COLORS.grayscale[0],
   },
   header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
     paddingHorizontal: 16,
     paddingVertical: 12,
     backgroundColor: COLORS.grayscale[0],
@@ -19,35 +19,39 @@ export const styles = StyleSheet.create({
     borderBottomColor: COLORS.grayscale[10],
   },
   logoContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  logoImage: {
+    width: 110,
+    height: 32,
   },
   logoText: {
     fontSize: 24,
-    fontWeight: '800',
-    color: COLORS.chathams_blue[600],
-    letterSpacing: -0.5,
+    fontWeight: "900",
+    color: "#000",
+    letterSpacing: -1,
   },
   headerActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
   },
   headerActionButton: {
     marginLeft: 20,
   },
   loadingContainer: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
     backgroundColor: COLORS.grayscale[0],
   },
   loadingText: {
     marginTop: 12,
     fontSize: 14,
     color: COLORS.grayscale[45],
-    fontWeight: '500',
+    fontWeight: "500",
   },
-  
+
   // StoryBar Styles
   storyBarContainer: {
     paddingVertical: 12,
@@ -56,14 +60,14 @@ export const styles = StyleSheet.create({
     backgroundColor: COLORS.grayscale[0],
   },
   storyItem: {
-    alignItems: 'center',
+    alignItems: "center",
     marginLeft: 16,
   },
   storyAvatarContainer: {
     padding: 3,
     borderRadius: 35,
     borderWidth: 2,
-    borderColor: COLORS.chathams_blue[400],
+    borderColor: COLORS.primary_green,
     marginBottom: 6,
   },
   storyAvatar: {
@@ -78,17 +82,17 @@ export const styles = StyleSheet.create({
     maxWidth: 70,
   },
   addStoryBadge: {
-    position: 'absolute',
+    position: "absolute",
     bottom: 0,
     right: 0,
-    backgroundColor: COLORS.chathams_blue[500],
+    backgroundColor: COLORS.primary_green,
     borderRadius: 10,
     width: 20,
     height: 20,
     borderWidth: 2,
     borderColor: COLORS.grayscale[0],
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
   },
 
   // PostCard Styles
@@ -97,14 +101,14 @@ export const styles = StyleSheet.create({
     marginBottom: 8,
   },
   cardHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     padding: 12,
-    justifyContent: 'space-between',
+    justifyContent: "space-between",
   },
   cardHeaderLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
   },
   cardAvatar: {
     width: 36,
@@ -115,7 +119,7 @@ export const styles = StyleSheet.create({
   },
   cardUsername: {
     fontSize: 14,
-    fontWeight: '700',
+    fontWeight: "700",
     color: COLORS.grayscale[100],
   },
   cardLocation: {
@@ -128,19 +132,27 @@ export const styles = StyleSheet.create({
     backgroundColor: COLORS.grayscale[5],
   },
   media: {
-    width: '100%',
-    height: '100%',
+    width: "100%",
+    height: "100%",
+  },
+  overlayHeart: {
+    position: "absolute",
+    top: "50%",
+    left: "50%",
+    marginLeft: -40,
+    marginTop: -40,
+    zIndex: 10,
   },
   actionsBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
     paddingHorizontal: 12,
     paddingVertical: 10,
   },
   actionsLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
   },
   actionIcon: {
     marginRight: 18,
@@ -150,17 +162,17 @@ export const styles = StyleSheet.create({
   },
   likesText: {
     fontSize: 14,
-    fontWeight: '700',
+    fontWeight: "700",
     color: COLORS.grayscale[100],
     marginBottom: 4,
   },
   captionContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
+    flexDirection: "row",
+    flexWrap: "wrap",
     marginBottom: 4,
   },
   captionUser: {
-    fontWeight: '700',
+    fontWeight: "700",
     marginRight: 6,
   },
   captionText: {
@@ -177,11 +189,11 @@ export const styles = StyleSheet.create({
     fontSize: 10,
     color: COLORS.grayscale[30],
     marginTop: 6,
-    textTransform: 'uppercase',
+    textTransform: "uppercase",
   },
   quickComment: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     paddingHorizontal: 14,
     paddingVertical: 12,
   },
@@ -200,14 +212,14 @@ export const styles = StyleSheet.create({
   // Modal Styles
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    justifyContent: 'flex-end',
+    backgroundColor: "rgba(0,0,0,0.5)",
+    justifyContent: "flex-end",
   },
   modalContent: {
     backgroundColor: COLORS.grayscale[0],
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
-    height: '70%',
+    height: "70%",
     paddingTop: 12,
   },
   modalIndicator: {
@@ -215,13 +227,13 @@ export const styles = StyleSheet.create({
     height: 4,
     backgroundColor: COLORS.grayscale[20],
     borderRadius: 2,
-    alignSelf: 'center',
+    alignSelf: "center",
     marginBottom: 16,
   },
   modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
     paddingHorizontal: 16,
     paddingBottom: 16,
     borderBottomWidth: 0.5,
@@ -229,14 +241,14 @@ export const styles = StyleSheet.create({
   },
   modalTitle: {
     fontSize: 16,
-    fontWeight: '700',
+    fontWeight: "700",
     color: COLORS.grayscale[100],
   },
   modalList: {
     flex: 1,
   },
   commentItem: {
-    flexDirection: 'row',
+    flexDirection: "row",
     padding: 16,
     borderBottomWidth: 0.5,
     borderBottomColor: COLORS.grayscale[5],
@@ -252,7 +264,7 @@ export const styles = StyleSheet.create({
   },
   commentUser: {
     fontSize: 13,
-    fontWeight: '700',
+    fontWeight: "700",
     color: COLORS.grayscale[100],
   },
   commentBody: {
@@ -267,14 +279,14 @@ export const styles = StyleSheet.create({
     lineHeight: 18, // igual ao commentUser para alinhar na mesma linha
   },
   commentInputContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     paddingHorizontal: 8,
     paddingVertical: 12,
     borderTopWidth: 0.5,
     borderTopColor: COLORS.grayscale[10],
     backgroundColor: COLORS.grayscale[0],
-    paddingBottom: Platform.OS === 'ios' ? 24 : 12, // Redução sutil na área segura
+    paddingBottom: Platform.OS === "ios" ? 24 : 12, // Redução sutil na área segura
   },
   inputAvatar: {
     width: 32,
@@ -297,36 +309,36 @@ export const styles = StyleSheet.create({
   },
   postButton: {
     fontSize: 14,
-    fontWeight: '700',
-    color: COLORS.chathams_blue[500],
+    fontWeight: "700",
+    color: COLORS.primary_green,
     marginLeft: 10,
   },
   noComments: {
-    textAlign: 'center',
+    textAlign: "center",
     marginTop: 40,
-    color: COLORS.grayscale[40],
+    color: COLORS.grayscale[45],
     fontSize: 14,
   },
 
   // Swipe-to-delete styles
   swipeDeleteContainer: {
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
     width: 72,
-    backgroundColor: '#EF4444',
+    backgroundColor: "#EF4444",
     borderRadius: 0,
   },
   swipeDeleteBtn: {
     width: 72,
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
   },
-  
+
   // ActionSheet Styles
   actionSheetItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     paddingVertical: 15,
     paddingHorizontal: 20,
     borderBottomWidth: 0.5,
@@ -336,15 +348,15 @@ export const styles = StyleSheet.create({
     fontSize: 16,
     color: COLORS.grayscale[100],
     marginLeft: 15,
-    fontWeight: '500',
+    fontWeight: "500",
   },
 
   // Edit Screen Styles (Premium)
   editHeader: {
     height: 56,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
     paddingHorizontal: 16,
     borderBottomWidth: 0.5,
     borderBottomColor: COLORS.grayscale[10],
@@ -356,17 +368,17 @@ export const styles = StyleSheet.create({
   },
   editTitleText: {
     fontSize: 17,
-    fontWeight: '700',
+    fontWeight: "700",
     color: COLORS.grayscale[100],
   },
   editDoneText: {
     fontSize: 16,
-    fontWeight: '700',
+    fontWeight: "700",
     color: COLORS.primary_green,
   },
   editAuthorSection: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     padding: 16,
   },
   editAuthorPhoto: {
@@ -377,14 +389,14 @@ export const styles = StyleSheet.create({
   },
   editUsername: {
     fontSize: 14,
-    fontWeight: '700',
+    fontWeight: "700",
     color: COLORS.grayscale[100],
   },
   editMediaPreviewContainer: {
-    width: '100%',
+    width: "100%",
     height: 340,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
   },
   editMediaImage: {
     width: 300,
@@ -398,12 +410,18 @@ export const styles = StyleSheet.create({
     fontSize: 15,
     color: COLORS.grayscale[100],
     minHeight: 120,
-    textAlignVertical: 'top',
+    textAlignVertical: "top",
   },
   sheetPortal: {
     ...StyleSheet.absoluteFillObject,
     zIndex: 9999,
     elevation: 9999,
     pointerEvents: "box-none",
+  },
+  footer: {
+    alignItems: "flex-start",
+    marginTop: 40,
+    marginBottom: 40,
+    paddingHorizontal: 20,
   },
 });

@@ -23,17 +23,16 @@ import {
   Camera,
   MoreVertical,
   X as CloseIcon,
-  MessageCircle,
-  Send,
-  Trash2,
+  Archive,
+  User,
+  Settings,
 } from "lucide-react-native";
-import * as ImagePicker from "expo-image-picker";
 import { userService } from "@services/userService";
 import BackButton from "@components/BackButton";
 import FollowListModal from "@components/FollowListModal";
 import PostFormSheet from "@components/PostFormSheet";
 import SharePostSheet from "@components/SharePostSheet";
-import { useRoute, RouteProp, useNavigation } from "@react-navigation/native";
+import { useRoute, RouteProp, useNavigation, useIsFocused } from "@react-navigation/native";
 import { AppStackParamList } from "../../../@types/routes";
 import { useProfileCache } from "@/hooks/useChat";
 import { api } from "@services/api";
@@ -45,6 +44,7 @@ const ProfilePFScreen = () => {
   const currentUserId = authUser?.id_us || authUser?.id;
   const route = useRoute<RouteProp<AppStackParamList, "ProfilePFScreen">>();
   const navigation = useNavigation<any>();
+  const isFocused = useIsFocused();
 
   // Normalize user data to handle both AuthContext structure and Search results structure
   const baseUser = route.params?.user || authUser;
@@ -108,14 +108,7 @@ const ProfilePFScreen = () => {
   // New state for post management
   const [selectedPost, setSelectedPost] = useState<any>(null);
   const [manageModalVisible, setManageModalVisible] = useState(false);
-  const [viewPostVisible, setViewPostVisible] = useState(false);
-
-  // States for post interactions
-  const [comments, setComments] = useState<any[]>([]);
-  const [newComment, setNewComment] = useState("");
-  const [isLiking, setIsLiking] = useState(false);
-  const [isSendingComment, setIsSendingComment] = useState(false);
-  const [loadingComments, setLoadingComments] = useState(false);
+  const [configModalVisible, setConfigModalVisible] = useState(false);
 
   // Social state
   const [isFollowing, setIsFollowing] = useState(
@@ -138,7 +131,9 @@ const ProfilePFScreen = () => {
     bio: fetchedUser?.bio || baseUser?.bio || null,
   };
 
-  const isOwnProfile = !route.params?.user || String(profileData.id) === String(authUser?.id);
+  const lastTapRef = useRef(0);
+
+  const isOwnProfile = targetUserId === String(currentUserId);
 
   // Fetch full profile, posts, follow status and stats
   useEffect(() => {
@@ -190,7 +185,7 @@ const ProfilePFScreen = () => {
     }
 
     loadFullProfile();
-  }, [route.params?.user?.id, route.params?.user?.id_us, authUser?.id]);
+  }, [route.params?.user?.id, route.params?.user?.id_us, authUser?.id, isFocused]);
 
   const fetchPosts = async () => {
     const targetId = route.params?.user?.id || route.params?.user?.id_us || authUser?.id;
@@ -272,172 +267,14 @@ const ProfilePFScreen = () => {
     }
   };
 
-  const handlePickImage = async (type: "avatar" | "banner") => {
-    if (!isOwnProfile) return;
-    try {
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ["images"],
-        allowsEditing: true,
-        aspect: type === "avatar" ? [1, 1] : [16, 9],
-        quality: 0.8,
-      });
-
-      if (!result.canceled) {
-        setLoadingUpdate(true);
-        const imageUri = result.assets[0].uri;
-
-        if (type === "avatar") {
-          const response = await userService.updateAvatar(imageUri);
-          if (response.success) {
-            updateUser({ photo: response.data.photo });
-            setFetchedUser((prev: any) => ({ ...prev, photo: response.data.photo }));
-            Alert.alert("Sucesso", "Foto de perfil atualizada!");
-          }
-        } else {
-          const response = await userService.updateBanner(imageUri);
-          if (response.success) {
-            updateUser({ banner: response.data.banner });
-            setFetchedUser((prev: any) => ({ ...prev, banner: response.data.banner }));
-            Alert.alert("Sucesso", "Banner atualizado!");
-          }
-        }
-      }
-    } catch (error: any) {
-      console.error("Erro ao atualizar imagem:", error);
-      Alert.alert("Erro", "Não foi possível atualizar a imagem.");
-    } finally {
-      setLoadingUpdate(false);
-    }
-  };
 
   const handleCreatePost = () => {
     setSelectedPost(null); // Garante que é um novo post
     setIsPostSheetOpen(true);
   };
 
-  const handleManagePost = async (post: any) => {
-    setSelectedPost(post);
-    setViewPostVisible(true);
-    setLoadingComments(true);
-    try {
-      const res = await userService.getComments(String(post.id));
-      if (res.success) {
-        setComments(res.data);
-      }
-    } catch (error) {
-      console.error("Erro ao buscar comentários:", error);
-    } finally {
-      setLoadingComments(false);
-    }
-  };
-
-  const handleToggleLike = async () => {
-    if (!selectedPost || isLiking) return;
-
-    setIsLiking(true);
-    const originalPost = { ...selectedPost };
-
-    // Optimistic UI Update
-    const newIsLiked = !selectedPost.is_liked;
-    const newLikesCount = newIsLiked
-      ? Number(selectedPost.likes_count) + 1
-      : Math.max(0, Number(selectedPost.likes_count) - 1);
-
-    setSelectedPost((prev: any) => ({
-      ...prev,
-      is_liked: newIsLiked,
-      likes_count: newLikesCount,
-    }));
-
-    // Update main posts list as well
-    setPosts((prev) =>
-      prev.map((p) =>
-        p.id === selectedPost.id ? { ...p, is_liked: newIsLiked, likes_count: newLikesCount } : p
-      )
-    );
-
-    try {
-      const res = await userService.toggleLike(String(selectedPost.id));
-      if (!res.success) {
-        // Rollback on error
-        setSelectedPost(originalPost);
-        setPosts((prev) => prev.map((p) => (p.id === originalPost.id ? originalPost : p)));
-      }
-    } catch (error) {
-      console.error("Erro ao curtir:", error);
-      setSelectedPost(originalPost);
-      setPosts((prev) => prev.map((p) => (p.id === originalPost.id ? originalPost : p)));
-    } finally {
-      setIsLiking(false);
-    }
-  };
-
-  const handleSendComment = async () => {
-    if (!newComment.trim() || !selectedPost || isSendingComment) return;
-
-    setIsSendingComment(true);
-    try {
-      const res = await userService.addComment(String(selectedPost.id), newComment);
-      if (res.success) {
-        const commentData = res.data;
-        // Adicionar os IDs necessários para controle de exclusão local
-        const normalizedComment = {
-          ...commentData,
-          comment_user_id: currentUserId,
-          post_owner_id: selectedPost.id_us, // ID do dono do post
-        };
-        setComments((prev) => [...prev, normalizedComment]);
-        setNewComment("");
-
-        // Update counts in selectedPost and main list
-        setSelectedPost((prev: any) => ({
-          ...prev,
-          comments_count: Number(prev.comments_count) + 1,
-        }));
-        setPosts((prev) =>
-          prev.map((p) =>
-            p.id === selectedPost.id ? { ...p, comments_count: Number(p.comments_count) + 1 } : p
-          )
-        );
-      }
-    } catch (error) {
-      console.error("Erro ao comentar:", error);
-      Alert.alert("Erro", "Não foi possível enviar o comentário.");
-    } finally {
-      setIsSendingComment(false);
-    }
-  };
-
-  const handleDeleteComment = async (commentId: string) => {
-    Alert.alert("Excluir Comentário", "Deseja remover este comentário?", [
-      { text: "Cancelar", style: "cancel" },
-      {
-        text: "Excluir",
-        style: "destructive",
-        onPress: async () => {
-          try {
-            const res = await userService.deleteComment(commentId);
-            if (res.success) {
-              setComments((prev) => prev.filter((c) => String(c.id) !== String(commentId)));
-              setSelectedPost((prev: any) => ({
-                ...prev,
-                comments_count: Math.max(0, Number(prev.comments_count) - 1),
-              }));
-              setPosts((prev) =>
-                prev.map((p) =>
-                  p.id === selectedPost.id
-                    ? { ...p, comments_count: Math.max(0, Number(p.comments_count) - 1) }
-                    : p
-                )
-              );
-            }
-          } catch (error) {
-            console.error("Erro ao excluir comentário:", error);
-            Alert.alert("Erro", "Não foi possível excluir o comentário.");
-          }
-        },
-      },
-    ]);
+  const handleManagePost = (post: any) => {
+    navigation.navigate("PostDetailScreen", { postId: post.id || post.post_id });
   };
 
   const handleDeletePost = () => {
@@ -559,13 +396,6 @@ const ProfilePFScreen = () => {
         {/* Banner de Topo */}
         <View style={styles.bannerContainer}>
           <Image source={{ uri: profileData.banner || DEFAULT_BANNER }} style={styles.banner} />
-          {isOwnProfile && (
-            <TouchableOpacity
-              onPress={() => handlePickImage("banner")}
-              disabled={loadingUpdate}
-              style={StyleSheet.absoluteFill}
-            />
-          )}
         </View>
 
         {/* Informações do Perfil */}
@@ -574,13 +404,6 @@ const ProfilePFScreen = () => {
           <View style={styles.profileHeader}>
             <View style={styles.avatarContainer}>
               <Image source={{ uri: profileData.photo || DEFAULT_AVATAR }} style={styles.avatar} />
-              {isOwnProfile && (
-                <TouchableOpacity
-                  onPress={() => handlePickImage("avatar")}
-                  disabled={loadingUpdate}
-                  style={StyleSheet.absoluteFill}
-                />
-              )}
             </View>
 
             {/* Estatísticas: Posts, Seguidores, Seguindo */}
@@ -618,9 +441,34 @@ const ProfilePFScreen = () => {
 
           {/* Nome e Bio */}
           <View style={styles.nameSection}>
-            <Text style={styles.nameText}>{profileData.name}</Text>
-            {profileData.bio && <Text style={styles.bioText}>{profileData.bio}</Text>}
+            <View style={styles.nameSectionRow}>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.nameText}>{profileData.name}</Text>
+                {profileData.bio && <Text style={styles.bioText}>{profileData.bio}</Text>}
+              </View>
+            </View>
           </View>
+
+          {/* Botões de Ação do Próprio Perfil */}
+          {isOwnProfile && (
+            <View style={styles.ownProfileActions}>
+              <TouchableOpacity
+                style={styles.ownProfileButton}
+                onPress={() => navigation.navigate("EditProfileScreen")}
+              >
+                <User size={18} color="#1E293B" />
+                <Text style={styles.ownProfileButtonText}>Perfil</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity
+                style={styles.ownProfileButton}
+                onPress={() => setConfigModalVisible(true)}
+              >
+                <Settings size={18} color="#1E293B" />
+                <Text style={styles.ownProfileButtonText}>Configurações</Text>
+              </TouchableOpacity>
+            </View>
+          )}
 
           {/* Botões de Ação: Seguir e Mensagem / Novo Post */}
           {!isOwnProfile ? (
@@ -730,6 +578,33 @@ const ProfilePFScreen = () => {
         </View>
       )}
 
+      {/* Modal de Configurações */}
+      {configModalVisible && (
+        <View style={styles.loadingOverlay}>
+          <View style={styles.manageModal}>
+            <Text style={styles.manageTitle}>Configurações</Text>
+            <TouchableOpacity style={styles.manageOption} onPress={() => {
+              setConfigModalVisible(false);
+              navigation.navigate("ArchivedPostsScreen");
+            }}>
+              <Text style={styles.manageOptionText}>Posts Arquivados</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.manageOption} onPress={() => {
+              setConfigModalVisible(false);
+              navigation.navigate("ConfigScreen");
+            }}>
+              <Text style={styles.manageOptionText}>Configurações da Conta</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.cancelManage}
+              onPress={() => setConfigModalVisible(false)}
+            >
+              <Text style={styles.cancelManageText}>Cancelar</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      )}
+
       {loadingUpdate && (
         <View style={styles.loadingOverlay}>
           <ActivityIndicator size="large" color="#CBFB5E" />
@@ -758,183 +633,27 @@ const ProfilePFScreen = () => {
         />
 
         <SharePostSheet
-          postData={selectedPost ? {
-            id: selectedPost.id || selectedPost.post_id,
-            url: selectedPost.url || selectedPost.image_url || selectedPost.media?.[0]?.media_url || selectedPost.media_url,
-            legenda: selectedPost.legenda || selectedPost.caption || "",
-            author_id: profileData.id,
-            author_name: profileData.username,
-            author_avatar: profileData.photo,
-            likes_count: selectedPost.likes_count || 0,
-            comments_count: selectedPost.comments_count || 0
-          } : null}
+          postData={
+            selectedPost
+              ? {
+                  id: selectedPost.id || selectedPost.post_id,
+                  url:
+                    selectedPost.url ||
+                    selectedPost.image_url ||
+                    selectedPost.media?.[0]?.media_url ||
+                    selectedPost.media_url,
+                  legenda: selectedPost.legenda || selectedPost.caption || "",
+                  author_id: profileData.id,
+                  author_name: profileData.username,
+                  author_avatar: profileData.photo,
+                  likes_count: selectedPost.likes_count || 0,
+                  comments_count: selectedPost.comments_count || 0,
+                }
+              : null
+          }
           bottomSheetRef={shareSheetRef}
         />
       </View>
-
-      {/* Modal de Visualização de Post */}
-      <Modal
-        visible={viewPostVisible}
-        transparent={true}
-        animationType="fade"
-        statusBarTranslucent={true}
-        onRequestClose={() => setViewPostVisible(false)}
-      >
-        <View style={styles.viewerOverlay}>
-          <TouchableOpacity
-            style={styles.viewerCloseArea}
-            activeOpacity={1}
-            onPress={() => setViewPostVisible(false)}
-          />
-          <View style={styles.viewerContent}>
-            <View style={styles.viewerHeader}>
-              <View style={styles.viewerUserInfo}>
-                <Image
-                  source={{ uri: profileData.photo || DEFAULT_AVATAR }}
-                  style={styles.viewerAvatar}
-                />
-                <Text style={styles.viewerUsername}>
-                  {profileData.username || profileData.name}
-                </Text>
-              </View>
-              <View style={{ flexDirection: "row", alignItems: "center" }}>
-                {isOwnProfile && (
-                  <TouchableOpacity
-                    onPress={() => {
-                      setViewPostVisible(false);
-                      setManageModalVisible(true);
-                    }}
-                    style={{ marginRight: 15 }}
-                  >
-                    <MoreVertical size={20} color="#1E293B" />
-                  </TouchableOpacity>
-                )}
-                <TouchableOpacity onPress={() => setViewPostVisible(false)}>
-                  <CloseIcon size={24} color="#1E293B" />
-                </TouchableOpacity>
-              </View>
-            </View>
-
-            <Image
-              source={{ uri: selectedPost?.url || selectedPost?.image_url }}
-              style={styles.viewerImage}
-            />
-
-            <View style={styles.viewerFooter}>
-              <View style={styles.viewerActions}>
-                <TouchableOpacity
-                  style={styles.viewerActionItem}
-                  onPress={handleToggleLike}
-                  disabled={isLiking}
-                >
-                  <Heart
-                    size={22}
-                    color={selectedPost?.is_liked ? "#EF4444" : "#1E293B"}
-                    fill={selectedPost?.is_liked ? "#EF4444" : "none"}
-                  />
-                </TouchableOpacity>
-                <View style={styles.viewerActionItem}>
-                  <MessageCircle size={22} color="#1E293B" />
-                </View>
-                <TouchableOpacity 
-                   style={styles.viewerActionItem}
-                   onPress={() => handleOpenShare(selectedPost)}
-                >
-                  <Send size={22} color="#1E293B" />
-                </TouchableOpacity>
-              </View>
-
-              <View style={styles.viewerCaptionRow}>
-                <View style={{ flex: 1 }}>
-                  {(selectedPost?.legenda || selectedPost?.caption) && (
-                    <Text style={styles.viewerCaption}>
-                      <Text style={styles.viewerCaptionUsername}>
-                        {profileData.username || profileData.name}{" "}
-                      </Text>
-                      {selectedPost.legenda || selectedPost.caption}
-                    </Text>
-                  )}
-                </View>
-
-                {selectedPost?.created_at && (
-                  <Text style={styles.viewerDate}>
-                    {new Date(selectedPost.created_at).toLocaleDateString("pt-BR", {
-                      day: "2-digit",
-                      month: "short",
-                    })}
-                  </Text>
-                )}
-              </View>
-
-              {/* Seção de Comentários */}
-              <View style={styles.commentsSection}>
-                <Text style={styles.commentsTitle}>Comentários</Text>
-                {loadingComments ? (
-                  <ActivityIndicator size="small" color="#CBFB5E" style={{ marginVertical: 10 }} />
-                ) : comments.length > 0 ? (
-                  <View style={styles.commentsList}>
-                    {comments.slice(-5).map((comment) => {
-                      const canDelete =
-                        currentUserId === comment.comment_user_id ||
-                        currentUserId === comment.post_owner_id;
-
-                      return (
-                        <View key={comment.id} style={styles.commentItem}>
-                          <View style={{ flex: 1 }}>
-                            <Text style={styles.commentText}>
-                              <Text style={styles.commentUsername}>
-                                {comment.username || comment.name}{" "}
-                              </Text>
-                              {comment.comentario}
-                            </Text>
-                          </View>
-                          {canDelete && (
-                            <TouchableOpacity
-                              onPress={() => handleDeleteComment(String(comment.id))}
-                              style={styles.deleteCommentBtn}
-                            >
-                              <Trash2 size={16} color="#EF4444" />
-                            </TouchableOpacity>
-                          )}
-                        </View>
-                      );
-                    })}
-                    {comments.length > 3 && (
-                      <Text style={styles.viewMoreComments}>
-                        Ver todos os {comments.length} comentários...
-                      </Text>
-                    )}
-                  </View>
-                ) : (
-                  <Text style={styles.noComments}>Nenhum comentário ainda. Seja o primeiro!</Text>
-                )}
-              </View>
-
-              {/* Input de Comentário */}
-              <View style={styles.commentInputContainer}>
-                <Image
-                  source={{ uri: authUser?.photo || DEFAULT_AVATAR }}
-                  style={styles.inputAvatar}
-                />
-                <TextInput
-                  style={styles.commentInput}
-                  placeholder="Escreva um comentário..."
-                  value={newComment}
-                  onChangeText={setNewComment}
-                  placeholderTextColor="#94A3B8"
-                />
-                <TouchableOpacity
-                  onPress={handleSendComment}
-                  disabled={!newComment.trim() || isSendingComment}
-                  style={styles.sendButton}
-                >
-                  <Send size={20} color={newComment.trim() ? "#CBFB5E" : "#94A3B8"} />
-                </TouchableOpacity>
-              </View>
-            </View>
-          </View>
-        </View>
-      </Modal>
 
       <FollowListModal
         visible={modalVisible}
@@ -946,7 +665,6 @@ const ProfilePFScreen = () => {
           navigation.push("ProfilePFScreen", { user });
         }}
       />
-
     </View>
   );
 };
@@ -1014,6 +732,42 @@ const styles = StyleSheet.create({
   },
   nameSection: {
     marginTop: 15,
+  },
+  nameSectionRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+  },
+  ownProfileActions: {
+    flexDirection: "row",
+    gap: 12,
+    marginTop: 16,
+  },
+  ownProfileButton: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    backgroundColor: "#F8FAFC",
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    paddingVertical: 10,
+    borderRadius: 10,
+  },
+  ownProfileButtonText: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#1E293B",
+  },
+  archiveButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    backgroundColor: "#F1F5F9",
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: 2,
   },
   nameText: {
     fontSize: 20,

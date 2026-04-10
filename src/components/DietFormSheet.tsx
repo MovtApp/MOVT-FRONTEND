@@ -328,183 +328,235 @@ const DietFormSheet: React.FC<DietFormSheetProps> = ({
       <BottomSheetScrollView
         style={styles.sheetContent}
         contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={true}
+        showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
         nestedScrollEnabled={true}
       >
-        <Text style={styles.sheetTitle}>
-          {isAddingNewDiet ? "Adicionar Nova Dieta" : "Editar Dieta"}
-        </Text>
-
-        <Text style={styles.label}>Nome da Dieta:</Text>
-        <Controller
-          control={control}
-          name="nome"
-          render={({ field: { onChange, onBlur, value } }) => (
-            <TextInput
-              style={styles.input}
-              placeholder="Ex: Salada de Frango"
-              onBlur={onBlur}
-              onChangeText={onChange}
-              value={value}
-            />
-          )}
-        />
-        {errors.nome && <Text style={styles.errorText}>{errors.nome.message}</Text>}
-
-        <Text style={styles.label}>Descrição:</Text>
-        <Controller
-          control={control}
-          name="descricao"
-          render={({ field: { onChange, onBlur, value } }) => (
-            <TextInput
-              style={[styles.input, styles.textArea]}
-              placeholder="Descreva a dieta..."
-              onBlur={onBlur}
-              onChangeText={onChange}
-              value={value}
-              multiline
-              numberOfLines={4}
-            />
-          )}
-        />
-        {errors.descricao && <Text style={styles.errorText}>{errors.descricao.message}</Text>}
-
-        <Text style={styles.label}>Categoria:</Text>
-        <Controller
-          control={control}
-          name="categoria"
-          render={({ field: { onChange, value } }) => (
-            <SelectInput
-              value={value}
-              onChange={onChange}
-              placeholder="Selecione a categoria"
-              options={categoryOptions}
-            />
-          )}
-        />
-        {errors.categoria && <Text style={styles.errorText}>{errors.categoria.message}</Text>}
-
-        <Text style={styles.label}>Calorias (kcal):</Text>
-        <Controller
-          control={control}
-          name="calorias"
-          render={({ field: { onChange, onBlur, value } }) => (
-            <TextInput
-              style={styles.input}
-              placeholder="Ex: 300"
-              onBlur={onBlur}
-              onChangeText={(text) => onChange(text === "" ? undefined : Number(text))}
-              value={value?.toString() || ""}
-              keyboardType="numeric"
-            />
-          )}
-        />
-        {errors.calorias && <Text style={styles.errorText}>{errors.calorias.message}</Text>}
-
-        <Text style={styles.label}>Tempo de Preparo (minutos):</Text>
-        <Controller
-          control={control}
-          name="tempo_preparo"
-          render={({ field: { onChange, onBlur, value } }) => (
-            <TextInput
-              style={styles.input}
-              placeholder="Ex: 30"
-              onBlur={onBlur}
-              onChangeText={(text) => onChange(text === "" ? undefined : Number(text))}
-              value={value?.toString() || ""}
-              keyboardType="numeric"
-            />
-          )}
-        />
-        {errors.tempo_preparo && (
-          <Text style={styles.errorText}>{errors.tempo_preparo.message}</Text>
-        )}
-
-        <Text style={styles.label}>Carboidratos (g):</Text>
-        <Controller
-          control={control}
-          name="carboidratos"
-          render={({ field: { onChange, onBlur, value } }) => (
-            <TextInput
-              style={styles.input}
-              placeholder="Ex: 40"
-              onBlur={onBlur}
-              onChangeText={(text) => onChange(text === "" ? undefined : Number(text))}
-              value={value?.toString() || ""}
-              keyboardType="numeric"
-            />
-          )}
-        />
-        {errors.carboidratos && <Text style={styles.errorText}>{errors.carboidratos.message}</Text>}
-
-        <Text style={styles.label}>Gordura (g):</Text>
-        <Controller
-          control={control}
-          name="gordura"
-          render={({ field: { onChange, onBlur, value } }) => (
-            <TextInput
-              style={styles.input}
-              placeholder="Ex: 15"
-              onBlur={onBlur}
-              onChangeText={(text) => onChange(text === "" ? undefined : Number(text))}
-              value={value?.toString() || ""}
-              keyboardType="numeric"
-            />
-          )}
-        />
-        {errors.gordura && <Text style={styles.errorText}>{errors.gordura.message}</Text>}
-
-        <Text style={styles.label}>Proteína (g):</Text>
-        <Controller
-          control={control}
-          name="proteina"
-          render={({ field: { onChange, onBlur, value } }) => (
-            <TextInput
-              style={styles.input}
-              placeholder="Ex: 25"
-              onBlur={onBlur}
-              onChangeText={(text) => onChange(text === "" ? undefined : Number(text))}
-              value={value?.toString() || ""}
-              keyboardType="numeric"
-            />
-          )}
-        />
-        {errors.proteina && <Text style={styles.errorText}>{errors.proteina.message}</Text>}
-
-        <Text style={styles.label}>Imagem da Dieta:</Text>
-        <View style={styles.imagePickerContainer}>
-          {imageUri ? (
-            <TouchableOpacity onPress={handleImageSelection}>
-              <Image source={{ uri: imageUri }} style={styles.selectedImage} />
-            </TouchableOpacity>
-          ) : (
-            <TouchableOpacity onPress={handleImageSelection}>
-              <View style={styles.imagePlaceholder}>
-                <ImageIcon size={40} color="#ccc" />
-                <Text style={[styles.imagePlaceholderText, { textAlign: "center" }]}>
-                  Tire uma foto{"\n"} ou selecione uma imagem {"\n"}da sua galeria.
-                </Text>
-              </View>
-            </TouchableOpacity>
-          )}
+        <View style={styles.headerRow}>
+          <Text style={styles.sheetTitle}>
+            {isAddingNewDiet ? "Nova Dieta" : "Editar Dieta"}
+          </Text>
         </View>
-        {errors.imageurl && <Text style={styles.errorText}>{errors.imageurl.message}</Text>}
+
+        <View style={styles.formSection}>
+          <Text style={styles.label}>Informações Básicas</Text>
+          <Controller
+            control={control}
+            name="nome"
+            render={({ field: { onChange, onBlur, value } }) => (
+              <TextInput
+                style={[styles.input, errors.nome && styles.inputError]}
+                placeholder="Ex: Salada de Frango"
+                placeholderTextColor="#94A3B8"
+                onBlur={onBlur}
+                onChangeText={onChange}
+                value={value}
+              />
+            )}
+          />
+          {errors.nome && <Text style={styles.errorText}>{errors.nome.message}</Text>}
+
+          <Controller
+            control={control}
+            name="descricao"
+            render={({ field: { onChange, onBlur, value } }) => (
+              <TextInput
+                style={[styles.input, styles.textArea, errors.descricao && styles.inputError]}
+                placeholder="Descreva a dieta..."
+                placeholderTextColor="#94A3B8"
+                onBlur={onBlur}
+                onChangeText={onChange}
+                value={value}
+                multiline
+                numberOfLines={3}
+              />
+            )}
+          />
+          {errors.descricao && <Text style={styles.errorText}>{errors.descricao.message}</Text>}
+        </View>
+
+        <View style={styles.formSection}>
+          <Text style={styles.label}>Categoria e Preparo</Text>
+          <View style={styles.row}>
+            <View style={{ flex: 1.5 }}>
+              <Controller
+                control={control}
+                name="categoria"
+                render={({ field: { onChange, value } }) => (
+                  <SelectInput
+                    value={value}
+                    onChange={onChange}
+                    placeholder="Categoria"
+                    options={categoryOptions}
+                  />
+                )}
+              />
+            </View>
+            <View style={{ flex: 1, marginLeft: 12 }}>
+              <Controller
+                control={control}
+                name="tempo_preparo"
+                render={({ field: { onChange, onBlur, value } }) => (
+                  <TextInput
+                    style={[styles.input, errors.tempo_preparo && styles.inputError]}
+                    placeholder="Tempo (min)"
+                    placeholderTextColor="#94A3B8"
+                    onBlur={onBlur}
+                    onChangeText={(text) => onChange(text === "" ? undefined : Number(text))}
+                    value={value?.toString() || ""}
+                    keyboardType="numeric"
+                  />
+                )}
+              />
+            </View>
+          </View>
+          <View style={styles.row}>
+            {errors.categoria ? (
+              <Text style={[styles.errorText, { flex: 1.5 }]}>{errors.categoria.message}</Text>
+            ) : null}
+            {errors.tempo_preparo ? (
+              <Text style={[styles.errorText, { flex: 1, marginLeft: 12 }]}>
+                {errors.tempo_preparo.message}
+              </Text>
+            ) : null}
+          </View>
+        </View>
+
+        <View style={styles.formSection}>
+          <Text style={styles.label}>Valores Nutricionais</Text>
+          <View style={styles.calorieContainer}>
+            <Text style={styles.calorieLabel}>Calorias (kcal)</Text>
+            <Controller
+              control={control}
+              name="calorias"
+              render={({ field: { onChange, onBlur, value } }) => (
+                <TextInput
+                  style={[styles.calorieInput, errors.calorias && styles.inputError]}
+                  placeholder="0"
+                  placeholderTextColor="#94A3B8"
+                  onBlur={onBlur}
+                  onChangeText={(text) => onChange(text === "" ? undefined : Number(text))}
+                  value={value?.toString() || ""}
+                  keyboardType="numeric"
+                />
+              )}
+            />
+          </View>
+          {errors.calorias && <Text style={styles.errorText}>{errors.calorias.message}</Text>}
+
+          <View style={styles.macrosGrid}>
+            <View style={styles.macroCol}>
+              <Text style={styles.macroLabel}>Prot. (g)</Text>
+              <Controller
+                control={control}
+                name="proteina"
+                render={({ field: { onChange, onBlur, value } }) => (
+                  <TextInput
+                    style={[styles.macroInput, errors.proteina && styles.inputError]}
+                    placeholder="0"
+                    placeholderTextColor="#94A3B8"
+                    onBlur={onBlur}
+                    onChangeText={(text) => onChange(text === "" ? undefined : Number(text))}
+                    value={value?.toString() || ""}
+                    keyboardType="numeric"
+                  />
+                )}
+              />
+              {errors.proteina && <Text style={styles.errorText}>{errors.proteina.message}</Text>}
+            </View>
+
+            <View style={styles.macroCol}>
+              <Text style={styles.macroLabel}>Carb. (g)</Text>
+              <Controller
+                control={control}
+                name="carboidratos"
+                render={({ field: { onChange, onBlur, value } }) => (
+                  <TextInput
+                    style={[styles.macroInput, errors.carboidratos && styles.inputError]}
+                    placeholder="0"
+                    placeholderTextColor="#94A3B8"
+                    onBlur={onBlur}
+                    onChangeText={(text) => onChange(text === "" ? undefined : Number(text))}
+                    value={value?.toString() || ""}
+                    keyboardType="numeric"
+                  />
+                )}
+              />
+              {errors.carboidratos && (
+                <Text style={styles.errorText}>{errors.carboidratos.message}</Text>
+              )}
+            </View>
+
+            <View style={styles.macroCol}>
+              <Text style={styles.macroLabel}>Gord. (g)</Text>
+              <Controller
+                control={control}
+                name="gordura"
+                render={({ field: { onChange, onBlur, value } }) => (
+                  <TextInput
+                    style={[styles.macroInput, errors.gordura && styles.inputError]}
+                    placeholder="0"
+                    placeholderTextColor="#94A3B8"
+                    onBlur={onBlur}
+                    onChangeText={(text) => onChange(text === "" ? undefined : Number(text))}
+                    value={value?.toString() || ""}
+                    keyboardType="numeric"
+                  />
+                )}
+              />
+              {errors.gordura && <Text style={styles.errorText}>{errors.gordura.message}</Text>}
+            </View>
+          </View>
+        </View>
+
+        <View style={styles.formSection}>
+          <Text style={styles.label}>Mídia</Text>
+          <View style={styles.imagePickerContainer}>
+            {imageUri ? (
+              <TouchableOpacity
+                onPress={handleImageSelection}
+                activeOpacity={0.9}
+                style={styles.imageWrapper}
+              >
+                <Image source={{ uri: imageUri }} style={styles.selectedImage} />
+                <View style={styles.changeImageBadge}>
+                  <ImageIcon size={16} color="#fff" />
+                </View>
+              </TouchableOpacity>
+            ) : (
+              <TouchableOpacity
+                onPress={handleImageSelection}
+                activeOpacity={0.7}
+                style={styles.imagePlaceholder}
+              >
+                <View style={styles.placeholderIconCircle}>
+                  <ImageIcon size={32} color="#94A3B8" />
+                </View>
+                <Text style={styles.imagePlaceholderText}>Adicione uma foto da sua dieta</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+          {errors.imageurl && <Text style={styles.errorText}>{errors.imageurl.message}</Text>}
+        </View>
 
         <View style={styles.bottomButtonsContainer}>
-          <TouchableOpacity style={[styles.submitButton, styles.cancelButton]} onPress={onClose}>
-            <Text style={styles.submitButtonText}>Cancelar</Text>
+          <TouchableOpacity
+            style={[styles.actionButton, styles.cancelBtn]}
+            onPress={onClose}
+            activeOpacity={0.7}
+          >
+            <Text style={styles.cancelBtnText}>Cancelar</Text>
           </TouchableOpacity>
           <TouchableOpacity
-            style={[styles.submitButton, isSubmitting && styles.submitButtonDisabled]}
+            style={[styles.actionButton, styles.saveBtn, isSubmitting && styles.saveBtnDisabled]}
             onPress={handleSubmit(onSubmitForm)}
             disabled={isSubmitting}
+            activeOpacity={0.8}
           >
-            <Text style={styles.submitButtonText}>{isSubmitting ? "Salvando..." : "Salvar"}</Text>
+            <Text style={styles.saveBtnText}>{isSubmitting ? "Salvando..." : "Salvar Dieta"}</Text>
           </TouchableOpacity>
         </View>
 
-        {/* Espaço extra para garantir que os botões sejam totalmente visíveis */}
         <View style={styles.extraBottomSpace} />
       </BottomSheetScrollView>
     </BottomSheet>
@@ -514,121 +566,214 @@ const DietFormSheet: React.FC<DietFormSheetProps> = ({
 const styles = StyleSheet.create({
   sheetBackground: {
     backgroundColor: "#fff",
-    shadowColor: "rgba(0, 0, 0, 0.7)",
-    shadowOffset: { width: 0, height: -6 },
-    shadowOpacity: 0.5,
-    shadowRadius: 10,
-    elevation: 15,
+    borderTopLeftRadius: 32,
+    borderTopRightRadius: 32,
   },
   sheetHandle: {
-    backgroundColor: "#d1d5db",
-    width: 40,
+    backgroundColor: "#E2E8F0",
+    width: 36,
     height: 4,
+    marginTop: 8,
   },
   sheetContent: {
     flex: 1,
-    paddingHorizontal: 16,
-    paddingTop: 16,
+    paddingHorizontal: 24,
   },
   scrollContent: {
     paddingBottom: 120,
-    paddingHorizontal: 0,
+  },
+  headerRow: {
+    marginTop: 12,
+    marginBottom: 24,
+    alignItems: "center",
   },
   sheetTitle: {
-    fontSize: 20,
-    fontWeight: "700",
-    color: "#111827",
-    marginBottom: 20,
-    textAlign: "center",
+    fontSize: 22,
+    fontWeight: "800",
+    color: "#0F172A",
+    letterSpacing: -0.5,
+  },
+  formSection: {
+    marginBottom: 24,
   },
   label: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: "#111827",
-    marginTop: 15,
-    marginBottom: 8,
+    fontSize: 15,
+    fontWeight: "700",
+    color: "#475569",
+    marginBottom: 12,
+    letterSpacing: -0.2,
+  },
+  row: {
+    flexDirection: "row",
+    alignItems: "center",
   },
   input: {
+    backgroundColor: "#F8FAFC",
     borderWidth: 1,
-    borderColor: "#e5e7eb",
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
+    borderColor: "#F1F5F9",
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
     fontSize: 16,
-    color: "#111827",
-    backgroundColor: "#f9fafb",
+    color: "#0F172A",
+    marginBottom: 10,
   },
   textArea: {
-    minHeight: 80,
+    minHeight: 100,
     textAlignVertical: "top",
+    paddingTop: 14,
+  },
+  inputError: {
+    borderColor: "#FECACA",
+    backgroundColor: "#FEF2F2",
+  },
+  calorieContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    backgroundColor: "#F8FAFC",
+    paddingHorizontal: 16,
+    paddingVertical: 4,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#F1F5F9",
+    marginBottom: 12,
+  },
+  calorieLabel: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#64748B",
+  },
+  calorieInput: {
+    fontSize: 20,
+    fontWeight: "800",
+    color: "#0F172A",
+    textAlign: "right",
+    minWidth: 80,
+    paddingVertical: 8,
+  },
+  macrosGrid: {
+    flexDirection: "row",
+    gap: 12 as any,
+  },
+  macroCol: {
+    flex: 1,
+    backgroundColor: "#F8FAFC",
+    borderRadius: 12,
+    padding: 10,
+    borderWidth: 1,
+    borderColor: "#F1F5F9",
+    alignItems: "center",
+  },
+  macroLabel: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#64748B",
+    marginBottom: 4,
+    textTransform: "uppercase",
+  },
+  macroInput: {
+    fontSize: 18,
+    fontWeight: "800",
+    color: "#0F172A",
+    textAlign: "center",
+    width: "100%",
+    paddingVertical: 4,
   },
   imagePickerContainer: {
-    marginTop: 15,
-    marginHorizontal: -16,
+    marginTop: 4,
   },
-  imagePlaceholder: {
+  imageWrapper: {
     width: "100%",
-    height: 150,
-    backgroundColor: "#f3f4f6",
-    borderRadius: 20,
-    justifyContent: "center",
-    alignItems: "center",
-    marginBottom: 10,
-    borderWidth: 1,
-    borderColor: "#e5e7eb",
-    borderStyle: "dashed",
-  },
-  imagePlaceholderText: {
-    color: "#6b7280",
-    marginTop: 5,
+    height: 200,
+    borderRadius: 16,
+    overflow: "hidden",
+    position: "relative",
   },
   selectedImage: {
     width: "100%",
-    height: 180,
-    borderRadius: 10,
+    height: "100%",
     resizeMode: "cover",
-    marginBottom: 10,
   },
-  submitButton: {
-    backgroundColor: "#192126",
-    paddingVertical: 14,
-    borderRadius: 10,
+  changeImageBadge: {
+    position: "absolute",
+    bottom: 12,
+    right: 12,
+    backgroundColor: "rgba(15, 23, 42, 0.7)",
+    width: 32,
+    height: 32,
+    borderRadius: 16,
     alignItems: "center",
-    flex: 1,
-    minHeight: 50,
+    justifyContent: "center",
   },
-  submitButtonText: {
-    color: "#fff",
-    fontWeight: "700",
-    fontSize: 16,
+  imagePlaceholder: {
+    width: "100%",
+    height: 160,
+    backgroundColor: "#F8FAFC",
+    borderRadius: 16,
+    borderWidth: 2,
+    borderColor: "#F1F5F9",
+    borderStyle: "dashed",
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 20,
+  },
+  placeholderIconCircle: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: "#F1F5F9",
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 12,
+  },
+  imagePlaceholderText: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#94A3B8",
+    textAlign: "center",
   },
   errorText: {
-    color: "red",
+    color: "#EF4444",
     fontSize: 12,
-    marginBottom: 5,
-    marginTop: -5,
+    fontWeight: "600",
+    marginTop: -4,
+    marginBottom: 8,
+    marginLeft: 4,
   },
   bottomButtonsContainer: {
     flexDirection: "row",
-    justifyContent: "space-between",
-    gap: 12,
-    marginTop: 20,
-    marginBottom: -90,
-    paddingHorizontal: 0,
+    gap: 12 as any,
+    marginTop: 8,
   },
-  cancelButton: {
-    backgroundColor: "#192126",
-    paddingVertical: 14,
-    borderRadius: 10,
-    alignItems: "center",
+  actionButton: {
     flex: 1,
+    height: 56,
+    borderRadius: 14,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  cancelBtn: {
+    backgroundColor: "#F1F5F9",
+  },
+  cancelBtnText: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: "#64748B",
+  },
+  saveBtn: {
+    backgroundColor: "#BBF246",
+  },
+  saveBtnDisabled: {
+    opacity: 0.6,
+  },
+  saveBtnText: {
+    fontSize: 16,
+    fontWeight: "800",
+    color: "#0F172A",
   },
   extraBottomSpace: {
-    height: 80,
-  },
-  submitButtonDisabled: {
-    backgroundColor: "#9ca3af",
-    opacity: 0.6,
+    height: 100,
   },
 });
 

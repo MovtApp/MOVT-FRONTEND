@@ -88,6 +88,7 @@ export type AppStackParamList = {
   CommunityDetails: { community: Community };
   TrainingScreen: undefined;
   TrainingDetails: { training: Training };
+  ActiveWorkout: { training: Training };
   ExplorerScreen: undefined;
   AppointmentScreen:
     | {
@@ -99,6 +100,10 @@ export type AppStackParamList = {
       }
     | undefined;
   FeedScreen: undefined;
+  PostDetailScreen: { postId: string | number };
+  ArchivedPostsScreen: undefined;
+  EditProfileScreen: undefined;
+  AdminDashboard: undefined;
 };
 
 export interface Community {

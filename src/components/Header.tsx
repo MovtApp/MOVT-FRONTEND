@@ -1,11 +1,11 @@
-import React, { useState } from "react";
+import React from "react";
 import { View, Image, TouchableOpacity, StyleSheet, Dimensions, Platform } from "react-native";
 import { Bell, Menu } from "lucide-react-native";
 import { useNavigation, NavigationProp, CompositeNavigationProp } from "@react-navigation/native";
 import { DrawerNavigationProp } from "@react-navigation/drawer";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { AppStackParamList, AppDrawerParamList } from "../@types/routes";
-import NotificationModal from "./NotificationModal";
+import { useNotifications } from "../contexts/NotificationContext";
 
 const { width } = Dimensions.get("window");
 
@@ -24,17 +24,16 @@ const Header: React.FC<HeaderProps> = ({
   >;
   const navigation = useNavigation<HeaderNavigationProp>();
   const insets = useSafeAreaInsets();
-  const [isNotificationModalVisible, setIsNotificationModalVisible] = useState(false);
+  const { unreadCount } = useNotifications();
 
   const toggleNotificationModal = () => {
-    setIsNotificationModalVisible(!isNotificationModalVisible);
+    (navigation as any).getParent("RightDrawer")?.openDrawer();
   };
 
   const handleMenuPress = () => {
     navigation.openDrawer();
   };
 
-  // Ajuste específico: Android costuma precisar de mais respiro comparado ao iOS que já usa Safe Area bem
   const paddingTop =
     Platform.OS === "android" ? (insets.top > 0 ? insets.top + 20 : 40) : Math.max(insets.top, 10);
 
@@ -54,16 +53,24 @@ const Header: React.FC<HeaderProps> = ({
         {showNotifications && (
           <TouchableOpacity style={styles.iconButton} onPress={toggleNotificationModal}>
             <Bell size={24} color="#000" />
+            {unreadCount > 0 && (
+              <View
+                style={{
+                  position: "absolute",
+                  top: 8,
+                  right: 8,
+                  backgroundColor: "#BBF246",
+                  width: 8,
+                  height: 8,
+                  borderRadius: 4,
+                  borderWidth: 1.5,
+                  borderColor: "#fff",
+                }}
+              />
+            )}
           </TouchableOpacity>
         )}
       </View>
-      {showNotifications && (
-        <NotificationModal
-          isVisible={isNotificationModalVisible}
-          onClose={toggleNotificationModal}
-          sheetHeight={notificationSheetHeight}
-        />
-      )}
     </View>
   );
 };

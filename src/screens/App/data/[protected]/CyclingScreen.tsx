@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useRef, useCallback } from "react";
+import React, { useState, useMemo, useRef, useCallback, useEffect } from "react";
 import {
   View,
   Text,
@@ -7,9 +7,11 @@ import {
   TouchableOpacity,
   Dimensions,
   Platform,
+  Alert,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import MapView, { Polyline, Marker, PROVIDER_GOOGLE } from "react-native-maps";
+import * as Location from "expo-location";
 import {
   Bike,
   Timer,
@@ -17,42 +19,182 @@ import {
   Mountain,
   Zap,
   ChevronRight,
-  Info,
   TrendingUp,
   Heart,
   Droplets,
   Flame,
+  Play,
+  Pause,
+  Square,
+  Share2,
 } from "lucide-react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import BottomSheet, { BottomSheetView, BottomSheetBackdrop } from "@gorhom/bottom-sheet";
 import BackButton from "../../../../components/BackButton";
 import DataPillNavigator from "../../../../components/data/DataPillNavigator";
+import {
+  speedToPace,
+  formatDuration,
+  estimateCalories,
+} from "../../../../utils/workout/performance";
 
 const { width, height } = Dimensions.get("window");
 
-// Mock route data (simulating a professional cycling route)
-const MOCK_ROUTE = [
-  { latitude: -23.5505, longitude: -46.6333 },
-  { latitude: -23.5515, longitude: -46.6353 },
-  { latitude: -23.5535, longitude: -46.6373 },
-  { latitude: -23.5555, longitude: -46.6403 },
-  { latitude: -23.5585, longitude: -46.6433 },
-  { latitude: -23.5605, longitude: -46.6453 },
-  { latitude: -23.5625, longitude: -46.6423 },
-  { latitude: -23.5645, longitude: -46.6393 },
-];
-
-const METRIC_CARDS = [
-  { id: "dist", label: "Distância", value: "32.4", unit: "km", icon: Navigation, color: "#3B82F6" },
-  { id: "time", label: "Tempo", value: "01:24", unit: "h", icon: Timer, color: "#10B981" },
-  { id: "elev", label: "Elevação", value: "450", unit: "m", icon: Mountain, color: "#F59E0B" },
-  { id: "speed", label: "Vel. Média", value: "24.5", unit: "km/h", icon: Zap, color: "#EF4444" },
-];
+const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => {
+  const R = 6371;
+  const dLat = (lat2 - lat1) * (Math.PI / 180);
+  const dLon = (lon2 - lon1) * (Math.PI / 180);
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(lat1 * (Math.PI / 180)) *
+      Math.cos(lat2 * (Math.PI / 180)) *
+      Math.sin(dLon / 2) *
+      Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c;
+};
 
 const CyclingScreen: React.FC = () => {
   const [activeTab, setActiveTab] = useState<"Ciclismo" | "Corrida" | "Maratona">("Ciclismo");
   const bottomSheetRef = useRef<BottomSheet>(null);
   const snapPoints = useMemo(() => ["50%", "85%"], []);
+
+  // Tracking States
+  const [isTracking, setIsTracking] = useState(false);
+  const [isPaused, setIsPaused] = useState(false);
+  const [isAutoPaused, setIsAutoPaused] = useState(false);
+  const [seconds, setSeconds] = useState(0);
+  const [distance, setDistance] = useState(0);
+  const [route, setRoute] = useState<{ latitude: number; longitude: number }[]>([]);
+  const [currentLocation, setCurrentLocation] = useState<Location.LocationObject | null>(null);
+  const [currentSpeedMs, setCurrentSpeedMs] = useState(0);
+  const [splits, setSplits] = useState<{ km: number; time: string; pace: string }[]>([]);
+
+  const lastSplitDist = useRef(0);
+  const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const locationSubscriber = useRef<Location.LocationSubscription | null>(null);
+
+  const startTracking = async () => {
+    const { status } = await Location.requestForegroundPermissionsAsync();
+    if (status !== "granted") {
+      Alert.alert("Permissão negada", "Precisamos de acesso ao GPS para o MOVT Performance.");
+      return;
+    }
+
+    setIsTracking(true);
+    setIsPaused(false);
+    setIsAutoPaused(false);
+    setSeconds(0);
+    setDistance(0);
+    setRoute([]);
+    setSplits([]);
+    lastSplitDist.current = 0;
+
+    timerRef.current = setInterval(() => {
+      setSeconds((prev) => prev + 1);
+    }, 1000);
+
+    locationSubscriber.current = await Location.watchPositionAsync(
+      {
+        accuracy: Location.Accuracy.BestForNavigation,
+        timeInterval: 2000,
+        distanceInterval: 3,
+      },
+      (location) => {
+        const { latitude, longitude, speed } = location.coords;
+        setCurrentLocation(location);
+        const currentSpeed = speed || 0;
+        setCurrentSpeedMs(currentSpeed);
+
+        // Auto-Pause Logic (below 1km/h)
+        if (currentSpeed < 0.28 && !isPaused && !isAutoPaused) {
+          handleAutoPause(true);
+        } else if (currentSpeed >= 1.0 && isAutoPaused) {
+          handleAutoPause(false);
+        }
+
+        if (isPaused || isAutoPaused) return;
+
+        setRoute((prev) => {
+          const newPoint = { latitude, longitude };
+          if (prev.length > 0) {
+            const lastPoint = prev[prev.length - 1];
+            const d = calculateDistance(
+              lastPoint.latitude,
+              lastPoint.longitude,
+              latitude,
+              longitude
+            );
+            if (d > 0.003) {
+              const newTotalDistance = distance + d;
+              setDistance(newTotalDistance);
+
+              // Marking SPLITS every 1km
+              if (Math.floor(newTotalDistance) > lastSplitDist.current) {
+                const currentKm = Math.floor(newTotalDistance);
+                lastSplitDist.current = currentKm;
+                setSplits((prevSplits) => [
+                  ...prevSplits,
+                  {
+                    km: currentKm,
+                    time: formatDuration(seconds),
+                    pace: speedToPace((distance * 1000) / seconds),
+                  },
+                ]);
+              }
+            }
+          }
+          return [...prev, newPoint];
+        });
+      }
+    );
+  };
+
+  const handleAutoPause = (pause: boolean) => {
+    if (pause) {
+      if (timerRef.current) clearInterval(timerRef.current);
+      setIsAutoPaused(true);
+    } else {
+      timerRef.current = setInterval(() => setSeconds((prev) => prev + 1), 1000);
+      setIsAutoPaused(false);
+    }
+  };
+
+  const togglePause = () => {
+    if (isPaused || isAutoPaused) {
+      if (timerRef.current) clearInterval(timerRef.current);
+      timerRef.current = setInterval(() => setSeconds((prev) => prev + 1), 1000);
+      setIsPaused(false);
+      setIsAutoPaused(false);
+    } else {
+      if (timerRef.current) clearInterval(timerRef.current);
+      setIsPaused(true);
+      setCurrentSpeedMs(0);
+    }
+  };
+
+  const stopTracking = () => {
+    Alert.alert("Finalizar Treino", "Deseja salvar e postar seu progresso?", [
+      { text: "Continuar", style: "cancel" },
+      {
+        text: "Finalizar e Analisar",
+        style: "destructive",
+        onPress: () => {
+          setIsTracking(false);
+          if (timerRef.current) clearInterval(timerRef.current);
+          if (locationSubscriber.current) locationSubscriber.current.remove();
+          handleOpenAnalysis();
+        },
+      },
+    ]);
+  };
+
+  useEffect(() => {
+    return () => {
+      if (timerRef.current) clearInterval(timerRef.current);
+      if (locationSubscriber.current) locationSubscriber.current.remove();
+    };
+  }, []);
 
   const renderBackdrop = useCallback(
     (props: any) => (
@@ -63,13 +205,17 @@ const CyclingScreen: React.FC = () => {
 
   const handleOpenAnalysis = () => bottomSheetRef.current?.expand();
 
+  const currentSpeedKmh = (currentSpeedMs * 3.6).toFixed(1);
+  const currentPace = speedToPace(currentSpeedMs);
+  const estimatedKcal = estimateCalories(distance).toFixed(0);
+
   return (
     <SafeAreaView style={styles.safeArea} edges={["top"]}>
       <View style={styles.header}>
         <BackButton to={{ name: "DataScreen" }} />
-        <Text style={styles.headerTitle}>Atividades de Rota</Text>
+        <Text style={styles.headerTitle}>MOVT Performance</Text>
         <TouchableOpacity onPress={handleOpenAnalysis} style={styles.infoBtn}>
-          <Info size={22} color="#1E293B" />
+          <TrendingUp size={22} color="#1E293B" />
         </TouchableOpacity>
       </View>
 
@@ -79,9 +225,15 @@ const CyclingScreen: React.FC = () => {
             <TouchableOpacity
               key={tab}
               onPress={() => setActiveTab(tab as any)}
-              style={[styles.tab, activeTab === tab && styles.activeTab]}
+              style={[
+                styles.tab,
+                activeTab === tab && {
+                  backgroundColor: activeTab === "Ciclismo" ? "#3B82F6" : "#10B981",
+                },
+              ]}
+              disabled={isTracking}
             >
-              <Text style={[styles.tabText, activeTab === tab && styles.activeTabText]}>{tab}</Text>
+              <Text style={[styles.tabText, activeTab === tab && { color: "#FFF" }]}>{tab}</Text>
             </TouchableOpacity>
           ))}
         </View>
@@ -92,68 +244,137 @@ const CyclingScreen: React.FC = () => {
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        {/* Map View Section */}
         <View style={styles.mapContainer}>
           <MapView
             provider={PROVIDER_GOOGLE}
             style={styles.map}
+            region={
+              currentLocation
+                ? {
+                    latitude: currentLocation.coords.latitude,
+                    longitude: currentLocation.coords.longitude,
+                    latitudeDelta: 0.005,
+                    longitudeDelta: 0.005,
+                  }
+                : undefined
+            }
             initialRegion={{
               latitude: -23.5555,
               longitude: -46.6383,
               latitudeDelta: 0.02,
               longitudeDelta: 0.02,
             }}
-            scrollEnabled={false}
-            zoomEnabled={false}
           >
-            <Polyline
-              coordinates={MOCK_ROUTE}
-              strokeColor="#3B82F6"
-              strokeWidth={4}
-              lineCap="round"
-            />
-            <Marker coordinate={MOCK_ROUTE[0]}>
-              <View style={styles.markerStart} />
-            </Marker>
-            <Marker coordinate={MOCK_ROUTE[MOCK_ROUTE.length - 1]}>
-              <View style={styles.markerEnd}>
-                <Bike size={12} color="#FFF" />
-              </View>
-            </Marker>
+            {route.length > 1 && (
+              <Polyline
+                coordinates={route}
+                strokeColor={activeTab === "Ciclismo" ? "#3B82F6" : "#10B981"}
+                strokeWidth={5}
+              />
+            )}
+            {route.length > 0 && <Marker coordinate={route[0]} title="Início" pinColor="green" />}
+            {currentLocation && (
+              <Marker
+                coordinate={{
+                  latitude: currentLocation.coords.latitude,
+                  longitude: currentLocation.coords.longitude,
+                }}
+              >
+                <View
+                  style={[
+                    styles.currentLocationMarker,
+                    { backgroundColor: activeTab === "Ciclismo" ? "#3B82F6" : "#10B981" },
+                  ]}
+                />
+              </Marker>
+            )}
           </MapView>
 
-          {/* HUD Overlay Metrics */}
+          {isAutoPaused && (
+            <View style={styles.autoPauseOverlay}>
+              <Text style={styles.autoPauseText}>| | AUTO-PAUSA</Text>
+            </View>
+          )}
+
           <View style={styles.hudOverlay}>
             <View style={styles.hudGrid}>
-              {METRIC_CARDS.map((card) => (
-                <View key={card.id} style={styles.hudCard}>
-                  <card.icon size={16} color={card.color} />
-                  <View style={styles.hudCardValueContainer}>
-                    <Text style={styles.hudCardValue}>{card.value}</Text>
-                    <Text style={styles.hudCardUnit}>{card.unit}</Text>
-                  </View>
+              <View style={styles.hudCard}>
+                <Navigation size={16} color="#3B82F6" />
+                <View style={styles.hudCardValueContainer}>
+                  <Text style={styles.hudCardValue}>{distance.toFixed(2)}</Text>
+                  <Text style={styles.hudCardUnit}>km</Text>
                 </View>
-              ))}
+              </View>
+              <View style={styles.hudCard}>
+                <Timer size={16} color="#10B981" />
+                <View style={styles.hudCardValueContainer}>
+                  <Text style={styles.hudCardValue}>{formatDuration(seconds)}</Text>
+                  <Text style={styles.hudCardUnit}>tempo</Text>
+                </View>
+              </View>
+              <View style={styles.hudCard}>
+                <Zap size={16} color="#EF4444" />
+                <View style={styles.hudCardValueContainer}>
+                  <Text style={styles.hudCardValue}>
+                    {activeTab === "Ciclismo" ? currentSpeedKmh : currentPace}
+                  </Text>
+                  <Text style={styles.hudCardUnit}>
+                    {activeTab === "Ciclismo" ? "km/h" : "pace/km"}
+                  </Text>
+                </View>
+              </View>
+              <View style={styles.hudCard}>
+                <Flame size={16} color="#F97316" />
+                <View style={styles.hudCardValueContainer}>
+                  <Text style={styles.hudCardValue}>{estimatedKcal}</Text>
+                  <Text style={styles.hudCardUnit}>kcal</Text>
+                </View>
+              </View>
             </View>
           </View>
         </View>
 
-        {/* Insight Section */}
+        <View style={styles.controlContainer}>
+          {!isTracking ? (
+            <TouchableOpacity
+              style={[styles.mainButton, { backgroundColor: "#BBF246" }]}
+              onPress={startTracking}
+              activeOpacity={0.8}
+            >
+              <Play size={24} color="#000" fill="#000" />
+              <Text style={styles.mainButtonText}>INICIAR {activeTab.toUpperCase()}</Text>
+            </TouchableOpacity>
+          ) : (
+            <View style={styles.activeControls}>
+              <TouchableOpacity style={[styles.roundButton]} onPress={togglePause}>
+                {isPaused || isAutoPaused ? (
+                  <Play size={24} color="#000" fill="#000" />
+                ) : (
+                  <Pause size={24} color="#000" fill="#000" />
+                )}
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.stopButton, { backgroundColor: "#EF4444" }]}
+                onPress={stopTracking}
+              >
+                <Square size={24} color="#FFF" fill="#FFF" />
+                <Text style={styles.stopButtonText}>FINALIZAR</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+        </View>
+
         <View style={styles.insightContainer}>
           <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Análise do Percurso</Text>
-            <TouchableOpacity onPress={handleOpenAnalysis}>
-              <Text style={styles.seeMore}>Ver detalhes</Text>
-            </TouchableOpacity>
+            <Text style={styles.sectionTitle}>Tendências de Esforço</Text>
           </View>
 
-          <TouchableOpacity style={styles.mainInsightCard} activeOpacity={0.9} onPress={handleOpenAnalysis}>
-            <LinearGradient
-              colors={["#EFF6FF", "#DBEAFE"]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={styles.insightGradient}
-            >
+          <TouchableOpacity
+            style={styles.mainInsightCard}
+            activeOpacity={0.85}
+            onPress={handleOpenAnalysis}
+          >
+            <LinearGradient colors={["#F8FAFC", "#F1F5F9"]} style={styles.insightGradient}>
               <View style={styles.insightLeft}>
                 <View style={styles.insightIconCircle}>
                   <TrendingUp size={24} color="#3B82F6" />
@@ -167,7 +388,6 @@ const CyclingScreen: React.FC = () => {
             </LinearGradient>
           </TouchableOpacity>
 
-          {/* Quick Stats Grid */}
           <View style={styles.statsRow}>
             <View style={styles.smallStatCard}>
               <Heart size={20} color="#EF4444" />
@@ -177,7 +397,7 @@ const CyclingScreen: React.FC = () => {
             <View style={styles.smallStatCard}>
               <Flame size={20} color="#F97316" />
               <Text style={styles.smallStatLabel}>Calorias</Text>
-              <Text style={styles.smallStatValue}>840</Text>
+              <Text style={styles.smallStatValue}>{estimatedKcal}</Text>
             </View>
             <View style={styles.smallStatCard}>
               <Droplets size={20} color="#3B82F6" />
@@ -187,12 +407,11 @@ const CyclingScreen: React.FC = () => {
           </View>
         </View>
 
-        <View style={{ height: 100 }} />
+        <View style={{ height: 120 }} />
       </ScrollView>
 
       <DataPillNavigator currentScreen="CyclingScreen" />
 
-      {/* Analysis Bottom Sheet */}
       <BottomSheet
         ref={bottomSheetRef}
         index={-1}
@@ -204,44 +423,70 @@ const CyclingScreen: React.FC = () => {
         <BottomSheetView style={styles.bsContainer}>
           <ScrollView showsVerticalScrollIndicator={false}>
             <View style={styles.bsHeader}>
-              <View style={styles.bsIconContainer}>
-                <Bike size={24} color="#FFF" />
+              <View
+                style={[
+                  styles.bsIconContainer,
+                  { backgroundColor: activeTab === "Ciclismo" ? "#3B82F6" : "#10B981" },
+                ]}
+              >
+                {activeTab === "Ciclismo" ? (
+                  <Bike size={24} color="#FFF" />
+                ) : (
+                  <TrendingUp size={24} color="#FFF" />
+                )}
               </View>
               <View>
-                <Text style={styles.bsTitle}>Análise de Desempenho</Text>
-                <Text style={styles.bsSubtitle}>Resumo técnico da sua última atividade</Text>
+                <Text style={styles.bsTitle}>Resumo do Treino</Text>
+                <Text style={styles.bsSubtitle}>Histórico e análise de voltas</Text>
               </View>
             </View>
 
             <View style={styles.bsSection}>
-              <Text style={styles.bsSectionTitle}>Zonas de Intensidade</Text>
-              <View style={styles.intensityBar}>
-                <View style={[styles.intensitySegment, { flex: 0.2, backgroundColor: "#3B82F6" }]} />
-                <View style={[styles.intensitySegment, { flex: 0.5, backgroundColor: "#10B981" }]} />
-                <View style={[styles.intensitySegment, { flex: 0.2, backgroundColor: "#F59E0B" }]} />
-                <View style={[styles.intensitySegment, { flex: 0.1, backgroundColor: "#EF4444" }]} />
-              </View>
-              <View style={styles.intensityLabels}>
-                <Text style={styles.intensityText}>Aeróbico (50%)</Text>
-                <Text style={styles.intensityText}>Limiar (20%)</Text>
+              <Text style={styles.bsSectionTitle}>Métricas Finais</Text>
+              <View style={styles.statsRow}>
+                <View style={styles.smallStatCard}>
+                  <Text style={styles.smallStatLabel}>Distância</Text>
+                  <Text style={styles.smallStatValue}>{distance.toFixed(2)} km</Text>
+                </View>
+                <View style={styles.smallStatCard}>
+                  <Text style={styles.smallStatLabel}>Tempo</Text>
+                  <Text style={styles.smallStatValue}>{formatDuration(seconds)}</Text>
+                </View>
               </View>
             </View>
 
-            <View style={styles.bsSection}>
-              <Text style={styles.bsSectionTitle}>Recomendações</Text>
-              <View style={styles.tipCard}>
-                <Zap size={18} color="#F59E0B" />
-                <Text style={styles.tipText}>
-                  Seu esforço foi intenso. Recomendamos <Text style={{ fontWeight: "700" }}>24h de recuperação</Text> antes da próxima sessão de alta carga.
-                </Text>
+            {splits.length > 0 && (
+              <View style={styles.bsSection}>
+                <Text style={styles.bsSectionTitle}>Voltas (Splits por KM)</Text>
+                <View style={styles.splitsTable}>
+                  <View style={styles.splitRowHeader}>
+                    <Text style={styles.splitHeaderText}>KM</Text>
+                    <Text style={styles.splitHeaderText}>TEMPO</Text>
+                    <Text style={styles.splitHeaderText}>PACE</Text>
+                  </View>
+                  {splits.map((s, index) => (
+                    <View key={index} style={styles.splitRow}>
+                      <Text style={styles.splitNum}>{s.km}</Text>
+                      <Text style={styles.splitValue}>{s.time}</Text>
+                      <Text
+                        style={[
+                          styles.splitValue,
+                          { color: activeTab === "Ciclismo" ? "#3B82F6" : "#10B981" },
+                        ]}
+                      >
+                        {s.pace}
+                      </Text>
+                    </View>
+                  ))}
+                </View>
               </View>
-            </View>
+            )}
 
             <TouchableOpacity
               style={styles.bsCloseBtn}
-              onPress={() => bottomSheetRef.current?.close()}
+              onPress={() => Alert.alert("Compartilhar", "Postando no Feed do MOVT...")}
             >
-              <Text style={styles.bsCloseBtnText}>Fechar Análise</Text>
+              <Text style={styles.bsCloseBtnText}>Postar no Feed do App</Text>
             </TouchableOpacity>
           </ScrollView>
         </BottomSheetView>
@@ -251,10 +496,7 @@ const CyclingScreen: React.FC = () => {
 };
 
 const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-    backgroundColor: "#FFFFFF",
-  },
+  safeArea: { flex: 1, backgroundColor: "#FFFFFF" },
   header: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -262,15 +504,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingVertical: 15,
   },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: "700",
-    color: "#1E293B",
-  },
-  tabsContainer: {
-    paddingHorizontal: 20,
-    paddingBottom: 15,
-  },
+  headerTitle: { fontSize: 18, fontWeight: "900", color: "#1E293B", letterSpacing: -0.5 },
+  tabsContainer: { paddingHorizontal: 20, paddingBottom: 15 },
   tabSelector: {
     flexDirection: "row",
     backgroundColor: "#F1F5F9",
@@ -278,162 +513,133 @@ const styles = StyleSheet.create({
     padding: 2,
     width: "100%",
   },
-  tab: {
-    flex: 1,
-    paddingVertical: 8,
-    alignItems: "center",
-    borderRadius: 18,
-  },
+  tab: { flex: 1, paddingVertical: 12, alignItems: "center", borderRadius: 18 },
+  tabText: { fontSize: 14, fontWeight: "800", color: "#64748B" },
   activeTab: {
     backgroundColor: "#FFFFFF",
-    ...Platform.select({
-      ios: { shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4 },
-      android: { elevation: 2 },
-    }),
+    elevation: 2,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
   },
-  tabText: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: "#64748B",
-  },
-  activeTabText: {
-    color: "#1E293B",
-  },
-  infoBtn: {
-    padding: 8,
-  },
-  scrollView: {
-    flex: 1,
-  },
-  scrollContent: {
-    flexGrow: 1,
-  },
+  infoBtn: { padding: 8 },
+  scrollView: { flex: 1 },
+  scrollContent: { flexGrow: 1 },
   mapContainer: {
-    height: height * 0.45,
+    height: height * 0.4,
     marginHorizontal: 20,
     borderRadius: 32,
     overflow: "hidden",
     marginTop: 10,
-    ...Platform.select({
-      ios: { shadowColor: "#000", shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.1, shadowRadius: 12 },
-      android: { elevation: 8 },
-    }),
+    elevation: 8,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
   },
-  map: {
-    ...StyleSheet.absoluteFillObject,
-  },
-  hudOverlay: {
+  map: { ...StyleSheet.absoluteFillObject },
+  autoPauseOverlay: {
     position: "absolute",
-    bottom: 20,
-    left: 20,
-    right: 20,
+    top: 20,
+    alignSelf: "center",
+    backgroundColor: "rgba(0,0,0,0.8)",
+    paddingHorizontal: 20,
+    paddingVertical: 8,
+    borderRadius: 20,
+    zIndex: 10,
   },
-  hudGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 10,
+  autoPauseText: { color: "#BBF246", fontWeight: "900", fontSize: 12 },
+  currentLocationMarker: {
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    borderWidth: 4,
+    borderColor: "#FFF",
+    elevation: 4,
   },
+  hudOverlay: { position: "absolute", bottom: 15, left: 15, right: 15 },
+  hudGrid: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
   hudCard: {
     flex: 1,
     minWidth: "45%",
-    backgroundColor: "rgba(255, 255, 255, 0.95)",
+    backgroundColor: "rgba(255, 255, 255, 0.98)",
     padding: 12,
-    borderRadius: 20,
+    borderRadius: 18,
     flexDirection: "row",
     alignItems: "center",
-    gap: 10,
+    gap: 8,
   },
-  hudCardValueContainer: {
-    flex: 1,
-  },
-  hudCardValue: {
-    fontSize: 16,
-    fontWeight: "800",
-    color: "#1E293B",
-  },
+  hudCardValueContainer: { flex: 1 },
+  hudCardValue: { fontSize: 18, fontWeight: "900", color: "#000", letterSpacing: -0.5 },
   hudCardUnit: {
     fontSize: 10,
     color: "#64748B",
-    fontWeight: "600",
+    fontWeight: "700",
+    textTransform: "uppercase",
+    marginTop: -2,
   },
-  markerStart: {
-    width: 14,
-    height: 14,
-    borderRadius: 7,
-    backgroundColor: "#FFFFFF",
-    borderWidth: 3,
-    borderColor: "#3B82F6",
-  },
-  markerEnd: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    backgroundColor: "#3B82F6",
+  controlContainer: { paddingHorizontal: 20, marginTop: 25 },
+  mainButton: {
+    flexDirection: "row",
+    height: 64,
+    borderRadius: 32,
     alignItems: "center",
     justifyContent: "center",
-    borderWidth: 2,
-    borderColor: "#FFFFFF",
+    gap: 12,
+    elevation: 8,
+    shadowColor: "#BBF246",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.4,
+    shadowRadius: 8,
   },
-  insightContainer: {
-    paddingHorizontal: 20,
-    marginTop: 30,
+  mainButtonText: { fontSize: 18, fontWeight: "900", color: "#000" },
+  activeControls: { flexDirection: "row", gap: 15 },
+  roundButton: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#F1F5F9",
   },
+  stopButton: {
+    flex: 1,
+    height: 64,
+    borderRadius: 32,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 12,
+  },
+  stopButtonText: { color: "#FFF", fontWeight: "900", fontSize: 16 },
+  insightContainer: { paddingHorizontal: 20, marginTop: 30 },
   sectionHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "baseline",
     marginBottom: 15,
   },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: "800",
-    color: "#1E293B",
-  },
-  seeMore: {
-    fontSize: 14,
-    color: "#3B82F6",
-    fontWeight: "700",
-  },
-  mainInsightCard: {
-    borderRadius: 24,
-    overflow: "hidden",
-    marginBottom: 20,
-  },
+  sectionTitle: { fontSize: 18, fontWeight: "800", color: "#1E293B" },
+  mainInsightCard: { borderRadius: 24, overflow: "hidden", marginBottom: 20 },
   insightGradient: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
     padding: 20,
   },
-  insightLeft: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 15,
-  },
+  insightLeft: { flexDirection: "row", alignItems: "center", gap: 15 },
   insightIconCircle: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     backgroundColor: "#FFFFFF",
     alignItems: "center",
     justifyContent: "center",
   },
-  insightLabel: {
-    fontSize: 12,
-    fontWeight: "700",
-    color: "#3B82F6",
-    textTransform: "uppercase",
-  },
-  insightValue: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: "#1E3A8A",
-    marginTop: 2,
-  },
-  statsRow: {
-    flexDirection: "row",
-    gap: 12,
-  },
+  insightLabel: { fontSize: 11, fontWeight: "800", textTransform: "uppercase", color: "#3B82F6" },
+  insightValue: { fontSize: 15, fontWeight: "700", color: "#1E293B", marginTop: 2 },
+  statsRow: { flexDirection: "row", gap: 12 },
   smallStatCard: {
     flex: 1,
     backgroundColor: "#F8FAFC",
@@ -450,101 +656,53 @@ const styles = StyleSheet.create({
     marginTop: 8,
     textTransform: "uppercase",
   },
-  smallStatValue: {
-    fontSize: 18,
-    fontWeight: "800",
-    color: "#1E293B",
-    marginTop: 4,
-  },
-  bsBackground: {
-    backgroundColor: "#FFFFFF",
-    borderRadius: 32,
-  },
-  bsContainer: {
-    flex: 1,
-    padding: 24,
-  },
-  bsHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 15,
-    marginBottom: 30,
-  },
+  smallStatValue: { fontSize: 18, fontWeight: "800", color: "#1E293B", marginTop: 4 },
+  bsBackground: { backgroundColor: "#FFFFFF", borderRadius: 32 },
+  bsContainer: { flex: 1, padding: 24 },
+  bsHeader: { flexDirection: "row", alignItems: "center", gap: 15, marginBottom: 30 },
   bsIconContainer: {
     width: 50,
     height: 50,
     borderRadius: 16,
-    backgroundColor: "#3B82F6",
     alignItems: "center",
     justifyContent: "center",
   },
-  bsTitle: {
-    fontSize: 20,
-    fontWeight: "800",
-    color: "#1E293B",
+  bsTitle: { fontSize: 20, fontWeight: "900", color: "#1E293B" },
+  bsSubtitle: { fontSize: 13, color: "#64748B", marginTop: 2 },
+  bsSection: { marginBottom: 25 },
+  bsSectionTitle: { fontSize: 16, fontWeight: "800", color: "#1E293B", marginBottom: 15 },
+  splitsTable: {
+    backgroundColor: "#F8FAFC",
+    borderRadius: 20,
+    padding: 15,
+    borderWidth: 1,
+    borderColor: "#F1F5F9",
   },
-  bsSubtitle: {
-    fontSize: 13,
-    color: "#64748B",
-    marginTop: 2,
-  },
-  bsSection: {
-    marginBottom: 25,
-  },
-  bsSectionTitle: {
-    fontSize: 16,
-    fontWeight: "700",
-    color: "#1E293B",
-    marginBottom: 15,
-  },
-  intensityBar: {
-    height: 12,
-    borderRadius: 6,
-    flexDirection: "row",
-    overflow: "hidden",
-    backgroundColor: "#F1F5F9",
-  },
-  intensitySegment: {
-    height: "100%",
-  },
-  intensityLabels: {
+  splitRowHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
-    marginTop: 8,
+    paddingBottom: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: "#E2E8F0",
   },
-  intensityText: {
-    fontSize: 12,
-    color: "#64748B",
-    fontWeight: "600",
-  },
-  tipCard: {
+  splitHeaderText: { fontSize: 10, fontWeight: "900", color: "#94A3B8" },
+  splitRow: {
     flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-    backgroundColor: "#FFFBEB",
-    padding: 16,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: "#FEF3C7",
+    justifyContent: "space-between",
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: "#F1F5F9",
   },
-  tipText: {
-    flex: 1,
-    fontSize: 14,
-    color: "#92400E",
-    lineHeight: 20,
-  },
+  splitNum: { fontSize: 14, fontWeight: "900", color: "#1E293B" },
+  splitValue: { fontSize: 14, fontWeight: "700", color: "#475569" },
   bsCloseBtn: {
     backgroundColor: "#1E293B",
-    paddingVertical: 16,
+    paddingVertical: 18,
     borderRadius: 20,
     alignItems: "center",
     marginTop: 10,
   },
-  bsCloseBtnText: {
-    color: "#FFFFFF",
-    fontWeight: "800",
-    fontSize: 16,
-  },
+  bsCloseBtnText: { color: "#FFFFFF", fontWeight: "900", fontSize: 16 },
 });
 
 export default CyclingScreen;

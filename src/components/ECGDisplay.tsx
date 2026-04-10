@@ -136,7 +136,7 @@ const ECGDisplay: React.FC<ECGDisplayProps> = ({
   const pathData = React.useMemo(() => {
     return generateECGWaveform(displayOffset.current, bpm || 60);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [bpm]);
+  }, [bpm, containerSize.width, containerSize.height]);
 
   return (
     <View style={[styles.container, { width: containerSize.width, height: containerSize.height }]}>
@@ -147,7 +147,7 @@ const ECGDisplay: React.FC<ECGDisplayProps> = ({
           color={color}
           style="stroke"
           strokeWidth={1.5}
-          strokeLineCap="round"
+          strokeCap="round"
           strokeJoin="round"
         />
       </Canvas>

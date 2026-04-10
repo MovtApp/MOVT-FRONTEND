@@ -10,11 +10,7 @@ import {
   ActivityIndicator,
   Alert,
 } from "react-native";
-import { 
-  BottomSheetModal, 
-  BottomSheetView, 
-  BottomSheetBackdrop 
-} from "@gorhom/bottom-sheet";
+import { BottomSheetModal, BottomSheetView, BottomSheetBackdrop } from "@gorhom/bottom-sheet";
 import { Search, Send, X, CheckCircle2 } from "lucide-react-native";
 import { api } from "../services/api";
 
@@ -33,14 +29,13 @@ interface SharePostSheetProps {
     author_id?: string | number;
     author_name?: string;
     author_avatar?: string;
+    likes_count?: number | string;
+    comments_count?: number | string;
   } | null;
   bottomSheetRef: React.RefObject<BottomSheetModal>;
 }
 
-const SharePostSheet: React.FC<SharePostSheetProps> = ({
-  postData,
-  bottomSheetRef,
-}) => {
+const SharePostSheet: React.FC<SharePostSheetProps> = ({ postData, bottomSheetRef }) => {
   const [search, setSearch] = useState("");
   const [contacts, setContacts] = useState<UserContact[]>([]);
   const [loading, setLoading] = useState(false);
@@ -76,7 +71,14 @@ const SharePostSheet: React.FC<SharePostSheetProps> = ({
   const handleShare = async (contact: UserContact) => {
     if (sharingTo || !postData) return;
 
-    console.log("📤 Compartilhando post:", postData.id, "| URL:", postData.url, "| Autor:", postData.author_name);
+    console.log(
+      "📤 Compartilhando post:",
+      postData.id,
+      "| URL:",
+      postData.url,
+      "| Autor:",
+      postData.author_name
+    );
 
     setSharingTo(contact.id);
     try {
@@ -92,9 +94,11 @@ const SharePostSheet: React.FC<SharePostSheetProps> = ({
         image_url: postData.url,
         caption: postData.legenda || "",
         author_name: postData.author_name || "usuario",
-        author_avatar: postData.author_avatar || `https://ui-avatars.com/api/?name=${postData.author_name}&background=random`,
+        author_avatar:
+          postData.author_avatar ||
+          `https://ui-avatars.com/api/?name=${postData.author_name}&background=random`,
         likes_count: postData.likes_count || 0,
-        comments_count: postData.comments_count || 0
+        comments_count: postData.comments_count || 0,
       };
 
       await api.post(`/chat/${chatId}/messages`, {
@@ -103,7 +107,7 @@ const SharePostSheet: React.FC<SharePostSheetProps> = ({
       });
 
       setSharedUsers((prev) => new Set(prev).add(contact.id));
-      
+
       setTimeout(() => {
         setSharedUsers((prev) => {
           const next = new Set(prev);
@@ -111,7 +115,6 @@ const SharePostSheet: React.FC<SharePostSheetProps> = ({
           return next;
         });
       }, 1500);
-
     } catch (error) {
       console.error("Erro ao compartilhar post:", error);
       Alert.alert("Erro", "Não foi possível compartilhar este post.");
@@ -122,12 +125,7 @@ const SharePostSheet: React.FC<SharePostSheetProps> = ({
 
   const renderBackdrop = useCallback(
     (props: any) => (
-      <BottomSheetBackdrop
-        {...props}
-        disappearsOnIndex={-1}
-        appearsOnIndex={0}
-        opacity={0.5}
-      />
+      <BottomSheetBackdrop {...props} disappearsOnIndex={-1} appearsOnIndex={0} opacity={0.5} />
     ),
     []
   );
@@ -177,7 +175,9 @@ const SharePostSheet: React.FC<SharePostSheetProps> = ({
                 <View style={styles.contactInfo}>
                   <Image
                     source={{
-                      uri: item.avatar || `https://ui-avatars.com/api/?name=${item.name}&background=random`,
+                      uri:
+                        item.avatar ||
+                        `https://ui-avatars.com/api/?name=${item.name}&background=random`,
                     }}
                     style={styles.avatar}
                   />

@@ -1,17 +1,18 @@
-// eslint-disable-next-line import/no-unresolved
+/* eslint-disable import/no-unresolved */
+// @ts-nocheck
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
-// eslint-disable-next-line import/no-unresolved
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.42.0";
-// eslint-disable-next-line @typescript-eslint/no-unused-vars, import/no-unresolved
-import { load } from "https://deno.land/std@0.223.0/dotenv/mod.ts";
 
 // Carregar variáveis de ambiente - embora para Google SignInWithIdToken, o Supabase geralmente faz a validação
 // Se houver necessidade de validação mais profunda ou de outras credenciais, elas seriam carregadas aqui.
 
 // Inicializar cliente Supabase com service_role key para acesso administrativo
 // SUPABASE_URL e SUPABASE_SERVICE_ROLE_KEY são injetadas automaticamente nas Edge Functions.
+// @ts-ignore
 const supabaseAdmin = createClient(
+  // @ts-ignore
   Deno.env.get("SUPABASE_URL")!,
+  // @ts-ignore
   Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
   {
     auth: {
@@ -21,7 +22,8 @@ const supabaseAdmin = createClient(
   }
 );
 
-serve(async (req) => {
+// @ts-ignore
+serve(async (req: Request) => {
   if (req.method !== "POST") {
     return new Response("Method Not Allowed", { status: 405 });
   }

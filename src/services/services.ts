@@ -30,7 +30,10 @@ const auth_login = async (unidade: string, login: string, senha: string) => {
   });
 };
 
-async function uploadImageToSupabase(imageUri: string, bucketName: string = "diet-images"): Promise<string | null> {
+async function uploadImageToSupabase(
+  imageUri: string,
+  bucketName: string = "diet-images"
+): Promise<string | null> {
   if (!imageUri) {
     console.warn("Image URI is empty, skipping upload.");
     return null;
@@ -40,7 +43,7 @@ async function uploadImageToSupabase(imageUri: string, bucketName: string = "die
   const fileExtension = fileName.split(".").pop();
   const newFileName = `${Date.now()}.${fileExtension}`;
 
-  let contentType = "image/jpeg"; 
+  let contentType = "image/jpeg";
   switch (fileExtension?.toLowerCase()) {
     case "png":
       contentType = "image/png";

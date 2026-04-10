@@ -34,7 +34,7 @@ const Communities: React.FC<CommunitiesProps> = ({
     <View style={styles.section}>
       <View style={styles.sectionHeader}>
         <View>
-          <Text style={styles.sectionTitle}>Comunidades</Text>
+          <Text style={styles.sectionTitle}>Movt Comunidades</Text>
           <View style={styles.activeIndicator} />
         </View>
         {showSeeAll && (

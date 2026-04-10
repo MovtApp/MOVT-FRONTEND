@@ -36,12 +36,7 @@ import Animated, {
   withSequence,
   withTiming,
 } from "react-native-reanimated";
-import {
-  getLatestWearOsHealthData,
-  pollWearOsHealthData,
-  getLatestWearOsHealthDataFromAllDevices,
-  checkWearOsDeviceRegistered,
-} from "../../../../services/wearOsHealthService";
+import { NativeHealthManager } from "../../../../services/nativeHealthManager";
 
 // Fallback seguro para ReanimatedView
 const ReanimatedView = Animated ? Animated.View : View;
@@ -77,7 +72,7 @@ const HeartbeatsScreen: React.FC = () => {
   >("disconnected");
   const [connectionMessage, setConnectionMessage] = useState<string>("Buscando...");
   const [lastUpdate, setLastUpdate] = useState<string | null>(null);
-  const [hasWearOsDevice, setHasWearOsDevice] = useState<boolean | null>(null);
+  const [isAuthorized, setIsAuthorized] = useState<boolean>(false);
   const [svgContent, setSvgContent] = useState<string | null>(null);
   const [isDeviceModalVisible, setIsDeviceModalVisible] = useState(false);
 
@@ -123,75 +118,64 @@ const HeartbeatsScreen: React.FC = () => {
     loadSvg();
   }, []);
 
-  // Sync Logic (Mantida conforme original)
+  // Iniciar checagem de autorização nativa ao abrir a tela
   useEffect(() => {
-    if (!user?.id) {
-      setIsLoading(false);
-      setConnectionStatus("disconnected");
-      return;
-    }
-    const userId = parseInt(user.id, 10);
-    if (isNaN(userId)) return;
+    const checkNativeConnection = async () => {
+      // Tentativa ligeira de autorização
+      const success = await NativeHealthManager.authorize();
+      setIsAuthorized(success);
 
-    if (hasWearOsDevice === null) {
-      setConnectionStatus("connecting");
-      return;
-    }
+      if (success) {
+        setConnectionStatus("connected");
+        setConnectionMessage("Monitorando " + (Platform.OS === 'ios' ? 'Apple Watch' : 'Android Watch'));
 
-    if (hasWearOsDevice === false) {
-      setIsLoading(false);
-      setConnectionStatus("disconnected");
-      setConnectionMessage("Nenhum relógio detectado");
-      return;
-    }
+        // Pre-carga
+        const bpm = await NativeHealthManager.fetchHeartRate();
+        const oxygen = await NativeHealthManager.fetchOxygen();
+        const pressure = await NativeHealthManager.fetchPressure();
+        
+        if (bpm) setHeartRate(bpm);
+        if (oxygen) setOxygen(oxygen);
+        if (pressure) setPressure(pressure);
 
-    const loadInitialData = async () => {
-      try {
-        const data = await getLatestWearOsHealthData(userId);
-        if (data) {
-          setHeartRate(data.heartRate);
-          setPressure(data.pressure);
-          setOxygen(data.oxygen);
-          setConnectionStatus("connected");
-          setConnectionMessage("Monitorando em tempo real");
-          setLastUpdate(new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }));
-        } else {
-          setConnectionStatus("disconnected");
-          setConnectionMessage("Sem dados recentes");
-        }
         setIsLoading(false);
-      } catch (error) {
-        setConnectionStatus("error");
+      } else {
+        setConnectionStatus("disconnected");
+        setConnectionMessage("Nenhum relógio conectado");
         setIsLoading(false);
       }
     };
+    checkNativeConnection();
+  }, [user?.id]);
 
-    loadInitialData();
+  // Handle subscription to heart rate if authorized
+  useEffect(() => {
+    if (!isAuthorized) return;
 
-    const cancelPolling = pollWearOsHealthData(userId, 5000, async (data) => {
-      setHeartRate(data.heartRate);
-      setPressure(data.pressure);
-      setOxygen(data.oxygen);
-      setConnectionStatus("connected");
+    const cancelSubscription = NativeHealthManager.subscribeHeartRate((bpm) => {
+      setHeartRate(bpm);
       setLastUpdate(new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }));
     });
 
-    return () => cancelPolling();
-  }, [user?.id, hasWearOsDevice]);
+    return () => cancelSubscription();
+  }, [isAuthorized]);
 
-  useEffect(() => {
-    const verifyDevice = async () => {
-      if (!user?.id) return;
-      const userId = parseInt(user.id, 10);
-      try {
-        const device = await checkWearOsDeviceRegistered(userId);
-        setHasWearOsDevice(Boolean(device));
-      } catch {
-        setHasWearOsDevice(false);
-      }
-    };
-    verifyDevice();
-  }, [user?.id]);
+  const handleConnectDevice = async () => {
+    setConnectionStatus("connecting");
+    setConnectionMessage("Autorizando conexão...");
+    const success = await NativeHealthManager.authorize();
+    
+    if (success) {
+      setIsAuthorized(true);
+      setConnectionStatus("connected");
+      setConnectionMessage("Relógio Conectado via " + (Platform.OS === 'ios' ? 'HealthKit' : 'Health Connect'));
+      Alert.alert("Sucesso", "Seu dispositivo foi conectado profissionalmente.");
+    } else {
+      setConnectionStatus("error");
+      setConnectionMessage("Falha ao autorizar");
+      Alert.alert("Erro", "Não foi possível conectar. Verifique as permissões de saúde nativas (Apple Health / Google Health Connect).");
+    }
+  };
 
   const getStatusColor = () => {
     switch (connectionStatus) {
@@ -320,13 +304,21 @@ const HeartbeatsScreen: React.FC = () => {
               <Text style={styles.infoTitle}>Status da Conexão</Text>
               <Text style={styles.infoSubtitle}>
                 {connectionStatus === "connected"
-                  ? "Seu relógio está sincronizado e enviando dados."
-                  : "Por favor, verifique se seu Wear OS está por perto."}
+                  ? "Seu relógio está sincronizado diretamente."
+                  : "Por favor, autorize a conexão com o Health Connect/HealthKit."}
               </Text>
             </View>
-            <TouchableOpacity style={styles.syncBtn} onPress={() => setIsDeviceModalVisible(true)}>
-              <Watch size={18} color="#2563EB" />
-            </TouchableOpacity>
+
+            {connectionStatus !== "connected" ? (
+              <TouchableOpacity style={styles.connectBtnAction} onPress={handleConnectDevice}>
+                <Text style={styles.connectBtnText}>Conectar</Text>
+                <Watch size={16} color="#FFFFFF" style={{ marginLeft: 6 }} />
+              </TouchableOpacity>
+            ) : (
+              <TouchableOpacity style={styles.syncBtn} onPress={handleConnectDevice}>
+                <Watch size={18} color="#2563EB" />
+              </TouchableOpacity>
+            )}
           </ReanimatedView>
 
           <View style={{ height: 120 }} />
@@ -521,6 +513,19 @@ const styles = StyleSheet.create({
       },
       android: { elevation: 2 },
     }),
+  },
+  connectBtnAction: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#1E293B",
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 16,
+  },
+  connectBtnText: {
+    color: "#FFFFFF",
+    fontWeight: "700",
+    fontSize: 14,
   },
 });
 

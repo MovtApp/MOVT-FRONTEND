@@ -65,9 +65,27 @@ export const useChats = (userId: string) => {
       const resp = await api.get("/chat");
       if (resp.status === 200) {
         const data = resp.data.data || [];
-        globalChatCache.list = data;
+
+        // Processa as mensagens para limpar JSON de posts compartilhados na lista
+        const processedData = data.map((chat: Chat) => {
+          let lastMsg = chat.last_message || "";
+          if (lastMsg && lastMsg.includes('"type":"shared_post"')) {
+            try {
+              const startIdx = lastMsg.indexOf('{"');
+              const endIdx = lastMsg.lastIndexOf("}") + 1;
+              const jsonStr = lastMsg.substring(startIdx, endIdx);
+              const parsed = JSON.parse(jsonStr);
+              lastMsg = parsed.caption || "Post compartilhado";
+            } catch (e) {
+              lastMsg = "Post compartilhado";
+            }
+          }
+          return { ...chat, last_message: lastMsg };
+        });
+
+        globalChatCache.list = processedData;
         globalChatCache.lastFetch = Date.now();
-        setChats(data);
+        setChats(processedData);
       }
     } catch (e) {
       console.error("useChats error:", e);
@@ -170,17 +188,17 @@ export const useMessages = (chatId: string, userId: string) => {
                 if (text && text.includes('"type":"shared_post"')) {
                   // Tenta extrair o JSON puro caso haja lixo em volta
                   const startIdx = text.indexOf('{"');
-                  const endIdx = text.lastIndexOf('}') + 1;
+                  const endIdx = text.lastIndexOf("}") + 1;
                   const jsonStr = text.substring(startIdx, endIdx);
-                  
+
                   const parsed = JSON.parse(jsonStr);
                   if (parsed.type === "shared_post") {
                     shareData = {
                       ...parsed,
                       likes_count: parsed.likes_count || 0,
-                      comments_count: parsed.comments_count || 0
+                      comments_count: parsed.comments_count || 0,
                     };
-                    text = parsed.caption || "Compartilhou um post";
+                    text = parsed.caption || "Post compartilhado";
                     image = null;
                   }
                 }
@@ -199,7 +217,7 @@ export const useMessages = (chatId: string, userId: string) => {
                   avatar: `https://i.pravatar.cc/150?u=${msg.sender_id}`,
                 },
                 read: !!msg.is_read,
-                shareData: shareData
+                shareData: shareData,
               };
             });
 
@@ -307,7 +325,7 @@ export const useMessages = (chatId: string, userId: string) => {
 
     try {
       const resp = await api.post(`/chat/${chatId}/messages`, {
-        text: msg.text,
+        text: msg.text || " ", // Espaço em branco para evitar erro de NOT NULL no banco
         image_url: msg.image,
       });
 
@@ -328,7 +346,7 @@ export const useMessages = (chatId: string, userId: string) => {
                 if (text && text.includes('"type":"shared_post"')) {
                   // Tenta extrair o JSON puro caso haja lixo em volta
                   const startIdx = text.indexOf('{"');
-                  const endIdx = text.lastIndexOf('}') + 1;
+                  const endIdx = text.lastIndexOf("}") + 1;
                   const jsonStr = text.substring(startIdx, endIdx);
 
                   const parsed = JSON.parse(jsonStr);
@@ -336,9 +354,9 @@ export const useMessages = (chatId: string, userId: string) => {
                     shareData = {
                       ...parsed,
                       likes_count: parsed.likes_count || 0,
-                      comments_count: parsed.comments_count || 0
+                      comments_count: parsed.comments_count || 0,
                     };
-                    text = parsed.caption || "Compartilhou um post";
+                    text = parsed.caption || "Post compartilhado";
                     image = null;
                   }
                 }
@@ -351,7 +369,7 @@ export const useMessages = (chatId: string, userId: string) => {
                 createdAt: new Date(savedMsg.created_at),
                 image,
                 read: !!savedMsg.is_read,
-                shareData
+                shareData,
               };
             }
             return m;
@@ -370,32 +388,44 @@ export const useMessages = (chatId: string, userId: string) => {
   const uploadMedia = async (fileUri: string): Promise<string | null> => {
     if (!supabase) return null;
     try {
-      const fileName = `${chatId}/${Date.now()}.jpg`;
-      const formData = new FormData();
-      formData.append("file", {
-        uri: fileUri,
-        name: fileName,
-        type: "image/jpeg",
-      } as any);
+      const fileExt = fileUri.split(".").pop()?.toLowerCase() || "jpg";
+      const fileName = `${Date.now()}.${fileExt}`;
+      const path = `chat_attachments/${chatId}/${fileName}`;
+      const bucketName = "diet-images"; // Usando o bucket que sabemos que funciona no projeto
 
-      const fileExt = fileUri.split(".").pop();
-      const path = `chat_attachments/${chatId}/${Date.now()}.${fileExt}`;
+      // 1. Obter uma URL de upload assinada para contornar restrições básicas de RLS
+      const { data: signedUploadData, error: signedUploadError } = await supabase.storage
+        .from(bucketName)
+        .createSignedUploadUrl(path);
 
-      // Para simplificar, usaremos o Blob se disponível ou o sistema de arquivos
+      if (signedUploadError) {
+        console.error("❌ Erro ao obter URL assinada:", signedUploadError);
+        throw signedUploadError;
+      }
+
+      const { signedUrl } = signedUploadData;
+
+      // 2. Preparar o Blob
       const response = await fetch(fileUri);
       const blob = await response.blob();
 
-      const { data, error } = await supabase.storage
-        .from("avatars") // Reutilizando bucket existente ou use um novo
-        .upload(path, blob);
+      // 3. Fazer o upload para a URL assinada
+      const uploadResponse = await fetch(signedUrl, {
+        method: "PUT",
+        headers: {
+          "Content-Type": fileExt === "png" ? "image/png" : "image/jpeg",
+          "x-upsert": "true",
+        },
+        body: blob,
+      });
 
-      if (error) throw error;
+      if (!uploadResponse.ok) {
+        throw new Error(`Falha no upload: ${uploadResponse.status}`);
+      }
 
-      const {
-        data: { publicUrl },
-      } = supabase.storage.from("avatars").getPublicUrl(path);
-
-      return publicUrl;
+      // 4. Obter a URL pública final
+      const { data: publicUrlData } = supabase.storage.from(bucketName).getPublicUrl(path);
+      return publicUrlData.publicUrl;
     } catch (e) {
       console.error("Upload media error:", e);
       return null;
@@ -526,7 +556,7 @@ export const usePreloadChat = () => {
                     if (text && text.includes('"type":"shared_post"')) {
                       // Tenta extrair o JSON puro caso haja lixo em volta
                       const startIdx = text.indexOf('{"');
-                      const endIdx = text.lastIndexOf('}') + 1;
+                      const endIdx = text.lastIndexOf("}") + 1;
                       const jsonStr = text.substring(startIdx, endIdx);
 
                       const parsed = JSON.parse(jsonStr);
@@ -534,9 +564,9 @@ export const usePreloadChat = () => {
                         shareData = {
                           ...parsed,
                           likes_count: parsed.likes_count || 0,
-                          comments_count: parsed.comments_count || 0
+                          comments_count: parsed.comments_count || 0,
                         };
-                        text = parsed.caption || "Compartilhou um post";
+                        text = parsed.caption || "Post compartilhado";
                         image = null;
                       }
                     }
@@ -549,11 +579,12 @@ export const usePreloadChat = () => {
                     createdAt: new Date(msg.created_at),
                     user: {
                       _id: msg.sender_id,
-                      name: String(msg.sender_id) === String(effectiveUserId) ? "Eu" : "Participante",
+                      name:
+                        String(msg.sender_id) === String(effectiveUserId) ? "Eu" : "Participante",
                       avatar: `https://i.pravatar.cc/150?u=${msg.sender_id}`,
                     },
                     read: !!msg.is_read,
-                    shareData
+                    shareData,
                   };
                 });
               }

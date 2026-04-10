@@ -9,7 +9,7 @@ import {
   Alert,
   ActivityIndicator,
 } from "react-native";
-import BottomSheet, { BottomSheetScrollView } from "@gorhom/bottom-sheet";
+import BottomSheet, { BottomSheetScrollView, BottomSheetTextInput } from "@gorhom/bottom-sheet";
 import { Image as ImageIcon, X } from "lucide-react-native";
 import * as ImagePicker from "expo-image-picker";
 import { useForm, Controller } from "react-hook-form";
@@ -160,6 +160,7 @@ const PostFormSheet: React.FC<PostFormSheetProps> = ({
         if (response.success) {
           Alert.alert("Sucesso", "Legenda atualizada!");
           if (onSuccess) onSuccess();
+          bottomSheetRef.current?.close();
           onClose();
           reset();
         } else {
@@ -181,6 +182,7 @@ const PostFormSheet: React.FC<PostFormSheetProps> = ({
         if (response.status === 200 || response.status === 201 || response.data?.success) {
           Alert.alert("Sucesso", "Publicação enviada!");
           if (onSuccess) onSuccess();
+          bottomSheetRef.current?.close();
           onClose();
           reset();
         } else {
@@ -195,25 +197,31 @@ const PostFormSheet: React.FC<PostFormSheetProps> = ({
     }
   };
 
-  if (!isOpen) return null;
+  const handleInternalClose = () => {
+    bottomSheetRef.current?.close();
+    onClose();
+  };
 
+  // No longer returning null to ensure the component is always mounted and ref is attached
   return (
     <BottomSheet
       ref={bottomSheetRef}
       snapPoints={snapPoints}
       enablePanDownToClose={true}
       onClose={onClose}
-      index={sheetIndex}
+      index={isOpen ? sheetIndex : -1}
       onChange={setSheetIndex}
       backgroundStyle={styles.sheetBackground}
       handleIndicatorStyle={styles.sheetHandle}
+      keyboardBehavior="extend"
+      keyboardBlurBehavior="restore"
     >
       <BottomSheetScrollView contentContainerStyle={styles.scrollContent}>
         <View style={styles.header}>
           <Text style={styles.sheetTitle}>
-            {initialData?.id ? "Editar Publicação" : "Nova Publicação"}
+            {initialData?.id ? "Editar publicação" : "Nova publicação"}
           </Text>
-          <TouchableOpacity onPress={onClose} style={styles.closeBtn}>
+          <TouchableOpacity onPress={handleInternalClose} style={styles.closeBtn}>
             <X size={20} color="#64748B" />
           </TouchableOpacity>
         </View>
@@ -240,7 +248,7 @@ const PostFormSheet: React.FC<PostFormSheetProps> = ({
           control={control}
           name="legenda"
           render={({ field: { onChange, onBlur, value } }) => (
-            <TextInput
+            <BottomSheetTextInput
               style={styles.textArea}
               placeholder="Escreva algo sobre este momento..."
               onBlur={onBlur}

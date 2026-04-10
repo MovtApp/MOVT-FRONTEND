@@ -28,7 +28,7 @@ import {
 } from "react-native-gifted-chat";
 import { useMessages, useProfileCache } from "@/hooks/useChat";
 import { useRoute, useNavigation } from "@react-navigation/native";
-import { Send as SendIcon, CheckCheck, Plus, Heart, MessageCircle } from "lucide-react-native";
+import { Send as SendIcon, CheckCheck, Plus, Heart, MessageCircle, X } from "lucide-react-native";
 import { useAuth } from "@/contexts/AuthContext";
 import * as ImagePicker from "expo-image-picker";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -36,12 +36,12 @@ import BackButton from "@/components/BackButton";
 import dayjs from "dayjs";
 import "dayjs/locale/pt-br";
 import { userService } from "@/services/userService";
-
-dayjs.locale("pt-br");
+import { useNotifications } from "@/contexts/NotificationContext";
 
 dayjs.locale("pt-br");
 
 const Chat = () => {
+  const { setActiveChatId } = useNotifications();
   const route = useRoute();
   const navigation = useNavigation<any>();
   const { chatId, participantName, participantAvatar, participantId } = route.params as {
@@ -54,6 +54,11 @@ const Chat = () => {
   const [isUploading, setIsUploading] = useState(false);
   const insets = useSafeAreaInsets();
   const [participantProfile, setParticipantProfile] = useState<any>(null);
+
+  useEffect(() => {
+    setActiveChatId(chatId);
+    return () => setActiveChatId(null);
+  }, [chatId, setActiveChatId]);
 
   const effectiveUserId = user?.supabaseUserId || "";
   const { messages, sendMessage, uploadMedia, markAsRead, deleteMessage } = useMessages(
@@ -74,6 +79,15 @@ const Chat = () => {
   const [isLiking, setIsLiking] = useState(false);
   const [newComment, setNewComment] = useState("");
   const [isSendingComment, setIsSendingComment] = useState(false);
+
+  // Image Viewer state
+  const [viewImageVisible, setViewImageVisible] = useState(false);
+  const [selectedImage, setSelectedImage] = useState<string | null>(null);
+
+  const handleOpenImage = (uri: string) => {
+    setSelectedImage(uri);
+    setViewImageVisible(true);
+  };
 
   const handleOpenPostDetails = async (post: any) => {
     setSelectedPost(post);
@@ -121,17 +135,22 @@ const Chat = () => {
     try {
       const res = await userService.addComment(String(selectedPost.id), newComment);
       if (res.success) {
-        console.log("👤 Dados do usuário logado para comentário:", user?.name, user?.username, user?.photo);
-        
+        console.log(
+          "👤 Dados do usuário logado para comentário:",
+          user?.name,
+          user?.username,
+          user?.photo
+        );
+
         // Injeta os dados do usuário atual para que o comentário apareça corretamente na UI
         const newCommentWithUser = {
           ...res.data,
           comment_user_id: effectiveUserId,
           nome: user?.name,
           username: user?.username,
-          photo: user?.photo
+          photo: user?.photo,
         };
-        
+
         setComments((prev) => [...prev, newCommentWithUser]);
         setNewComment("");
         setSelectedPost((prev: any) => ({
@@ -283,7 +302,7 @@ const Chat = () => {
       try {
         const publicUrl = await uploadMedia(result.assets[0].uri);
         if (publicUrl) {
-          onSend([{ image: publicUrl, user: { _id: effectiveUserId } }]);
+          onSend([{ text: "", image: publicUrl, user: { _id: effectiveUserId } }]);
         } else {
           Alert.alert("Erro", "Não foi possível enviar a imagem.");
         }
@@ -355,34 +374,48 @@ const Chat = () => {
         {...props}
         wrapperStyle={{
           right: {
-            backgroundColor: "#F3F4F6", // Cinza neutro e minimalista
+            backgroundColor: props.currentMessage.image ? "transparent" : "#F3F4F6",
             borderRadius: 15,
-            padding: 2,
+            padding: props.currentMessage.image ? 0 : 2,
             maxWidth: "82%",
             borderWidth: 0,
+            elevation: 0, // Sem sombra no Android
+            shadowOpacity: 0, // Sem sombra no iOS
           },
           left: {
-            backgroundColor: "#F1F5F9",
+            backgroundColor: props.currentMessage.image ? "transparent" : "#F1F5F9",
             borderRadius: 15,
-            padding: 2,
+            padding: props.currentMessage.image ? 0 : 2,
             maxWidth: "82%",
+            elevation: 0,
+            shadowOpacity: 0,
+          },
+        }}
+        containerStyle={{
+          right: {
+            marginBottom: props.nextMessage?._id
+              ? 2
+              : Platform.OS === "android"
+                ? 5
+                : isKeyboardOpen
+                  ? 10
+                  : 40,
+            backgroundColor: props.currentMessage.image ? "transparent" : undefined,
+          },
+          left: {
+            marginBottom: props.nextMessage?._id
+              ? 2
+              : Platform.OS === "android"
+                ? 5
+                : isKeyboardOpen
+                  ? 10
+                  : 40,
+            backgroundColor: props.currentMessage.image ? "transparent" : undefined,
           },
         }}
         textStyle={{
           right: { color: "#000", fontSize: 15 },
           left: { color: "#000", fontSize: 15 },
-        }}
-        containerStyle={{
-          right: { 
-            marginBottom: props.nextMessage?._id 
-              ? 2 
-              : (Platform.OS === "android" ? 5 : (isKeyboardOpen ? 10 : 40)) 
-          },
-          left: { 
-            marginBottom: props.nextMessage?._id 
-              ? 2 
-              : (Platform.OS === "android" ? 5 : (isKeyboardOpen ? 10 : 40)) 
-          },
         }}
         renderTicks={() => null}
       />
@@ -433,40 +466,47 @@ const Chat = () => {
         comments_count: data.comments_count || 0,
         author: {
           username: data.author_name,
-          avatar_url: data.author_avatar
-        }
+          avatar_url: data.author_avatar,
+        },
       };
 
       return (
-        <View style={{ 
-          width: "100%", 
-          alignItems: isMyMessage ? "flex-end" : "flex-start",
-          paddingHorizontal: 15,
-          marginVertical: 0,
-          marginBottom: props.nextMessage?._id ? 2 : (Platform.OS === 'android' ? 8 : (isKeyboardOpen ? 10 : 40))
-        }}>
-          <View style={[
-            styles.shareContainer,
-            { width: 280, maxWidth: "85%" }
-          ]}>
-            <TouchableOpacity 
-              activeOpacity={0.9} 
+        <View
+          style={{
+            width: "100%",
+            alignItems: isMyMessage ? "flex-end" : "flex-start",
+            paddingHorizontal: 15,
+            marginVertical: 0,
+            marginBottom: props.nextMessage?._id
+              ? 2
+              : Platform.OS === "android"
+                ? 8
+                : isKeyboardOpen
+                  ? 10
+                  : 40,
+          }}
+        >
+          <View style={[styles.shareContainer, { width: 280, maxWidth: "85%" }]}>
+            <TouchableOpacity
+              activeOpacity={0.9}
               onPress={() => handleOpenPostDetails(normalizedPost)}
               style={styles.shareContent}
             >
               {/* Header do Card */}
               <View style={styles.shareHeader}>
                 <Image source={{ uri: data.author_avatar }} style={styles.shareAvatar} />
-                <Text style={styles.shareUsername} numberOfLines={1}>{data.author_name}</Text>
+                <Text style={styles.shareUsername} numberOfLines={1}>
+                  {data.author_name}
+                </Text>
               </View>
-              
+
               {/* Imagem do Post */}
-              <Image 
-                source={{ uri: data.image_url }} 
-                style={[styles.shareImage, { height: 280 }]} 
+              <Image
+                source={{ uri: data.image_url }}
+                style={[styles.shareImage, { height: 280 }]}
                 resizeMode="cover"
               />
-              
+
               {/* Footer com legenda */}
               <View style={styles.shareFooter}>
                 <Text style={styles.shareCaption} numberOfLines={2}>
@@ -479,8 +519,53 @@ const Chat = () => {
       );
     }
 
+    // Se for uma imagem, renderiza fora da estrutura de Bubble do GiftedChat para remover molduras indesejadas
+    if (currentMessage.image) {
+      return renderMessageImage(props);
+    }
+
     const { key, ...rest } = props;
     return <Message {...rest} key={currentMessage._id} />;
+  };
+
+  const renderMessageImage = (props: any) => {
+    const { currentMessage, nextMessage } = props;
+    const isMyMessage = currentMessage.user._id === effectiveUserId;
+
+    return (
+      <View
+        style={[
+          {
+            width: "100%",
+            alignItems: isMyMessage ? "flex-end" : "flex-start",
+            paddingHorizontal: 15,
+            marginBottom: nextMessage?._id
+              ? 2
+              : Platform.OS === "android"
+                ? 8
+                : isKeyboardOpen
+                  ? 10
+                  : 40,
+          },
+        ]}
+      >
+        <TouchableOpacity activeOpacity={0.9} onPress={() => handleOpenImage(currentMessage.image)}>
+          <View style={styles.imageMessageContainer}>
+            <Image
+              source={{ uri: currentMessage.image }}
+              style={styles.messageImage}
+              resizeMode="cover"
+            />
+            {/* Adiciona o horário sobre a imagem de forma sutil */}
+            <View style={styles.imageTimeBadge}>
+              <Text style={styles.imageTimeText}>
+                {dayjs(currentMessage.createdAt).format("HH:mm")}
+              </Text>
+            </View>
+          </View>
+        </TouchableOpacity>
+      </View>
+    );
   };
 
   const renderMessageText = (props: any) => {
@@ -488,6 +573,11 @@ const Chat = () => {
     const isMyMessage = currentMessage.user._id === effectiveUserId;
     const time = dayjs(currentMessage.createdAt).format("HH:mm");
     const isRead = currentMessage.read;
+
+    // Se a mensagem contém imagem, não renderiza o texto (que pode ser apenas o espaço/hash de criptografia)
+    if (currentMessage.image) {
+      return null;
+    }
 
     return (
       <Text
@@ -556,7 +646,7 @@ const Chat = () => {
             primaryStyle={styles.inputToolbarPrimary}
             renderComposer={renderComposer}
             renderSend={renderSend}
-            renderActions={renderActions}
+            renderActions={() => null}
           />
         );
       }
@@ -647,21 +737,25 @@ const Chat = () => {
           onSend={onSend}
           text={inputText}
           onInputTextChanged={setInputText}
+          placeholder="Escreva sua mensagem"
           user={{ _id: effectiveUserId }}
           renderAvatar={null}
           renderBubble={renderBubble}
           renderInputToolbar={
             Platform.OS === "android"
               ? renderInputToolbar
-              : (props) => <View style={{ height: (60 + (insets.bottom || 0)) }} />
+              : (props) => <View style={{ height: 60 + (insets.bottom || 0) }} />
           }
           renderComposer={Platform.OS === "android" ? renderComposer : undefined}
           renderSend={renderSend}
-          renderActions={renderActions}
+          renderActions={() => null}
           renderMessageText={renderMessageText}
           renderDay={renderDay}
           renderMessage={renderMessage}
-          renderTime={(props: any) => (props.currentMessage?.shareData ? null : undefined)}
+          renderMessageImage={renderMessageImage}
+          renderTime={(props: any) =>
+            props.currentMessage?.shareData || props.currentMessage?.image ? null : undefined
+          }
           textInputProps={{
             autoFocus: false,
             style: {
@@ -674,6 +768,7 @@ const Chat = () => {
               paddingHorizontal: 16,
             },
             multiline: true,
+            placeholder: "Escreva sua mensagem",
           }}
           locale="pt-br"
           minInputToolbarHeight={60}
@@ -699,11 +794,12 @@ const Chat = () => {
           }}
         >
           <InputToolbar
-            {...{
+            {...({
               onSend: (msgs: any) => onSend(msgs),
-            } as any}
+            } as any)}
             text={inputText}
             onTextChanged={setInputText}
+            placeholder="Escreva sua mensagem"
             containerStyle={[
               styles.inputToolbar,
               {
@@ -718,12 +814,14 @@ const Chat = () => {
               <TouchableOpacity
                 onPress={() => {
                   if (inputText.trim()) {
-                    onSend([{
-                      text: inputText.trim(),
-                      user: { _id: effectiveUserId },
-                      createdAt: new Date(),
-                      _id: Math.random().toString(),
-                    }]);
+                    onSend([
+                      {
+                        text: inputText.trim(),
+                        user: { _id: effectiveUserId },
+                        createdAt: new Date(),
+                        _id: Math.random().toString(),
+                      },
+                    ]);
                   }
                 }}
                 disabled={!inputText.trim()}
@@ -734,7 +832,7 @@ const Chat = () => {
                 </View>
               </TouchableOpacity>
             )}
-            renderActions={renderActions}
+            renderActions={() => null}
           />
         </Animated.View>
       )}
@@ -764,7 +862,7 @@ const Chat = () => {
                 </Text>
               </View>
               <TouchableOpacity onPress={() => setViewPostVisible(false)}>
-                 <Plus color="#000" size={24} style={{ transform: [{ rotate: "45deg" }] }} />
+                <Plus color="#000" size={24} style={{ transform: [{ rotate: "45deg" }] }} />
               </TouchableOpacity>
             </View>
 
@@ -809,7 +907,9 @@ const Chat = () => {
                         style={styles.commentAvatar}
                       />
                       <View style={styles.commentContent}>
-                        <Text style={styles.commentUser}>{item.nome || item.username || "Usuário"}</Text>
+                        <Text style={styles.commentUser}>
+                          {item.nome || item.username || "Usuário"}
+                        </Text>
                         <Text style={styles.commentText}>{item.comentario}</Text>
                       </View>
                     </View>
@@ -840,6 +940,30 @@ const Chat = () => {
               </TouchableOpacity>
             </View>
           </View>
+        </View>
+      </Modal>
+
+      {/* Modal de Visualização de Imagem Pura (Full Screen) */}
+      <Modal
+        visible={viewImageVisible}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setViewImageVisible(false)}
+      >
+        <View style={styles.imageViewerOverlay}>
+          <TouchableOpacity
+            style={styles.imageViewerCloseBtn}
+            activeOpacity={0.7}
+            onPress={() => setViewImageVisible(false)}
+          >
+            <X color="#fff" size={32} />
+          </TouchableOpacity>
+
+          <Image
+            source={{ uri: selectedImage || "" }}
+            style={styles.imageViewerFull}
+            resizeMode="contain"
+          />
         </View>
       </Modal>
     </View>
@@ -888,15 +1012,14 @@ const styles = StyleSheet.create({
     backgroundColor: "#F2F2F7",
     borderRadius: 24,
     paddingHorizontal: 16,
-    paddingTop: 10,
-    paddingBottom: 10,
+    paddingTop: Platform.OS === "ios" ? 11 : 10, // Pequeno ajuste no iOS
+    paddingBottom: Platform.OS === "ios" ? 11 : 10,
     marginRight: 10,
-    fontSize: 16,
+    flex: 1, // Faz o input crescer para ocupar o espaço
+    fontSize: 15, // Reduzido ligeiramente para centralizar melhor
     lineHeight: 20,
     color: "#000",
-    minHeight: 44,
-    borderWidth: 1,
-    borderColor: "#c1c1c1",
+    minHeight: 42,
   },
   actionsContainer: {
     marginBottom: 0,
@@ -1124,6 +1247,54 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     paddingHorizontal: 16,
     marginRight: 12,
+  },
+
+  // Image Message Styles
+  imageMessageContainer: {
+    width: 240,
+    borderRadius: 18,
+    overflow: "hidden",
+    backgroundColor: "transparent",
+    borderWidth: 0.5,
+    borderColor: "#E2E8F0", // Borda simples e discreta
+  },
+  messageImage: {
+    width: "100%",
+    height: 240,
+    borderRadius: 18,
+  },
+  imageTimeBadge: {
+    position: "absolute",
+    bottom: 8,
+    right: 8,
+    backgroundColor: "rgba(0,0,0,0.4)",
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 10,
+  },
+  imageTimeText: {
+    color: "#fff",
+    fontSize: 10,
+    fontWeight: "600",
+  },
+
+  // Image Viewer Styles
+  imageViewerOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.9)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  imageViewerCloseBtn: {
+    position: "absolute",
+    top: Platform.OS === "ios" ? 60 : 40,
+    right: 20,
+    zIndex: 100,
+    padding: 10,
+  },
+  imageViewerFull: {
+    width: "100%",
+    height: "100%",
   },
 });
 

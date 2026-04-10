@@ -18,7 +18,7 @@ import AppointmentCard from "@components/AppointmentCard";
 import RatingModal from "@components/RatingModal";
 import { API_BASE_URL } from "@/config/api";
 import { Flame } from "lucide-react-native";
-interface Appointment {
+interface AppointmentData {
   id: string;
   time: string;
   title: string;
@@ -59,14 +59,14 @@ export function Appointment() {
   const [selectedDate, setSelectedDate] = useState(getLocalDateString()); // Data atual
   const [currentMonth, setCurrentMonth] = useState(new Date()); // Mês atual
   const [showMonthSelector, setShowMonthSelector] = useState(false); // Controlar exibição do seletor de mês
-  const [newAppointments, setNewAppointments] = useState<Appointment[]>([]);
-  const [pastTrainings, setPastTrainings] = useState<Appointment[]>([]);
+  const [newAppointments, setNewAppointments] = useState<AppointmentData[]>([]);
+  const [pastTrainings, setPastTrainings] = useState<AppointmentData[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   // Estados para o Modal de Avaliação
   const [isRatingModalVisible, setIsRatingModalVisible] = useState(false);
-  const [appointmentToRate, setAppointmentToRate] = useState<Appointment | null>(null);
+  const [appointmentToRate, setAppointmentToRate] = useState<AppointmentData | null>(null);
   useEffect(() => {
     if (user?.sessionId) {
       fetchAppointments();
@@ -85,8 +85,8 @@ export function Appointment() {
       // Verificar se a resposta tem a estrutura esperada
       const appointments = response?.data || response || []; // lidar com o formato {count, data} ou array direto
       // Separar agendamentos por status e tipo
-      const upcomingAppointments: Appointment[] = [];
-      const completedAppointments: Appointment[] = [];
+      const upcomingAppointments: AppointmentData[] = [];
+      const completedAppointments: AppointmentData[] = [];
       if (Array.isArray(appointments)) {
         appointments.forEach((apt: any) => {
           // Safe date parsing to avoid timezone issues
@@ -99,7 +99,7 @@ export function Appointment() {
           const today = new Date();
           today.setHours(0, 0, 0, 0);
 
-          const appointment: Appointment = {
+          const appointment: AppointmentData = {
             id: apt.id_agendamento.toString(),
             time: formatTime(apt.hora_inicio),
             title: role === "trainer" ? "Musculação" : apt.trainer_name || "Treinador",
@@ -262,7 +262,7 @@ export function Appointment() {
   // Dummy function to prevent errors in CalendarComponent
   const isInactiveDay = (dateStr: string) => false;
 
-  const handleOpenRating = (appointment: Appointment) => {
+  const handleOpenRating = (appointment: AppointmentData) => {
     setAppointmentToRate(appointment);
     setIsRatingModalVisible(true);
   };

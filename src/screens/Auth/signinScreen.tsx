@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useCallback } from "react";
 import { View, Text, TouchableOpacity, StyleSheet, Alert, Platform } from "react-native";
 import BackButton from "@/components/BackButton";
 import SocialButton from "@/components/SocialButton";
@@ -10,8 +10,8 @@ import { Eye, EyeOff } from "lucide-react-native";
 import { useAuth } from "@contexts/AuthContext";
 import { supabase } from "../../services/supabaseClient";
 import * as WebBrowser from "expo-web-browser";
-import * as Google from "expo-auth-session/providers/google";
-import * as AuthSession from "expo-auth-session";
+// import * as Google from "expo-auth-session/providers/google";
+// import * as AuthSession from "expo-auth-session";
 // import { LoginManager, AccessToken } from 'react-native-fbsdk-next'; // Para Facebook (Removido)
 
 import { api } from "../../services/api";
@@ -22,8 +22,8 @@ const SOCIAL_SIGN_IN_EDGE_FUNCTION_URL = `${
 }/functions/v1/auth/social-sign-in`;
 
 // Variáveis de ambiente (usa EXPO_PUBLIC_* e faz fallback)
-const GOOGLE_WEB_CLIENT_ID =
-  process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID || process.env.GOOGLE_WEB_CLIENT_ID;
+// const GOOGLE_WEB_CLIENT_ID =
+//   process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID || process.env.GOOGLE_WEB_CLIENT_ID;
 
 export const SignInScreen = () => {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
@@ -89,11 +89,13 @@ export const SignInScreen = () => {
       // Persiste sessão no contexto/AsyncStorage
       await signIn(response.data.sessionId, {
         id: response.data.user.id,
+        id_us: response.data.user.id,
         name: response.data.user.nome,
         email: response.data.user.email,
         username: response.data.user.username,
         isVerified: response.data.user.isVerified,
         supabaseUserId: response.data.user.supabase_uid,
+        role: response.data.user.role,
         documentId,
         documentType: resolvedDocumentType,
       });
@@ -138,6 +140,7 @@ export const SignInScreen = () => {
 
   WebBrowser.maybeCompleteAuthSession();
 
+  /*
   const handleSignInWithSocialToken = useCallback(
     async (provider: "google", token: string) => {
       setLoading(true);
@@ -207,6 +210,7 @@ export const SignInScreen = () => {
     },
     [navigation, signIn]
   );
+  */
   /* 
    Google Sign-In no Expo Go:
    O Google bloqueia redirecionamentos para IPs locais (exp://192.168...), causando erro 400.

@@ -1,5 +1,5 @@
 import AppleHealthKit, { HealthInputOptions, HealthValue } from "react-native-health";
-import { Platform } from "react-native";
+import { Platform, NativeEventEmitter, NativeModules } from "react-native";
 
 const PERMISSIONS = {
   permissions: {
@@ -61,4 +61,42 @@ export const fetchHealthKitHeartRate = (): Promise<number> => {
       resolve(results[0].value || 0);
     });
   });
+};
+
+export const fetchHealthKitCalories = (): Promise<number> => {
+  return new Promise((resolve) => {
+    if (Platform.OS !== "ios" || !AppleHealthKit?.getActiveEnergyBurned) return resolve(0);
+
+    const startOfDay = new Date();
+    startOfDay.setHours(0, 0, 0, 0);
+
+    const options: HealthInputOptions = {
+      startDate: startOfDay.toISOString(),
+    };
+
+    AppleHealthKit.getActiveEnergyBurned(options, (err, results) => {
+      if (err || !results) {
+        return resolve(0);
+      }
+      const total = results.reduce((sum, r) => sum + r.value, 0);
+      resolve(total);
+    });
+  });
+};
+
+export const subscribeHeartRate = (callback: (bpm: number) => void): (() => void) => {
+  if (Platform.OS !== "ios" || !AppleHealthKit?.setObserver) return () => {};
+
+  const type = AppleHealthKit.Constants.Observers.HeartRate;
+
+  AppleHealthKit.setObserver({ type });
+
+  const healthKitEmitter = new NativeEventEmitter(NativeModules.AppleHealthKit);
+  const subscription = healthKitEmitter.addListener("healthKit:HeartRate:new", () => {
+    fetchHealthKitHeartRate().then(callback);
+  });
+
+  return () => {
+    subscription.remove();
+  };
 };

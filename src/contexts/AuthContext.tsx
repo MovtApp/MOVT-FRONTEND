@@ -1,5 +1,6 @@
 import React, { createContext, useState, useEffect } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { DeviceEventEmitter, Alert } from "react-native";
 import { api } from "../services/api";
 
 interface User {
@@ -12,9 +13,12 @@ interface User {
   sessionId?: string;
   supabaseUserId?: string | null;
   photo?: string | null;
+  avatar_url?: string | null; // Adicionado para compatibilidade
+  image?: string | null;      // Adicionado para compatibilidade
   banner?: string | null;
   documentId?: string | null;
   documentType?: "CPF" | "CNPJ" | null;
+  role?: string;
 }
 
 interface AuthContextData {
@@ -49,6 +53,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               const refreshedUser = {
                 ...parsedUserDetails,
                 ...response.data.user,
+                photo: response.data.user.avatar_url || response.data.user.photo || parsedUserDetails.photo,
                 supabaseUserId: response.data.user.supabase_uid || parsedUserDetails.supabaseUserId,
                 sessionId: storedSessionId,
               };
@@ -65,6 +70,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                   isVerified: refreshedUser.isVerified,
                   photo: refreshedUser.photo,
                   supabaseUserId: refreshedUser.supabaseUserId,
+                  role: refreshedUser.role,
                 })
               );
             } else {
@@ -90,6 +96,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
 
     loadUserData();
+  }, []);
+
+  useEffect(() => {
+    const subscription = DeviceEventEmitter.addListener("force_logout_inactive", (data) => {
+      signOut();
+      Alert.alert(
+        "Conta Inativa",
+        data?.message || "Sua conta foi desativada pelo administrador. Entre em contato com o suporte."
+      );
+    });
+
+    return () => {
+      subscription.remove();
+    };
   }, []);
 
   async function signIn(sessionId: string, userDetails: Omit<User, "sessionId">) {
@@ -131,6 +151,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         supabaseUserId: updatedUser.supabaseUserId,
         documentId: updatedUser.documentId,
         documentType: updatedUser.documentType,
+        role: updatedUser.role,
       })
     );
   }

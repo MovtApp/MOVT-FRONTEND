@@ -284,16 +284,18 @@ const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
     backgroundColor: "#fff",
+    paddingTop: Platform.OS === 'android' ? 40 : 0,
   },
   scrollContent: {
     flexGrow: 1,
+    paddingBottom: 100, // padding extra na parte inferior para que o botão de + não fique escondido sob a navegação
   },
   header: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
     paddingHorizontal: 20,
-    marginTop: 20,
+    marginTop: Platform.OS === 'android' ? 10 : 20,
   },
   headerTitle: {
     fontSize: 24,

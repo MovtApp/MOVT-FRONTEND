@@ -107,7 +107,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.15,
     shadowRadius: 15,
     elevation: 8,
-    marginBottom: 30
+    marginBottom: 30,
   },
   container: {
     borderRadius: 24,

@@ -17,6 +17,7 @@ import { api } from "@services/api";
 import { useLocationContext } from "@contexts/LocationContext";
 import { useBottomNav } from "@contexts/BottomNavContext";
 import { useGymDetails } from "@hooks/useGymDetails";
+import { getGymStatus } from "@utils/gymUtils";
 import { OpeningHours } from "@components/OpeningHours";
 import {
   MapPin,
@@ -158,45 +159,7 @@ export const GymDetailsSheet: React.FC<GymDetailsSheetProps> = ({
     }
   };
 
-  const getDynamicStatus = () => {
-    if (!displayData.horarios_funcionamento) {
-      return displayData.ativo
-        ? { isOpen: true, label: "Disponível" }
-        : { isOpen: false, label: "Inativo" };
-    }
-
-    const daysMap = ["domingo", "segunda", "terca", "quarta", "quinta", "sexta", "sabado"];
-    const now = new Date();
-    const dayName = daysMap[now.getDay()];
-    const todayHours = displayData.horarios_funcionamento[dayName];
-
-    if (!todayHours || todayHours.length === 0) {
-      return { isOpen: false, label: "Fechado hoje" };
-    }
-
-    const currentTime = now.getHours() * 100 + now.getMinutes();
-
-    const isOpen = todayHours.some((period: any) => {
-      const abre = parseInt(period.abre);
-      let fecha = parseInt(period.fecha);
-
-      // Se fecha for 0000 ou menor que abre, consideramos que fecha no dia seguinte
-      // Google às vezes retorna 0000 para meia-noite
-      if (fecha === 0) fecha = 2400;
-
-      if (fecha < abre) {
-        return currentTime >= abre || currentTime <= fecha;
-      }
-
-      return currentTime >= abre && currentTime <= fecha;
-    });
-
-    return isOpen
-      ? { isOpen: true, label: "Aberto agora" }
-      : { isOpen: false, label: "Fechado no momento" };
-  };
-
-  const status = getDynamicStatus();
+  const status = getGymStatus(displayData.horarios_funcionamento, displayData.ativo);
 
   const handleWebsite = () => {
     const website = displayData.website;

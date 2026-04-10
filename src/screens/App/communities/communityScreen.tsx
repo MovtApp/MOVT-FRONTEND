@@ -23,6 +23,8 @@ import { listCommunities } from "@services/communityService";
 import Communities from "@components/Communities";
 import { FooterVersion } from "@components/FooterVersion";
 import { AppStackParamList, Community } from "../../../@types/routes";
+import CommunityManagementSheet, { CommunityManagementSheetRef } from "../admin/[protected]/components/CommunityManagementSheet";
+import { Settings } from "lucide-react-native";
 
 const { width } = Dimensions.get("window");
 const ITEM_WIDTH = 270;
@@ -44,6 +46,10 @@ const CommunityScreen: React.FC = () => {
   const [activeBannerIndex, setActiveBannerIndex] = useState(0);
   const [selectedCategory, setSelectedCategory] = useState(route.params?.category || "Todas");
   const scrollX = useRef(new Animated.Value(0)).current;
+
+  // Ref e estado para uso do Admin
+  const adminSheetRef = useRef<CommunityManagementSheetRef>(null);
+  const isAdmin = user?.id === "15" || String(user?.id_us) === "15";
 
   useEffect(() => {
     // Update selectedCategory if it changes via route params (e.g., subsequent navigations)
@@ -242,6 +248,20 @@ const CommunityScreen: React.FC = () => {
         )}
         <FooterVersion style={styles.footer} />
       </ScrollView>
+
+      {isAdmin && (
+        <TouchableOpacity 
+          style={styles.adminFab} 
+          onPress={() => adminSheetRef.current?.open()}
+          activeOpacity={0.8}
+        >
+          <Settings size={28} color="#000" />
+        </TouchableOpacity>
+      )}
+
+      {isAdmin && (
+        <CommunityManagementSheet ref={adminSheetRef} onClose={() => fetchCommunities()} />
+      )}
     </View>
   );
 };
@@ -361,6 +381,23 @@ const styles = StyleSheet.create({
   paginationDotActive: {
     backgroundColor: "#4CAF50",
     width: 24,
+  },
+  adminFab: {
+    position: 'absolute',
+    bottom: 20,
+    right: 20,
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: '#BBF246',
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 5,
+    elevation: 8,
+    zIndex: 99,
   },
 });
 

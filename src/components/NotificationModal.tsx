@@ -3,54 +3,61 @@ import {
   View,
   Text,
   TouchableOpacity,
-  Modal,
   StyleSheet,
   ScrollView,
-  Animated,
   Dimensions,
   Platform,
-  TouchableWithoutFeedback,
+  Image,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Bell, X, CheckCircle, AlertCircle, Info } from "lucide-react-native";
+import { useNavigation } from "@react-navigation/native";
+import { useDrawerStatus } from "@react-navigation/drawer";
+import {
+  Bell,
+  X,
+  CheckCircle,
+  AlertCircle,
+  Info,
+  Heart,
+  MessageCircle,
+  UserPlus,
+  Check,
+} from "lucide-react-native";
 import { useNotifications } from "../contexts/NotificationContext";
 import { formatTime } from "../utils/formatters";
 
 const { width } = Dimensions.get("window");
 
-interface NotificationModalProps {
-  isVisible: boolean;
-  onClose: () => void;
-  sheetHeight?: number | string;
-}
-
-const NotificationModal: React.FC<NotificationModalProps> = ({
-  isVisible,
-  onClose,
-  sheetHeight = "100%",
-}) => {
+export const NotificationDrawerContent = ({ navigation }: any) => {
   const insets = useSafeAreaInsets();
-  const { notifications, markAsRead, markAllAsRead } = useNotifications();
-  const [slideAnimation] = useState(new Animated.Value(width));
+  const {
+    notifications,
+    followRequests,
+    markAsRead,
+    markAllAsRead,
+    fetchRemoteData,
+    respondToFollowRequest,
+  } = useNotifications();
+
+  const drawerStatus = useDrawerStatus();
 
   useEffect(() => {
-    if (isVisible) {
-      Animated.timing(slideAnimation, {
-        toValue: 0,
-        duration: 300,
-        useNativeDriver: true,
-      }).start();
-    } else {
-      Animated.timing(slideAnimation, {
-        toValue: width,
-        duration: 300,
-        useNativeDriver: true,
-      }).start();
+    if (drawerStatus === "open") {
+      fetchRemoteData();
     }
-  }, [isVisible, slideAnimation]);
+  }, [drawerStatus, fetchRemoteData]);
 
   const renderNotificationIcon = (type?: string) => {
     switch (type) {
+      case "like":
+      case "like_diet":
+        return <Heart size={20} color="#EF4444" fill="#EF4444" />;
+      case "comment":
+      case "comment_diet":
+        return <MessageCircle size={20} color="#3B82F6" />;
+      case "follow":
+      case "follow_request":
+        return <UserPlus size={20} color="#10B981" />;
       case "success":
         return <CheckCircle size={20} color="#10B981" />;
       case "warning":
@@ -63,109 +70,160 @@ const NotificationModal: React.FC<NotificationModalProps> = ({
     }
   };
 
+  const totalUnread = notifications.filter((n) => !n.read).length + followRequests.length;
+
   return (
-    <Modal animationType="none" transparent={true} visible={isVisible} onRequestClose={onClose}>
-      <TouchableWithoutFeedback onPress={onClose}>
-        <View style={modalStyles.overlay}>
-          <TouchableWithoutFeedback onPress={() => {}}>
-            <Animated.View
-              style={[
-                {
-                  transform: [{ translateX: slideAnimation }],
-                  width: "85%",
-                  height: sheetHeight as any,
-                  backgroundColor: "#FFFFFF",
-                  borderTopLeftRadius: 20,
-                  borderBottomLeftRadius: 20,
-                  // Shadow for elevation
-                  elevation: 15,
-                  shadowColor: "#000",
-                  shadowOffset: { width: -10, height: 0 },
-                  shadowOpacity: 0.15,
-                  shadowRadius: 15,
-                },
-              ]}
-            >
-              <View
-                style={[
-                  modalStyles.header,
-                  {
-                    paddingTop: Platform.OS === "ios" ? Math.max(insets.top, 20) : 20,
-                  },
-                ]}
-              >
+    <View
+      style={{
+        flex: 1,
+        width: "100%",
+        backgroundColor: "#FFFFFF",
+        borderTopLeftRadius: 20,
+        borderBottomLeftRadius: 20,
+      }}
+    >
+      <View
+        style={[
+          modalStyles.header,
+          {
+            paddingTop: Platform.OS === "android" ? (insets.top > 0 ? insets.top + 20 : 40) : Math.max(insets.top, 20),
+          },
+        ]}
+      >
                 <View style={modalStyles.headerLeft}>
                   <Text style={modalStyles.title}>Notificações</Text>
-                  <View style={modalStyles.badgeContainer}>
-                    <Text style={modalStyles.badgeText}>
-                      {notifications.filter((n) => !n.read).length}
-                    </Text>
-                  </View>
+                  {totalUnread > 0 && (
+                    <View style={modalStyles.badgeContainer}>
+                      <Text style={modalStyles.badgeText}>{totalUnread}</Text>
+                    </View>
+                  )}
                 </View>
                 <TouchableOpacity style={modalStyles.markAllButton} onPress={markAllAsRead}>
-                  <Text style={modalStyles.markAllText}>Marcar todas</Text>
+                  <Text style={modalStyles.markAllText}>Limpar</Text>
                 </TouchableOpacity>
-                <TouchableOpacity style={modalStyles.closeButton} onPress={onClose}>
+                <TouchableOpacity style={modalStyles.closeButton} onPress={() => navigation.closeDrawer()}>
                   <X size={24} color="#000" />
                 </TouchableOpacity>
               </View>
 
               <ScrollView style={modalStyles.content} contentContainerStyle={{ flexGrow: 1 }}>
-                {notifications.length === 0 ? (
+                {/* Solicitações de Seguidores */}
+                {followRequests.length > 0 && (
+                  <View style={modalStyles.section}>
+                    <Text style={modalStyles.sectionTitle}>Solicitações</Text>
+                    {followRequests.map((req) => (
+                      <View key={`req-${req.id}`} style={modalStyles.requestItem}>
+                        <Image
+                          source={{ uri: req.photo || "https://i.pravatar.cc/150" }}
+                          style={modalStyles.requestAvatar}
+                        />
+                        <View style={modalStyles.requestInfo}>
+                          <Text style={modalStyles.requestUser}>@{req.username}</Text>
+                          <Text style={modalStyles.requestText}>quer te seguir</Text>
+                        </View>
+                        <View style={modalStyles.requestActions}>
+                          <TouchableOpacity
+                            onPress={() => respondToFollowRequest(req.id, true)}
+                            style={[modalStyles.requestActionBtn, modalStyles.acceptBtn]}
+                          >
+                            <Check size={16} color="#FFF" />
+                          </TouchableOpacity>
+                          <TouchableOpacity
+                            onPress={() => respondToFollowRequest(req.id, false)}
+                            style={[modalStyles.requestActionBtn, modalStyles.rejectBtn]}
+                          >
+                            <X size={16} color="#000" />
+                          </TouchableOpacity>
+                        </View>
+                      </View>
+                    ))}
+                  </View>
+                )}
+
+                {notifications.length === 0 && followRequests.length === 0 ? (
                   <View style={modalStyles.emptyContainer}>
                     <Bell size={48} color="#D1D5DB" />
                     <Text style={modalStyles.emptyText}>Sem notificações</Text>
                     <Text style={modalStyles.emptySubtext}>
-                      As notificações aparecerão aqui quando estiverem disponíveis
+                      Suas atividades aparecerão aqui quando alguém interagir com você
                     </Text>
                   </View>
                 ) : (
-                  notifications.map((notification) => (
-                    <TouchableOpacity
-                      key={notification.id}
-                      style={[
-                        modalStyles.notificationItem,
-                        !notification.read && modalStyles.unreadNotification,
-                      ]}
-                      onPress={() => markAsRead(notification.id)}
-                    >
-                      <View style={modalStyles.iconContainer}>
-                        {renderNotificationIcon(notification.type)}
-                      </View>
-                      <View style={modalStyles.notificationContent}>
-                        <Text
-                          style={[
-                            modalStyles.notificationTitle,
-                            !notification.read && modalStyles.unreadTitle,
-                          ]}
-                        >
-                          {notification.title}
-                        </Text>
-                        <Text style={modalStyles.notificationMessage}>{notification.message}</Text>
-                        <Text style={modalStyles.timeText}>
-                          {formatTime(notification.timestamp)}
-                        </Text>
-                      </View>
-                      {!notification.read && <View style={modalStyles.unreadIndicator} />}
-                    </TouchableOpacity>
-                  ))
+                  <View style={modalStyles.section}>
+                    {followRequests.length > 0 && (
+                      <Text style={[modalStyles.sectionTitle, { marginTop: 20 }]}>Atividade</Text>
+                    )}
+                    {notifications.map((notification) => (
+                      <TouchableOpacity
+                        key={notification.id}
+                        style={[
+                          modalStyles.notificationItem,
+                          !notification.read && modalStyles.unreadNotification,
+                        ]}
+                        onPress={() => {
+                          markAsRead(notification.id);
+                          // Redireciona se for curtida ou comentário e tiver o ID do post
+                          if ((notification.type === 'like' || notification.type === 'comment') && notification.reference_id) {
+                            navigation.closeDrawer();
+                            (navigation as any).navigate('AppDrawer', {
+                              screen: 'HomeStack',
+                              params: {
+                                screen: 'PostDetailScreen',
+                                params: { postId: notification.reference_id }
+                              }
+                            });
+                          } else if ((notification.type === 'like_diet' || notification.type === 'comment_diet') && notification.reference_id) {
+                            // Redireciona para a tela de detalhes da dieta
+                            navigation.closeDrawer();
+                            (navigation as any).navigate('AppDrawer', {
+                              screen: 'diet',
+                              params: {
+                                screen: 'DietDetailsScreen',
+                                params: { mealId: notification.reference_id }
+                              }
+                            });
+                          }
+                        }}
+                      >
+                        <View style={modalStyles.iconContainer}>
+                          {notification.userImage ? (
+                            <Image
+                              source={{ uri: notification.userImage }}
+                              style={modalStyles.miniAvatar}
+                            />
+                          ) : (
+                            renderNotificationIcon(notification.type)
+                          )}
+                        </View>
+                        <View style={modalStyles.notificationContent}>
+                          <Text
+                            style={[
+                              modalStyles.notificationTitle,
+                              !notification.read && modalStyles.unreadTitle,
+                            ]}
+                          >
+                            {notification.username
+                              ? `@${notification.username}`
+                              : notification.title}
+                          </Text>
+                          <Text style={modalStyles.notificationMessage}>
+                            {notification.message}
+                          </Text>
+                          <Text style={modalStyles.timeText}>
+                            {formatTime(notification.timestamp)}
+                          </Text>
+                        </View>
+                        {!notification.read && <View style={modalStyles.unreadIndicator} />}
+                      </TouchableOpacity>
+                    ))}
+                  </View>
                 )}
-              </ScrollView>
-            </Animated.View>
-          </TouchableWithoutFeedback>
-        </View>
-      </TouchableWithoutFeedback>
-    </Modal>
+            </ScrollView>
+    </View>
   );
 };
 
 const modalStyles = StyleSheet.create({
-  overlay: {
-    flex: 1,
-    backgroundColor: "rgba(0, 0, 0, 0.45)",
-    justifyContent: "flex-end",
-    alignItems: "flex-end",
-  },
   header: {
     flexDirection: "row",
     alignItems: "center",
@@ -184,23 +242,26 @@ const modalStyles = StyleSheet.create({
     color: "#000",
   },
   badgeContainer: {
-    backgroundColor: "#EF4444",
+    backgroundColor: "#BBF246",
     borderRadius: 10,
     paddingHorizontal: 6,
     paddingVertical: 2,
     marginLeft: 8,
   },
   badgeText: {
-    color: "#FFFFFF",
+    color: "#000000",
     fontSize: 12,
     fontWeight: "bold",
   },
   markAllButton: {
     padding: 5,
+    marginLeft: "auto",
+    marginRight: 15,
   },
   markAllText: {
-    color: "#000",
+    color: "#3B82F6",
     fontSize: 14,
+    fontWeight: "600",
   },
   closeButton: {
     padding: 5,
@@ -208,23 +269,58 @@ const modalStyles = StyleSheet.create({
   content: {
     flex: 1,
   },
-  emptyContainer: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    padding: 40,
+  section: {
+    paddingVertical: 10,
   },
-  emptyText: {
-    fontSize: 18,
+  sectionTitle: {
+    fontSize: 12,
     fontWeight: "bold",
-    color: "#6B7280",
-    marginTop: 16,
-    marginBottom: 8,
-  },
-  emptySubtext: {
-    fontSize: 14,
     color: "#9CA3AF",
-    textAlign: "center",
+    textTransform: "uppercase",
+    paddingHorizontal: 20,
+    marginBottom: 10,
+  },
+  requestItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    backgroundColor: "#F9FAFB",
+  },
+  requestAvatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+  },
+  requestInfo: {
+    flex: 1,
+    marginLeft: 12,
+  },
+  requestUser: {
+    fontSize: 14,
+    fontWeight: "bold",
+    color: "#000",
+  },
+  requestText: {
+    fontSize: 12,
+    color: "#6B7280",
+  },
+  requestActions: {
+    flexDirection: "row",
+  },
+  requestActionBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: "center",
+    justifyContent: "center",
+    marginLeft: 8,
+  },
+  acceptBtn: {
+    backgroundColor: "#10B981",
+  },
+  rejectBtn: {
+    backgroundColor: "#F3F4F6",
   },
   notificationItem: {
     flexDirection: "row",
@@ -236,7 +332,7 @@ const modalStyles = StyleSheet.create({
   unreadNotification: {
     backgroundColor: "#F9FAFB",
     borderLeftWidth: 4,
-    borderLeftColor: "#EF4444",
+    borderLeftColor: "#BBF246",
   },
   iconContainer: {
     width: 40,
@@ -246,6 +342,11 @@ const modalStyles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     marginRight: 12,
+    overflow: "hidden",
+  },
+  miniAvatar: {
+    width: "100%",
+    height: "100%",
   },
   notificationContent: {
     flex: 1,
@@ -272,10 +373,28 @@ const modalStyles = StyleSheet.create({
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: "#EF4444",
+    backgroundColor: "#BBF246",
     alignSelf: "center",
     marginRight: 8,
   },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 40,
+  },
+  emptyText: {
+    fontSize: 18,
+    fontWeight: "bold",
+    color: "#6B7280",
+    marginTop: 16,
+    marginBottom: 8,
+  },
+  emptySubtext: {
+    fontSize: 14,
+    color: "#9CA3AF",
+    textAlign: "center",
+  },
 });
 
-export default NotificationModal;
+export default NotificationDrawerContent;

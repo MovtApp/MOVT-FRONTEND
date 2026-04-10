@@ -112,11 +112,7 @@ const PlanTile: React.FC<{ plan: Plan; index: number; onPress?: (plan: Plan) => 
             <View style={styles.titleRow}>
               <View style={{ flex: 1, paddingRight: 8 }}>
                 <Text style={styles.categoryText}>{plan.category || "Treino"}</Text>
-                <Text
-                  style={styles.planTitle}
-                  numberOfLines={1}
-                  ellipsizeMode="tail"
-                >
+                <Text style={styles.planTitle} numberOfLines={1} ellipsizeMode="tail">
                   {plan.title}
                 </Text>
               </View>
@@ -143,7 +139,10 @@ const PlanTile: React.FC<{ plan: Plan; index: number; onPress?: (plan: Plan) => 
               </View>
 
               {/* Botão Play sempre fixo à direita */}
-              <TouchableOpacity style={styles.playIconButton}>
+              <TouchableOpacity 
+                style={styles.playIconButton}
+                onPress={() => onPress?.(plan)}
+              >
                 <Play size={14} fill="#192126" color="#192126" />
               </TouchableOpacity>
             </View>

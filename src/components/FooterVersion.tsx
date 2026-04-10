@@ -2,7 +2,6 @@ import React from "react";
 import { View, Text, Image, StyleSheet, ViewStyle, Platform } from "react-native";
 import Constants from "expo-constants";
 
-
 interface Props {
   style?: ViewStyle;
 }
@@ -14,7 +13,9 @@ export const FooterVersion: React.FC<Props> = ({ style }) => {
   return (
     <View style={[styles.footer, style]}>
       <Image
-        source={{ uri: "https://res.cloudinary.com/dgxavefbh/image/upload/v1771958920/Component_13_cwktao.png" }}
+        source={{
+          uri: "https://res.cloudinary.com/dgxavefbh/image/upload/v1771958920/Component_13_cwktao.png",
+        }}
         style={styles.logoImage}
         resizeMode="contain"
       />

@@ -10,7 +10,7 @@ import {
   Image,
   ActivityIndicator,
 } from "react-native";
-import { Search, Play } from "lucide-react-native";
+import { Search, User, Dumbbell, Utensils, Users, MapPin, ChevronRight, Activity } from "lucide-react-native";
 import TrainingSelector from "../../../components/TrainingSelector";
 import PromotionalBanner from "../../../components/PromotionalBanner";
 import PlanCardTraining from "../../../components/PlanCardsTraining";
@@ -144,7 +144,9 @@ const HomeScreen: React.FC = () => {
             sets: t.sets || "3 séries",
             calories: t.calories,
             category: t.category || "Fitness",
-            imageUrl: t.image_url || "https://res.cloudinary.com/ditlmzgrh/image/upload/v1757513125/prancha_g1v30x.png",
+            imageUrl:
+              t.image_url ||
+              "https://res.cloudinary.com/ditlmzgrh/image/upload/v1757513125/prancha_g1v30x.png",
           }));
           setDailyPlans(apiPlans);
         }
@@ -226,6 +228,26 @@ const HomeScreen: React.FC = () => {
       nav.navigate(item.targetScreen);
     }
   };
+  const getResultIcon = (type: string) => {
+    switch (type) {
+      case "trainer":
+      case "personal":
+        return <Activity size={14} color="#6B7280" />;
+      case "user":
+        return <User size={14} color="#6B7280" />;
+      case "gym":
+        return <MapPin size={14} color="#6B7280" />;
+      case "diet":
+        return <Utensils size={14} color="#6B7280" />;
+      case "community":
+        return <Users size={14} color="#6B7280" />;
+      case "training":
+        return <Dumbbell size={14} color="#6B7280" />;
+      default:
+        return <Search size={14} color="#6B7280" />;
+    }
+  };
+
   const getBadgeColor = (type: string) => {
     switch (type) {
       case "trainer":
@@ -245,6 +267,25 @@ const HomeScreen: React.FC = () => {
 
   const getBadgeTextColor = (type: string) => {
     return type === "gym" ? "#192126" : "#fff";
+  };
+
+  const handleTrainingPress = (training: any) => {
+    // Normaliza os dados para o tipo Training definido em routes.d.ts
+    const trainingData: any = {
+      id_treino: String(training.id_treino || training.id || ""),
+      nome: training.nome || training.title || "Treino",
+      descricao: training.descricao || training.description || "Sem descrição disponível",
+      imageurl: training.imageurl || training.imageUrl || training.image_url || "https://res.cloudinary.com/ditlmzgrh/image/upload/v1757229915/image_71_jntmsv.jpg",
+      duracao: training.duracao || training.minutes || training.description || "0 min",
+      calorias: training.calorias || training.calories || "0 kcal",
+      nivel: training.nivel || training.level || "Iniciante",
+      categoria: training.categoria || training.category || "Fitness",
+      exercicios: training.exercicios || training.exercises || [],
+      instrutor: training.instrutor || training.trainerName || "Instrutor MOVT",
+      equipamentos: training.equipamentos || [],
+    };
+
+    navigation.navigate("TrainingDetails", { training: trainingData });
   };
 
   return (
@@ -274,54 +315,66 @@ const HomeScreen: React.FC = () => {
                   <TouchableOpacity
                     key={`${result.id}-${idx}`}
                     style={styles.searchResultItem}
+                    activeOpacity={0.7}
                     onPress={() => handleResultPress(result)}
                   >
-                    <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
+                    <View style={{ flexDirection: "row", alignItems: "center", gap: 14 }}>
                       {result.image ? (
                         <Image source={{ uri: result.image }} style={styles.resultAvatar} />
                       ) : (
-                        <View
-                          style={[
-                            styles.resultAvatar,
-                            {
-                              backgroundColor: "#F3F4F6",
-                              alignItems: "center",
-                              justifyContent: "center",
-                            },
-                          ]}
-                        >
-                          <Search size={16} color="#9CA3AF" />
+                        <View style={styles.resultIconWrapper}>
+                          {getResultIcon(result.type)}
                         </View>
                       )}
+                      
                       <View style={{ flex: 1 }}>
                         <Text style={styles.searchResultTitle} numberOfLines={1}>
                           {result.title}
                         </Text>
-                        {result.subtitle ? (
+                        
+                        <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginTop: 2 }}>
+                          {/* Exibe o ícone do tipo se houver imagem (se não houver, o ícone já está no lugar da imagem) */}
+                          {result.image && (
+                            <View style={{ opacity: 0.8 }}>
+                              {getResultIcon(result.type)}
+                            </View>
+                          )}
+                          
                           <Text style={styles.searchResultSubtitle} numberOfLines={1}>
-                            {result.subtitle}
+                            {result.subtitle || result.type || "Resultado"}
                           </Text>
-                        ) : null}
+                        </View>
                       </View>
-                      <View
-                        style={{
-                          backgroundColor: getBadgeColor(result.type),
-                          paddingHorizontal: 8,
-                          paddingVertical: 4,
-                          borderRadius: 6,
-                        }}
-                      >
-                        <Text
+
+                      {/* Removemos o badge de texto para 'user', 'trainer', 'personal' e 'community' conforme solicitado */}
+                      {result.type.toLowerCase() !== "user" && 
+                       result.type.toLowerCase() !== "trainer" && 
+                       result.type.toLowerCase() !== "personal" && 
+                       result.type.toLowerCase() !== "community" && 
+                       result.type.toLowerCase() !== "communities" && (
+                        <View
                           style={{
-                            fontSize: 10,
-                            fontWeight: "700",
-                            color: getBadgeTextColor(result.type),
-                            textTransform: "uppercase",
+                            backgroundColor: getBadgeColor(result.type),
+                            paddingHorizontal: 10,
+                            paddingVertical: 4,
+                            borderRadius: 100,
                           }}
                         >
-                          {result.type || "Geral"}
-                        </Text>
-                      </View>
+                          <Text
+                            style={{
+                              fontSize: 9,
+                              fontWeight: "800",
+                              color: getBadgeTextColor(result.type),
+                              textTransform: "uppercase",
+                              letterSpacing: 0.5,
+                            }}
+                          >
+                            {result.type}
+                          </Text>
+                        </View>
+                      )}
+                      
+                      <ChevronRight size={18} color="#D1D5DB" />
                     </View>
                   </TouchableOpacity>
                 ))}
@@ -346,14 +399,18 @@ const HomeScreen: React.FC = () => {
           trainings={trainings}
           selectedSpecialty={selectedSpecialty}
           loadingTrainings={loadingTrainings}
+          onPressExercise={handleTrainingPress}
         />
-        <PlanCardTraining planData={dailyPlans} />
+        <PlanCardTraining planData={dailyPlans} onPressPlan={handleTrainingPress} />
         <TrainingBanner
           title="Melhor treino de superiores"
           imageUrl="https://img.freepik.com/free-photo/view-woman-helping-man-exercise-gym_52683-98092.jpg?t=st=1758297406~exp=1758301006~hmac=66860a69d0b54e22b28d0831392e01278764d6b6d47e956a9576e041c9e016c2&w=1480"
-          onPress={() => { }}
+          onPress={() => {
+            // Caso queira um treino específico para o banner, pode definir aqui
+            Alert.alert("Destaque", "Este treino está em destaque para você!");
+          }}
         />
-        <TheBestForYou />
+        <TheBestForYou onPressPlan={handleTrainingPress} />
         <ChallengesSection />
         <HeatingScreen />
         <FooterVersion style={styles.footer} />
@@ -419,42 +476,54 @@ const styles = StyleSheet.create({
     left: 20,
     right: 20,
     backgroundColor: "#FFFFFF",
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: "#E5E7EB",
+    borderRadius: 16,
     zIndex: 999,
-    elevation: 8,
+    elevation: 10,
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
+    shadowOffset: { width: 0, height: 10 },
     shadowOpacity: 0.1,
-    shadowRadius: 12,
+    shadowRadius: 20,
+    overflow: "hidden",
+    borderWidth: 1,
+    borderColor: "#F3F4F6",
   },
   searchResultItem: {
     paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingVertical: 14,
     borderBottomWidth: 1,
-    borderBottomColor: "#F1F5F9",
+    borderBottomColor: "#F9FAFB",
+  },
+  resultIconWrapper: {
+    width: 44,
+    height: 44,
+    borderRadius: 12,
+    backgroundColor: "#F3F4F6",
+    alignItems: "center",
+    justifyContent: "center",
   },
   searchResultTitle: {
-    fontSize: 14,
-    fontWeight: "600",
+    fontSize: 15,
+    fontWeight: "700",
     color: "#111827",
+    letterSpacing: -0.2,
   },
   searchResultSubtitle: {
-    fontSize: 12,
+    fontSize: 13,
     color: "#6B7280",
-    marginTop: 2,
+    fontWeight: "500",
   },
   resultAvatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 44,
+    height: 44,
+    borderRadius: 12,
+    backgroundColor: "#F3F4F6",
   },
   noSearchResultsText: {
-    padding: 16,
-    fontSize: 12,
-    color: "#6B7280",
+    padding: 24,
+    fontSize: 14,
+    color: "#9CA3AF",
     textAlign: "center",
+    fontWeight: "500",
   },
   searchInput: {
     marginBottom: 20,

@@ -17,7 +17,6 @@ import { TrainerProfileScreen } from "../screens/App/profile/TrainerProfileScree
 import SelectedTrainersScreen from "../screens/App/profile/SelectedTrainersScreen";
 import ConfigScreen from "../screens/App/config/configScreen";
 import PlanScreen from "../screens/App/plan/planScreen";
-import LanguageScreen from "../screens/App/language/languageScreen";
 import FAQScreen from "../screens/App/faq/faqScreen";
 import ServiceScreen from "../screens/App/service/serviceScreen";
 import ReviewScreen from "../screens/App/reviews/reviewScreen";
@@ -45,9 +44,18 @@ import TrainingScreen from "../screens/App/training/trainingScreen";
 import TrainingDetails from "../screens/App/training/[protected]/training";
 import ExplorerScreen from "../screens/App/explorer/explorerScreen";
 import FeedScreen from "../screens/Feed/FeedScreen";
+import { NotificationDrawerContent } from "../components/NotificationModal";
+import PostDetailScreen from "../screens/Feed/PostDetailScreen";
+import ArchivedPostsScreen from "../screens/App/profile/ArchivedPostsScreen";
+import EditProfileScreen from "../screens/App/profile/EditProfileScreen";
+import AdminDashboardScreen from "../screens/App/admin/AdminDashboardScreen";
+
+import ActiveWorkout from "../screens/App/training/[protected]/activeWorkout";
+import LanguageScreen from "../screens/App/config/LanguageScreen";
 
 const Stack = createNativeStackNavigator<AppStackParamList>();
-const Drawer = createDrawerNavigator(); // Definir o Drawer Navigator
+const LeftDrawer = createDrawerNavigator();
+const RightDrawer = createDrawerNavigator();
 
 function AppLayout() {
   // Removendo isDietSheetOpen e setIsDietSheetOpen, pois não são mais usados para controlar a visibilidade da BottomNavigationBar.
@@ -84,6 +92,7 @@ function AppLayout() {
         <Stack.Screen name="CommunityDetails" component={CommunityDetails} />
         <Stack.Screen name="TrainingScreen" component={TrainingScreen} />
         <Stack.Screen name="TrainingDetails" component={TrainingDetails} />
+        <Stack.Screen name="ActiveWorkout" component={ActiveWorkout} />
         <Stack.Screen name="ExplorerScreen" component={ExplorerScreen} />
         <Stack.Screen name="ConfigScreen" component={ConfigScreen} />
         <Stack.Screen name="PlanScreen" component={PlanScreen} />
@@ -96,6 +105,10 @@ function AppLayout() {
         <Stack.Screen name="AboutScreen" component={AboutScreen} />
         <Stack.Screen name="PlatformRulesScreen" component={PlatformRulesScreen} />
         <Stack.Screen name="FeedScreen" component={FeedScreen} />
+        <Stack.Screen name="PostDetailScreen" component={PostDetailScreen} />
+        <Stack.Screen name="ArchivedPostsScreen" component={ArchivedPostsScreen} />
+        <Stack.Screen name="EditProfileScreen" component={EditProfileScreen} />
+        <Stack.Screen name="AdminDashboard" component={AdminDashboardScreen} />
       </Stack.Navigator>
       <BottomNavigationBar />
     </View>
@@ -104,21 +117,36 @@ function AppLayout() {
 
 function AppDrawerNavigator() {
   return (
-    <Drawer.Navigator
+    <LeftDrawer.Navigator
+      // @ts-ignore
+      id="LeftDrawer"
       screenOptions={{
         headerShown: false,
         drawerPosition: "left",
-        drawerStyle: { backgroundColor: "#192126" }, // Definir a cor de fundo do drawer
+        drawerStyle: { backgroundColor: "#192126" },
       }}
-      drawerContent={(props) => <CustomDrawerContent {...props} />} // Usar o CustomDrawerContent
+      drawerContent={(props) => <CustomDrawerContent {...props} />}
     >
-      <Drawer.Screen name="HomeStack" component={AppLayout} />
-    </Drawer.Navigator>
+      <LeftDrawer.Screen name="HomeStack" component={AppLayout} />
+    </LeftDrawer.Navigator>
   );
 }
 
 export function AppRoutes() {
-  return <AppDrawerNavigator />;
+  return (
+    <RightDrawer.Navigator
+      // @ts-ignore
+      id="RightDrawer"
+      screenOptions={{
+        headerShown: false,
+        drawerPosition: "right",
+        drawerStyle: { width: "85%", backgroundColor: "transparent" },
+      }}
+      drawerContent={(props) => <NotificationDrawerContent {...props} />}
+    >
+      <RightDrawer.Screen name="AppDrawer" component={AppDrawerNavigator} />
+    </RightDrawer.Navigator>
+  );
 }
 
 const styles = StyleSheet.create({

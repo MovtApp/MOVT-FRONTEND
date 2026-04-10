@@ -1,7 +1,8 @@
 import React from "react";
 import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
-import { MapPin, Phone, Star, Globe } from "lucide-react-native";
+import { MapPin, Phone, Star, Globe, Clock } from "lucide-react-native";
 import { Gym } from "@services/gymService";
+import { getGymStatus } from "@utils/gymUtils";
 
 interface GymCardProps {
   gym: Gym;
@@ -19,6 +20,15 @@ export const GymCard: React.FC<GymCardProps> = ({ gym, onDetailsPress }) => {
         <View style={styles.ratingContainer}>
           <Star size={14} color="#fff" fill="#fff" />
           <Text style={styles.ratingText}>{Number(gym.rating || 0).toFixed(1)}</Text>
+        </View>
+      </View>
+
+      <View style={styles.statusRow}>
+        <View style={[styles.statusBadge, { backgroundColor: getGymStatus(gym.horarios_funcionamento, gym.ativo).isOpen ? "#DCFCE7" : "#FEE2E2" }]}>
+          <Clock size={12} color={getGymStatus(gym.horarios_funcionamento, gym.ativo).isOpen ? "#166534" : "#991B1B"} />
+          <Text style={[styles.statusText, { color: getGymStatus(gym.horarios_funcionamento, gym.ativo).isOpen ? "#166534" : "#991B1B" }]}>
+            {getGymStatus(gym.horarios_funcionamento, gym.ativo).label}
+          </Text>
         </View>
       </View>
 
@@ -109,5 +119,21 @@ const styles = StyleSheet.create({
     borderRadius: 24,
     alignItems: "center",
     justifyContent: "center",
+  },
+  statusRow: {
+    marginBottom: 12,
+  },
+  statusBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    alignSelf: "flex-start",
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+    gap: 4,
+  },
+  statusText: {
+    fontSize: 12,
+    fontWeight: "600",
   },
 });

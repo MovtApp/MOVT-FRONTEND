@@ -92,29 +92,17 @@ const ConfigScreen: React.FC = () => {
           <SettingItem
             icon={User}
             label="Perfil"
-            onPress={() =>
-              navigation.navigate("App", {
-                screen: "HomeStack",
-                params: { screen: "ProfilePFScreen" },
-              })
-            }
+            onPress={() => navigation.navigate("ProfilePFScreen")}
           />
           <SettingItem
             icon={Radio}
             label="Minha assinatura"
-            onPress={() =>
-              navigation.navigate("App", { screen: "HomeStack", params: { screen: "PlanScreen" } })
-            }
+            onPress={() => navigation.navigate("PlanScreen")}
           />
           <SettingItem
             icon={Calendar}
             label="Meus agendamentos"
-            onPress={() =>
-              navigation.navigate("App", {
-                screen: "HomeStack",
-                params: { screen: "Appointments" },
-              })
-            }
+            onPress={() => navigation.navigate("Appointments")}
           />
 
           <Separator />
@@ -153,13 +141,8 @@ const ConfigScreen: React.FC = () => {
           />
           <SettingItem
             icon={Globe}
-            label="Mudar idioma"
-            onPress={() =>
-              navigation.navigate("App", {
-                screen: "HomeStack",
-                params: { screen: "LanguageScreen" },
-              })
-            }
+            label="Idioma"
+            onPress={() => navigation.navigate("LanguageScreen")}
           />
 
           <Separator />
@@ -169,29 +152,17 @@ const ConfigScreen: React.FC = () => {
           <SettingItem
             icon={HelpCircle}
             label="FAQ"
-            onPress={() =>
-              navigation.navigate("App", { screen: "HomeStack", params: { screen: "FAQScreen" } })
-            }
+            onPress={() => navigation.navigate("FAQScreen")}
           />
           <SettingItem
             icon={PhoneCall}
             label="Atendimento"
-            onPress={() =>
-              navigation.navigate("App", {
-                screen: "HomeStack",
-                params: { screen: "ServiceScreen" },
-              })
-            }
+            onPress={() => navigation.navigate("ServiceScreen")}
           />
           <SettingItem
             icon={UserStar}
             label="Nos avalie"
-            onPress={() =>
-              navigation.navigate("App", {
-                screen: "HomeStack",
-                params: { screen: "ReviewScreen" },
-              })
-            }
+            onPress={() => navigation.navigate("ReviewScreen")}
           />
 
           <Separator />
@@ -201,19 +172,12 @@ const ConfigScreen: React.FC = () => {
           <SettingItem
             icon={ClipboardMinus}
             label="Termos e condições"
-            onPress={() =>
-              navigation.navigate("App", { screen: "HomeStack", params: { screen: "TermsScreen" } })
-            }
+            onPress={() => navigation.navigate("TermsScreen")}
           />
           <SettingItem
             icon={BookText}
             label="Política de privacidade"
-            onPress={() =>
-              navigation.navigate("App", {
-                screen: "HomeStack",
-                params: { screen: "PoliciesScreen" },
-              })
-            }
+            onPress={() => navigation.navigate("PoliciesScreen")}
           />
 
           <Separator />

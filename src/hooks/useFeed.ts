@@ -1,6 +1,6 @@
-import { useState, useCallback, useEffect } from 'react';
-import { useAuth } from '../contexts/AuthContext';
-import { api } from '../services/api';
+import { useState, useCallback, useEffect } from "react";
+import { useAuth } from "../contexts/AuthContext";
+import { api } from "../services/api";
 
 interface Post {
   post_id: string;
@@ -13,7 +13,7 @@ interface Post {
     is_verified: boolean;
     is_following: boolean;
   };
-  media: Array<{
+  media: {
     media_id: string;
     media_url: string;
     thumbnail_url: string;
@@ -21,7 +21,7 @@ interface Post {
     width: number;
     height: number;
     position: number;
-  }>;
+  }[];
   caption: string;
   location: string | null;
   hashtags: string[];
@@ -57,44 +57,47 @@ export const useFeed = (userId: string | undefined): UseFeedReturn => {
   const [hasMore, setHasMore] = useState(true);
   const [cursor, setCursor] = useState<string | null>(null);
 
-  const loadPosts = useCallback(async (reset = false) => {
-    if (!userId) return;
+  const loadPosts = useCallback(
+    async (reset = false) => {
+      if (!userId) return;
 
-    if (reset) {
-      setPosts([]);
-      setCursor(null);
-      setHasMore(true);
-    }
+      if (reset) {
+        setPosts([]);
+        setCursor(null);
+        setHasMore(true);
+      }
 
-    setIsLoading(true);
-    try {
-      const response = await api.get('/feed', {
-        params: {
-          cursor: cursor,
-          limit: 10,
-        },
-      });
+      setIsLoading(true);
+      try {
+        const response = await api.get("/feed", {
+          params: {
+            cursor: cursor,
+            limit: 10,
+          },
+        });
 
-      const newPosts = response.data.posts;
-      setPosts(prev => reset ? newPosts : [...prev, ...newPosts]);
-      setCursor(response.data.next_cursor);
-      setHasMore(response.data.has_more);
-    } catch (error) {
-      console.error('Erro ao carregar feed:', error);
-    } finally {
-      setIsLoading(false);
-      setIsRefreshing(false);
-    }
-  }, [userId, cursor]);
+        const newPosts = response.data.posts;
+        setPosts((prev) => (reset ? newPosts : [...prev, ...newPosts]));
+        setCursor(response.data.next_cursor);
+        setHasMore(response.data.has_more);
+      } catch (error) {
+        console.error("Erro ao carregar feed:", error);
+      } finally {
+        setIsLoading(false);
+        setIsRefreshing(false);
+      }
+    },
+    [userId, cursor]
+  );
 
-  const loadMore = useCallback(() => {
+  const loadMore = useCallback(async () => {
     if (!isLoading && hasMore) {
-      loadPosts(false);
+      await loadPosts(false);
     }
   }, [isLoading, hasMore, loadPosts]);
 
-  const refresh = useCallback(() => {
-    loadPosts(true);
+  const refresh = useCallback(async () => {
+    await loadPosts(true);
   }, [loadPosts]);
 
   useEffect(() => {

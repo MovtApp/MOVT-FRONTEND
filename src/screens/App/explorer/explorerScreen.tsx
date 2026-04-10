@@ -309,9 +309,11 @@ const PostCard: React.FC<{ post: Post }> = ({ post }) => {
             </View>
           </View>
         </View>
-        <View style={[styles.postTypeBadge, { backgroundColor: getTypeColor() }]}>
-          <Text style={styles.postTypeText}>{getTypeLabel()}</Text>
-        </View>
+        {post.type !== "community" && (
+          <View style={[styles.postTypeBadge, { backgroundColor: getTypeColor() }]}>
+            <Text style={styles.postTypeText}>{getTypeLabel()}</Text>
+          </View>
+        )}
       </View>
 
       {/* Content */}

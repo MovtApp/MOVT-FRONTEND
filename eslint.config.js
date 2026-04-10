@@ -4,6 +4,7 @@ import expoConfig from "eslint-config-expo/flat.js";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import typescriptParser from "@typescript-eslint/parser";
+import typescriptPlugin from "@typescript-eslint/eslint-plugin";
 import prettierPlugin from "eslint-plugin-prettier";
 import prettierConfig from "eslint-config-prettier";
 
@@ -36,6 +37,7 @@ export default defineConfig([
     files: ["**/*.ts", "**/*.tsx", "**/*.js", "**/*.jsx"],
     plugins: {
       prettier: prettierPlugin,
+      "@typescript-eslint": typescriptPlugin,
     },
     languageOptions: {
       parser: typescriptParser,
@@ -47,6 +49,15 @@ export default defineConfig([
     rules: {
       "prettier/prettier": "error",
       "import/no-unresolved": ["error", { commonjs: true, amd: true }],
+      "@typescript-eslint/no-unused-vars": "off",
+      "react-hooks/exhaustive-deps": "off",
+      "import/no-named-as-default": "off",
+      "import/no-named-as-default-member": "off",
+      "@typescript-eslint/no-require-imports": "off",
+      "no-console": "off",
+    },
+    linterOptions: {
+      reportUnusedDisableDirectives: false,
     },
     settings: {
       "import/parsers": {

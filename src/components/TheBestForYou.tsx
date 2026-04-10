@@ -82,11 +82,7 @@ const SmallPlanCard: React.FC<{ plan: Plan; onPress?: () => void }> = ({ plan, o
 
   return (
     <Animated.View style={[styles.cardWrapper, { transform: [{ scale }, { translateY }] }]}>
-      <Pressable
-        onPressIn={handlePressIn}
-        onPressOut={handlePressOut}
-        onPress={onPress}
-      >
+      <Pressable onPressIn={handlePressIn} onPressOut={handlePressOut} onPress={onPress}>
         <LinearGradient
           colors={["#FFFFFF", "#F9FAFB"]}
           start={{ x: 0, y: 0 }}
@@ -112,7 +108,9 @@ const SmallPlanCard: React.FC<{ plan: Plan; onPress?: () => void }> = ({ plan, o
               </View>
             </View>
 
-            <Text style={styles.planTitle} numberOfLines={1}>{plan.title}</Text>
+            <Text style={styles.planTitle} numberOfLines={1}>
+              {plan.title}
+            </Text>
 
             <View style={styles.infoRow}>
               <View style={styles.infoItem}>
@@ -135,7 +133,7 @@ const SmallPlanCard: React.FC<{ plan: Plan; onPress?: () => void }> = ({ plan, o
           </View>
 
           {/* Botão flutuante sutil no canto */}
-          <TouchableOpacity style={styles.playIconButton}>
+          <TouchableOpacity style={styles.playIconButton} onPress={onPress}>
             <Play size={Platform.select({ ios: 12, android: 14 })} fill="#192126" color="#192126" />
           </TouchableOpacity>
         </LinearGradient>
@@ -163,11 +161,7 @@ const TheBestForYou: React.FC<TheBestForYouProps> = ({ planData: propData, onPre
 
       <View style={styles.planCardsContainer}>
         {data.map((plan) => (
-          <SmallPlanCard
-            key={plan.id}
-            plan={plan}
-            onPress={() => onPressPlan?.(plan)}
-          />
+          <SmallPlanCard key={plan.id} plan={plan} onPress={() => onPressPlan?.(plan)} />
         ))}
       </View>
     </View>

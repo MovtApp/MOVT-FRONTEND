@@ -1,7 +1,7 @@
 import { View, TouchableOpacity, StyleSheet, Text, Platform } from "react-native";
 import { useState, useEffect, useMemo } from "react";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { RootStackParamList, AppStackParamList, AppDrawerParamList } from "../@types/routes";
+import { AppStackParamList } from "../@types/routes";
 import { ChartPie, House, Map, MessageCircle, Soup } from "lucide-react-native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import {
@@ -11,6 +11,7 @@ import {
   PartialState,
 } from "@react-navigation/native";
 import { useBottomNav } from "@contexts/BottomNavContext";
+import { useNotifications } from "@contexts/NotificationContext";
 
 interface NavItem {
   name: keyof AppStackParamList;
@@ -37,7 +38,6 @@ const HIDDEN_SCREENS = [
   "ConfigScreen",
   "ProfilePFScreen",
   "PlanScreen",
-  "LanguageScreen",
   "FAQScreen",
   "ServiceScreen",
   "ReviewScreen",
@@ -45,7 +45,12 @@ const HIDDEN_SCREENS = [
   "PoliciesScreen",
   "CommunityDetails",
   "TrainingDetails",
-  "FeedScreen"
+  "FeedScreen",
+  "PostDetailScreen",
+  "ArchivedPostsScreen",
+  "EditProfileScreen",
+  "ActiveWorkout",
+  "AdminDashboard",
 ];
 // ============================================================================
 
@@ -81,10 +86,11 @@ const getDeepRouteName = (
 const BottomNavigationBar = () => {
   const insets = useSafeAreaInsets();
   const navigation =
-    useNavigation<NativeStackNavigationProp<RootStackParamList & AppDrawerParamList>>();
+    useNavigation<NativeStackNavigationProp<AppStackParamList>>();
   const [activeTab, setActiveTab] = useState<keyof AppStackParamList>("HomeScreen");
   const currentScreen = useNavigationState((state) => getDeepRouteName(state) ?? null);
   const { isVisible: isVisibleFromContext } = useBottomNav();
+  const { unreadCount: unreadChatCount } = useNotifications();
 
   const bottomInset = useMemo(() => {
     if (Platform.OS === "android") {
@@ -142,10 +148,9 @@ const BottomNavigationBar = () => {
 
   const navigateTo = (screenName: keyof AppStackParamList) => {
     setActiveTab(screenName);
-    navigation.navigate("App", {
-      screen: "HomeStack",
-      params: { screen: screenName },
-    });
+    // BottomNavigationBar's useNavigation() returns LeftDrawer navigation,
+    // which only knows "HomeStack". We reach the inner Stack screens via params.
+    (navigation as any).navigate("HomeStack", { screen: screenName });
   };
 
   // Se deve esconder por tela ou por contexto, retorna null
@@ -163,7 +168,16 @@ const BottomNavigationBar = () => {
             style={[styles.navItem, isActive && styles.activeNavItem]}
             onPress={() => navigateTo(item.name)}
           >
-            <item.icon size={24} color={isActive ? "#192126" : "#fff"} />
+            <View style={{ position: "relative" }}>
+              <item.icon size={24} color={isActive ? "#192126" : "#fff"} />
+              {item.name === "ChatScreen" && unreadChatCount > 0 && (
+                <View style={styles.badge}>
+                  <Text style={styles.badgeText}>
+                    {unreadChatCount > 9 ? "9+" : unreadChatCount}
+                  </Text>
+                </View>
+              )}
+            </View>
             {isActive && <Text style={styles.activeNavText}>{item.label}</Text>}
           </TouchableOpacity>
         );
@@ -208,6 +222,25 @@ const styles = StyleSheet.create({
   activeNavText: {
     color: "#192126",
     marginLeft: 8,
+    fontWeight: "bold",
+  },
+  badge: {
+    position: "absolute",
+    top: -6,
+    right: -8,
+    backgroundColor: "#BBF246",
+    borderRadius: 10,
+    minWidth: 16,
+    height: 16,
+    justifyContent: "center",
+    alignItems: "center",
+    paddingHorizontal: 2,
+    borderWidth: 1,
+    borderColor: "#1E232C",
+  },
+  badgeText: {
+    color: "#000",
+    fontSize: 9,
     fontWeight: "bold",
   },
 });

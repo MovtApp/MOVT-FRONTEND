@@ -18,10 +18,13 @@ const BackButton: React.FC<BackButtonProps> = ({ to, onPress, style, autoTopInse
   const navigation = useNavigation<NavigationProp<Record<string, object | undefined>>>();
   const insets = useSafeAreaInsets();
 
-  const dynamicStyle =
-    Platform.OS === "android" && autoTopInset
-      ? { marginTop: insets.top > 0 ? insets.top + 20 : 40 }
-      : {};
+  const dynamicStyle = autoTopInset
+    ? {
+        marginTop: Platform.OS === "android"
+          ? (insets.top > 0 ? insets.top + 20 : 40)
+          : (insets.top > 0 ? insets.top : 20)
+      }
+    : {};
 
   const handlePress = () => {
     if (onPress) {

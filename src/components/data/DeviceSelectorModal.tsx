@@ -271,8 +271,6 @@ const DeviceSelectorModal: React.FC<DeviceSelectorModalProps> = ({ isVisible, on
               <Text style={styles.sectionTitle}>Procurar via Bluetooth</Text>
             </View>
 
-
-
             {isScanning && (
               <View style={styles.scanningBox}>
                 <ActivityIndicator color="#2563EB" />

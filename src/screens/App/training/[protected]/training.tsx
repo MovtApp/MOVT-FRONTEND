@@ -9,14 +9,16 @@ import {
   StatusBar,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useRoute, RouteProp } from "@react-navigation/native";
+import { useRoute, RouteProp, useNavigation } from "@react-navigation/native";
+import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { Play } from "lucide-react-native";
 import BackButton from "@components/BackButton";
 import { StatsCard } from "@components/StatsCard";
-import { AppStackParamList } from "../../../../@types/routes";
+import { AppStackParamList, Training } from "../../../../@types/routes";
 import { FooterVersion } from "@components/FooterVersion";
 
 type TrainingDetailsRouteProp = RouteProp<AppStackParamList, "TrainingDetails">;
+type NavigationProp = NativeStackNavigationProp<AppStackParamList>;
 
 interface ExerciseVariation {
   id: string;
@@ -27,6 +29,7 @@ interface ExerciseVariation {
 
 const TrainingDetails: React.FC = () => {
   const route = useRoute<TrainingDetailsRouteProp>();
+  const navigation = useNavigation<NavigationProp>();
   const { training } = route.params || {};
 
   // Mock data para variações do exercício
@@ -95,7 +98,7 @@ const TrainingDetails: React.FC = () => {
   }
 
   return (
-    <SafeAreaView style={styles.container} edges={["top"]}>
+    <SafeAreaView style={styles.container} edges={["top", "bottom"]}>
       <StatusBar barStyle="dark-content" backgroundColor="#fff" />
 
       {/* Header */}
@@ -159,6 +162,17 @@ const TrainingDetails: React.FC = () => {
 
         <FooterVersion style={styles.footer} />
       </ScrollView>
+
+      {/* FIXED BOTTOM BUTTON */}
+      <View style={styles.buttonContainer}>
+        <TouchableOpacity 
+          style={styles.startButton} 
+          onPress={() => navigation.navigate("ActiveWorkout", { training })}
+          activeOpacity={0.8}
+        >
+          <Text style={styles.startButtonText}>INICIAR TREINO</Text>
+        </TouchableOpacity>
+      </View>
     </SafeAreaView>
   );
 };
@@ -185,7 +199,7 @@ const styles = StyleSheet.create({
     color: "#6B7280",
   },
   scrollContent: {
-    paddingBottom: 40,
+    paddingBottom: 100, // Increased to accommodate button
   },
   exerciseTitle: {
     fontSize: 20,
@@ -243,55 +257,6 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: "#fff",
     fontWeight: "bold",
-  },
-  musicPlayer: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    backgroundColor: "#1E3A8A",
-    marginHorizontal: 20,
-    marginBottom: 20,
-    borderRadius: 12,
-    paddingVertical: 10,
-    paddingHorizontal: 12,
-  },
-  musicLeft: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-    flex: 1,
-  },
-  musicIconContainer: {
-    width: 36,
-    height: 36,
-    borderRadius: 6,
-    backgroundColor: "#2563EB",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  musicInfo: {
-    flex: 1,
-  },
-  musicTitle: {
-    fontSize: 13,
-    fontWeight: "600",
-    color: "#fff",
-    marginBottom: 2,
-  },
-  musicArtist: {
-    fontSize: 11,
-    color: "#94A3B8",
-  },
-  musicActions: {
-    flexDirection: "row",
-    gap: 8,
-    alignItems: "center",
-  },
-  musicActionButton: {
-    width: 28,
-    height: 28,
-    alignItems: "center",
-    justifyContent: "center",
   },
   exerciseName: {
     fontSize: 18,
@@ -370,28 +335,34 @@ const styles = StyleSheet.create({
     backgroundColor: "#fff",
     paddingHorizontal: 20,
     paddingVertical: 12,
-    paddingBottom: 20,
+    paddingBottom: 25,
     borderTopWidth: 1,
     borderTopColor: "#F3F4F6",
+    zIndex: 10,
   },
   startButton: {
-    backgroundColor: "#192126",
-    height: 52,
-    borderRadius: 12,
+    backgroundColor: "#BBF246",
+    height: 56,
+    borderRadius: 16,
     alignItems: "center",
     justifyContent: "center",
+    shadowColor: "#BBF246",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 4,
   },
   startButtonText: {
-    color: "#fff",
-    fontSize: 15,
-    fontWeight: "bold",
+    color: "#192126",
+    fontSize: 16,
+    fontWeight: "900",
+    letterSpacing: 1,
   },
   footer: {
-    marginTop: "auto",
-    paddingTop: 20,
+    marginTop: 20,
     paddingHorizontal: 20,
-    alignItems: "flex-start",
-    marginBottom: 20,
+    alignItems: "center",
+    marginBottom: 120, // To give space for fixed button
   },
 });
 

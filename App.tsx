@@ -18,6 +18,7 @@ import {
   Rubik_500Medium,
   Rubik_700Bold,
 } from "@expo-google-fonts/rubik";
+import FlashMessage from "react-native-flash-message";
 import "react-native-reanimated";
 
 function AppContent() {
@@ -79,6 +80,7 @@ export default function App() {
             <AppContent />
           </AuthProvider>
         </BottomSheetModalProvider>
+        <FlashMessage position="top" />
       </GestureHandlerRootView>
     </SafeAreaProvider>
   );

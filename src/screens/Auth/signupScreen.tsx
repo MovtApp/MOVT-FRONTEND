@@ -139,7 +139,7 @@ export const SignUpScreen = ({ navigation }: Props) => {
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
         >
-          <BackButton />
+          <BackButton autoTopInset={true} />
           <Text style={styles.title}>Inscrever-se</Text>
           <Text style={styles.subtitle}>Crie uma conta para continuar!</Text>
           <View style={styles.tabContainer}>

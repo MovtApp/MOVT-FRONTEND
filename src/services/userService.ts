@@ -1,5 +1,9 @@
 import { api } from "./api";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { Platform } from "react-native";
+import { supabase } from "./supabaseClient";
+import * as FileSystem from "expo-file-system/legacy";
+import { decode } from "base64-arraybuffer";
 
 const getAuthHeaders = async () => {
   const sessionId = await AsyncStorage.getItem("userSessionId");
@@ -19,44 +23,62 @@ export const userService = {
 
   updateAvatar: async (imageUri: string) => {
     const headers = await getAuthHeaders();
-    const formData = new FormData();
+    
+    try {
+      // 1. Ler o arquivo como base64 (Método ultra-estável no Expo)
+      const base64 = await FileSystem.readAsStringAsync(imageUri, {
+        encoding: "base64",
+      });
+      
+      const filename = imageUri.split("/").pop();
+      const match = /\.(\w+)$/.exec(filename || "");
+      const mimetype = match ? `image/${match[1]}` : `image/jpeg`;
 
-    // @ts-ignore
-    formData.append("avatar", {
-      uri: imageUri,
-      name: "avatar.jpg",
-      type: "image/jpeg",
-    });
+      // 2. Enviar para o Back-end via JSON (Zero erros de Multipart ou RLS)
+      const response = await api.put("/user/avatar-base64", {
+        base64,
+        mimetype,
+      }, headers);
 
-    const response = await api.put("/user/avatar", formData, {
-      ...headers,
-      headers: {
-        ...headers.headers,
-        "Content-Type": "multipart/form-data",
-      },
-    });
-    return response.data;
+      return {
+        success: true,
+        photo: response.data.data?.photo,
+        ...response.data
+      };
+    } catch (error) {
+      console.error("Erro no Upload Pro (Base64 Bridge):", error);
+      throw error;
+    }
   },
 
   updateBanner: async (imageUri: string) => {
     const headers = await getAuthHeaders();
-    const formData = new FormData();
+    
+    try {
+      // 1. Ler o arquivo
+      const base64 = await FileSystem.readAsStringAsync(imageUri, {
+        encoding: "base64",
+      });
+      
+      const filename = imageUri.split("/").pop();
+      const match = /\.(\w+)$/.exec(filename || "");
+      const mimetype = match ? `image/${match[1]}` : `image/jpeg`;
 
-    // @ts-ignore
-    formData.append("banner", {
-      uri: imageUri,
-      name: "banner.jpg",
-      type: "image/jpeg",
-    });
+      // 2. Enviar para o Back-end
+      const response = await api.put("/user/banner-base64", {
+        base64,
+        mimetype,
+      }, headers);
 
-    const response = await api.put("/user/banner", formData, {
-      ...headers,
-      headers: {
-        ...headers.headers,
-        "Content-Type": "multipart/form-data",
-      },
-    });
-    return response.data;
+      return {
+        success: true,
+        banner: response.data.data?.banner,
+        ...response.data
+      };
+    } catch (error) {
+      console.error("Erro no Upload do Banner (Base64 Bridge):", error);
+      throw error;
+    }
   },
 
   getUserPosts: async (userId: string) => {
@@ -145,6 +167,50 @@ export const userService = {
   archivePost: async (postId: string) => {
     const headers = await getAuthHeaders();
     const response = await api.post(`/user/posts/${postId}/archive`, {}, headers);
+    return response.data;
+  },
+
+  unarchivePost: async (postId: string) => {
+    const headers = await getAuthHeaders();
+    const response = await api.post(`/user/posts/${postId}/unarchive`, {}, headers);
+    return response.data;
+  },
+
+  getArchivedPosts: async () => {
+    const headers = await getAuthHeaders();
+    const response = await api.get(`/user/posts/archived`, headers);
+    return response.data;
+  },
+
+  getNotifications: async () => {
+    const headers = await getAuthHeaders();
+    const response = await api.get("/user/notifications", headers);
+    return response.data;
+  },
+
+  getFollowRequests: async () => {
+    const headers = await getAuthHeaders();
+    const response = await api.get("/user/follow-requests", headers);
+    return response.data;
+  },
+
+  respondToFollowRequest: async (targetId: string, accept: boolean) => {
+    const headers = await getAuthHeaders();
+    const response = await api.post(
+      `/user/follow-requests/${targetId}/respond`,
+      { accept },
+      headers
+    );
+    return response.data;
+  },
+  markNotificationAsRead: async (id: string) => {
+    const headers = await getAuthHeaders();
+    const response = await api.put(`/user/notifications/${id}/read`, {}, headers);
+    return response.data;
+  },
+  markAllNotificationsAsRead: async () => {
+    const headers = await getAuthHeaders();
+    const response = await api.put("/user/notifications/read-all", {}, headers);
     return response.data;
   },
 };

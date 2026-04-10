@@ -1,5 +1,6 @@
-import { View, Text, TouchableOpacity, StyleSheet, Image, Alert } from "react-native";
-import { DrawerContentScrollView, DrawerContentComponentProps } from "@react-navigation/drawer";
+import React, { useState, useEffect } from "react";
+import { View, Text, TouchableOpacity, StyleSheet, Image, Alert, Platform } from "react-native";
+import { DrawerContentScrollView, DrawerContentComponentProps, useDrawerStatus } from "@react-navigation/drawer";
 import {
   X,
   Home,
@@ -14,16 +15,57 @@ import {
   Info,
   LogOut,
   Layout,
+  ShieldEllipsis,
 } from "lucide-react-native";
 import { AppStackParamList } from "../@types/routes";
 import { useAuth } from "../hooks/useAuth";
+import { userService } from "../services/userService";
 
 export function CustomDrawerContent(props: DrawerContentComponentProps) {
-  const { user, signOut } = useAuth();
+  const { user, signOut, updateUser } = useAuth();
+  const drawerStatus = useDrawerStatus();
+  
+  const initialAvatar = user?.avatar_url || user?.photo || (user as any)?.image || null;
+  const [liveAvatar, setLiveAvatar] = useState<string | null>(initialAvatar);
 
-  const handleCloseDrawer = () => {
-    props.navigation.closeDrawer();
-  };
+  useEffect(() => {
+    if (initialAvatar && initialAvatar !== liveAvatar) {
+      setLiveAvatar(initialAvatar);
+    }
+  }, [initialAvatar]);
+
+  useEffect(() => {
+    if (drawerStatus === "open" && user) {
+      const fetchLiveData = async () => {
+        try {
+          const id = user.id_us || user.id;
+          if (!id) return;
+          const res = await userService.getUserProfile(String(id));
+          if (res.success && res.data) {
+            const fetched = res.data;
+            const livePhoto = fetched.photo || fetched.avatar_url || fetched.image;
+            const liveRole = fetched.role;
+
+            const updates: any = {};
+            if (livePhoto && livePhoto !== liveAvatar) {
+              setLiveAvatar(livePhoto);
+              updates.photo = livePhoto;
+            }
+            if (liveRole && liveRole !== user.role) {
+              updates.role = liveRole;
+            }
+
+            if (Object.keys(updates).length > 0) {
+              updateUser(updates);
+            }
+          }
+        } catch (err) {
+          console.error("Erro ao atualizar perfil do drawer:", err);
+        }
+      };
+      fetchLiveData();
+    }
+  }, [drawerStatus, user]);
 
   const handleProfilePress = () => {
     props.navigation.navigate("HomeStack", {
@@ -41,11 +83,26 @@ export function CustomDrawerContent(props: DrawerContentComponentProps) {
   ];
 
   const panelItems = [
-    { name: "Agendamentos", icon: Calendar, route: "Appointments" },
-    { name: "Feed", icon: Layout, route: "FeedScreen" },
-    { name: "Comunidades", icon: Users, route: "CommunityScreen" },
-    { name: "Planos", icon: Users, route: "PlanScreen" },
+    { name: "Explorar", icon: Layout, route: "FeedScreen" as keyof AppStackParamList },
+    ...(
+      user?.role?.toLowerCase()?.includes("admin") || 
+      user?.id_us === 15 || 
+      user?.id_us === "15" ||
+      user?.email === "comercial.movtapp@gmail.com"
+        ? [{ name: "Dashboard", icon: ShieldEllipsis, route: "AdminDashboard" as keyof AppStackParamList }] 
+        : []
+    ),
+    { name: "Agendamentos", icon: Calendar, route: "Appointments" as keyof AppStackParamList },
+    { name: "Comunidades", icon: Users, route: "CommunityScreen" as keyof AppStackParamList },
+    { name: "Planos", icon: Users, route: "PlanScreen" as keyof AppStackParamList },
   ];
+
+  const handleNavigation = (route: string) => {
+    props.navigation.navigate("HomeStack", {
+      screen: route as keyof AppStackParamList,
+    } as any);
+    props.navigation.closeDrawer();
+  };
 
   const accountItems = [
     {
@@ -59,6 +116,8 @@ export function CustomDrawerContent(props: DrawerContentComponentProps) {
     { name: "Sobre", icon: Info, route: "AboutScreen" },
   ];
 
+
+
   return (
     <DrawerContentScrollView {...props} contentContainerStyle={styles.drawerContent}>
       <TouchableOpacity
@@ -68,11 +127,9 @@ export function CustomDrawerContent(props: DrawerContentComponentProps) {
       >
         <Image
           source={
-            user?.photo
-              ? { uri: user.photo }
-              : {
-                  uri: "https://res.cloudinary.com/ditlmzgrh/image/upload/v1767896239/Captura_de_tela_2026-01-08_151542_r3acpt.png",
-                }
+            liveAvatar 
+              ? { uri: liveAvatar }
+              : { uri: "https://images.unsplash.com/photo-1633332755192-727a05c4013d?w=400&h=400&fit=crop" }
           }
           style={styles.profileImage}
         />
@@ -88,12 +145,7 @@ export function CustomDrawerContent(props: DrawerContentComponentProps) {
           <TouchableOpacity
             key={index}
             style={styles.drawerItem}
-            onPress={() =>
-              props.navigation.navigate("App", {
-                screen: "HomeStack",
-                params: { screen: item.route as keyof AppStackParamList },
-              })
-            }
+            onPress={() => handleNavigation(item.route)}
           >
             <item.icon size={20} color="#FFFFFF" style={styles.drawerItemIcon} />
             <Text style={styles.drawerItemText}>{item.name}</Text>
@@ -107,12 +159,7 @@ export function CustomDrawerContent(props: DrawerContentComponentProps) {
           <TouchableOpacity
             key={index}
             style={styles.drawerItem}
-            onPress={() => {
-              props.navigation.navigate("App", {
-                screen: "HomeStack",
-                params: { screen: item.route as keyof AppStackParamList },
-              });
-            }}
+            onPress={() => handleNavigation(item.route)}
           >
             <item.icon size={20} color="#FFFFFF" style={styles.drawerItemIcon} />
             <Text style={styles.drawerItemText}>{item.name}</Text>
@@ -120,18 +167,15 @@ export function CustomDrawerContent(props: DrawerContentComponentProps) {
         ))}
       </View>
 
+
+
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Sua conta</Text>
         {accountItems.map((item, index) => (
           <TouchableOpacity
             key={index}
             style={styles.drawerItem}
-            onPress={() =>
-              props.navigation.navigate("App", {
-                screen: "HomeStack",
-                params: { screen: item.route as keyof AppStackParamList },
-              })
-            }
+            onPress={() => handleNavigation(item.route)}
           >
             <item.icon size={20} color="#FFFFFF" style={styles.drawerItemIcon} />
             <Text style={styles.drawerItemText}>{item.name}</Text>

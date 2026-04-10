@@ -98,7 +98,7 @@ export const fetchTodayStepCount = async (): Promise<number> => {
 };
 
 export const subscribeToStepUpdates = (listener: (steps: number) => void): (() => void) => {
-  if (!GoogleFit?.startRecording || !GoogleFit?.observeSteps) return () => { };
+  if (!GoogleFit?.startRecording || !GoogleFit?.observeSteps) return () => {};
   try {
     GoogleFit.startRecording(() => {
       // Apenas garante que o Google Fit está gravando dados de atividade

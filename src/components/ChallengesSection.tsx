@@ -82,7 +82,7 @@ const ChallengesSection: React.FC = () => {
             key={challenge.id}
             image={challenge.image}
             title={challenge.title}
-            onPress={() => { }} // Removido console.log
+            onPress={() => {}} // Removido console.log
           />
         ))}
       </ScrollView>
