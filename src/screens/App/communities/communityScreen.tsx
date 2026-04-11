@@ -13,9 +13,10 @@ import {
   NativeScrollEvent,
   Animated,
 } from "react-native";
-import { Users, Settings } from "lucide-react-native";
-import { useNavigation, useRoute, RouteProp } from "@react-navigation/native";
+import { Users, Settings, Search, MapPin, Star, TrendingUp } from "lucide-react-native";
+import { useNavigation, useRoute, RouteProp, useIsFocused } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
+import { LinearGradient } from "expo-linear-gradient";
 
 import Header from "@components/Header";
 import { useAuth } from "@contexts/AuthContext";
@@ -50,10 +51,16 @@ const CommunityScreen: React.FC = () => {
 
   // Ref e estado para uso do Admin
   const adminSheetRef = useRef<CommunityManagementSheetRef>(null);
+  const isFocused = useIsFocused();
   const isAdmin = user?.id === "15" || String(user?.id_us) === "15";
 
   useEffect(() => {
-    // Update selectedCategory if it changes via route params (e.g., subsequent navigations)
+    if (isFocused) {
+      fetchCommunities();
+    }
+  }, [isFocused]);
+
+  useEffect(() => {
     if (route.params?.category) {
       setSelectedCategory(route.params.category);
     }
@@ -70,15 +77,12 @@ const CommunityScreen: React.FC = () => {
       setLoading(true);
       if (user?.sessionId) {
         const data = await listCommunities(user.sessionId, selectedCategory);
-
-        // Adaptar dados da API para garantir que seja um array
         let formattedData: Community[] = [];
         if (Array.isArray(data)) {
           formattedData = data;
         } else if (data && Array.isArray(data.data)) {
           formattedData = data.data;
         }
-
         setCommunities(formattedData);
       }
     } catch (error) {
@@ -97,11 +101,8 @@ const CommunityScreen: React.FC = () => {
 
   const filteredCommunities = communities.filter((item) => {
     if (selectedCategory === "Todas") return true;
-
-    // Proteção contra valores nulos/undefined
     const nome = item.nome || "";
     const categoria = item.categoria || "";
-
     return (
       categoria === selectedCategory || nome.toLowerCase().includes(selectedCategory.toLowerCase())
     );
@@ -117,19 +118,16 @@ const CommunityScreen: React.FC = () => {
 
   const renderHeroItem = ({ item, index }: { item: string; index: number }) => {
     const inputRange = [(index - 1) * ITEM_WIDTH, index * ITEM_WIDTH, (index + 1) * ITEM_WIDTH];
-
     const scale = scrollX.interpolate({
       inputRange,
       outputRange: [0.8, 1, 0.8],
       extrapolate: "clamp",
     });
-
     const opacity = scrollX.interpolate({
       inputRange,
       outputRange: [0.6, 1, 0.6],
       extrapolate: "clamp",
     });
-
     const translateX = scrollX.interpolate({
       inputRange,
       outputRange: [-80, 0, 80],
@@ -170,7 +168,6 @@ const CommunityScreen: React.FC = () => {
           <Text style={styles.headerTitle}>Comunidades</Text>
         </View>
 
-        {/* Hero Image - Carousel */}
         <View style={styles.heroContainer}>
           <Animated.FlatList
             data={heroImages}
@@ -202,7 +199,6 @@ const CommunityScreen: React.FC = () => {
         </View>
 
         <View style={styles.section}>
-          {/* Communities Section */}
           <Communities
             showSeeAll={false}
             selectedCategory={selectedCategory}
@@ -210,42 +206,70 @@ const CommunityScreen: React.FC = () => {
           />
         </View>
 
-        {/* Section Title */}
-        <Text style={styles.sectionTitle}>Encontre as comunidades perto de você!</Text>
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>Comunidades em Destaque</Text>
+          <TrendingUp size={20} color="#BBF246" />
+        </View>
 
         {loading ? (
           <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color="#4CAF50" />
+            <ActivityIndicator size="large" color="#BBF246" />
           </View>
         ) : (
-          /* Nearby Communities Cards */
-          communities.map((item, index) => (
-            <TouchableOpacity
-              key={item.id_comunidade ? String(item.id_comunidade) : `comm-${index}`}
-              style={styles.card}
-              activeOpacity={0.9}
-              onPress={() => handleCommunityPress(item)}
-            >
-              <Image
-                source={{ uri: item.imageurl || "https://via.placeholder.com/150" }}
-                style={styles.cardImage}
-              />
+          <View style={styles.cardsWrapper}>
+            {filteredCommunities.map((item, index) => {
+              const participants = Number(item.participantes) || 0;
+              const maxParticipants = item.max_participantes || 50;
+              const progress = Math.min(participants / maxParticipants, 1);
 
-              <View style={styles.cardContent}>
-                <Text style={styles.cardTitle}>{item.nome || "Sem Nome"}</Text>
-                <Text style={styles.cardDescription} numberOfLines={2}>
-                  {item.descricao || "Sem descrição disponível."}
-                </Text>
+              return (
+                <TouchableOpacity
+                  key={item.id_comunidade ? String(item.id_comunidade) : `comm-${index}`}
+                  style={styles.card}
+                  activeOpacity={0.9}
+                  onPress={() => handleCommunityPress(item)}
+                >
+                  <View style={styles.cardImageWrapper}>
+                    <Image
+                      source={{
+                        uri:
+                          item.imageurl ||
+                          "https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?w=400",
+                      }}
+                      style={styles.cardImage}
+                    />
+                    <View style={styles.categoryBadge}>
+                      <Text style={styles.categoryBadgeText}>{item.categoria || "Geral"}</Text>
+                    </View>
+                  </View>
 
-                <View style={styles.confirmedRow}>
-                  <Users size={16} color="#666" />
-                  <Text style={styles.confirmedText}>
-                    {item.participantes || 0}/{item.max_participantes || 50} confirmados
-                  </Text>
-                </View>
-              </View>
-            </TouchableOpacity>
-          ))
+                  <View style={styles.cardContent}>
+                    <View>
+                      <Text style={styles.cardTitle} numberOfLines={1}>
+                        {item.nome || "Sem Nome"}
+                      </Text>
+                      <View style={styles.locationRow}>
+                        <MapPin size={12} color="#94A3B8" />
+                        <Text style={styles.locationText}>São Paulo, SP</Text>
+                      </View>
+                    </View>
+
+                    <View style={styles.progressSection}>
+                      <View style={styles.confirmedRow}>
+                        <Users size={14} color="#64748B" />
+                        <Text style={styles.confirmedText}>
+                          {participants} de {maxParticipants} membros
+                        </Text>
+                      </View>
+                      <View style={styles.progressBarBg}>
+                        <View style={[styles.progressBarFill, { width: `${progress * 100}%` }]} />
+                      </View>
+                    </View>
+                  </View>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
         )}
         <FooterVersion style={styles.footer} />
       </ScrollView>
@@ -274,20 +298,19 @@ const styles = StyleSheet.create({
   },
   footer: {
     paddingHorizontal: 30,
-    marginTop: 20,
-    paddingBottom: 20,
-    alignItems: "flex-start",
+    marginVertical: 40,
+    alignItems: "center",
   },
   contentHeader: {
-    paddingHorizontal: 30,
-    paddingVertical: 12,
-    backgroundColor: "#FFFFFF",
+    paddingHorizontal: 25,
+    paddingTop: 20,
+    paddingBottom: 10,
   },
   headerTitle: {
-    fontSize: 24,
-    fontWeight: "700",
+    fontSize: 28,
+    fontWeight: "900",
     color: "#111827",
-    marginBottom: 10,
+    letterSpacing: -0.5,
   },
   heroContainer: {
     marginBottom: 20,
@@ -306,51 +329,92 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     resizeMode: "cover",
   },
+  sectionHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 25,
+    marginBottom: 20,
+    marginTop: 10,
+  },
   sectionTitle: {
-    fontSize: 18,
-    fontWeight: "bold",
-    color: "#000",
-    paddingHorizontal: 30,
-    marginBottom: 16,
+    fontSize: 20,
+    fontWeight: "900",
+    color: "#111827",
   },
   section: {
-    marginBottom: 10,
-    paddingHorizontal: 30,
+    marginBottom: 15,
+    paddingHorizontal: 20,
+  },
+  cardsWrapper: {
+    paddingHorizontal: 25,
+    gap: 16,
   },
   card: {
     flexDirection: "row",
     backgroundColor: "#fff",
-    marginHorizontal: 30,
-    marginBottom: 16,
-    borderRadius: 16,
-    overflow: "hidden",
+    borderRadius: 24,
+    height: 160,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: "#F1F5F9",
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 8,
-    elevation: 4,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.05,
+    shadowRadius: 12,
+    elevation: 3,
+  },
+  cardImageWrapper: {
+    width: 120,
+    height: "100%",
+    borderRadius: 18,
+    overflow: "hidden",
   },
   cardImage: {
-    width: 120,
-    height: 140,
+    width: "100%",
+    height: "100%",
     resizeMode: "cover",
+  },
+  categoryBadge: {
+    position: "absolute",
+    bottom: 8,
+    left: 8,
+    right: 8,
+    backgroundColor: "rgba(25, 33, 38, 0.8)",
+    paddingVertical: 4,
+    borderRadius: 8,
+    alignItems: "center",
+  },
+  categoryBadgeText: {
+    color: "#fff",
+    fontSize: 10,
+    fontWeight: "800",
+    textTransform: "uppercase",
   },
   cardContent: {
     flex: 1,
-    padding: 16,
+    paddingLeft: 16,
+    paddingVertical: 4,
     justifyContent: "space-between",
   },
   cardTitle: {
-    fontSize: 18,
-    fontWeight: "bold",
-    color: "#000",
-    marginBottom: 6,
+    fontSize: 17,
+    fontWeight: "800",
+    color: "#1E293B",
   },
-  cardDescription: {
-    fontSize: 14,
-    color: "#666",
-    lineHeight: 20,
-    marginBottom: 8,
+  locationRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    marginTop: 4,
+  },
+  locationText: {
+    fontSize: 12,
+    color: "#94A3B8",
+    fontWeight: "600",
+  },
+  progressSection: {
+    gap: 8,
   },
   confirmedRow: {
     flexDirection: "row",
@@ -358,46 +422,58 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   confirmedText: {
-    fontSize: 14,
-    color: "#666",
-    fontWeight: "500",
+    fontSize: 12,
+    color: "#64748B",
+    fontWeight: "700",
+  },
+  progressBarBg: {
+    height: 6,
+    backgroundColor: "#F1F5F9",
+    borderRadius: 10,
+    overflow: "hidden",
+  },
+  progressBarFill: {
+    height: "100%",
+    backgroundColor: "#BBF246",
+    borderRadius: 10,
   },
   loadingContainer: {
-    padding: 20,
+    padding: 40,
     alignItems: "center",
   },
   paginationContainer: {
     flexDirection: "row",
-    marginTop: 12,
+    marginTop: -20,
+    marginBottom: 20,
     justifyContent: "center",
     alignItems: "center",
   },
   paginationDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: "#E5E7EB",
-    marginHorizontal: 4,
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: "rgba(0,0,0,0.1)",
+    marginHorizontal: 3,
   },
   paginationDotActive: {
-    backgroundColor: "#4CAF50",
-    width: 24,
+    backgroundColor: "#BBF246",
+    width: 18,
   },
   adminFab: {
     position: "absolute",
-    bottom: 20,
-    right: 20,
-    width: 60,
-    height: 60,
-    borderRadius: 30,
+    bottom: 30,
+    right: 25,
+    width: 64,
+    height: 64,
+    borderRadius: 22,
     backgroundColor: "#BBF246",
     justifyContent: "center",
     alignItems: "center",
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 5,
-    elevation: 8,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.25,
+    shadowRadius: 15,
+    elevation: 10,
     zIndex: 99,
   },
 });

@@ -19,6 +19,8 @@ import { StatsCard } from "@components/StatsCard";
 import { AppStackParamList, Community } from "../../../../@types/routes";
 import { getCommunityDetails, joinCommunity } from "@services/communityService";
 import { useAuth } from "@contexts/AuthContext";
+import ConfettiCannon from "react-native-confetti-cannon";
+import { LinearGradient } from "expo-linear-gradient";
 
 type CommunityDetailsRouteProp = RouteProp<AppStackParamList, "CommunityDetails">;
 
@@ -37,6 +39,8 @@ const CommunityDetails = () => {
     initialCommunity ? parseInt(initialCommunity.participantes || "0") : 0
   );
   const [isJoining, setIsJoining] = useState(false);
+  const [showConfetti, setShowConfetti] = useState(false);
+  const [isMember, setIsMember] = useState(false);
 
   useEffect(() => {
     if (initialCommunity?.id_comunidade && user?.sessionId) {
@@ -57,8 +61,10 @@ const CommunityDetails = () => {
 
       // Por enquanto, vamos usar o número de participantes como total
       // até implementarmos a lista real de membros
+      // Checagem básica se o usuário já faz parte (baseado no histórico ou API)
       const participantesNum = parseInt(details.participantes || "0");
       setTotalMembers(participantesNum);
+      setIsMember(!!details.is_member);
       setMembers([]); // Lista vazia por enquanto
     } catch (error) {
       console.error("Erro ao carregar detalhes:", error);
@@ -67,14 +73,33 @@ const CommunityDetails = () => {
 
   const handleJoin = async () => {
     if (!community?.id_comunidade || !user?.sessionId) return;
+
+    if (isMember) {
+      // Simulação de navegação direta para o Centro da Tribo
+      Alert.alert("Sucesso", "Acessando o Centro de Treinamento da Tribo...");
+      return;
+    }
+
     try {
       setIsJoining(true);
-      await joinCommunity(String(community.id_comunidade), user.sessionId);
-      await loadDetails();
-      Alert.alert("Sucesso", "Você agora faz parte desta comunidade!");
-    } catch (error) {
+      const res = await joinCommunity(String(community.id_comunidade), user.sessionId);
+
+      if (res.success || res) {
+        setShowConfetti(true);
+        setIsMember(true);
+        setTotalMembers((prev) => prev + 1);
+
+        // Reset confetti after 5 seconds
+        setTimeout(() => setShowConfetti(false), 5000);
+      }
+    } catch (error: any) {
+      if (error?.response?.status === 409) {
+        setIsMember(true);
+        Alert.alert("Sucesso", "Você já é membro! Redirecionando...");
+        return;
+      }
       console.error("Erro ao entrar:", error);
-      Alert.alert("Erro", "Não foi possível entrar na comunidade.");
+      Alert.alert("Erro", "Não foi possível entrar na comunidade no momento.");
     } finally {
       setIsJoining(false);
     }
@@ -142,12 +167,7 @@ const CommunityDetails = () => {
         {/* Title & Description */}
         <View style={styles.infoSection}>
           <Text style={styles.communityTitle}>
-            {community.nome}{" "}
-            {totalMembers
-              ? `(${totalMembers})`
-              : community.max_participantes
-                ? `(${community.max_participantes}+)`
-                : "(50+)"}
+            {community.nome}
           </Text>
           <Text style={styles.description}>
             {community.descricao ||
@@ -227,18 +247,29 @@ const CommunityDetails = () => {
 
         {/* Join Button */}
         <TouchableOpacity
-          style={styles.joinButton}
+          style={[styles.joinButton, isMember && styles.memberButton]}
           activeOpacity={0.8}
           onPress={handleJoin}
           disabled={isJoining}
         >
           {isJoining ? (
-            <ActivityIndicator color="#fff" />
+            <ActivityIndicator color={isMember ? "#000" : "#fff"} />
           ) : (
-            <Text style={styles.joinButtonText}>Participar</Text>
+            <Text style={[styles.joinButtonText, isMember && styles.memberButtonText]}>
+              {isMember ? "Participando" : "Participar"}
+            </Text>
           )}
         </TouchableOpacity>
       </ScrollView>
+
+      {showConfetti && (
+        <ConfettiCannon
+          count={200}
+          origin={{ x: width / 2, y: -20 }}
+          fadeOut={true}
+          explosionSpeed={350}
+        />
+      )}
     </SafeAreaView>
   );
 };
@@ -405,16 +436,29 @@ const styles = StyleSheet.create({
   joinButton: {
     backgroundColor: "#192126",
     marginHorizontal: 20,
-    height: 56,
-    borderRadius: 16,
+    height: 60,
+    borderRadius: 20,
     alignItems: "center",
     justifyContent: "center",
     marginBottom: 20,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 10,
+    elevation: 5,
+  },
+  memberButton: {
+    backgroundColor: "#BBF246",
   },
   joinButtonText: {
     color: "#fff",
     fontSize: 16,
-    fontWeight: "bold",
+    fontWeight: "900",
+    textTransform: "uppercase",
+    letterSpacing: 1,
+  },
+  memberButtonText: {
+    color: "#000",
   },
   contactSection: {
     paddingHorizontal: 20,
