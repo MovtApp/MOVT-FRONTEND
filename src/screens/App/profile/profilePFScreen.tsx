@@ -8,6 +8,7 @@ import {
   StatusBar,
   StyleSheet,
   Dimensions,
+  Platform,
   Alert,
   ActivityIndicator,
   Modal,
@@ -35,6 +36,7 @@ import SharePostSheet from "@components/SharePostSheet";
 import { useRoute, RouteProp, useNavigation, useIsFocused } from "@react-navigation/native";
 import { AppStackParamList } from "../../../@types/routes";
 import { useProfileCache } from "@/hooks/useChat";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { api } from "@services/api";
 
 const { width } = Dimensions.get("window");
@@ -45,6 +47,7 @@ const ProfilePFScreen = () => {
   const route = useRoute<RouteProp<AppStackParamList, "ProfilePFScreen">>();
   const navigation = useNavigation<any>();
   const isFocused = useIsFocused();
+  const insets = useSafeAreaInsets();
 
   // Normalize user data to handle both AuthContext structure and Search results structure
   const baseUser = route.params?.user || authUser;
@@ -387,7 +390,17 @@ const ProfilePFScreen = () => {
     <View style={styles.container}>
       <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
 
-      <View style={styles.backButtonContainer}>
+      <View
+        style={[
+          styles.backButtonContainer,
+          {
+            top:
+              Platform.OS === "android"
+                ? (StatusBar.currentHeight || 0) + 15
+                : (insets.top || 20) + 10,
+          },
+        ]}
+      >
         <BackButton />
       </View>
 

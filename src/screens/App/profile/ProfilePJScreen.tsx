@@ -10,13 +10,13 @@ import {
   Platform,
   ActivityIndicator,
 } from "react-native";
+import { LinearGradient } from "expo-linear-gradient";
 import { Calendar, MapPin, Award, Dumbbell, BadgeCheck } from "lucide-react-native";
 import { RouteProp, useRoute, useNavigation } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { AppStackParamList } from "../../../@types/routes";
 import BackButton from "../../../components/BackButton";
-import NotificationModal from "../../../components/NotificationModal";
 import { API_BASE_URL } from "../../../config/api";
 import { useAuth } from "../../../contexts/AuthContext";
 
@@ -79,9 +79,6 @@ const ProfilePJScreen = () => {
     fetchTrainerDetails();
   }, [fetchTrainerDetails]);
 
-  const showNotifications = true;
-  const notificationSheetHeight = "90%";
-
   // Use trainerData if available, fallback to route.params or defaults
   const trainerName = trainerData?.name || trainer?.name;
   const trainerImageUrl = trainerData?.avatar_url || trainer?.imageUrl;
@@ -136,122 +133,111 @@ const ProfilePJScreen = () => {
           contentContainerStyle={{ flexGrow: 1 }}
           showsVerticalScrollIndicator={false}
         >
-          {/* Imagem como parte do conteúdo do ScrollView */}
-          <View style={styles.imageSection}>
+          {/* PREMIUM HEADER SECTION */}
+          <View style={styles.premiumHeader}>
             <Image
-              source={{ uri: trainerImageUrl || "https://via.placeholder.com/400" }}
-              style={styles.topImage}
+              source={{
+                uri:
+                  trainerData?.banner_url ||
+                  "https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?w=800&h=400&fit=crop",
+              }}
+              style={styles.bannerImage}
               resizeMode="cover"
             />
+            <LinearGradient
+              colors={["transparent", "rgba(25, 33, 38, 0.4)"]}
+              style={styles.bannerOverlay}
+            />
+
+            <View style={styles.avatarWrapper}>
+              <View style={styles.avatarBorder}>
+                <Image
+                  source={{ uri: trainerImageUrl || "https://via.placeholder.com/400" }}
+                  style={styles.avatarImage}
+                />
+              </View>
+              {trainerVerificado && (
+                <View style={styles.verifiedBadge}>
+                  <BadgeCheck size={18} color="#192126" fill="#BBF246" />
+                </View>
+              )}
+            </View>
           </View>
 
-          {/* Card branco com dados - com arredondamento nos 4 cantos */}
-          <View style={styles.profileCardSeparated}>
-            <View style={styles.mainContent}>
-              {/* Nome e descrição */}
-              <View style={styles.textLeft}>
-                <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-                  <Text style={styles.nameText}>{trainerName}</Text>
-                </View>
-                <Text style={styles.titleText}>{trainerDescription}</Text>
+          {/* PROFILE DATA SECTION */}
+          <View style={styles.profileContentArea}>
+            <View style={styles.identitySection}>
+              <Text style={styles.nameText}>{trainerName}</Text>
+              <View style={styles.specialtyBadge}>
+                <Text style={styles.specialtyText}>
+                  {trainerData?.especialidades
+                    ? Array.isArray(trainerData.especialidades)
+                      ? trainerData.especialidades[0]
+                      : trainerData.especialidades.split(",")[0]
+                    : "Personal Trainer"}
+                </Text>
               </View>
+            </View>
 
-              {/* Experiência */}
-              <View style={styles.singleCardSection}>
-                <View style={styles.centerRow}>
-                  <BadgeCheck size={30} color="#BBF246" fill="#192126" />
-                  <Text style={[styles.textBold]}>
-                    {trainerData?.experienceYears || 0} anos de experiência
+            {/* KPI STRIP */}
+            <View style={styles.kpiStrip}>
+              <View style={styles.kpiItem}>
+                <Text style={styles.kpiValue}>{trainerData?.experienceYears || 0}</Text>
+                <Text style={styles.kpiLabel}>Anos Exp.</Text>
+              </View>
+              <View style={styles.kpiDivider} />
+              <View style={styles.kpiItem}>
+                <Text style={styles.kpiValue}>{trainerData?.agendamentosCount || 0}</Text>
+                <Text style={styles.kpiLabel}>Treinos</Text>
+              </View>
+              <View style={styles.kpiDivider} />
+              <View style={styles.kpiItem}>
+                <Text style={styles.kpiValue}>{trainerRating}</Text>
+                <Text style={styles.kpiLabel}>Avaliações</Text>
+              </View>
+            </View>
+
+            <View style={styles.mainBioCard}>
+              <Text style={styles.bioTitle}>Sobre o Profissional</Text>
+              <Text style={styles.bioText}>
+                {trainerDescription || "Nenhuma descrição informada pelo profissional."}
+              </Text>
+            </View>
+
+            {/* REGULAMENTO E FORMAÇÃO */}
+            <View style={styles.cardSection}>
+              <Text style={styles.cardSectionTitle}>Credenciais</Text>
+              <View style={styles.credentialBox}>
+                <View style={styles.credentialRow}>
+                  <Award size={18} color="#BBF246" />
+                  <Text style={styles.credentialText}>CREF: {trainerData?.cref || "Pendente"}</Text>
+                </View>
+                <View style={styles.credentialRow}>
+                  <Award size={18} color="#BBF246" />
+                  <Text style={styles.credentialText}>
+                    {trainerData?.formacao || "Formação em Educação Física"}
                   </Text>
                 </View>
               </View>
-
-              <View style={styles.divider} />
-
-              {/* Regulamento */}
-              <View style={styles.singleCardSection}>
-                <View style={styles.sectionHeader}>
-                  <Text style={styles.sectionTitle}>Regulamento</Text>
-                </View>
-                <View style={styles.credentialsList}>
-                  <View style={styles.credentialItem}>
-                    <BadgeCheck size={20} color="#fff" fill="#192126" />
-                    <Text style={styles.credentialText}>
-                      CREF: {trainerData?.cref || "Pendente"}
-                    </Text>
-                  </View>
-                  <View style={styles.credentialItem}>
-                    <BadgeCheck size={20} color="#fff" fill="#192126" />
-                    <Text style={styles.credentialText}>
-                      {trainerData?.formacao || "Formação em Educação Física"}
-                    </Text>
-                  </View>
-                </View>
-              </View>
-
-              <View style={styles.divider} />
-
-              {/* Informações */}
-              <View style={styles.singleCardSection}>
-                <View style={styles.sectionHeader}>
-                  <Text style={styles.sectionTitle}>Informações</Text>
-                </View>
-                <View style={styles.infoGrid}>
-                  <View style={styles.infoCol}>
-                    <View style={styles.infoRow}>
-                      <Dumbbell size={20} color="#192126" style={{ marginRight: 8 }} />
-                      <Text style={styles.infoText}>
-                        {trainerData?.especialidades
-                          ? Array.isArray(trainerData.especialidades)
-                            ? trainerData.especialidades[0]
-                            : trainerData.especialidades.split(",")[0]
-                          : "Musculação"}
-                      </Text>
-                    </View>
-                    <View style={styles.infoRow}>
-                      <Calendar size={20} color="#192126" style={{ marginRight: 8 }} />
-                      <Text style={styles.infoText}>
-                        {trainerData?.agendamentosCount || 0} treinos
-                      </Text>
-                    </View>
-                  </View>
-                  <View style={styles.infoCol}>
-                    <View style={styles.infoRow}>
-                      <Award size={20} color="#192126" style={{ marginRight: 8 }} />
-                      <Text style={styles.infoText}>{trainerRating} avaliações</Text>
-                    </View>
-                    <View style={styles.infoRow}>
-                      <BadgeCheck size={20} color="#192126" style={{ marginRight: 8 }} />
-                      <Text style={styles.infoText}>
-                        {trainerVerificado ? "Conta verificada" : "Em análise"}
-                      </Text>
-                    </View>
-                  </View>
-                </View>
-              </View>
-
-              <View style={styles.divider} />
-
-              <View style={styles.singleCardSection}>
-                <View style={styles.sectionHeader}>
-                  <Text style={styles.sectionTitle}>Dados para contato</Text>
-                </View>
-                <View style={styles.contactRow}>
-                  <MapPin size={20} color="#192126" style={{ marginRight: 8, marginTop: 4 }} />
-                  <View style={{ flex: 1 }}>
-                    {trainerData?.gym?.nome && (
-                      <Text style={[styles.contactText, { fontWeight: "bold", marginBottom: 2 }]}>
-                        {trainerData.gym.nome}
-                      </Text>
-                    )}
-                    <Text style={styles.contactText}>{trainerAddress}</Text>
-                  </View>
-                </View>
-              </View>
-
-              {/* Espaço extra para garantir que o card vá até o fundo sem mostrar o "fim" */}
-              <View style={{ height: 120 }} />
             </View>
+
+            {/* LOCALIZAÇÃO */}
+            <View style={styles.cardSection}>
+              <Text style={styles.cardSectionTitle}>Onde Atende</Text>
+              <TouchableOpacity style={styles.locationCard}>
+                <View style={styles.locationIconBox}>
+                  <MapPin size={20} color="#192126" />
+                </View>
+                <View style={{ flex: 1 }}>
+                  {trainerData?.gym?.nome && (
+                    <Text style={styles.gymNameText}>{trainerData.gym.nome}</Text>
+                  )}
+                  <Text style={styles.addressText}>{trainerAddress}</Text>
+                </View>
+              </TouchableOpacity>
+            </View>
+
+            <View style={{ height: 140 }} />
           </View>
         </ScrollView>
       )}
@@ -280,14 +266,6 @@ const ProfilePJScreen = () => {
           </View>
         </View>
       )}
-
-      {showNotifications && (
-        <NotificationModal
-          isVisible={isNotificationModalVisible}
-          onClose={toggleNotificationModal}
-          sheetHeight={notificationSheetHeight}
-        />
-      )}
     </View>
   );
 };
@@ -295,209 +273,230 @@ const ProfilePJScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#ffffff",
-    zIndex: 1,
+    backgroundColor: "#fff",
   },
   header: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: 20,
-    paddingBottom: 15,
-    zIndex: 20,
     position: "absolute",
     top: 0,
     left: 0,
     right: 0,
+    zIndex: 100,
+    flexDirection: "row",
+    paddingHorizontal: 20,
     justifyContent: "space-between",
-  },
-  iconButton: {
-    padding: 0,
-    zIndex: 46,
-    width: 46,
-    height: 46,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "#fff",
-    borderRadius: 12,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  badge: {
-    position: "absolute",
-    top: 10,
-    right: 10,
-    backgroundColor: "#EF4444",
-    borderRadius: 10,
-    minWidth: 16,
-    height: 16,
-    alignItems: "center",
-    justifyContent: "center",
-    zIndex: 12,
-  },
-  badgeText: {
-    color: "#FFFFFF",
-    fontSize: 10,
-    fontWeight: "bold",
-  },
-  imageSection: {
-    width: "100%",
-    height: 192,
-    position: "relative",
-  },
-  topImage: {
-    width: "100%",
-    height: 300,
   },
   contentContainer: {
     flex: 1,
   },
-  profileCardSeparated: {
-    backgroundColor: "#ffffff",
-    borderTopLeftRadius: 30,
-    borderTopRightRadius: 30,
-    borderBottomLeftRadius: 0,
-    borderBottomRightRadius: 0,
-    paddingTop: 30,
-    minHeight: height,
-    overflow: "visible",
-    flex: 1,
+  premiumHeader: {
+    height: 240,
+    width: "100%",
+    position: "relative",
+  },
+  bannerImage: {
+    width: "100%",
+    height: 200,
+  },
+  bannerOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    height: 200,
+  },
+  avatarWrapper: {
+    position: "absolute",
+    bottom: 0,
+    left: 20,
+    flexDirection: "row",
+    alignItems: "flex-end",
+  },
+  avatarBorder: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    borderWidth: 4,
+    borderColor: "#fff",
+    backgroundColor: "#fff",
+    overflow: "hidden",
+  },
+  avatarImage: {
+    width: "100%",
+    height: "100%",
+  },
+  verifiedBadge: {
+    position: "absolute",
+    bottom: 4,
+    left: 74,
+    backgroundColor: "#fff",
+    borderRadius: 12,
+    padding: 2,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 10,
-    elevation: 5,
-    marginTop: 0,
-    paddingBottom: 150,
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 4,
   },
-  mainContent: {
-    paddingHorizontal: 16,
-    paddingBottom: 0,
+  profileContentArea: {
+    flex: 1,
+    backgroundColor: "#fff",
+    paddingHorizontal: 20,
+    paddingTop: 15,
   },
-  textLeft: {
-    alignItems: "flex-start",
-    paddingHorizontal: 16,
-    marginTop: 10,
+  identitySection: {
+    marginBottom: 20,
   },
   nameText: {
-    fontSize: 20,
-    fontWeight: "bold",
-    marginBottom: 8,
-  },
-  titleText: {
-    fontSize: 16,
+    fontSize: 26,
+    fontWeight: "900",
     color: "#192126",
   },
-  centerRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "#BBF246",
-    height: 50,
-    width: "100%",
+  specialtyBadge: {
+    alignSelf: "flex-start",
+    backgroundColor: "#F1F5F9",
+    paddingHorizontal: 12,
+    paddingVertical: 6,
     borderRadius: 8,
+    marginTop: 6,
   },
-  textBold: {
-    fontWeight: "bold",
-    fontSize: 16,
-    color: "#192126",
-    textAlign: "center",
-    justifyContent: "center",
-    marginLeft: 10,
+  specialtyText: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#64748B",
+    textTransform: "uppercase",
   },
-  sectionHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginBottom: 16,
-  },
-  sectionTitle: {
-    fontSize: 14,
-    color: "#45525F",
-    fontWeight: "bold",
-  },
-  credentialsList: {
-    gap: 8,
-  },
-  credentialItem: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-  },
-  credentialText: {
-    color: "#192126",
-  },
-  infoGrid: {
+  kpiStrip: {
     flexDirection: "row",
     justifyContent: "space-between",
+    alignItems: "center",
+    backgroundColor: "#192126",
+    borderRadius: 20,
+    paddingVertical: 20,
+    paddingHorizontal: 10,
+    marginBottom: 25,
   },
-  infoCol: {
+  kpiItem: {
     flex: 1,
+    alignItems: "center",
   },
-  infoRow: {
+  kpiValue: {
+    fontSize: 20,
+    fontWeight: "900",
+    color: "#BBF246",
+  },
+  kpiLabel: {
+    fontSize: 11,
+    color: "rgba(255,255,255,0.6)",
+    marginTop: 2,
+    fontWeight: "600",
+  },
+  kpiDivider: {
+    width: 1,
+    height: 30,
+    backgroundColor: "rgba(255,255,255,0.1)",
+  },
+  mainBioCard: {
+    marginBottom: 25,
+  },
+  bioTitle: {
+    fontSize: 16,
+    fontWeight: "800",
+    color: "#192126",
+    marginBottom: 8,
+  },
+  bioText: {
+    fontSize: 14,
+    lineHeight: 22,
+    color: "#475569",
+  },
+  cardSection: {
+    marginBottom: 25,
+  },
+  cardSectionTitle: {
+    fontSize: 14,
+    fontWeight: "900",
+    color: "#94A3B8",
+    textTransform: "uppercase",
+    marginBottom: 12,
+    letterSpacing: 1,
+  },
+  credentialBox: {
+    backgroundColor: "#F8FAFC",
+    borderRadius: 20,
+    padding: 16,
+    gap: 12,
+  },
+  credentialRow: {
     flexDirection: "row",
     alignItems: "center",
-    marginBottom: 12,
+    gap: 10,
   },
-  infoText: {
-    fontWeight: "500",
+  credentialText: {
+    fontSize: 14,
+    fontWeight: "700",
     color: "#192126",
   },
-  contactRow: {
+  locationCard: {
     flexDirection: "row",
-    alignItems: "flex-start",
+    alignItems: "center",
+    backgroundColor: "#fff",
+    borderRadius: 20,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: "#F1F5F9",
+    gap: 15,
   },
-  contactText: {
+  locationIconBox: {
+    width: 44,
+    height: 44,
+    borderRadius: 12,
+    backgroundColor: "#BBF246",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  gymNameText: {
+    fontSize: 15,
+    fontWeight: "800",
     color: "#192126",
+    marginBottom: 2,
+  },
+  addressText: {
+    fontSize: 13,
+    color: "#64748B",
+  },
+  footerContainer: {
+    paddingHorizontal: 20,
+    paddingTop: 16,
+    backgroundColor: "#ffffff",
+    position: "absolute",
+    bottom: 0,
+    left: 0,
+    right: 0,
+    zIndex: 100,
+    borderTopWidth: 1,
+    borderTopColor: "#F1F5F9",
   },
   buttonRow: {
     flexDirection: "row",
     gap: 12,
   },
   outlineButton: {
-    width: 56,
-    height: 56,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: "#192126",
+    width: 60,
+    height: 60,
+    borderRadius: 20,
     backgroundColor: "#192126",
     alignItems: "center",
     justifyContent: "center",
   },
   mainButton: {
     flex: 1,
-    borderRadius: 16,
-    height: 56,
+    borderRadius: 20,
+    height: 60,
     justifyContent: "center",
     alignItems: "center",
-    borderColor: "#192126",
     backgroundColor: "#192126",
   },
   buttonText: {
-    color: "#ffffff",
-    fontWeight: "bold",
+    color: "#FFFFFF",
+    fontWeight: "900",
     fontSize: 16,
-  },
-  singleCardSection: {
-    paddingHorizontal: 16,
-    paddingVertical: 16,
-  },
-  divider: {
-    height: 1,
-    backgroundColor: "#E5E7EB",
-    marginHorizontal: 16,
-  },
-  footerContainer: {
-    paddingHorizontal: 16,
-    paddingTop: 16,
-    backgroundColor: "#ffffff",
-    borderTopWidth: 0,
-    position: "absolute",
-    bottom: 0,
-    left: 0,
-    right: 0,
-    zIndex: 10,
   },
   loadingContainer: {
     flex: 1,
@@ -509,7 +508,7 @@ const styles = StyleSheet.create({
     marginTop: 12,
     fontSize: 16,
     color: "#192126",
-    fontWeight: "500",
+    fontWeight: "600",
   },
 });
 
