@@ -127,13 +127,15 @@ const HeartbeatsScreen: React.FC = () => {
 
       if (success) {
         setConnectionStatus("connected");
-        setConnectionMessage("Monitorando " + (Platform.OS === 'ios' ? 'Apple Watch' : 'Android Watch'));
+        setConnectionMessage(
+          "Monitorando " + (Platform.OS === "ios" ? "Apple Watch" : "Android Watch")
+        );
 
         // Pre-carga
         const bpm = await NativeHealthManager.fetchHeartRate();
         const oxygen = await NativeHealthManager.fetchOxygen();
         const pressure = await NativeHealthManager.fetchPressure();
-        
+
         if (bpm) setHeartRate(bpm);
         if (oxygen) setOxygen(oxygen);
         if (pressure) setPressure(pressure);
@@ -164,16 +166,21 @@ const HeartbeatsScreen: React.FC = () => {
     setConnectionStatus("connecting");
     setConnectionMessage("Autorizando conexão...");
     const success = await NativeHealthManager.authorize();
-    
+
     if (success) {
       setIsAuthorized(true);
       setConnectionStatus("connected");
-      setConnectionMessage("Relógio Conectado via " + (Platform.OS === 'ios' ? 'HealthKit' : 'Health Connect'));
+      setConnectionMessage(
+        "Relógio Conectado via " + (Platform.OS === "ios" ? "HealthKit" : "Health Connect")
+      );
       Alert.alert("Sucesso", "Seu dispositivo foi conectado profissionalmente.");
     } else {
       setConnectionStatus("error");
       setConnectionMessage("Falha ao autorizar");
-      Alert.alert("Erro", "Não foi possível conectar. Verifique as permissões de saúde nativas (Apple Health / Google Health Connect).");
+      Alert.alert(
+        "Erro",
+        "Não foi possível conectar. Verifique as permissões de saúde nativas (Apple Health / Google Health Connect)."
+      );
     }
   };
 

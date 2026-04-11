@@ -75,9 +75,8 @@ const ArchivedPostsScreen = () => {
     );
   };
 
-  const topPadding = Platform.OS === "ios"
-    ? Math.max(insets.top, 10)
-    : insets.top > 0 ? insets.top + 20 : 40;
+  const topPadding =
+    Platform.OS === "ios" ? Math.max(insets.top, 10) : insets.top > 0 ? insets.top + 20 : 40;
 
   const renderPost = ({ item }: { item: any }) => {
     const isUnarchiving = unarchivingId === String(item.id);
@@ -120,9 +119,7 @@ const ArchivedPostsScreen = () => {
         <View style={styles.centered}>
           <PackageOpen size={56} color="#CBD5E1" strokeWidth={1.2} />
           <Text style={styles.emptyTitle}>Nenhuma publicação arquivada</Text>
-          <Text style={styles.emptySubtitle}>
-            Posts que você arquivar aparecerão aqui.
-          </Text>
+          <Text style={styles.emptySubtitle}>Posts que você arquivar aparecerão aqui.</Text>
         </View>
       ) : (
         <FlatList
@@ -133,14 +130,8 @@ const ArchivedPostsScreen = () => {
           columnWrapperStyle={styles.row}
           showsVerticalScrollIndicator={false}
           contentContainerStyle={styles.listContent}
-          ListHeaderComponent={
-            <Text style={styles.hint}>
-              Toque em um post para desarquivá-lo
-            </Text>
-          }
-          ListFooterComponent={
-            <FooterVersion style={styles.footer} />
-          }
+          ListHeaderComponent={<Text style={styles.hint}>Toque em um post para desarquivá-lo</Text>}
+          ListFooterComponent={<FooterVersion style={styles.footer} />}
         />
       )}
     </View>

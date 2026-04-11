@@ -10,7 +10,16 @@ import {
   Image,
   ActivityIndicator,
 } from "react-native";
-import { Search, User, Dumbbell, Utensils, Users, MapPin, ChevronRight, Activity } from "lucide-react-native";
+import {
+  Search,
+  User,
+  Dumbbell,
+  Utensils,
+  Users,
+  MapPin,
+  ChevronRight,
+  Activity,
+} from "lucide-react-native";
 import TrainingSelector from "../../../components/TrainingSelector";
 import PromotionalBanner from "../../../components/PromotionalBanner";
 import PlanCardTraining from "../../../components/PlanCardsTraining";
@@ -275,7 +284,11 @@ const HomeScreen: React.FC = () => {
       id_treino: String(training.id_treino || training.id || ""),
       nome: training.nome || training.title || "Treino",
       descricao: training.descricao || training.description || "Sem descrição disponível",
-      imageurl: training.imageurl || training.imageUrl || training.image_url || "https://res.cloudinary.com/ditlmzgrh/image/upload/v1757229915/image_71_jntmsv.jpg",
+      imageurl:
+        training.imageurl ||
+        training.imageUrl ||
+        training.image_url ||
+        "https://res.cloudinary.com/ditlmzgrh/image/upload/v1757229915/image_71_jntmsv.jpg",
       duracao: training.duracao || training.minutes || training.description || "0 min",
       calorias: training.calorias || training.calories || "0 kcal",
       nivel: training.nivel || training.level || "Iniciante",
@@ -322,24 +335,27 @@ const HomeScreen: React.FC = () => {
                       {result.image ? (
                         <Image source={{ uri: result.image }} style={styles.resultAvatar} />
                       ) : (
-                        <View style={styles.resultIconWrapper}>
-                          {getResultIcon(result.type)}
-                        </View>
+                        <View style={styles.resultIconWrapper}>{getResultIcon(result.type)}</View>
                       )}
-                      
+
                       <View style={{ flex: 1 }}>
                         <Text style={styles.searchResultTitle} numberOfLines={1}>
                           {result.title}
                         </Text>
-                        
-                        <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginTop: 2 }}>
+
+                        <View
+                          style={{
+                            flexDirection: "row",
+                            alignItems: "center",
+                            gap: 6,
+                            marginTop: 2,
+                          }}
+                        >
                           {/* Exibe o ícone do tipo se houver imagem (se não houver, o ícone já está no lugar da imagem) */}
                           {result.image && (
-                            <View style={{ opacity: 0.8 }}>
-                              {getResultIcon(result.type)}
-                            </View>
+                            <View style={{ opacity: 0.8 }}>{getResultIcon(result.type)}</View>
                           )}
-                          
+
                           <Text style={styles.searchResultSubtitle} numberOfLines={1}>
                             {result.subtitle || result.type || "Resultado"}
                           </Text>
@@ -347,33 +363,33 @@ const HomeScreen: React.FC = () => {
                       </View>
 
                       {/* Removemos o badge de texto para 'user', 'trainer', 'personal' e 'community' conforme solicitado */}
-                      {result.type.toLowerCase() !== "user" && 
-                       result.type.toLowerCase() !== "trainer" && 
-                       result.type.toLowerCase() !== "personal" && 
-                       result.type.toLowerCase() !== "community" && 
-                       result.type.toLowerCase() !== "communities" && (
-                        <View
-                          style={{
-                            backgroundColor: getBadgeColor(result.type),
-                            paddingHorizontal: 10,
-                            paddingVertical: 4,
-                            borderRadius: 100,
-                          }}
-                        >
-                          <Text
+                      {result.type.toLowerCase() !== "user" &&
+                        result.type.toLowerCase() !== "trainer" &&
+                        result.type.toLowerCase() !== "personal" &&
+                        result.type.toLowerCase() !== "community" &&
+                        result.type.toLowerCase() !== "communities" && (
+                          <View
                             style={{
-                              fontSize: 9,
-                              fontWeight: "800",
-                              color: getBadgeTextColor(result.type),
-                              textTransform: "uppercase",
-                              letterSpacing: 0.5,
+                              backgroundColor: getBadgeColor(result.type),
+                              paddingHorizontal: 10,
+                              paddingVertical: 4,
+                              borderRadius: 100,
                             }}
                           >
-                            {result.type}
-                          </Text>
-                        </View>
-                      )}
-                      
+                            <Text
+                              style={{
+                                fontSize: 9,
+                                fontWeight: "800",
+                                color: getBadgeTextColor(result.type),
+                                textTransform: "uppercase",
+                                letterSpacing: 0.5,
+                              }}
+                            >
+                              {result.type}
+                            </Text>
+                          </View>
+                        )}
+
                       <ChevronRight size={18} color="#D1D5DB" />
                     </View>
                   </TouchableOpacity>

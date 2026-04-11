@@ -13,7 +13,7 @@ import {
   NativeScrollEvent,
   Animated,
 } from "react-native";
-import { Users } from "lucide-react-native";
+import { Users, Settings } from "lucide-react-native";
 import { useNavigation, useRoute, RouteProp } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 
@@ -23,8 +23,9 @@ import { listCommunities } from "@services/communityService";
 import Communities from "@components/Communities";
 import { FooterVersion } from "@components/FooterVersion";
 import { AppStackParamList, Community } from "../../../@types/routes";
-import CommunityManagementSheet, { CommunityManagementSheetRef } from "../admin/[protected]/components/CommunityManagementSheet";
-import { Settings } from "lucide-react-native";
+import CommunityManagementSheet, {
+  CommunityManagementSheetRef,
+} from "../admin/[protected]/components/CommunityManagementSheet";
 
 const { width } = Dimensions.get("window");
 const ITEM_WIDTH = 270;
@@ -250,8 +251,8 @@ const CommunityScreen: React.FC = () => {
       </ScrollView>
 
       {isAdmin && (
-        <TouchableOpacity 
-          style={styles.adminFab} 
+        <TouchableOpacity
+          style={styles.adminFab}
           onPress={() => adminSheetRef.current?.open()}
           activeOpacity={0.8}
         >
@@ -383,16 +384,16 @@ const styles = StyleSheet.create({
     width: 24,
   },
   adminFab: {
-    position: 'absolute',
+    position: "absolute",
     bottom: 20,
     right: 20,
     width: 60,
     height: 60,
     borderRadius: 30,
-    backgroundColor: '#BBF246',
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: '#000',
+    backgroundColor: "#BBF246",
+    justifyContent: "center",
+    alignItems: "center",
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 5,

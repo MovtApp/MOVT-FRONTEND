@@ -47,37 +47,30 @@ export const useSelfDiets = (onlyMine: boolean = true): UseSelfDietsReturn => {
         params: { mine: onlyMine ? "true" : "false" },
       });
 
-      const mapped: DietFeedItem[] = (response.data.data || []).map(
-        (d: any) => ({
-          _type: "diet" as const,
-          id_dieta: String(d.id_dieta),
-          title: d.title || "Sem título",
-          description: d.description || "",
-          imageUrl: d.imageUrl || "https://via.placeholder.com/600",
-          calories: `${d.calories || 0} kcal`,
-          minutes: `${d.minutes || 0} min`,
-          protein: `${d.protein || 0} g`,
-          fat: `${d.fat || 0} g`,
-          carbs: `${d.carbs || 0} g`,
-          categoria: d.categoria,
-          id_us: d.id_us,
-          authorName: d.nome_autor || user?.username || "Você",
-          authorAvatar:
-            d.avatar_autor_url ||
-            user?.photo ||
-            "https://via.placeholder.com/150",
-          created_at: d.created_at || new Date().toISOString(),
-          likes: d.likes || [],
-          likes_count: parseInt(d.likes_count || 0),
-          comments_count: parseInt(d.comments_count || 0),
-          isLiked: !!d.isLiked,
-        })
-      );
+      const mapped: DietFeedItem[] = (response.data.data || []).map((d: any) => ({
+        _type: "diet" as const,
+        id_dieta: String(d.id_dieta),
+        title: d.title || "Sem título",
+        description: d.description || "",
+        imageUrl: d.imageUrl || "https://via.placeholder.com/600",
+        calories: `${d.calories || 0} kcal`,
+        minutes: `${d.minutes || 0} min`,
+        protein: `${d.protein || 0} g`,
+        fat: `${d.fat || 0} g`,
+        carbs: `${d.carbs || 0} g`,
+        categoria: d.categoria,
+        id_us: d.id_us,
+        authorName: d.nome_autor || user?.username || "Você",
+        authorAvatar: d.avatar_autor_url || user?.photo || "https://via.placeholder.com/150",
+        created_at: d.created_at || new Date().toISOString(),
+        likes: d.likes || [],
+        likes_count: parseInt(d.likes_count || 0),
+        comments_count: parseInt(d.comments_count || 0),
+        isLiked: !!d.isLiked,
+      }));
 
       // De-duplicate by id_dieta
-      const unique = Array.from(
-        new Map(mapped.map((item) => [item.id_dieta, item])).values()
-      );
+      const unique = Array.from(new Map(mapped.map((item) => [item.id_dieta, item])).values());
       setDiets(unique);
     } catch (error) {
       console.error("Erro ao buscar dietas próprias:", error);

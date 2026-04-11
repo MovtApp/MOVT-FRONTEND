@@ -1,12 +1,6 @@
 import React, { useState, useCallback, useMemo } from "react";
 import { useFocusEffect } from "@react-navigation/native";
-import {
-  View,
-  Text,
-  FlatList,
-  RefreshControl,
-  ActivityIndicator,
-} from "react-native";
+import { View, Text, FlatList, RefreshControl, ActivityIndicator } from "react-native";
 import { useAuth } from "../../contexts/AuthContext";
 import { useFeed } from "../../hooks/useFeed";
 import { useSelfDiets, DietFeedItem } from "../../hooks/useSelfDiets";
@@ -18,19 +12,12 @@ import { styles } from "./styles";
 import { FooterVersion } from "../../components/FooterVersion";
 
 // A discriminated union for any item that can appear in the feed
-type FeedItem =
-  | { _type: "post"; data: any }
-  | { _type: "diet"; data: DietFeedItem };
+type FeedItem = { _type: "post"; data: any } | { _type: "diet"; data: DietFeedItem };
 
 const FeedScreen: React.FC = () => {
   const { user } = useAuth();
-  const { posts, isLoading, isRefreshing, hasMore, loadMore, refresh } =
-    useFeed(user?.id);
-  const {
-    diets,
-    isLoading: dietsLoading,
-    refresh: refreshDiets,
-  } = useSelfDiets(false);
+  const { posts, isLoading, isRefreshing, hasMore, loadMore, refresh } = useFeed(user?.id);
+  const { diets, isLoading: dietsLoading, refresh: refreshDiets } = useSelfDiets(false);
 
   const [selectedSharePost, setSelectedSharePost] = useState<any>(null);
   const shareSheetRef = React.useRef<any>(null);
@@ -62,12 +49,8 @@ const FeedScreen: React.FC = () => {
     const merged = [...postItems, ...dietItems];
 
     merged.sort((a, b) => {
-      const dateA = new Date(
-        a._type === "post" ? a.data.created_at : a.data.created_at
-      ).getTime();
-      const dateB = new Date(
-        b._type === "post" ? b.data.created_at : b.data.created_at
-      ).getTime();
+      const dateA = new Date(a._type === "post" ? a.data.created_at : a.data.created_at).getTime();
+      const dateB = new Date(b._type === "post" ? b.data.created_at : b.data.created_at).getTime();
       return dateB - dateA; // newest first
     });
 
@@ -86,20 +69,9 @@ const FeedScreen: React.FC = () => {
 
   const renderItem = ({ item }: { item: FeedItem }) => {
     if (item._type === "diet") {
-      return (
-        <DietCard
-          diet={item.data}
-          onShare={handleOpenShare}
-        />
-      );
+      return <DietCard diet={item.data} onShare={handleOpenShare} />;
     }
-    return (
-      <PostCard
-        post={item.data}
-        key={item.data.post_id}
-        onShare={handleOpenShare}
-      />
-    );
+    return <PostCard post={item.data} key={item.data.post_id} onShare={handleOpenShare} />;
   };
 
   const keyExtractor = (item: FeedItem, index: number) => {

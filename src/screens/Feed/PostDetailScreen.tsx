@@ -22,7 +22,7 @@ const PostDetailScreen = () => {
   const navigation = useNavigation();
   const { postId } = route.params as { postId: string | number };
   const insets = useSafeAreaInsets();
-  
+
   const [post, setPost] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -67,9 +67,19 @@ const PostDetailScreen = () => {
   if (error || !post) {
     return (
       <View style={styles.container}>
-        <View style={[styles.header, { 
-          paddingTop: Platform.OS === "android" ? (insets.top > 0 ? insets.top + 20 : 40) : Math.max(insets.top, 10) 
-        }]}>
+        <View
+          style={[
+            styles.header,
+            {
+              paddingTop:
+                Platform.OS === "android"
+                  ? insets.top > 0
+                    ? insets.top + 20
+                    : 40
+                  : Math.max(insets.top, 10),
+            },
+          ]}
+        >
           <BackButton style={styles.backBtn} />
           <Text style={styles.headerTitle}>Post</Text>
           <View style={{ width: 46 }} />
@@ -87,9 +97,19 @@ const PostDetailScreen = () => {
   return (
     <View style={styles.container}>
       <StatusBar barStyle="dark-content" />
-      <View style={[styles.header, { 
-        paddingTop: Platform.OS === "android" ? (insets.top > 0 ? insets.top + 20 : 40) : Math.max(insets.top, 10) 
-      }]}>
+      <View
+        style={[
+          styles.header,
+          {
+            paddingTop:
+              Platform.OS === "android"
+                ? insets.top > 0
+                  ? insets.top + 20
+                  : 40
+                : Math.max(insets.top, 10),
+          },
+        ]}
+      >
         <BackButton style={styles.backBtn} />
         <Text style={styles.headerTitle}>Publicação</Text>
         <View style={{ width: 46 }} />
@@ -98,7 +118,11 @@ const PostDetailScreen = () => {
       <ScrollView
         showsVerticalScrollIndicator={false}
         refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={COLORS.primary_green} />
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor={COLORS.primary_green}
+          />
         }
       >
         <PostCard post={post} />

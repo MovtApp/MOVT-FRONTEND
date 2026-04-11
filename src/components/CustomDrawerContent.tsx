@@ -1,6 +1,10 @@
 import React, { useState, useEffect } from "react";
 import { View, Text, TouchableOpacity, StyleSheet, Image, Alert, Platform } from "react-native";
-import { DrawerContentScrollView, DrawerContentComponentProps, useDrawerStatus } from "@react-navigation/drawer";
+import {
+  DrawerContentScrollView,
+  DrawerContentComponentProps,
+  useDrawerStatus,
+} from "@react-navigation/drawer";
 import {
   X,
   Home,
@@ -24,7 +28,7 @@ import { userService } from "../services/userService";
 export function CustomDrawerContent(props: DrawerContentComponentProps) {
   const { user, signOut, updateUser } = useAuth();
   const drawerStatus = useDrawerStatus();
-  
+
   const initialAvatar = user?.avatar_url || user?.photo || (user as any)?.image || null;
   const [liveAvatar, setLiveAvatar] = useState<string | null>(initialAvatar);
 
@@ -84,14 +88,18 @@ export function CustomDrawerContent(props: DrawerContentComponentProps) {
 
   const panelItems = [
     { name: "Explorar", icon: Layout, route: "FeedScreen" as keyof AppStackParamList },
-    ...(
-      user?.role?.toLowerCase()?.includes("admin") || 
-      user?.id_us === 15 || 
-      user?.id_us === "15" ||
-      user?.email === "comercial.movtapp@gmail.com"
-        ? [{ name: "Dashboard", icon: ShieldEllipsis, route: "AdminDashboard" as keyof AppStackParamList }] 
-        : []
-    ),
+    ...(user?.role?.toLowerCase()?.includes("admin") ||
+    user?.id_us === 15 ||
+    user?.id_us === "15" ||
+    user?.email === "comercial.movtapp@gmail.com"
+      ? [
+          {
+            name: "Dashboard",
+            icon: ShieldEllipsis,
+            route: "AdminDashboard" as keyof AppStackParamList,
+          },
+        ]
+      : []),
     { name: "Agendamentos", icon: Calendar, route: "Appointments" as keyof AppStackParamList },
     { name: "Comunidades", icon: Users, route: "CommunityScreen" as keyof AppStackParamList },
     { name: "Planos", icon: Users, route: "PlanScreen" as keyof AppStackParamList },
@@ -116,8 +124,6 @@ export function CustomDrawerContent(props: DrawerContentComponentProps) {
     { name: "Sobre", icon: Info, route: "AboutScreen" },
   ];
 
-
-
   return (
     <DrawerContentScrollView {...props} contentContainerStyle={styles.drawerContent}>
       <TouchableOpacity
@@ -127,9 +133,11 @@ export function CustomDrawerContent(props: DrawerContentComponentProps) {
       >
         <Image
           source={
-            liveAvatar 
+            liveAvatar
               ? { uri: liveAvatar }
-              : { uri: "https://images.unsplash.com/photo-1633332755192-727a05c4013d?w=400&h=400&fit=crop" }
+              : {
+                  uri: "https://images.unsplash.com/photo-1633332755192-727a05c4013d?w=400&h=400&fit=crop",
+                }
           }
           style={styles.profileImage}
         />
@@ -166,8 +174,6 @@ export function CustomDrawerContent(props: DrawerContentComponentProps) {
           </TouchableOpacity>
         ))}
       </View>
-
-
 
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Sua conta</Text>

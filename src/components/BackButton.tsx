@@ -20,9 +20,14 @@ const BackButton: React.FC<BackButtonProps> = ({ to, onPress, style, autoTopInse
 
   const dynamicStyle = autoTopInset
     ? {
-        marginTop: Platform.OS === "android"
-          ? (insets.top > 0 ? insets.top + 20 : 40)
-          : (insets.top > 0 ? insets.top : 20)
+        marginTop:
+          Platform.OS === "android"
+            ? insets.top > 0
+              ? insets.top + 20
+              : 40
+            : insets.top > 0
+              ? insets.top
+              : 20,
       }
     : {};
 

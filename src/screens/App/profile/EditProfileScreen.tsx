@@ -23,15 +23,21 @@ const EditProfileScreen = () => {
   const navigation = useNavigation<any>();
   const insets = useSafeAreaInsets();
   const { user: authUser, updateUser } = useAuth();
-  
+
   const [profileData, setProfileData] = useState({
     nome: authUser?.name || "",
     username: authUser?.username || "",
     pronomes: "Pronomes",
     bio: (authUser as any)?.bio || "",
-    photo: authUser?.photo || (authUser as any)?.avatar_url || "https://images.unsplash.com/photo-1633332755192-727a05c4013d?w=400&h=400&fit=crop",
-    banner: (authUser as any)?.banner_url || authUser?.banner || "https://images.unsplash.com/photo-1579546929518-9e396f3cc809",
-    genero: "Masculino"
+    photo:
+      authUser?.photo ||
+      (authUser as any)?.avatar_url ||
+      "https://images.unsplash.com/photo-1633332755192-727a05c4013d?w=400&h=400&fit=crop",
+    banner:
+      (authUser as any)?.banner_url ||
+      authUser?.banner ||
+      "https://images.unsplash.com/photo-1579546929518-9e396f3cc809",
+    genero: "Masculino",
   });
 
   const [loadingUpdate, setLoadingUpdate] = useState(false);
@@ -44,7 +50,7 @@ const EditProfileScreen = () => {
         const res = await userService.getUserProfile(String(id));
         if (res.success) {
           const fetchedUser = res.data;
-          setProfileData(prev => ({
+          setProfileData((prev) => ({
             ...prev,
             nome: fetchedUser.nome || fetchedUser.name || prev.nome,
             username: fetchedUser.username || prev.username,
@@ -62,9 +68,8 @@ const EditProfileScreen = () => {
     }
   }, [authUser]);
 
-  const topPadding = Platform.OS === "ios" 
-    ? Math.max(insets.top, 10) 
-    : insets.top > 0 ? insets.top + 20 : 40;
+  const topPadding =
+    Platform.OS === "ios" ? Math.max(insets.top, 10) : insets.top > 0 ? insets.top + 20 : 40;
 
   const handlePickImage = async () => {
     try {
@@ -80,9 +85,14 @@ const EditProfileScreen = () => {
         const imageUri = result.assets[0].uri;
         const response = await userService.updateAvatar(imageUri);
         if (response.success || response.avatar_url || response.photo) {
-          const newPhoto = response.data?.avatar_url || response.data?.photo || response.avatar_url || response.photo || imageUri;
+          const newPhoto =
+            response.data?.avatar_url ||
+            response.data?.photo ||
+            response.avatar_url ||
+            response.photo ||
+            imageUri;
           updateUser({ photo: newPhoto });
-          setProfileData(prev => ({ ...prev, photo: newPhoto }));
+          setProfileData((prev) => ({ ...prev, photo: newPhoto }));
         }
       }
     } catch (error: any) {
@@ -105,11 +115,16 @@ const EditProfileScreen = () => {
         setLoadingUpdate(true);
         const imageUri = result.assets[0].uri;
         const response = await userService.updateBanner(imageUri);
-        
+
         if (response.success || response.banner || response.banner_url) {
-          const newBanner = response.data?.banner_url || response.data?.banner || response.banner_url || response.banner || imageUri;
+          const newBanner =
+            response.data?.banner_url ||
+            response.data?.banner ||
+            response.banner_url ||
+            response.banner ||
+            imageUri;
           updateUser({ banner: newBanner });
-          setProfileData(prev => ({ ...prev, banner: newBanner }));
+          setProfileData((prev) => ({ ...prev, banner: newBanner }));
         }
       }
     } catch (error: any) {
@@ -138,9 +153,12 @@ const EditProfileScreen = () => {
       </View>
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
-        
         {/* Banner Section */}
-        <TouchableOpacity style={styles.bannerContainer} onPress={handlePickBanner} disabled={loadingUpdate}>
+        <TouchableOpacity
+          style={styles.bannerContainer}
+          onPress={handlePickBanner}
+          disabled={loadingUpdate}
+        >
           <Image source={{ uri: profileData.banner }} style={styles.bannerImage} />
         </TouchableOpacity>
 
@@ -158,13 +176,12 @@ const EditProfileScreen = () => {
 
         {/* Inputs */}
         <View style={styles.inputList}>
-          
           <View style={styles.inputRow}>
             <Text style={styles.inputLabel}>Nome</Text>
             <TextInput
               style={styles.textInput}
               value={profileData.nome}
-              onChangeText={(text) => setProfileData(prev => ({ ...prev, nome: text }))}
+              onChangeText={(text) => setProfileData((prev) => ({ ...prev, nome: text }))}
               onBlur={() => updateField("nome", profileData.nome)}
               placeholder="Seu nome"
               placeholderTextColor="#94A3B8"
@@ -176,7 +193,7 @@ const EditProfileScreen = () => {
             <TextInput
               style={styles.textInput}
               value={profileData.username}
-              onChangeText={(text) => setProfileData(prev => ({ ...prev, username: text }))}
+              onChangeText={(text) => setProfileData((prev) => ({ ...prev, username: text }))}
               onBlur={() => updateField("username", profileData.username)}
               placeholder="Seu nome de usuário"
               placeholderTextColor="#94A3B8"
@@ -189,7 +206,7 @@ const EditProfileScreen = () => {
             <TextInput
               style={[styles.textInput, { height: 60, textAlignVertical: "top", paddingTop: 16 }]}
               value={profileData.bio}
-              onChangeText={(text) => setProfileData(prev => ({ ...prev, bio: text }))}
+              onChangeText={(text) => setProfileData((prev) => ({ ...prev, bio: text }))}
               onBlur={() => updateField("bio", profileData.bio)}
               multiline
               placeholder="Sua bio"
@@ -202,7 +219,11 @@ const EditProfileScreen = () => {
             <Text style={[styles.linkValue, { color: "#94A3B8" }]}>Adicionar links</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.linkRow} onPress={handlePickBanner} disabled={loadingUpdate}>
+          <TouchableOpacity
+            style={styles.linkRow}
+            onPress={handlePickBanner}
+            disabled={loadingUpdate}
+          >
             <Text style={styles.inputLabel}>Banners</Text>
             <View style={styles.rowRight}>
               <Text style={[styles.linkValue, { color: "#94A3B8" }]}>Editar banner</Text>

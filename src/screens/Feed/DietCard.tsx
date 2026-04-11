@@ -15,19 +15,12 @@ import {
   ScrollView,
   Animated,
 } from "react-native";
-import { 
-  Flame, 
-  Clock4, 
-  Beef, 
-  Wheat, 
-  Droplets,
-  Heart,
-} from "lucide-react-native";
+import { Flame, Clock4, Beef, Wheat, Droplets, Heart } from "lucide-react-native";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
-import { 
-  Swipeable, 
+import {
+  Swipeable,
   FlatList as GestureHandlerFlatList,
-  GestureHandlerRootView 
+  GestureHandlerRootView,
 } from "react-native-gesture-handler";
 import {
   BottomSheetModal,
@@ -114,7 +107,12 @@ const DietCommentItem: React.FC<DietCommentItemProps> = ({
   if (!canDelete) return content;
 
   return (
-    <Swipeable renderRightActions={renderRightActions} friction={2} rightThreshold={40} overshootRight={false}>
+    <Swipeable
+      renderRightActions={renderRightActions}
+      friction={2}
+      rightThreshold={40}
+      overshootRight={false}
+    >
       {content}
     </Swipeable>
   );
@@ -136,7 +134,7 @@ const DietCard: React.FC<DietCardProps> = ({ diet, onShare }) => {
   const { user } = useAuth();
   const navigation = useNavigation<any>();
   const currentUserId = user?.id_us || user?.id;
-  
+
   const [isLiked, setIsLiked] = useState(false);
   const [likesCount, setLikesCount] = useState(diet.likes_count || 0);
   const [commentsCount, setCommentsCount] = useState(diet.comments_count || 0);
@@ -186,7 +184,10 @@ const DietCard: React.FC<DietCardProps> = ({ diet, onShare }) => {
     setLoadingComments(true);
     try {
       const response = await api.get(`/dietas/${diet.id_dieta}/comments`);
-      console.log(`[DietCard] Comentários recebidos p/ dieta ${diet.id_dieta}:`, response.data.data?.length || 0);
+      console.log(
+        `[DietCard] Comentários recebidos p/ dieta ${diet.id_dieta}:`,
+        response.data.data?.length || 0
+      );
       if (response.data.success && Array.isArray(response.data.data)) {
         setComments(response.data.data);
       } else {
@@ -199,7 +200,6 @@ const DietCard: React.FC<DietCardProps> = ({ diet, onShare }) => {
       setLoadingComments(false);
     }
   }, [diet.id_dieta]);
-
 
   const handlePress = () => {
     navigation.navigate("DietDetails", {
@@ -315,7 +315,6 @@ const DietCard: React.FC<DietCardProps> = ({ diet, onShare }) => {
     }
   };
 
-
   const handleShareClick = () => {
     if (onShare) {
       onShare({
@@ -341,7 +340,12 @@ const DietCard: React.FC<DietCardProps> = ({ diet, onShare }) => {
             <View style={{ flexDirection: "row", alignItems: "center" }}>
               <Text style={styles.cardUsername}>{diet.authorName}</Text>
               {Number(diet.id_us) === Number(user?.id) && (
-                <MaterialCommunityIcons name="check-decagram" size={14} color={COLORS.primary_green} style={{ marginLeft: 4 }} />
+                <MaterialCommunityIcons
+                  name="check-decagram"
+                  size={14}
+                  color={COLORS.primary_green}
+                  style={{ marginLeft: 4 }}
+                />
               )}
             </View>
             {diet.categoria ? <Text style={styles.cardLocation}>{diet.categoria}</Text> : null}
@@ -351,13 +355,13 @@ const DietCard: React.FC<DietCardProps> = ({ diet, onShare }) => {
 
       {/* ── Hero image (Isolated Touch Area) ───────────────────── */}
       <View style={stylesLocal.mediaWrapper}>
-        <TouchableOpacity 
-          activeOpacity={1} 
+        <TouchableOpacity
+          activeOpacity={1}
           onPress={handleMediaPress}
           style={{ width: "100%", height: "100%" }}
         >
           <Image source={{ uri: diet.imageUrl }} style={stylesLocal.heroImage} resizeMode="cover" />
-          
+
           {/* Coração Central Animado para Double Tap */}
           <Animated.View
             style={[
@@ -383,8 +387,8 @@ const DietCard: React.FC<DietCardProps> = ({ diet, onShare }) => {
       {/* ── Social toolbar (High Priority Layer) ────────────────── */}
       <View style={[styles.actionsBar, { zIndex: 10, position: "relative" }]}>
         <View style={styles.actionsLeft}>
-          <TouchableOpacity 
-            onPress={handleToggleLike} 
+          <TouchableOpacity
+            onPress={handleToggleLike}
             style={styles.actionIcon}
             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
           >
@@ -394,15 +398,15 @@ const DietCard: React.FC<DietCardProps> = ({ diet, onShare }) => {
               color={isLiked ? "#ED4956" : COLORS.grayscale[100]}
             />
           </TouchableOpacity>
-          <TouchableOpacity 
-            onPress={handleOpenComments} 
+          <TouchableOpacity
+            onPress={handleOpenComments}
             style={styles.actionIcon}
             hitSlop={{ top: 10, bottom: 10, left: 10, right: 20 }}
           >
             <Ionicons name="chatbubble-outline" size={24} color={COLORS.grayscale[100]} />
           </TouchableOpacity>
-          <TouchableOpacity 
-            onPress={handleShareClick} 
+          <TouchableOpacity
+            onPress={handleShareClick}
             style={styles.actionIcon}
             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
           >
@@ -414,7 +418,7 @@ const DietCard: React.FC<DietCardProps> = ({ diet, onShare }) => {
       {/* ── Stats Container ────────────────────────────────────── */}
       <View style={[styles.statsContainer, { zIndex: 5 }]}>
         <Text style={styles.likesText}>{likesCount} curtidas</Text>
-        
+
         <View style={stylesLocal.infoPanel}>
           <Text style={stylesLocal.title}>{diet.title}</Text>
           {diet.description ? (
@@ -425,29 +429,44 @@ const DietCard: React.FC<DietCardProps> = ({ diet, onShare }) => {
 
           {/* Macros section */}
           <View style={stylesLocal.macrosRow}>
-            <MacroChip icon={<Flame size={13} color="#F97316" />} label="Cal" value={diet.calories} />
+            <MacroChip
+              icon={<Flame size={13} color="#F97316" />}
+              label="Cal"
+              value={diet.calories}
+            />
             <View style={stylesLocal.macroDivider} />
-            <MacroChip icon={<Clock4 size={13} color="#6B7280" />} label="Tempo" value={diet.minutes} />
+            <MacroChip
+              icon={<Clock4 size={13} color="#6B7280" />}
+              label="Tempo"
+              value={diet.minutes}
+            />
             <View style={stylesLocal.macroDivider} />
-            <MacroChip icon={<Beef size={13} color="#EF4444" />} label="Prot" value={diet.protein} />
+            <MacroChip
+              icon={<Beef size={13} color="#EF4444" />}
+              label="Prot"
+              value={diet.protein}
+            />
             <View style={stylesLocal.macroDivider} />
             <MacroChip icon={<Wheat size={13} color="#EAB308" />} label="Carb" value={diet.carbs} />
             <View style={stylesLocal.macroDivider} />
-            <MacroChip icon={<Droplets size={13} color="#3B82F6" />} label="Gord" value={diet.fat} />
+            <MacroChip
+              icon={<Droplets size={13} color="#3B82F6" />}
+              label="Gord"
+              value={diet.fat}
+            />
           </View>
         </View>
 
         {commentsCount > 0 && (
-          <TouchableOpacity 
+          <TouchableOpacity
             onPress={handleOpenComments}
             hitSlop={{ top: 5, bottom: 5, left: 0, right: 10 }}
           >
             <Text style={styles.viewComments}>Ver todos os {commentsCount} comentários</Text>
           </TouchableOpacity>
         )}
-        
-        <Text style={styles.timestamp}>{getRelativeTime(diet.created_at)}</Text>
 
+        <Text style={styles.timestamp}>{getRelativeTime(diet.created_at)}</Text>
       </View>
 
       {/* ─── Modal de Comentários (Agora usando BottomSheetModal padrão MOVT) ─── */}
@@ -469,7 +488,11 @@ const DietCard: React.FC<DietCardProps> = ({ diet, onShare }) => {
           </View>
 
           {loadingComments ? (
-            <ActivityIndicator size="large" color={COLORS.primary_green} style={{ marginTop: 40, flex: 1 }} />
+            <ActivityIndicator
+              size="large"
+              color={COLORS.primary_green}
+              style={{ marginTop: 40, flex: 1 }}
+            />
           ) : (
             <GestureHandlerFlatList
               data={comments}
@@ -482,12 +505,21 @@ const DietCard: React.FC<DietCardProps> = ({ diet, onShare }) => {
                   onDelete={handleDeleteComment}
                 />
               )}
-              ListEmptyComponent={<Text style={styles.noComments}>Nenhum comentário nesta dieta. Seja o primeiro! 💬</Text>}
+              ListEmptyComponent={
+                <Text style={styles.noComments}>
+                  Nenhum comentário nesta dieta. Seja o primeiro! 💬
+                </Text>
+              }
               style={styles.modalList}
             />
           )}
 
-          <View style={[styles.commentInputContainer, { paddingBottom: Platform.OS === "ios" ? 20 : 10 }]}>
+          <View
+            style={[
+              styles.commentInputContainer,
+              { paddingBottom: Platform.OS === "ios" ? 20 : 10 },
+            ]}
+          >
             <BottomSheetTextInput
               style={styles.commentInput}
               placeholder="Comentar nesta dieta..."
@@ -498,14 +530,18 @@ const DietCard: React.FC<DietCardProps> = ({ diet, onShare }) => {
               returnKeyType="send"
               editable={!isSubmittingComment}
             />
-            <TouchableOpacity onPress={handleSubmitComment} disabled={!modalCommentText.trim() || isSubmittingComment} style={styles.sendButton}>
+            <TouchableOpacity
+              onPress={handleSubmitComment}
+              disabled={!modalCommentText.trim() || isSubmittingComment}
+              style={styles.sendButton}
+            >
               {isSubmittingComment ? (
                 <ActivityIndicator size="small" color={COLORS.primary_green} />
               ) : (
-                <Ionicons 
-                  name="send" 
-                  size={20} 
-                  color={modalCommentText.trim() ? COLORS.primary_green : COLORS.grayscale[30]} 
+                <Ionicons
+                  name="send"
+                  size={20}
+                  color={modalCommentText.trim() ? COLORS.primary_green : COLORS.grayscale[30]}
                 />
               )}
             </TouchableOpacity>

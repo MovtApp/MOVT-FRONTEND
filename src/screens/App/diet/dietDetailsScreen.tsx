@@ -25,11 +25,11 @@ import {
   Wheat,
   Droplets,
 } from "lucide-react-native";
-import BottomSheet, { 
-  BottomSheetModal, 
-  BottomSheetView, 
+import BottomSheet, {
+  BottomSheetModal,
+  BottomSheetView,
   BottomSheetTextInput,
-  BottomSheetBackdrop
+  BottomSheetBackdrop,
 } from "@gorhom/bottom-sheet";
 import { api } from "../../../services/api";
 import { useAuth } from "../../../hooks/useAuth";
@@ -41,7 +41,7 @@ import { COLORS } from "../../../styles/colors";
 const { width } = Dimensions.get("window");
 
 interface DietDetailsScreenProps {
-  route?: { params?: { meal?: any, mealId?: string | number } };
+  route?: { params?: { meal?: any; mealId?: string | number } };
   navigation?: any;
 }
 
@@ -53,7 +53,7 @@ const DietDetailsScreen: React.FC<DietDetailsScreenProps> = ({ route, navigation
   const [likesCount, setLikesCount] = useState(meal.likes_count || 0);
   const [commentsCount, setCommentsCount] = useState(meal.comments_count || 0);
   const [loading, setLoading] = useState(false);
-  
+
   // States for Edit Sheet
   const [isEditSheetOpen, setIsEditSheetOpen] = useState(false);
   const editSheetRef = useRef<BottomSheet>(null);
@@ -122,7 +122,7 @@ const DietDetailsScreen: React.FC<DietDetailsScreenProps> = ({ route, navigation
   const description =
     ((meal?.description ?? meal?.details ?? meal?.desc ?? "") as string)?.toString?.().trim?.() ||
     "";
-    
+
   const planItems = Array.isArray(meal?.planMeals)
     ? meal.planMeals
     : Array.isArray(meal?.plan)
@@ -173,17 +173,13 @@ const DietDetailsScreen: React.FC<DietDetailsScreenProps> = ({ route, navigation
 
   const handleMorePress = () => {
     const isOwner = Number(meal.id_us) === Number(user?.id);
-    
+
     if (isOwner) {
-      Alert.alert(
-        "Opções da Dieta",
-        "O que você deseja fazer?",
-        [
-          { text: "Editar Dieta", onPress: () => handleOpenEdit() },
-          { text: "Excluir Dieta", onPress: handleDelete, style: "destructive" },
-          { text: "Cancelar", style: "cancel" },
-        ]
-      );
+      Alert.alert("Opções da Dieta", "O que você deseja fazer?", [
+        { text: "Editar Dieta", onPress: () => handleOpenEdit() },
+        { text: "Excluir Dieta", onPress: handleDelete, style: "destructive" },
+        { text: "Cancelar", style: "cancel" },
+      ]);
     } else {
       Alert.alert("Opções", "Deseja denunciar esta publicação?", [
         { text: "Denunciar", onPress: () => Alert.alert("Sucesso", "Denúncia enviada.") },
@@ -205,25 +201,21 @@ const DietDetailsScreen: React.FC<DietDetailsScreenProps> = ({ route, navigation
   };
 
   const handleDelete = () => {
-    Alert.alert(
-      "Confirmar exclusão",
-      "Tem certeza que deseja apagar esta dieta?",
-      [
-        { text: "Não", style: "cancel" },
-        { 
-          text: "Sim, excluir", 
-          style: "destructive", 
-          onPress: async () => {
-            try {
-              await api.delete(`/dietas/${meal.id_dieta || meal.id}`);
-              navigation.goBack();
-            } catch (err) {
-              Alert.alert("Erro", "Não foi possível excluir a dieta.");
-            }
+    Alert.alert("Confirmar exclusão", "Tem certeza que deseja apagar esta dieta?", [
+      { text: "Não", style: "cancel" },
+      {
+        text: "Sim, excluir",
+        style: "destructive",
+        onPress: async () => {
+          try {
+            await api.delete(`/dietas/${meal.id_dieta || meal.id}`);
+            navigation.goBack();
+          } catch (err) {
+            Alert.alert("Erro", "Não foi possível excluir a dieta.");
           }
         },
-      ]
-    );
+      },
+    ]);
   };
 
   const handleUpdateSuccess = async () => {
@@ -253,7 +245,7 @@ const DietDetailsScreen: React.FC<DietDetailsScreenProps> = ({ route, navigation
           ) : (
             <View style={[styles.heroImage, { backgroundColor: "#F1F5F9" }]} />
           )}
-          
+
           {/* Back Button Component */}
           <BackButton style={styles.backBtn} />
 
@@ -276,28 +268,39 @@ const DietDetailsScreen: React.FC<DietDetailsScreenProps> = ({ route, navigation
 
         {/* --- Main Content --- */}
         <View style={styles.content}>
-          
           {/* Interaction Bar */}
           <View style={styles.interactionBar}>
             <View style={styles.interactionItem}>
-              <TouchableOpacity onPress={handleToggleLike} activeOpacity={0.7} style={styles.socialIcon}>
-                <Heart 
-                  size={24} 
-                  color={isLiked ? "#EF4444" : "#64748B"} 
-                  fill={isLiked ? "#EF4444" : "transparent"} 
+              <TouchableOpacity
+                onPress={handleToggleLike}
+                activeOpacity={0.7}
+                style={styles.socialIcon}
+              >
+                <Heart
+                  size={24}
+                  color={isLiked ? "#EF4444" : "#64748B"}
+                  fill={isLiked ? "#EF4444" : "transparent"}
                 />
               </TouchableOpacity>
               <Text style={styles.interactionCount}>{likesCount}</Text>
             </View>
 
             <View style={styles.interactionItem}>
-              <TouchableOpacity onPress={handleComment} activeOpacity={0.7} style={styles.socialIcon}>
+              <TouchableOpacity
+                onPress={handleComment}
+                activeOpacity={0.7}
+                style={styles.socialIcon}
+              >
                 <MessageCircle size={24} color="#64748B" />
               </TouchableOpacity>
               <Text style={styles.interactionCount}>{commentsCount}</Text>
             </View>
 
-            <TouchableOpacity onPress={handleOpenShare} activeOpacity={0.7} style={styles.socialIcon}>
+            <TouchableOpacity
+              onPress={handleOpenShare}
+              activeOpacity={0.7}
+              style={styles.socialIcon}
+            >
               <Send size={24} color="#64748B" />
             </TouchableOpacity>
 
@@ -375,9 +378,14 @@ const DietDetailsScreen: React.FC<DietDetailsScreenProps> = ({ route, navigation
                       }
                     }}
                   >
-                    <Image source={{ uri: item.imageUrl || meal.imageUrl }} style={styles.planImage} />
+                    <Image
+                      source={{ uri: item.imageUrl || meal.imageUrl }}
+                      style={styles.planImage}
+                    />
                     <View style={styles.planInfo}>
-                      <Text style={styles.planTitle} numberOfLines={1}>{item.title}</Text>
+                      <Text style={styles.planTitle} numberOfLines={1}>
+                        {item.title}
+                      </Text>
                       <View style={styles.planStats}>
                         <Text style={styles.planStatText}>{item.calories || "—"} kcal</Text>
                         <View style={styles.dot} />
@@ -452,7 +460,9 @@ const DietDetailsScreen: React.FC<DietDetailsScreenProps> = ({ route, navigation
               </View>
             )}
             ListEmptyComponent={() => (
-              <View style={{ flex: 1, justifyContent: "center", alignItems: "center", paddingTop: 40 }}>
+              <View
+                style={{ flex: 1, justifyContent: "center", alignItems: "center", paddingTop: 40 }}
+              >
                 {loadingComments ? (
                   <ActivityIndicator color={COLORS.primary_green} />
                 ) : (
@@ -462,7 +472,9 @@ const DietDetailsScreen: React.FC<DietDetailsScreenProps> = ({ route, navigation
             )}
           />
 
-          <View style={[styles.commentInputContainer, { paddingBottom: isKeyboardVisible ? 10 : 20 }]}>
+          <View
+            style={[styles.commentInputContainer, { paddingBottom: isKeyboardVisible ? 10 : 20 }]}
+          >
             <Image
               source={{ uri: user?.photo || "https://via.placeholder.com/150" }}
               style={styles.inputAvatar}

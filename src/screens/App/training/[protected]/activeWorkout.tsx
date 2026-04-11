@@ -13,16 +13,16 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRoute, useNavigation, RouteProp } from "@react-navigation/native";
-import { 
-  Play, 
-  Pause, 
-  RotateCcw, 
-  ChevronRight, 
-  ChevronLeft, 
+import {
+  Play,
+  Pause,
+  RotateCcw,
+  ChevronRight,
+  ChevronLeft,
   CheckCircle2,
   X,
   Clock,
-  Dumbbell
+  Dumbbell,
 } from "lucide-react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { AppStackParamList, Exercise } from "../../../../@types/routes";
@@ -47,16 +47,18 @@ const ActiveWorkout: React.FC = () => {
     if (t.exercicios && t.exercicios.length > 0) {
       return t.exercicios;
     }
-    
+
     // Cria um exercício virtual baseado nos dados do treino
-    return [{
-      id: String(t.id_treino || t.id || "virtual-1"),
-      nome: t.nome || t.title || "Exercício Principal",
-      series: t.series || (t.sets ? parseInt(t.sets) : 3),
-      repeticoes: t.repeticoes || (t.reps ? parseInt(t.reps) : 12),
-      descanso: t.descanso || "45s",
-      imageUrl: t.imageurl || t.imageUrl || t.image_url
-    }];
+    return [
+      {
+        id: String(t.id_treino || t.id || "virtual-1"),
+        nome: t.nome || t.title || "Exercício Principal",
+        series: t.series || (t.sets ? parseInt(t.sets) : 3),
+        repeticoes: t.repeticoes || (t.reps ? parseInt(t.reps) : 12),
+        descanso: t.descanso || "45s",
+        imageUrl: t.imageurl || t.imageUrl || t.image_url,
+      },
+    ];
   }, [t]);
 
   const currentExercise = exercises[currentExerciseIndex];
@@ -109,14 +111,10 @@ const ActiveWorkout: React.FC = () => {
   };
 
   const handleQuit = () => {
-    Alert.alert(
-      "Sair do Treino",
-      "Tem certeza que deseja interromper seu progresso?",
-      [
-        { text: "Continuar", style: "cancel" },
-        { text: "Sair", style: "destructive", onPress: () => navigation.goBack() }
-      ]
-    );
+    Alert.alert("Sair do Treino", "Tem certeza que deseja interromper seu progresso?", [
+      { text: "Continuar", style: "cancel" },
+      { text: "Sair", style: "destructive", onPress: () => navigation.goBack() },
+    ]);
   };
 
   if (exercises.length === 0) {
@@ -132,18 +130,18 @@ const ActiveWorkout: React.FC = () => {
     );
   }
 
-  const progress = ((completedExercises.length) / exercises.length) * 100;
+  const progress = (completedExercises.length / exercises.length) * 100;
 
   return (
     <SafeAreaView style={styles.container} edges={["top"]}>
       <StatusBar barStyle="light-content" />
-      
+
       {/* Header com Progresso */}
       <View style={styles.header}>
         <TouchableOpacity onPress={handleQuit} style={styles.closeButton}>
           <X size={24} color="#fff" />
         </TouchableOpacity>
-        
+
         <View style={styles.headerInfo}>
           <Text style={styles.trainingTitle}>{training.nome}</Text>
           <View style={styles.progressBarBg}>
@@ -160,8 +158,8 @@ const ActiveWorkout: React.FC = () => {
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
         {/* Card do Exercício Atual */}
         <View style={styles.exerciseCard}>
-          <Image 
-            source={{ uri: currentExercise.imageUrl || training.imageurl }} 
+          <Image
+            source={{ uri: currentExercise.imageUrl || training.imageurl }}
             style={styles.exerciseImage}
             resizeMode="cover"
           />
@@ -169,7 +167,7 @@ const ActiveWorkout: React.FC = () => {
             colors={["transparent", "rgba(25, 33, 38, 0.8)"]}
             style={styles.imageOverlay}
           />
-          
+
           <View style={styles.exerciseInfo}>
             <Text style={styles.exerciseName}>{currentExercise.nome}</Text>
             <View style={styles.statsRow}>
@@ -189,8 +187,8 @@ const ActiveWorkout: React.FC = () => {
         <View style={styles.instructionsContainer}>
           <Text style={styles.sectionTitle}>Como executar:</Text>
           <Text style={styles.instructionText}>
-            Mantenha a postura correta e respire fundo durante cada repetição. 
-            O tempo de descanso sugerido é de {currentExercise.descanso}.
+            Mantenha a postura correta e respire fundo durante cada repetição. O tempo de descanso
+            sugerido é de {currentExercise.descanso}.
           </Text>
         </View>
 
@@ -198,18 +196,27 @@ const ActiveWorkout: React.FC = () => {
         <View style={styles.listContainer}>
           <Text style={styles.sectionTitle}>Fila de exercícios ({exercises.length})</Text>
           {exercises.map((ex, idx) => (
-            <View 
-              key={ex.id} 
+            <View
+              key={ex.id}
               style={[
                 styles.listItem,
                 idx === currentExerciseIndex && styles.listItemActive,
-                completedExercises.includes(ex.id) && styles.listItemCompleted
+                completedExercises.includes(ex.id) && styles.listItemCompleted,
               ]}
             >
-              <Text style={[styles.listIndex, (idx === currentExerciseIndex || completedExercises.includes(ex.id)) && {color: '#BBF246'}]}>
+              <Text
+                style={[
+                  styles.listIndex,
+                  (idx === currentExerciseIndex || completedExercises.includes(ex.id)) && {
+                    color: "#BBF246",
+                  },
+                ]}
+              >
                 {idx + 1 < 10 ? `0${idx + 1}` : idx + 1}
               </Text>
-              <Text style={[styles.listName, idx === currentExerciseIndex && styles.listNameActive]}>
+              <Text
+                style={[styles.listName, idx === currentExerciseIndex && styles.listNameActive]}
+              >
                 {ex.nome}
               </Text>
               {completedExercises.includes(ex.id) && <CheckCircle2 size={18} color="#BBF246" />}
@@ -224,19 +231,20 @@ const ActiveWorkout: React.FC = () => {
       {/* Controles Fixos no Rodapé */}
       <View style={styles.footer}>
         <View style={styles.controlsRow}>
-          <TouchableOpacity 
-            onPress={handlePrevious} 
+          <TouchableOpacity
+            onPress={handlePrevious}
             disabled={currentExerciseIndex === 0}
             style={[styles.smallButton, currentExerciseIndex === 0 && { opacity: 0.3 }]}
           >
             <ChevronLeft size={28} color="#fff" />
           </TouchableOpacity>
 
-          <TouchableOpacity 
-            onPress={() => setIsActive(!isActive)} 
-            style={styles.mainControlButton}
-          >
-            {isActive ? <Pause size={32} color="#192126" fill="#192126" /> : <Play size={32} color="#192126" fill="#192126" />}
+          <TouchableOpacity onPress={() => setIsActive(!isActive)} style={styles.mainControlButton}>
+            {isActive ? (
+              <Pause size={32} color="#192126" fill="#192126" />
+            ) : (
+              <Play size={32} color="#192126" fill="#192126" />
+            )}
           </TouchableOpacity>
 
           <TouchableOpacity onPress={handleNext} style={styles.smallButton}>
@@ -244,10 +252,7 @@ const ActiveWorkout: React.FC = () => {
           </TouchableOpacity>
         </View>
 
-        <TouchableOpacity 
-          style={styles.finishWorkoutButton}
-          onPress={handleFinish}
-        >
+        <TouchableOpacity style={styles.finishWorkoutButton} onPress={handleFinish}>
           <Text style={styles.finishWorkoutText}>CONCLUIR TREINO</Text>
         </TouchableOpacity>
       </View>
@@ -311,7 +316,7 @@ const styles = StyleSheet.create({
     color: "#BBF246",
     fontWeight: "bold",
     fontSize: 14,
-    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
+    fontFamily: Platform.OS === "ios" ? "Courier" : "monospace",
   },
   scrollContent: {
     paddingBottom: 200,
@@ -436,7 +441,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#192126",
     paddingHorizontal: 20,
     paddingTop: 20,
-    paddingBottom: Platform.OS === 'ios' ? 40 : 25,
+    paddingBottom: Platform.OS === "ios" ? 40 : 25,
     borderTopWidth: 1,
     borderTopColor: "rgba(255,255,255,0.1)",
   },
@@ -505,7 +510,7 @@ const styles = StyleSheet.create({
   backButtonText: {
     color: "#192126",
     fontWeight: "bold",
-  }
+  },
 });
 
 export default ActiveWorkout;

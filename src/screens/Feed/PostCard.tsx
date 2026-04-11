@@ -145,7 +145,7 @@ const PostCard: React.FC<PostCardProps> = ({ post, onShare }) => {
   const [comments, setComments] = useState<any[]>([]);
   const [loadingComments, setLoadingComments] = useState(false);
   const [isKeyboardVisible, setKeyboardVisible] = useState(false);
-  
+
   // Refs para detecção de toques (Double Tap)
   const lastTapRef = useRef(0);
   const doubleTapDebounceRef = useRef<NodeJS.Timeout | null>(null);
@@ -156,7 +156,7 @@ const PostCard: React.FC<PostCardProps> = ({ post, onShare }) => {
   const [editCaption, setEditCaption] = useState(post.caption || "");
   const [isUpdatingPost, setIsUpdatingPost] = useState(false);
   const [isDeleted, setIsDeleted] = useState(false); // Para remoção otimista do feed
-  
+
   const [heartAnim] = useState(new Animated.Value(0));
 
   // 🔑 Ref que conecta o FlatList ao Swipeable via NativeViewGestureHandler

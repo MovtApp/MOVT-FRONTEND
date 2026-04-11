@@ -107,10 +107,7 @@ const ExerciseCard: React.FC<{
               </View>
 
               {/* Botão play */}
-              <TouchableOpacity 
-                style={styles.playButton}
-                onPress={() => onPress?.(exercise)}
-              >
+              <TouchableOpacity style={styles.playButton} onPress={() => onPress?.(exercise)}>
                 <Play size={13} fill="#192126" color="#192126" />
               </TouchableOpacity>
             </View>

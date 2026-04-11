@@ -9,9 +9,7 @@ interface HorariosFuncionamento {
 
 export const getGymStatus = (horarios?: HorariosFuncionamento, ativo: boolean = true) => {
   if (!horarios || Object.keys(horarios).length === 0) {
-    return ativo 
-      ? { isOpen: true, label: "Disponível" } 
-      : { isOpen: false, label: "Inativo" };
+    return ativo ? { isOpen: true, label: "Disponível" } : { isOpen: false, label: "Inativo" };
   }
 
   const daysMap = ["domingo", "segunda", "terca", "quarta", "quinta", "sexta", "sabado"];

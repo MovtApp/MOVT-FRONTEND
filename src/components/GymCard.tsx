@@ -24,9 +24,32 @@ export const GymCard: React.FC<GymCardProps> = ({ gym, onDetailsPress }) => {
       </View>
 
       <View style={styles.statusRow}>
-        <View style={[styles.statusBadge, { backgroundColor: getGymStatus(gym.horarios_funcionamento, gym.ativo).isOpen ? "#DCFCE7" : "#FEE2E2" }]}>
-          <Clock size={12} color={getGymStatus(gym.horarios_funcionamento, gym.ativo).isOpen ? "#166534" : "#991B1B"} />
-          <Text style={[styles.statusText, { color: getGymStatus(gym.horarios_funcionamento, gym.ativo).isOpen ? "#166534" : "#991B1B" }]}>
+        <View
+          style={[
+            styles.statusBadge,
+            {
+              backgroundColor: getGymStatus(gym.horarios_funcionamento, gym.ativo).isOpen
+                ? "#DCFCE7"
+                : "#FEE2E2",
+            },
+          ]}
+        >
+          <Clock
+            size={12}
+            color={
+              getGymStatus(gym.horarios_funcionamento, gym.ativo).isOpen ? "#166534" : "#991B1B"
+            }
+          />
+          <Text
+            style={[
+              styles.statusText,
+              {
+                color: getGymStatus(gym.horarios_funcionamento, gym.ativo).isOpen
+                  ? "#166534"
+                  : "#991B1B",
+              },
+            ]}
+          >
             {getGymStatus(gym.horarios_funcionamento, gym.ativo).label}
           </Text>
         </View>

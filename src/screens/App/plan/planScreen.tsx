@@ -22,7 +22,9 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 
 import Constants from "expo-constants";
 import { useAuth } from "../../../contexts/AuthContext";
-import StripePlansSheet, { StripePlansSheetRef } from "../admin/[protected]/components/StripePlansSheet";
+import StripePlansSheet, {
+  StripePlansSheetRef,
+} from "../admin/[protected]/components/StripePlansSheet";
 import { Settings } from "lucide-react-native";
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL || "http://10.0.2.2:3000";
@@ -316,8 +318,8 @@ const PlanScreen: React.FC = () => {
       </ScrollView>
 
       {isAdmin && (
-        <TouchableOpacity 
-          style={styles.adminFab} 
+        <TouchableOpacity
+          style={styles.adminFab}
           onPress={() => adminSheetRef.current?.open()}
           activeOpacity={0.8}
         >
@@ -325,9 +327,7 @@ const PlanScreen: React.FC = () => {
         </TouchableOpacity>
       )}
 
-      {isAdmin && (
-        <StripePlansSheet ref={adminSheetRef} />
-      )}
+      {isAdmin && <StripePlansSheet ref={adminSheetRef} />}
     </View>
   );
 };
@@ -565,16 +565,16 @@ const styles = StyleSheet.create({
     fontFamily: "Rubik_400Regular",
   },
   adminFab: {
-    position: 'absolute',
+    position: "absolute",
     bottom: 20,
     right: 20,
     width: 60,
     height: 60,
     borderRadius: 30,
-    backgroundColor: '#BBF246',
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: '#000',
+    backgroundColor: "#BBF246",
+    justifyContent: "center",
+    alignItems: "center",
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 5,

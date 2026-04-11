@@ -29,21 +29,25 @@ api.interceptors.response.use(
     return response;
   },
   (error) => {
-    const isInactiveError = error.response?.status === 403 && 
-      (error.response?.data?.error === "Conta inativa" || error.response?.data?.error === "USER_INACTIVE");
+    const isInactiveError =
+      error.response?.status === 403 &&
+      (error.response?.data?.error === "Conta inativa" ||
+        error.response?.data?.error === "USER_INACTIVE");
 
     // Silencia os logs no console/expo se for apenas um erro de conta inativa (evita RedBox no dev)
     if (!isInactiveError) {
       console.error("❌ Erro na resposta:", error.response?.status, error.config?.url);
       console.error("❌ Dados do erro:", error.response?.data);
     }
-    
+
     if (isInactiveError) {
       const { DeviceEventEmitter } = require("react-native");
-      const message = error.response?.data?.message || "Sua conta foi desativada pelo administrador. Entre em contato com o suporte.";
+      const message =
+        error.response?.data?.message ||
+        "Sua conta foi desativada pelo administrador. Entre em contato com o suporte.";
       DeviceEventEmitter.emit("force_logout_inactive", { message });
     }
-    
+
     return Promise.reject(error);
   }
 );

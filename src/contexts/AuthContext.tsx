@@ -14,7 +14,7 @@ interface User {
   supabaseUserId?: string | null;
   photo?: string | null;
   avatar_url?: string | null; // Adicionado para compatibilidade
-  image?: string | null;      // Adicionado para compatibilidade
+  image?: string | null; // Adicionado para compatibilidade
   banner?: string | null;
   documentId?: string | null;
   documentType?: "CPF" | "CNPJ" | null;
@@ -53,7 +53,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               const refreshedUser = {
                 ...parsedUserDetails,
                 ...response.data.user,
-                photo: response.data.user.avatar_url || response.data.user.photo || parsedUserDetails.photo,
+                photo:
+                  response.data.user.avatar_url ||
+                  response.data.user.photo ||
+                  parsedUserDetails.photo,
                 supabaseUserId: response.data.user.supabase_uid || parsedUserDetails.supabaseUserId,
                 sessionId: storedSessionId,
               };
@@ -103,7 +106,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       signOut();
       Alert.alert(
         "Conta Inativa",
-        data?.message || "Sua conta foi desativada pelo administrador. Entre em contato com o suporte."
+        data?.message ||
+          "Sua conta foi desativada pelo administrador. Entre em contato com o suporte."
       );
     });
 

@@ -242,5 +242,7 @@ export const pollHealthConnectHeartRate = (
   };
 
   poll();
-  return () => { isRunning = false; };
+  return () => {
+    isRunning = false;
+  };
 };

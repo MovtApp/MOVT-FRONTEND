@@ -23,27 +23,31 @@ export const userService = {
 
   updateAvatar: async (imageUri: string) => {
     const headers = await getAuthHeaders();
-    
+
     try {
       // 1. Ler o arquivo como base64 (Método ultra-estável no Expo)
       const base64 = await FileSystem.readAsStringAsync(imageUri, {
         encoding: "base64",
       });
-      
+
       const filename = imageUri.split("/").pop();
       const match = /\.(\w+)$/.exec(filename || "");
       const mimetype = match ? `image/${match[1]}` : `image/jpeg`;
 
       // 2. Enviar para o Back-end via JSON (Zero erros de Multipart ou RLS)
-      const response = await api.put("/user/avatar-base64", {
-        base64,
-        mimetype,
-      }, headers);
+      const response = await api.put(
+        "/user/avatar-base64",
+        {
+          base64,
+          mimetype,
+        },
+        headers
+      );
 
       return {
         success: true,
         photo: response.data.data?.photo,
-        ...response.data
+        ...response.data,
       };
     } catch (error) {
       console.error("Erro no Upload Pro (Base64 Bridge):", error);
@@ -53,27 +57,31 @@ export const userService = {
 
   updateBanner: async (imageUri: string) => {
     const headers = await getAuthHeaders();
-    
+
     try {
       // 1. Ler o arquivo
       const base64 = await FileSystem.readAsStringAsync(imageUri, {
         encoding: "base64",
       });
-      
+
       const filename = imageUri.split("/").pop();
       const match = /\.(\w+)$/.exec(filename || "");
       const mimetype = match ? `image/${match[1]}` : `image/jpeg`;
 
       // 2. Enviar para o Back-end
-      const response = await api.put("/user/banner-base64", {
-        base64,
-        mimetype,
-      }, headers);
+      const response = await api.put(
+        "/user/banner-base64",
+        {
+          base64,
+          mimetype,
+        },
+        headers
+      );
 
       return {
         success: true,
         banner: response.data.data?.banner,
-        ...response.data
+        ...response.data,
       };
     } catch (error) {
       console.error("Erro no Upload do Banner (Base64 Bridge):", error);

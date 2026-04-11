@@ -85,8 +85,7 @@ const getDeepRouteName = (
 
 const BottomNavigationBar = () => {
   const insets = useSafeAreaInsets();
-  const navigation =
-    useNavigation<NativeStackNavigationProp<AppStackParamList>>();
+  const navigation = useNavigation<NativeStackNavigationProp<AppStackParamList>>();
   const [activeTab, setActiveTab] = useState<keyof AppStackParamList>("HomeScreen");
   const currentScreen = useNavigationState((state) => getDeepRouteName(state) ?? null);
   const { isVisible: isVisibleFromContext } = useBottomNav();

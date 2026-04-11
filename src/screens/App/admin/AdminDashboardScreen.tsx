@@ -15,7 +15,11 @@ import {
   Linking,
 } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
-import BottomSheet, { BottomSheetView, BottomSheetBackdrop, BottomSheetFlatList } from "@gorhom/bottom-sheet";
+import BottomSheet, {
+  BottomSheetView,
+  BottomSheetBackdrop,
+  BottomSheetFlatList,
+} from "@gorhom/bottom-sheet";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
 import { useNavigation } from "@react-navigation/native";
@@ -70,6 +74,7 @@ import { LinearGradient as SkiaGradient, vec, Circle } from "@shopify/react-nati
 import BackButton from "../../../components/BackButton";
 import { api } from "../../../services/api";
 import * as ImagePicker from "expo-image-picker";
+import DecisionBI from "./components/DecisionBI";
 
 const PolarChartAny = PolarChart as any;
 
@@ -147,6 +152,12 @@ interface DashboardData {
     user_name: string;
     user_avatar: string;
   }[];
+  planDistribution?: { label: string; count: number; color: string }[];
+  churn?: { rate: string; status: string; count: number };
+  ltv?: { value: number; arpu: number };
+  churnBreakdown?: { label: string; value: string }[];
+  ltvBreakdown?: { plan: string; val: number }[];
+  topUnits?: { name: string; members: number; rev: number; grow: string }[];
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -189,20 +200,28 @@ const AdminDashboardScreen: React.FC = () => {
   const activePlansSheetRef = React.useRef<BottomSheet>(null);
   const userDetailSheetRef = React.useRef<BottomSheet>(null);
 
+  // Novos Refs para BI Estratégico
+  const churnDetailSheetRef = React.useRef<BottomSheet>(null);
+  const ltvDetailSheetRef = React.useRef<BottomSheet>(null);
+  const revenueMixSheetRef = React.useRef<BottomSheet>(null);
+  const unitAuditSheetRef = React.useRef<BottomSheet>(null);
+
   const [selectedUserDetail, setSelectedUserDetail] = useState<any>(null);
   const [selectedClient, setSelectedClient] = useState<PersonalClient | null>(null);
   const [clientHistory, setClientHistory] = useState<any[]>([]);
   const [adminUsers, setAdminUsers] = useState<any[]>([]);
   const [userSearchQuery, setUserSearchQuery] = useState("");
   const [userStatusFilter, setUserStatusFilter] = useState<"all" | "active" | "blocked">("all");
-  const [userRoleFilter, setUserRoleFilter] = useState<"all" | "cliente_pf" | "cliente_pj" | "admin">("all");
+  const [userRoleFilter, setUserRoleFilter] = useState<
+    "all" | "cliente_pf" | "cliente_pj" | "admin"
+  >("all");
   const [editingPlan, setEditingPlan] = useState<any | null>(null);
-  const [planForm, setPlanForm] = useState({ 
-    name: "", 
-    price: "", 
-    description: "", 
+  const [planForm, setPlanForm] = useState({
+    name: "",
+    price: "",
+    description: "",
     interval: "month",
-    features: [] as string[]
+    features: [] as string[],
   });
   const [newFeature, setNewFeature] = useState("");
   const [selectedGym, setSelectedGym] = useState<any | null>(null);
@@ -215,25 +234,30 @@ const AdminDashboardScreen: React.FC = () => {
   const [gymForm, setGymForm] = useState<any>({});
   const [adminTrainers, setAdminTrainers] = useState<any[]>([]);
   const [trainerListSearchQuery, setTrainerListSearchQuery] = useState("");
-  const [trainerListStatusFilter, setTrainerListStatusFilter] = useState<"all" | "active" | "blocked">("all");
+  const [trainerListStatusFilter, setTrainerListStatusFilter] = useState<
+    "all" | "active" | "blocked"
+  >("all");
   const [adminGyms, setAdminGyms] = useState<any[]>([]);
   const [gymListSearchQuery, setGymListSearchQuery] = useState("");
-  const [gymListStatusFilter, setGymListStatusFilter] = useState<"all" | "active" | "blocked">("all");
+  const [gymListStatusFilter, setGymListStatusFilter] = useState<"all" | "active" | "blocked">(
+    "all"
+  );
 
   const filteredAdminGyms = useMemo(() => {
-    return adminGyms
-      .filter(g => {
-        const matchesSearch = 
-          (g.nome || "").toLowerCase().includes(gymListSearchQuery.toLowerCase()) || 
-          (g.endereco || g.endereco_completo || "").toLowerCase().includes(gymListSearchQuery.toLowerCase());
-        
-        const matchesStatus = 
-          gymListStatusFilter === 'all' || 
-          (gymListStatusFilter === 'active' && g.ativo) || 
-          (gymListStatusFilter === 'blocked' && !g.ativo);
+    return adminGyms.filter((g) => {
+      const matchesSearch =
+        (g.nome || "").toLowerCase().includes(gymListSearchQuery.toLowerCase()) ||
+        (g.endereco || g.endereco_completo || "")
+          .toLowerCase()
+          .includes(gymListSearchQuery.toLowerCase());
 
-        return matchesSearch && matchesStatus;
-      });
+      const matchesStatus =
+        gymListStatusFilter === "all" ||
+        (gymListStatusFilter === "active" && g.ativo) ||
+        (gymListStatusFilter === "blocked" && !g.ativo);
+
+      return matchesSearch && matchesStatus;
+    });
   }, [adminGyms, gymListSearchQuery, gymListStatusFilter]);
 
   const [adminExpiring, setAdminExpiring] = useState<any[]>([]);
@@ -243,111 +267,142 @@ const AdminDashboardScreen: React.FC = () => {
   const [selectedAppt, setSelectedAppt] = useState<any | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [expiringSearchQuery, setExpiringSearchQuery] = useState("");
-  const [expiringPlanFilter, setExpiringPlanFilter] = useState<"all" | "FREE" | "premium" | "familia">("all");
+  const [expiringPlanFilter, setExpiringPlanFilter] = useState<
+    "all" | "FREE" | "premium" | "familia"
+  >("all");
 
   const trainersAvailableToLink = useMemo(() => {
     // Pegamos todos os adminTrainers que NÃO estão em gymTrainers (já vinculados)
-    const linkedIds = new Set(gymTrainers.map(t => t.id_us));
-    
+    const linkedIds = new Set(gymTrainers.map((t) => t.id_us));
+
     return adminTrainers
-      .filter(t => !linkedIds.has(t.id_us))
-      .filter(t => {
+      .filter((t) => !linkedIds.has(t.id_us))
+      .filter((t) => {
         if (!trainerSearchQuery) return true;
         const query = trainerSearchQuery.toLowerCase();
-        return (t.nome || "").toLowerCase().includes(query) || (t.email || "").toLowerCase().includes(query);
+        return (
+          (t.nome || "").toLowerCase().includes(query) ||
+          (t.email || "").toLowerCase().includes(query)
+        );
       });
   }, [adminTrainers, gymTrainers, trainerSearchQuery]);
 
   const filteredAdminUsers = useMemo(() => {
-    return adminUsers
-      .filter(u => {
-        const matchesSearch = 
-          u.nome.toLowerCase().includes(userSearchQuery.toLowerCase()) || 
-          u.email.toLowerCase().includes(userSearchQuery.toLowerCase());
-        
-        const matchesStatus = 
-          userStatusFilter === 'all' || 
-          (userStatusFilter === 'active' && u.ativo) || 
-          (userStatusFilter === 'blocked' && !u.ativo);
+    return adminUsers.filter((u) => {
+      const matchesSearch =
+        u.nome.toLowerCase().includes(userSearchQuery.toLowerCase()) ||
+        u.email.toLowerCase().includes(userSearchQuery.toLowerCase());
 
-        const r = String(u.role || u.tipo || u.role_name || "").toLowerCase();
-        const isAdmin = r.includes('admin') || Number(u.id_us) === 15;
-        const isPJ = r.includes('personal') || r.includes('trainer') || r.includes('pj') || (u.cref && String(u.cref).trim().length > 1) || [16,19,20,21,22].includes(Number(u.id_us));
+      const matchesStatus =
+        userStatusFilter === "all" ||
+        (userStatusFilter === "active" && u.ativo) ||
+        (userStatusFilter === "blocked" && !u.ativo);
 
-        let matchesRole = true;
-        if (userRoleFilter === 'admin') matchesRole = isAdmin;
-        else if (userRoleFilter === 'cliente_pj') matchesRole = isPJ;
-        else if (userRoleFilter === 'cliente_pf') matchesRole = true; // Exibe todos no card 'Todos'
+      const r = String(u.role || u.tipo || u.role_name || "").toLowerCase();
+      const isAdmin = r.includes("admin") || Number(u.id_us) === 15;
+      const isPJ =
+        r.includes("personal") ||
+        r.includes("trainer") ||
+        r.includes("pj") ||
+        (u.cref && String(u.cref).trim().length > 1) ||
+        [16, 19, 20, 21, 22].includes(Number(u.id_us));
 
-        return matchesSearch && matchesStatus && matchesRole;
-      });
+      let matchesRole = true;
+      if (userRoleFilter === "admin") matchesRole = isAdmin;
+      else if (userRoleFilter === "cliente_pj") matchesRole = isPJ;
+      else if (userRoleFilter === "cliente_pf") matchesRole = true; // Exibe todos no card 'Todos'
+
+      return matchesSearch && matchesStatus && matchesRole;
+    });
   }, [adminUsers, userSearchQuery, userStatusFilter, userRoleFilter]);
 
   const filteredAdminTrainers = useMemo(() => {
-    return adminTrainers
-      .filter(u => {
-        const matchesSearch = 
-          u.nome.toLowerCase().includes(trainerListSearchQuery.toLowerCase()) || 
-          u.email.toLowerCase().includes(trainerListSearchQuery.toLowerCase());
-        
-        const matchesStatus = 
-          trainerListStatusFilter === 'all' || 
-          (trainerListStatusFilter === 'active' && u.ativo) || 
-          (trainerListStatusFilter === 'blocked' && !u.ativo);
+    return adminTrainers.filter((u) => {
+      const matchesSearch =
+        u.nome.toLowerCase().includes(trainerListSearchQuery.toLowerCase()) ||
+        u.email.toLowerCase().includes(trainerListSearchQuery.toLowerCase());
 
-        return matchesSearch && matchesStatus;
-      });
+      const matchesStatus =
+        trainerListStatusFilter === "all" ||
+        (trainerListStatusFilter === "active" && u.ativo) ||
+        (trainerListStatusFilter === "blocked" && !u.ativo);
+
+      return matchesSearch && matchesStatus;
+    });
   }, [adminTrainers, trainerListSearchQuery, trainerListStatusFilter]);
 
   const [activePlanSearchQuery, setActivePlanSearchQuery] = useState("");
-  const [activePlanFilter, setActivePlanFilter] = useState<"all" | "FREE" | "premium" | "familia">("all");
+  const [activePlanFilter, setActivePlanFilter] = useState<"all" | "FREE" | "premium" | "familia">(
+    "all"
+  );
 
   const filteredActivePlansUsers = useMemo(() => {
-    return adminUsers
-      .filter(u => {
-        const matchesSearch = 
-          u.nome.toLowerCase().includes(activePlanSearchQuery.toLowerCase()) || 
-          u.email.toLowerCase().includes(activePlanSearchQuery.toLowerCase());
+    return adminUsers.filter((u) => {
+      const matchesSearch =
+        u.nome.toLowerCase().includes(activePlanSearchQuery.toLowerCase()) ||
+        u.email.toLowerCase().includes(activePlanSearchQuery.toLowerCase());
 
-        const planType = (u.plan || "").toLowerCase();
-        const matchesPlan = 
-          activePlanFilter === 'all' || 
-          (activePlanFilter === 'FREE' && (!planType || planType === 'free' || (planType !== 'premium' && planType !== 'familia'))) || 
-          (activePlanFilter === 'premium' && planType === 'premium') || 
-          (activePlanFilter === 'familia' && planType === 'familia');
+      const planType = (u.plan || "").toLowerCase();
+      const matchesPlan =
+        activePlanFilter === "all" ||
+        (activePlanFilter === "FREE" &&
+          (!planType ||
+            planType === "free" ||
+            (planType !== "premium" && planType !== "familia"))) ||
+        (activePlanFilter === "premium" && planType === "premium") ||
+        (activePlanFilter === "familia" && planType === "familia");
 
-        return matchesSearch && matchesPlan;
-      });
+      return matchesSearch && matchesPlan;
+    });
   }, [adminUsers, activePlanSearchQuery, activePlanFilter]);
 
   const rawExpiringUsers = useMemo(() => {
-    return adminExpiring.length > 0 ? adminExpiring : adminUsers.filter(u => {
-       const p = (u.plan || u.plano || "").toLowerCase();
-       return p.includes('premium') || p.includes('gold') || p.includes('familia') || p.includes('family');
-    });
+    return adminExpiring.length > 0
+      ? adminExpiring
+      : adminUsers.filter((u) => {
+          const p = (u.plan || u.plano || "").toLowerCase();
+          return (
+            p.includes("premium") ||
+            p.includes("gold") ||
+            p.includes("familia") ||
+            p.includes("family")
+          );
+        });
   }, [adminExpiring, adminUsers]);
 
   const filteredExpiringUsers = useMemo(() => {
     let filtered = rawExpiringUsers;
 
-    if (expiringPlanFilter !== 'all') {
-      filtered = filtered.filter(u => {
+    if (expiringPlanFilter !== "all") {
+      filtered = filtered.filter((u) => {
         const plan = (u.plan || u.plano || "").toLowerCase();
-        if (expiringPlanFilter === 'FREE') return !plan || plan === 'free' || (!plan.includes('premium') && !plan.includes('gold') && !plan.includes('familia') && !plan.includes('family'));
-        if (expiringPlanFilter === 'premium') return plan.includes('premium') || plan.includes('gold');
-        if (expiringPlanFilter === 'familia') return plan.includes('familia') || plan.includes('family');
+        if (expiringPlanFilter === "FREE")
+          return (
+            !plan ||
+            plan === "free" ||
+            (!plan.includes("premium") &&
+              !plan.includes("gold") &&
+              !plan.includes("familia") &&
+              !plan.includes("family"))
+          );
+        if (expiringPlanFilter === "premium")
+          return plan.includes("premium") || plan.includes("gold");
+        if (expiringPlanFilter === "familia")
+          return plan.includes("familia") || plan.includes("family");
         return true;
       });
     }
 
     if (expiringSearchQuery.trim()) {
       const query = expiringSearchQuery.toLowerCase();
-      filtered = filtered.filter(u => {
-        return (u.nome || "").toLowerCase().includes(query) || 
-               (u.email || "").toLowerCase().includes(query);
+      filtered = filtered.filter((u) => {
+        return (
+          (u.nome || "").toLowerCase().includes(query) ||
+          (u.email || "").toLowerCase().includes(query)
+        );
       });
     }
-    
+
     return filtered;
   }, [rawExpiringUsers, expiringSearchQuery, expiringPlanFilter]);
 
@@ -435,11 +490,13 @@ const AdminDashboardScreen: React.FC = () => {
     try {
       setLoadingSheet(true);
       expiringSheetRef.current?.expand();
-      
+
       // Busca paralela para garantir que temos dados mesmo que um endpoint venha vazio
       const [expResp, usersResp] = await Promise.all([
         api.get("/admin/expiring-users"),
-        adminUsers.length === 0 ? api.get("/admin/all-users") : Promise.resolve({ data: { users: adminUsers } })
+        adminUsers.length === 0
+          ? api.get("/admin/all-users")
+          : Promise.resolve({ data: { users: adminUsers } }),
       ]);
 
       setAdminExpiring(expResp.data.users || []);
@@ -476,7 +533,11 @@ const AdminDashboardScreen: React.FC = () => {
         price: String(plan.price),
         description: plan.description || "",
         interval: plan.interval || "month",
-        features: Array.isArray(plan.features) ? plan.features : (plan.features ? JSON.parse(plan.features) : [])
+        features: Array.isArray(plan.features)
+          ? plan.features
+          : plan.features
+            ? JSON.parse(plan.features)
+            : [],
       });
     } else {
       setEditingPlan(null);
@@ -485,7 +546,7 @@ const AdminDashboardScreen: React.FC = () => {
         price: "",
         description: "",
         interval: "month",
-        features: []
+        features: [],
       });
     }
     editPlanSheetRef.current?.expand();
@@ -493,12 +554,12 @@ const AdminDashboardScreen: React.FC = () => {
 
   const addFeature = () => {
     if (!newFeature.trim()) return;
-    setPlanForm(f => ({ ...f, features: [...f.features, newFeature.trim()] }));
+    setPlanForm((f) => ({ ...f, features: [...f.features, newFeature.trim()] }));
     setNewFeature("");
   };
 
   const removeFeature = (index: number) => {
-    setPlanForm(f => ({ ...f, features: f.features.filter((_, i) => i !== index) }));
+    setPlanForm((f) => ({ ...f, features: f.features.filter((_, i) => i !== index) }));
   };
 
   const savePlanEdits = async () => {
@@ -514,7 +575,7 @@ const AdminDashboardScreen: React.FC = () => {
         price: parseFloat(planForm.price),
         description: planForm.description,
         interval: planForm.interval,
-        features: JSON.stringify(planForm.features)
+        features: JSON.stringify(planForm.features),
       };
 
       let response;
@@ -543,9 +604,9 @@ const AdminDashboardScreen: React.FC = () => {
       `Deseja realmente arquivar o plano "${planName}"? Ele não aparecerá mais para novas vendas no Stripe.`,
       [
         { text: "Cancelar", style: "cancel" },
-        { 
-          text: "Confirmar", 
-          style: "destructive", 
+        {
+          text: "Confirmar",
+          style: "destructive",
           onPress: async () => {
             try {
               setLoadingSheet(true);
@@ -559,12 +620,12 @@ const AdminDashboardScreen: React.FC = () => {
             } finally {
               setLoadingSheet(false);
             }
-          }
-        }
+          },
+        },
       ]
     );
   };
- 
+
   // --- GESTÃO DE ACADEMIAS & VÍNCULOS ---
   const searchGoogleGyms = async (query: string) => {
     setGoogleSearchQuery(query);
@@ -619,31 +680,35 @@ const AdminDashboardScreen: React.FC = () => {
 
   const toggleGymStatus = async (gymId: number, currentName: string, isCurrentlyAtivo: boolean) => {
     const action = isCurrentlyAtivo ? "Bloquear" : "Ativar";
-    
+
     Alert.alert(
       "Confirmar Ação",
       `Deseja realmente ${action.toLowerCase()} a academia ${currentName}?`,
       [
         { text: "Cancelar", style: "cancel" },
-        { 
-          text: action, 
+        {
+          text: action,
           style: isCurrentlyAtivo ? "destructive" : "default",
           onPress: async () => {
-             try {
-               const response = await api.patch(`/admin/gyms/${gymId}/status`);
-               if (response.data.success) {
-                 setAdminGyms(prev => prev.map(g => g.id_academia === gymId ? { ...g, ativo: !isCurrentlyAtivo } : g));
-                 if (selectedGym?.id_academia === gymId) {
-                   setSelectedGym((prev: any) => ({ ...prev, ativo: !isCurrentlyAtivo }));
-                 }
-                 Alert.alert("Sucesso", `Academia ${action.toLowerCase()}da com sucesso!`);
-               }
-             } catch (err) {
-               console.error("Erro ao alternar status da academia:", err);
-               Alert.alert("Erro", "Não foi possível alterar o status da academia.");
-             }
-          }
-        }
+            try {
+              const response = await api.patch(`/admin/gyms/${gymId}/status`);
+              if (response.data.success) {
+                setAdminGyms((prev) =>
+                  prev.map((g) =>
+                    g.id_academia === gymId ? { ...g, ativo: !isCurrentlyAtivo } : g
+                  )
+                );
+                if (selectedGym?.id_academia === gymId) {
+                  setSelectedGym((prev: any) => ({ ...prev, ativo: !isCurrentlyAtivo }));
+                }
+                Alert.alert("Sucesso", `Academia ${action.toLowerCase()}da com sucesso!`);
+              }
+            } catch (err) {
+              console.error("Erro ao alternar status da academia:", err);
+              Alert.alert("Erro", "Não foi possível alterar o status da academia.");
+            }
+          },
+        },
       ]
     );
   };
@@ -654,9 +719,9 @@ const AdminDashboardScreen: React.FC = () => {
       `Deseja realmente excluir "${gymName}"? Esta ação removerá também todos os vínculos de profissionais.`,
       [
         { text: "Cancelar", style: "cancel" },
-        { 
-          text: "Excluir", 
-          style: "destructive", 
+        {
+          text: "Excluir",
+          style: "destructive",
           onPress: async () => {
             try {
               setLoadingSheet(true);
@@ -669,8 +734,8 @@ const AdminDashboardScreen: React.FC = () => {
             } finally {
               setLoadingSheet(false);
             }
-          }
-        }
+          },
+        },
       ]
     );
   };
@@ -708,7 +773,7 @@ const AdminDashboardScreen: React.FC = () => {
     if (!selectedGym) return;
     try {
       const response = await api.post(`/admin/gyms/${selectedGym.id_academia}/trainers`, {
-        trainer_id: trainerId
+        trainer_id: trainerId,
       });
       if (response.data.success) {
         Alert.alert("Sucesso", "Profissional vinculado com sucesso!");
@@ -728,12 +793,14 @@ const AdminDashboardScreen: React.FC = () => {
       `Deseja realmente remover o vínculo de ${trainerName} com esta academia?`,
       [
         { text: "Cancelar", style: "cancel" },
-        { 
-          text: "Remover", 
-          style: "destructive", 
+        {
+          text: "Remover",
+          style: "destructive",
           onPress: async () => {
             try {
-              const response = await api.delete(`/admin/gyms/${selectedGym.id_academia}/trainers/${trainerId}`);
+              const response = await api.delete(
+                `/admin/gyms/${selectedGym.id_academia}/trainers/${trainerId}`
+              );
               if (response.data.success) {
                 fetchGymTrainers(selectedGym.id_academia);
                 fetchAdminGyms();
@@ -741,8 +808,8 @@ const AdminDashboardScreen: React.FC = () => {
             } catch (err) {
               Alert.alert("Erro", "Não foi possível desvincular.");
             }
-          }
-        }
+          },
+        },
       ]
     );
   };
@@ -750,11 +817,14 @@ const AdminDashboardScreen: React.FC = () => {
   const toggleUserStatus = async (userId: number) => {
     // Trava de Auto-Bloqueio (Safe-Lock para Admins)
     if (userId === Number(user?.id_us)) {
-      Alert.alert("Ação Negada", "Você não pode bloquear ou desativar sua própria conta de administrador.");
+      Alert.alert(
+        "Ação Negada",
+        "Você não pode bloquear ou desativar sua própria conta de administrador."
+      );
       return;
     }
 
-    const userToToggle = adminUsers.find(u => u.id_us === userId);
+    const userToToggle = adminUsers.find((u) => u.id_us === userId);
     const isBlocking = userToToggle?.ativo;
 
     const performToggle = async () => {
@@ -779,7 +849,7 @@ const AdminDashboardScreen: React.FC = () => {
         `Deseja realmente bloquear o acesso de ${userToToggle.nome}?`,
         [
           { text: "Cancelar", style: "cancel" },
-          { text: "Bloquear", style: "destructive", onPress: performToggle }
+          { text: "Bloquear", style: "destructive", onPress: performToggle },
         ]
       );
     } else {
@@ -791,7 +861,7 @@ const AdminDashboardScreen: React.FC = () => {
     try {
       const response = await api.patch(`/admin/users/${userId}/plan`, { plan: newPlan });
       if (response.data.success) {
-        setAdminUsers((prev) => 
+        setAdminUsers((prev) =>
           prev.map((u) => (u.id_us === userId ? { ...u, plan: newPlan, role: u.role } : u))
         );
         if (selectedUserDetail?.id_us === userId) {
@@ -807,16 +877,12 @@ const AdminDashboardScreen: React.FC = () => {
   };
 
   const changeUserPlan = (u: any) => {
-    Alert.alert(
-      "Gerenciar Assinatura",
-      `Alterar plano de ${u.nome}:`,
-      [
-        { text: "Cancelar", style: "cancel" },
-        { text: "Free", onPress: () => performPlanChange(u.id_us, "FREE") },
-        { text: "Premium", onPress: () => performPlanChange(u.id_us, "premium") },
-        { text: "Família", onPress: () => performPlanChange(u.id_us, "familia") },
-      ]
-    );
+    Alert.alert("Gerenciar Assinatura", `Alterar plano de ${u.nome}:`, [
+      { text: "Cancelar", style: "cancel" },
+      { text: "Free", onPress: () => performPlanChange(u.id_us, "FREE") },
+      { text: "Premium", onPress: () => performPlanChange(u.id_us, "premium") },
+      { text: "Família", onPress: () => performPlanChange(u.id_us, "familia") },
+    ]);
   };
 
   const [updatingRoleId, setUpdatingRoleId] = useState<number | null>(null);
@@ -832,7 +898,9 @@ const AdminDashboardScreen: React.FC = () => {
         setUpdatingRoleId(userId);
         const response = await api.patch(`/admin/users/${userId}/role`, { role: newRole });
         if (response.status === 200 || response.data?.success) {
-          setAdminUsers(prev => prev.map(u => u.id_us === userId ? { ...u, role: newRole } : u));
+          setAdminUsers((prev) =>
+            prev.map((u) => (u.id_us === userId ? { ...u, role: newRole } : u))
+          );
           // Recarregar KPIs para atualizar os contadores no topo
           fetchData(activeTab, filterStatus);
           Alert.alert("Sucesso", "Papel do usuário atualizado com sucesso!");
@@ -845,15 +913,11 @@ const AdminDashboardScreen: React.FC = () => {
       }
     };
 
-    if (newRole === 'admin') {
-      Alert.alert(
-        "🛡️ CONCEDER PODER ADMIN",
-        "Confirmar promoção para Administrador?",
-        [
-          { text: "Cancelar", style: "cancel" },
-          { text: "CONFIRMAR", style: "destructive", onPress: performUpdate }
-        ]
-      );
+    if (newRole === "admin") {
+      Alert.alert("🛡️ CONCEDER PODER ADMIN", "Confirmar promoção para Administrador?", [
+        { text: "Cancelar", style: "cancel" },
+        { text: "CONFIRMAR", style: "destructive", onPress: performUpdate },
+      ]);
     } else {
       performUpdate();
     }
@@ -1032,25 +1096,28 @@ const AdminDashboardScreen: React.FC = () => {
         style={styles.kpiCard}
         activeOpacity={0.7}
         onPress={() => {
-            const labelLower = (item.label || "").toLowerCase();
-            
-            // Se clicou em Planos Ativos -> Abre a nova aba focada em Métrica de Assinantes
-            if (labelLower.includes("planos ativos") || item.id === "active_plans") {
-               fetchActivePlansList();
-               return;
-            }
-            
-            // Se clicou em Planos (Stripe) -> Abre o sheet de produtos da Stripe
-            if ((item.id === "plans" || item.id === "stripe_plans") && !labelLower.includes("ativo")) {
-               fetchAdminPlans();
-               return;
-            }
-            
-            // Outros Mapeamentos
-            if (item.id === "users") fetchAdminUsers();
-            else if (item.id === "expiring") fetchAdminExpiring();
-            else if (item.id === "trainers") fetchAdminTrainers();
-            else if (item.id === "gyms") fetchAdminGyms();
+          const labelLower = (item.label || "").toLowerCase();
+
+          // Se clicou em Planos Ativos -> Abre a nova aba focada em Métrica de Assinantes
+          if (labelLower.includes("planos ativos") || item.id === "active_plans") {
+            fetchActivePlansList();
+            return;
+          }
+
+          // Se clicou em Planos (Stripe) -> Abre o sheet de produtos da Stripe
+          if (
+            (item.id === "plans" || item.id === "stripe_plans") &&
+            !labelLower.includes("ativo")
+          ) {
+            fetchAdminPlans();
+            return;
+          }
+
+          // Outros Mapeamentos
+          if (item.id === "users") fetchAdminUsers();
+          else if (item.id === "expiring") fetchAdminExpiring();
+          else if (item.id === "trainers") fetchAdminTrainers();
+          else if (item.id === "gyms") fetchAdminGyms();
         }}
       >
         <LinearGradient
@@ -1067,14 +1134,22 @@ const AdminDashboardScreen: React.FC = () => {
             const labelLower = (item.label || "").toLowerCase();
             // Bifurcação 1: Planos Ativos (Assinantes Pagantes Reais)
             if (labelLower.includes("planos ativos") || item.id === "active_plans") {
-                return adminUsers.filter(u => {
-                  const p = (u.plan || u.plano || "").toLowerCase();
-                  return p.includes("premium") || p.includes("gold") || p.includes("familia") || p.includes("family");
-                }).length;
+              return adminUsers.filter((u) => {
+                const p = (u.plan || u.plano || "").toLowerCase();
+                return (
+                  p.includes("premium") ||
+                  p.includes("gold") ||
+                  p.includes("familia") ||
+                  p.includes("family")
+                );
+              }).length;
             }
             // Bifurcação 2: Planos Gerais (Produtos Cadastrados no Stripe)
-            if ((item.id === "plans" || item.id === "stripe_plans") && !labelLower.includes("ativo")) {
-                return adminPlans.length;
+            if (
+              (item.id === "plans" || item.id === "stripe_plans") &&
+              !labelLower.includes("ativo")
+            ) {
+              return adminPlans.length;
             }
             // Fallback: Default backend value
             return item.value;
@@ -1117,9 +1192,7 @@ const AdminDashboardScreen: React.FC = () => {
         <View style={styles.header}>
           <View style={styles.headerTop}>
             <BackButton />
-            <Text style={styles.headerTitle}>
-              Dashboard
-            </Text>
+            <Text style={styles.headerTitle}>Dashboard</Text>
             <View style={{ flexDirection: "row", gap: 12 }}>
               <TouchableOpacity style={styles.headerIconBtn} onPress={openFilter}>
                 <Filter size={20} color={filterStatus !== "all" ? "#10B981" : "#1E293B"} />
@@ -1162,7 +1235,7 @@ const AdminDashboardScreen: React.FC = () => {
               }}
             >
               <View>
-                <Text style={styles.sectionTitle}>Faturamento Estimado</Text>
+                <Text style={styles.sectionTitle}>Faturamento</Text>
                 <Text style={styles.sectionSubtitle}>Baseado em sessões confirmadas</Text>
               </View>
               <View style={{ alignItems: "flex-end" }}>
@@ -1180,17 +1253,20 @@ const AdminDashboardScreen: React.FC = () => {
           <View style={styles.chartCardCustom}>
             <View style={{ height: 180, marginTop: 10 }}>
               {(() => {
-                const MOCK_CHART = [
-                  { label: "Dom", total: 0 },
-                  { label: "Seg", total: 0 },
-                  { label: "Ter", total: 1 },
-                  { label: "Qua", total: 0 },
-                  { label: "Qui", total: 2 },
-                  { label: "Sex", total: 1 },
-                  { label: "Sáb", total: 0 },
-                ];
-                const chartData =
-                  (data?.chartData?.length ?? 0) > 0 ? data!.chartData : MOCK_CHART;
+                const chartData = data?.chartData || [];
+
+                if (chartData.length === 0) {
+                  return (
+                    <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
+                      <Activity size={24} color="#CBD5E1" />
+                      <Text
+                        style={{ fontSize: 13, color: "#94A3B8", marginTop: 8, fontWeight: "600" }}
+                      >
+                        Sem transações no Stripe para este período
+                      </Text>
+                    </View>
+                  );
+                }
 
                 return (
                   <CartesianChart
@@ -1236,75 +1312,66 @@ const AdminDashboardScreen: React.FC = () => {
             </View>
           </View>
 
+          {/* ── NOVAS MÉTRICAS DE APOIO À DECISÃO (BI) ── */}
+          <DecisionBI
+            data={data}
+            formatCurrency={formatCurrency}
+            onOpenChurn={() => churnDetailSheetRef.current?.expand()}
+            onOpenLTV={() => ltvDetailSheetRef.current?.expand()}
+            onOpenRevenue={() => revenueMixSheetRef.current?.expand()}
+            onOpenUnits={() => unitAuditSheetRef.current?.expand()}
+          />
+
           {/* ── OPERAÇÕES ── */}
           <View style={styles.operationSection}>
             <Text style={styles.sectionTitle}>Operações:</Text>
             <View style={styles.statusList}>
-              <TouchableOpacity
-                style={styles.statusItem}
-                onPress={() => fetchAdminUsers()}
-              >
+              <TouchableOpacity style={styles.statusItem} onPress={() => fetchAdminUsers()}>
                 <View style={styles.statusIndicator}>
                   <View style={[styles.statusDot, { backgroundColor: "#6366F1" }]} />
                   <Text style={styles.statusLabel}>Usuários</Text>
                 </View>
                 <View style={styles.statusValueRow}>
-                  <Text style={styles.statusValue}>{kpisData.find(k => k.id === 'users')?.value ?? 0}</Text>
+                  <Text style={styles.statusValue}>
+                    {kpisData.find((k) => k.id === "users")?.value ?? 0}
+                  </Text>
                   <ChevronRight size={16} color="#94A3B8" />
                 </View>
               </TouchableOpacity>
 
-              <TouchableOpacity
-                style={styles.statusItem}
-                onPress={() => fetchAdminTrainers()}
-              >
+              <TouchableOpacity style={styles.statusItem} onPress={() => fetchAdminTrainers()}>
                 <View style={styles.statusIndicator}>
                   <View style={[styles.statusDot, { backgroundColor: "#10B981" }]} />
                   <Text style={styles.statusLabel}>Personais trainer</Text>
                 </View>
                 <View style={styles.statusValueRow}>
-                  <Text style={styles.statusValue}>{kpisData.find(k => k.id === 'trainers')?.value ?? 0}</Text>
+                  <Text style={styles.statusValue}>
+                    {kpisData.find((k) => k.id === "trainers")?.value ?? 0}
+                  </Text>
                   <ChevronRight size={16} color="#94A3B8" />
                 </View>
               </TouchableOpacity>
 
-              <TouchableOpacity
-                style={styles.statusItem}
-                onPress={() => fetchAdminGyms()}
-              >
+              <TouchableOpacity style={styles.statusItem} onPress={() => fetchAdminGyms()}>
                 <View style={styles.statusIndicator}>
                   <View style={[styles.statusDot, { backgroundColor: "#F59E0B" }]} />
                   <Text style={styles.statusLabel}>Academias</Text>
                 </View>
                 <View style={styles.statusValueRow}>
-                  <Text style={styles.statusValue}>{kpisData.find(k => k.id === 'gyms')?.value ?? 0}</Text>
+                  <Text style={styles.statusValue}>
+                    {kpisData.find((k) => k.id === "gyms")?.value ?? 0}
+                  </Text>
                   <ChevronRight size={16} color="#94A3B8" />
                 </View>
               </TouchableOpacity>
 
-              <TouchableOpacity
-                style={styles.statusItem}
-                onPress={() => fetchAdminPlans()}
-              >
+              <TouchableOpacity style={styles.statusItem} onPress={() => fetchAdminPlans()}>
                 <View style={styles.statusIndicator}>
                   <View style={[styles.statusDot, { backgroundColor: "#8B5CF6" }]} />
                   <Text style={styles.statusLabel}>Planos</Text>
                 </View>
                 <View style={styles.statusValueRow}>
                   <Text style={styles.statusValue}>{adminPlans.length}</Text>
-                  <ChevronRight size={16} color="#94A3B8" />
-                </View>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={styles.statusItem}
-                onPress={() => revenueSheetRef.current?.expand()}
-              >
-                <View style={styles.statusIndicator}>
-                  <View style={[styles.statusDot, { backgroundColor: "#EC4899" }]} />
-                  <Text style={styles.statusLabel}>Financeiro</Text>
-                </View>
-                <View style={styles.statusValueRow}>
                   <ChevronRight size={16} color="#94A3B8" />
                 </View>
               </TouchableOpacity>
@@ -2123,20 +2190,29 @@ const AdminDashboardScreen: React.FC = () => {
                 <Text style={styles.sheetTitle}>Gestão de Usuários</Text>
                 <Text style={styles.sheetSubtitle}>{adminUsers.length} usuários no total</Text>
               </View>
-              <TouchableOpacity onPress={() => usersSheetRef.current?.close()} style={styles.sheetCloseBtn}>
+              <TouchableOpacity
+                onPress={() => usersSheetRef.current?.close()}
+                style={styles.sheetCloseBtn}
+              >
                 <X size={22} color="#64748B" />
               </TouchableOpacity>
             </View>
 
             {/* Quick Stats: Role Filters */}
             <View style={[styles.sheetStatsRow, { marginBottom: 15 }]}>
-              <TouchableOpacity 
+              <TouchableOpacity
                 activeOpacity={0.7}
                 style={[
-                  styles.sheetStatItem, 
-                  userRoleFilter === 'cliente_pf' && { backgroundColor: '#F1F5F9', borderColor: '#64748B', borderWidth: 2 }
+                  styles.sheetStatItem,
+                  userRoleFilter === "cliente_pf" && {
+                    backgroundColor: "#F1F5F9",
+                    borderColor: "#64748B",
+                    borderWidth: 2,
+                  },
                 ]}
-                onPress={() => setUserRoleFilter(userRoleFilter === 'cliente_pf' ? 'all' : 'cliente_pf')}
+                onPress={() =>
+                  setUserRoleFilter(userRoleFilter === "cliente_pf" ? "all" : "cliente_pf")
+                }
               >
                 <Text style={[styles.sheetStatValue, { color: "#64748B" }]}>
                   {adminUsers.length}
@@ -2144,39 +2220,59 @@ const AdminDashboardScreen: React.FC = () => {
                 <Text style={styles.sheetStatLabel}>Todos</Text>
               </TouchableOpacity>
 
-              <TouchableOpacity 
+              <TouchableOpacity
                 activeOpacity={0.7}
                 style={[
-                  styles.sheetStatItem, 
-                  userRoleFilter === 'cliente_pj' && { backgroundColor: '#F0FDF4', borderColor: '#16A34A', borderWidth: 2 }
+                  styles.sheetStatItem,
+                  userRoleFilter === "cliente_pj" && {
+                    backgroundColor: "#F0FDF4",
+                    borderColor: "#16A34A",
+                    borderWidth: 2,
+                  },
                 ]}
-                onPress={() => setUserRoleFilter(userRoleFilter === 'cliente_pj' ? 'all' : 'cliente_pj')}
+                onPress={() =>
+                  setUserRoleFilter(userRoleFilter === "cliente_pj" ? "all" : "cliente_pj")
+                }
               >
                 <Text style={[styles.sheetStatValue, { color: "#16A34A" }]}>
-                  {adminUsers.filter(u => {
-                    const r = String(u.role || u.tipo || u.role_name || "").toLowerCase();
-                    const isPJId = [16, 19, 20, 21, 22].includes(Number(u.id_us));
-                    const hasCref = u.cref && String(u.cref).trim().length > 1;
-                    return r.includes('personal') || r.includes('trainer') || r.includes('pj') || isPJId || hasCref;
-                  }).length}
+                  {
+                    adminUsers.filter((u) => {
+                      const r = String(u.role || u.tipo || u.role_name || "").toLowerCase();
+                      const isPJId = [16, 19, 20, 21, 22].includes(Number(u.id_us));
+                      const hasCref = u.cref && String(u.cref).trim().length > 1;
+                      return (
+                        r.includes("personal") ||
+                        r.includes("trainer") ||
+                        r.includes("pj") ||
+                        isPJId ||
+                        hasCref
+                      );
+                    }).length
+                  }
                 </Text>
                 <Text style={styles.sheetStatLabel}>Personais</Text>
               </TouchableOpacity>
 
-              <TouchableOpacity 
+              <TouchableOpacity
                 activeOpacity={0.7}
                 style={[
-                  styles.sheetStatItem, 
-                  userRoleFilter === 'admin' && { backgroundColor: '#FAF5FF', borderColor: '#9333EA', borderWidth: 2 }
+                  styles.sheetStatItem,
+                  userRoleFilter === "admin" && {
+                    backgroundColor: "#FAF5FF",
+                    borderColor: "#9333EA",
+                    borderWidth: 2,
+                  },
                 ]}
-                onPress={() => setUserRoleFilter(userRoleFilter === 'admin' ? 'all' : 'admin')}
+                onPress={() => setUserRoleFilter(userRoleFilter === "admin" ? "all" : "admin")}
               >
                 <Text style={[styles.sheetStatValue, { color: "#9333EA" }]}>
-                  {adminUsers.filter(u => {
-                    const r = String(u.role || u.tipo || u.role_name || "").toLowerCase();
-                    const isAdminId = Number(u.id_us) === 15;
-                    return r.includes('admin') || isAdminId;
-                  }).length}
+                  {
+                    adminUsers.filter((u) => {
+                      const r = String(u.role || u.tipo || u.role_name || "").toLowerCase();
+                      const isAdminId = Number(u.id_us) === 15;
+                      return r.includes("admin") || isAdminId;
+                    }).length
+                  }
                 </Text>
                 <Text style={styles.sheetStatLabel}>Admins</Text>
               </TouchableOpacity>
@@ -2199,12 +2295,12 @@ const AdminDashboardScreen: React.FC = () => {
               )}
             </View>
 
-
-
             {loadingSheet ? (
-              <View style={{ marginTop: 40, alignItems: 'center' }}>
+              <View style={{ marginTop: 40, alignItems: "center" }}>
                 <ActivityIndicator color="#10B981" size="large" />
-                <Text style={{ marginTop: 12, color: '#94A3B8', fontWeight: '600' }}>Carregando usuários...</Text>
+                <Text style={{ marginTop: 12, color: "#94A3B8", fontWeight: "600" }}>
+                  Carregando usuários...
+                </Text>
               </View>
             ) : (
               <BottomSheetFlatList
@@ -2214,60 +2310,66 @@ const AdminDashboardScreen: React.FC = () => {
                 style={{ flex: 1, marginTop: 15 }}
                 contentContainerStyle={{ paddingBottom: insets.bottom + 150 }}
                 ListEmptyComponent={() => (
-                   <View style={styles.proEmptyState}>
-                     <Users size={40} color="#E2E8F0" />
-                     <Text style={styles.emptyTxt}>Nenhum usuário encontrado.</Text>
-                   </View>
+                  <View style={styles.proEmptyState}>
+                    <Users size={40} color="#E2E8F0" />
+                    <Text style={styles.emptyTxt}>Nenhum usuário encontrado.</Text>
+                  </View>
                 )}
                 renderItem={({ item }: { item: any }) => {
                   const r = String(item.role || item.tipo || item.role_name || "").toLowerCase();
-                  const isAdmin = r.includes('admin') || Number(item.id_us) === 15;
-                  const isPJ = r.includes('personal') || r.includes('trainer') || r.includes('pj') || (item.cref && String(item.cref).trim().length > 1) || [16,19,20,21,22].includes(Number(item.id_us));
+                  const isAdmin = r.includes("admin") || Number(item.id_us) === 15;
+                  const isPJ =
+                    r.includes("personal") ||
+                    r.includes("trainer") ||
+                    r.includes("pj") ||
+                    (item.cref && String(item.cref).trim().length > 1) ||
+                    [16, 19, 20, 21, 22].includes(Number(item.id_us));
 
                   return (
-                    <TouchableOpacity 
+                    <TouchableOpacity
                       activeOpacity={0.8}
                       onPress={() => openUserDetail(item)}
                       onLongPress={() => {
-                        const isMasterAdmin = item.email === 'comercial.movtapp@gmail.com';
+                        const isMasterAdmin = item.email === "comercial.movtapp@gmail.com";
                         const isCurrentUser = item.id_us === Number(user?.id_us);
-                        
+
                         if (isMasterAdmin) {
-                          Alert.alert("🛡️ Admin Master", "Este usuário possui acesso vitalício e não pode ser alterado.");
+                          Alert.alert(
+                            "🛡️ Admin Master",
+                            "Este usuário possui acesso vitalício e não pode ser alterado."
+                          );
                           return;
                         }
 
                         if (isCurrentUser) return;
 
-                        Alert.alert(
-                          "Gestão de Privilégios",
-                          `Gerenciar acesso de ${item.nome}:`,
-                          [
-                            { text: "Cancelar", style: "cancel" },
-                            isAdmin ? (
-                              { 
-                                text: "Retirar Admin", 
-                                style: "destructive", 
+                        Alert.alert("Gestão de Privilégios", `Gerenciar acesso de ${item.nome}:`, [
+                          { text: "Cancelar", style: "cancel" },
+                          isAdmin
+                            ? {
+                                text: "Retirar Admin",
+                                style: "destructive",
                                 onPress: () => {
                                   Alert.alert(
                                     "⚠️ Revogar Acesso",
                                     `Retirar os poderes de Administrador de ${item.nome}?`,
                                     [
                                       { text: "Cancelar", style: "cancel" },
-                                      { text: "Sim, Revogar", style: "destructive", onPress: () => changeUserRole(item.id_us, "client_pf") }
+                                      {
+                                        text: "Sim, Revogar",
+                                        style: "destructive",
+                                        onPress: () => changeUserRole(item.id_us, "client_pf"),
+                                      },
                                     ]
                                   );
-                                } 
+                                },
                               }
-                            ) : (
-                              { 
-                                text: "Promover a Admin", 
-                                style: "destructive", 
-                                onPress: () => changeUserRole(item.id_us, "admin") 
-                              }
-                            )
-                          ]
-                        );
+                            : {
+                                text: "Promover a Admin",
+                                style: "destructive",
+                                onPress: () => changeUserRole(item.id_us, "admin"),
+                              },
+                        ]);
                       }}
                       style={styles.proUserCard}
                     >
@@ -2275,47 +2377,75 @@ const AdminDashboardScreen: React.FC = () => {
                         <View style={styles.proAvatarContainer}>
                           <Image
                             source={{
-                              uri: item.foto_url || "https://images.unsplash.com/photo-1633332755192-727a05c4013d?w=100&h=100&fit=crop",
+                              uri:
+                                item.foto_url ||
+                                "https://images.unsplash.com/photo-1633332755192-727a05c4013d?w=100&h=100&fit=crop",
                             }}
                             style={styles.proAvatar}
                           />
                         </View>
-                        
+
                         <View style={{ flex: 1, marginLeft: 16 }}>
-                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                          <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
                             <Text style={[styles.proName, { flexShrink: 1 }]} numberOfLines={1}>
-                               {item.nome}
+                              {item.nome}
                             </Text>
                             {(isAdmin || isPJ) && (
-                              <View style={[
-                                styles.proBadge, 
-                                { 
-                                  backgroundColor: isAdmin ? "#FAF5FF" : "#F0FDF4", 
-                                  borderColor: isAdmin ? "#E9D5FF" : "#DCFCE7",
-                                  borderWidth: 1,
-                                  paddingHorizontal: 8 
-                                }
-                              ]}>
-                                <Text style={[
-                                  styles.proBadgeText, 
-                                  { color: isAdmin ? "#9333EA" : "#16A34A", fontSize: 10, fontWeight: '800' }
-                                ]}>
+                              <View
+                                style={[
+                                  styles.proBadge,
+                                  {
+                                    backgroundColor: isAdmin ? "#FAF5FF" : "#F0FDF4",
+                                    borderColor: isAdmin ? "#E9D5FF" : "#DCFCE7",
+                                    borderWidth: 1,
+                                    paddingHorizontal: 8,
+                                  },
+                                ]}
+                              >
+                                <Text
+                                  style={[
+                                    styles.proBadgeText,
+                                    {
+                                      color: isAdmin ? "#9333EA" : "#16A34A",
+                                      fontSize: 10,
+                                      fontWeight: "800",
+                                    },
+                                  ]}
+                                >
                                   {isAdmin ? "ADMIN" : "PRO"}
                                 </Text>
                               </View>
                             )}
-                            <View style={[styles.proBadge, { backgroundColor: item.ativo ? "#DCFCE7" : "#FEE2E2", marginTop: 0 }]}>
-                               <View style={[styles.dot, { backgroundColor: item.ativo ? "#10B981" : "#EF4444" }]} />
-                               <Text style={[styles.proBadgeText, { color: item.ativo ? "#106534" : "#991B1B" }]}>
-                                 {item.ativo ? "Ativo" : "Bloq."}
-                               </Text>
+                            <View
+                              style={[
+                                styles.proBadge,
+                                {
+                                  backgroundColor: item.ativo ? "#DCFCE7" : "#FEE2E2",
+                                  marginTop: 0,
+                                },
+                              ]}
+                            >
+                              <View
+                                style={[
+                                  styles.dot,
+                                  { backgroundColor: item.ativo ? "#10B981" : "#EF4444" },
+                                ]}
+                              />
+                              <Text
+                                style={[
+                                  styles.proBadgeText,
+                                  { color: item.ativo ? "#106534" : "#991B1B" },
+                                ]}
+                              >
+                                {item.ativo ? "Ativo" : "Bloq."}
+                              </Text>
                             </View>
                           </View>
                           <Text style={[styles.proEmail, { marginTop: 4 }]}>{item.email}</Text>
                         </View>
 
                         {item.id_us !== Number(user?.id_us) && (
-                          <TouchableOpacity 
+                          <TouchableOpacity
                             style={styles.proActionBtn}
                             onPress={() => toggleUserStatus(item.id_us)}
                           >
@@ -2350,54 +2480,94 @@ const AdminDashboardScreen: React.FC = () => {
                 <Text style={styles.sheetTitle}>Planos Ativos</Text>
                 <Text style={styles.sheetSubtitle}>Distribuição da base de usuários</Text>
               </View>
-              <TouchableOpacity onPress={() => activePlansSheetRef.current?.close()} style={styles.sheetCloseBtn}>
+              <TouchableOpacity
+                onPress={() => activePlansSheetRef.current?.close()}
+                style={styles.sheetCloseBtn}
+              >
                 <X size={22} color="#64748B" />
               </TouchableOpacity>
             </View>
 
             {/* Quick Stats: Plan Filters */}
             <View style={styles.sheetStatsRow}>
-              <TouchableOpacity 
+              <TouchableOpacity
                 activeOpacity={0.7}
                 style={[
-                  styles.sheetStatItem, 
-                  activePlanFilter === 'FREE' && { backgroundColor: '#F1F5F9', borderColor: '#64748B', borderWidth: 2 }
+                  styles.sheetStatItem,
+                  activePlanFilter === "FREE" && {
+                    backgroundColor: "#F1F5F9",
+                    borderColor: "#64748B",
+                    borderWidth: 2,
+                  },
                 ]}
-                onPress={() => setActivePlanFilter(activePlanFilter === 'FREE' ? 'all' : 'FREE')}
+                onPress={() => setActivePlanFilter(activePlanFilter === "FREE" ? "all" : "FREE")}
               >
                 <Text style={[styles.sheetStatValue, { color: "#64748B" }]}>
-                  {adminUsers.filter(u => {
-                    const plan = (u.plan || "").toLowerCase();
-                    return !plan || plan === 'free' || (!plan.includes('premium') && !plan.includes('familia') && !plan.includes('gold') && !plan.includes('family'));
-                  }).length}
+                  {
+                    adminUsers.filter((u) => {
+                      const plan = (u.plan || "").toLowerCase();
+                      return (
+                        !plan ||
+                        plan === "free" ||
+                        (!plan.includes("premium") &&
+                          !plan.includes("familia") &&
+                          !plan.includes("gold") &&
+                          !plan.includes("family"))
+                      );
+                    }).length
+                  }
                 </Text>
                 <Text style={styles.sheetStatLabel}>Free</Text>
               </TouchableOpacity>
 
-              <TouchableOpacity 
+              <TouchableOpacity
                 activeOpacity={0.7}
                 style={[
-                  styles.sheetStatItem, 
-                  activePlanFilter === 'premium' && { backgroundColor: '#EEF2FF', borderColor: '#6366F1', borderWidth: 2 }
+                  styles.sheetStatItem,
+                  activePlanFilter === "premium" && {
+                    backgroundColor: "#EEF2FF",
+                    borderColor: "#6366F1",
+                    borderWidth: 2,
+                  },
                 ]}
-                onPress={() => setActivePlanFilter(activePlanFilter === 'premium' ? 'all' : 'premium')}
+                onPress={() =>
+                  setActivePlanFilter(activePlanFilter === "premium" ? "all" : "premium")
+                }
               >
                 <Text style={[styles.sheetStatValue, { color: "#6366F1" }]}>
-                  {adminUsers.filter(u => u.plan?.toLowerCase().includes('premium') || u.plan?.toLowerCase().includes('gold')).length}
+                  {
+                    adminUsers.filter(
+                      (u) =>
+                        u.plan?.toLowerCase().includes("premium") ||
+                        u.plan?.toLowerCase().includes("gold")
+                    ).length
+                  }
                 </Text>
                 <Text style={styles.sheetStatLabel}>Premium</Text>
               </TouchableOpacity>
 
-              <TouchableOpacity 
+              <TouchableOpacity
                 activeOpacity={0.7}
                 style={[
-                  styles.sheetStatItem, 
-                  activePlanFilter === 'familia' && { backgroundColor: '#ECFEFF', borderColor: '#06B6D4', borderWidth: 2 }
+                  styles.sheetStatItem,
+                  activePlanFilter === "familia" && {
+                    backgroundColor: "#ECFEFF",
+                    borderColor: "#06B6D4",
+                    borderWidth: 2,
+                  },
                 ]}
-                onPress={() => setActivePlanFilter(activePlanFilter === 'familia' ? 'all' : 'familia')}
+                onPress={() =>
+                  setActivePlanFilter(activePlanFilter === "familia" ? "all" : "familia")
+                }
               >
                 <Text style={[styles.sheetStatValue, { color: "#06B6D4" }]}>
-                  {adminUsers.filter(u => u.plan?.toLowerCase().includes('familia') || u.plan?.toLowerCase().includes('family')).length}
+                  {
+                    adminUsers.filter(
+                      (u) =>
+                        u.plan?.toLowerCase().includes("familia") ||
+                        u.plan?.toLowerCase().includes("family")
+                    ).length
+                  }
                 </Text>
                 <Text style={styles.sheetStatLabel}>Família</Text>
               </TouchableOpacity>
@@ -2421,9 +2591,11 @@ const AdminDashboardScreen: React.FC = () => {
             </View>
 
             {loadingSheet ? (
-              <View style={{ marginTop: 40, alignItems: 'center' }}>
+              <View style={{ marginTop: 40, alignItems: "center" }}>
                 <ActivityIndicator color="#10B981" size="large" />
-                <Text style={{ marginTop: 12, color: '#94A3B8', fontWeight: '600' }}>Carregando dados...</Text>
+                <Text style={{ marginTop: 12, color: "#94A3B8", fontWeight: "600" }}>
+                  Carregando dados...
+                </Text>
               </View>
             ) : (
               <BottomSheetFlatList
@@ -2433,47 +2605,83 @@ const AdminDashboardScreen: React.FC = () => {
                 style={{ flex: 1, marginTop: 15 }}
                 contentContainerStyle={{ paddingBottom: insets.bottom + 150 }}
                 ListEmptyComponent={() => (
-                   <View style={styles.proEmptyState}>
-                     <Users size={40} color="#E2E8F0" />
-                     <Text style={styles.emptyTxt}>Nenhum usuário correspondente aos filtros.</Text>
-                   </View>
+                  <View style={styles.proEmptyState}>
+                    <Users size={40} color="#E2E8F0" />
+                    <Text style={styles.emptyTxt}>Nenhum usuário correspondente aos filtros.</Text>
+                  </View>
                 )}
                 renderItem={({ item }: { item: any }) => (
-                  <TouchableOpacity style={styles.proUserCard} activeOpacity={0.8} onPress={() => openUserDetail(item)}>
+                  <TouchableOpacity
+                    style={styles.proUserCard}
+                    activeOpacity={0.8}
+                    onPress={() => openUserDetail(item)}
+                  >
                     <View style={styles.proUserMain}>
                       <View style={styles.proAvatarContainer}>
                         <Image
                           source={{
-                            uri: item.foto_url || "https://images.unsplash.com/photo-1633332755192-727a05c4013d?w=100&h=100&fit=crop",
+                            uri:
+                              item.foto_url ||
+                              "https://images.unsplash.com/photo-1633332755192-727a05c4013d?w=100&h=100&fit=crop",
                           }}
                           style={styles.proAvatar}
                         />
                       </View>
-                      
+
                       <View style={{ flex: 1, marginLeft: 16 }}>
-                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                        <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
                           <Text style={[styles.proName, { flexShrink: 1 }]} numberOfLines={1}>
                             {item.nome}
                           </Text>
                         </View>
                         <Text style={[styles.proEmail, { marginTop: 4 }]}>{item.email}</Text>
-                        
+
                         <View style={[styles.proBadgeRow, { marginTop: 8 }]}>
-                          <View style={[styles.proBadge, { backgroundColor: item.plan && item.plan !== 'FREE' ? "#EEF2FF" : "#F1F5F9" }]}>
-                             <Text style={[styles.proBadgeText, { color: item.plan && item.plan !== 'FREE' ? "#6366F1" : "#64748B" }]}>
-                               {item.plan || "FREE"}
-                             </Text>
+                          <View
+                            style={[
+                              styles.proBadge,
+                              {
+                                backgroundColor:
+                                  item.plan && item.plan !== "FREE" ? "#EEF2FF" : "#F1F5F9",
+                              },
+                            ]}
+                          >
+                            <Text
+                              style={[
+                                styles.proBadgeText,
+                                {
+                                  color: item.plan && item.plan !== "FREE" ? "#6366F1" : "#64748B",
+                                },
+                              ]}
+                            >
+                              {item.plan || "FREE"}
+                            </Text>
                           </View>
-                          <View style={[styles.proBadge, { backgroundColor: item.ativo ? "#DCFCE7" : "#FEE2E2" }]}>
-                             <View style={[styles.dot, { backgroundColor: item.ativo ? "#10B981" : "#EF4444" }]} />
-                             <Text style={[styles.proBadgeText, { color: item.ativo ? "#106534" : "#991B1B" }]}>
-                               {item.ativo ? "Ativo" : "Bloqueado"}
-                             </Text>
+                          <View
+                            style={[
+                              styles.proBadge,
+                              { backgroundColor: item.ativo ? "#DCFCE7" : "#FEE2E2" },
+                            ]}
+                          >
+                            <View
+                              style={[
+                                styles.dot,
+                                { backgroundColor: item.ativo ? "#10B981" : "#EF4444" },
+                              ]}
+                            />
+                            <Text
+                              style={[
+                                styles.proBadgeText,
+                                { color: item.ativo ? "#106534" : "#991B1B" },
+                              ]}
+                            >
+                              {item.ativo ? "Ativo" : "Bloqueado"}
+                            </Text>
                           </View>
                         </View>
                       </View>
-                      
-                      <View style={{ justifyContent: 'center', paddingLeft: 10 }}>
+
+                      <View style={{ justifyContent: "center", paddingLeft: 10 }}>
                         <ChevronRight size={20} color="#CBD5E1" />
                       </View>
                     </View>
@@ -2483,7 +2691,6 @@ const AdminDashboardScreen: React.FC = () => {
             )}
           </View>
         </BottomSheet>
-
 
         {/* ── SHEET: ACADEMIAS ── */}
         <BottomSheet
@@ -2500,19 +2707,22 @@ const AdminDashboardScreen: React.FC = () => {
                 <Text style={styles.sheetTitle}>Rede de Academias</Text>
                 <Text style={styles.sheetSubtitle}>{adminGyms.length} unidades cadastradas</Text>
               </View>
-              <View style={{ flexDirection: 'row', gap: 12 }}>
-                <TouchableOpacity 
-                   style={[styles.sheetCloseBtn, { backgroundColor: '#BBF246' }]}
-                   onPress={() => {
-                     setGoogleSearchQuery("");
-                     setGoogleResults([]);
-                     setGymForm({});
-                     createGymSheetRef.current?.expand();
-                   }}
+              <View style={{ flexDirection: "row", gap: 12 }}>
+                <TouchableOpacity
+                  style={[styles.sheetCloseBtn, { backgroundColor: "#BBF246" }]}
+                  onPress={() => {
+                    setGoogleSearchQuery("");
+                    setGoogleResults([]);
+                    setGymForm({});
+                    createGymSheetRef.current?.expand();
+                  }}
                 >
                   <Plus size={20} color="#192126" />
                 </TouchableOpacity>
-                <TouchableOpacity onPress={() => gymsSheetRef.current?.close()} style={styles.sheetCloseBtn}>
+                <TouchableOpacity
+                  onPress={() => gymsSheetRef.current?.close()}
+                  style={styles.sheetCloseBtn}
+                >
                   <X size={22} color="#64748B" />
                 </TouchableOpacity>
               </View>
@@ -2520,13 +2730,17 @@ const AdminDashboardScreen: React.FC = () => {
 
             {/* Quick Stats: Network Insights */}
             <View style={[styles.sheetStatsRow, { marginBottom: 15 }]}>
-              <TouchableOpacity 
+              <TouchableOpacity
                 activeOpacity={0.7}
                 style={[
-                  styles.sheetStatItem, 
-                  gymListStatusFilter === 'all' && { backgroundColor: '#F1F5F9', borderColor: '#64748B', borderWidth: 2 }
+                  styles.sheetStatItem,
+                  gymListStatusFilter === "all" && {
+                    backgroundColor: "#F1F5F9",
+                    borderColor: "#64748B",
+                    borderWidth: 2,
+                  },
                 ]}
-                onPress={() => setGymListStatusFilter('all')}
+                onPress={() => setGymListStatusFilter("all")}
               >
                 <Text style={[styles.sheetStatValue, { color: "#64748B" }]}>
                   {adminGyms.length}
@@ -2534,30 +2748,38 @@ const AdminDashboardScreen: React.FC = () => {
                 <Text style={styles.sheetStatLabel}>Todas</Text>
               </TouchableOpacity>
 
-              <TouchableOpacity 
+              <TouchableOpacity
                 activeOpacity={0.7}
                 style={[
-                  styles.sheetStatItem, 
-                  gymListStatusFilter === 'active' && { backgroundColor: '#F0FDF4', borderColor: '#16A34A', borderWidth: 2 }
+                  styles.sheetStatItem,
+                  gymListStatusFilter === "active" && {
+                    backgroundColor: "#F0FDF4",
+                    borderColor: "#16A34A",
+                    borderWidth: 2,
+                  },
                 ]}
-                onPress={() => setGymListStatusFilter('active')}
+                onPress={() => setGymListStatusFilter("active")}
               >
                 <Text style={[styles.sheetStatValue, { color: "#16A34A" }]}>
-                  {adminGyms.filter(g => g.ativo).length}
+                  {adminGyms.filter((g) => g.ativo).length}
                 </Text>
                 <Text style={styles.sheetStatLabel}>Ativas</Text>
               </TouchableOpacity>
 
-              <TouchableOpacity 
+              <TouchableOpacity
                 activeOpacity={0.7}
                 style={[
-                  styles.sheetStatItem, 
-                  gymListStatusFilter === 'blocked' && { backgroundColor: '#FEF2F2', borderColor: '#DC2626', borderWidth: 2 }
+                  styles.sheetStatItem,
+                  gymListStatusFilter === "blocked" && {
+                    backgroundColor: "#FEF2F2",
+                    borderColor: "#DC2626",
+                    borderWidth: 2,
+                  },
                 ]}
-                onPress={() => setGymListStatusFilter('blocked')}
+                onPress={() => setGymListStatusFilter("blocked")}
               >
                 <Text style={[styles.sheetStatValue, { color: "#DC2626" }]}>
-                  {adminGyms.filter(g => !g.ativo).length}
+                  {adminGyms.filter((g) => !g.ativo).length}
                 </Text>
                 <Text style={styles.sheetStatLabel}>Bloqueadas</Text>
               </TouchableOpacity>
@@ -2565,19 +2787,22 @@ const AdminDashboardScreen: React.FC = () => {
 
             {/* Search Bar */}
             <View style={[styles.searchContainer, { marginBottom: 10 }]}>
-               <Search size={18} color="#94A3B8" style={styles.searchIcon} />
-               <TextInput 
-                 placeholder="Buscar unidade por nome ou cidade..."
-                 placeholderTextColor="#94A3B8"
-                 style={styles.searchInput}
-                 value={gymListSearchQuery}
-                 onChangeText={setGymListSearchQuery}
-               />
-               {gymListSearchQuery.length > 0 && (
-                 <TouchableOpacity onPress={() => setGymListSearchQuery("")} style={{ marginRight: 15 }}>
-                   <XCircle size={18} color="#94A3B8" />
-                 </TouchableOpacity>
-               )}
+              <Search size={18} color="#94A3B8" style={styles.searchIcon} />
+              <TextInput
+                placeholder="Buscar unidade por nome ou cidade..."
+                placeholderTextColor="#94A3B8"
+                style={styles.searchInput}
+                value={gymListSearchQuery}
+                onChangeText={setGymListSearchQuery}
+              />
+              {gymListSearchQuery.length > 0 && (
+                <TouchableOpacity
+                  onPress={() => setGymListSearchQuery("")}
+                  style={{ marginRight: 15 }}
+                >
+                  <XCircle size={18} color="#94A3B8" />
+                </TouchableOpacity>
+              )}
             </View>
 
             {loadingSheet ? (
@@ -2590,25 +2815,25 @@ const AdminDashboardScreen: React.FC = () => {
                 style={{ flex: 1, marginTop: 5 }}
                 contentContainerStyle={{ paddingBottom: insets.bottom + 150 }}
                 ListEmptyComponent={() => (
-                   <View style={styles.proEmptyState}>
-                     <Building2 size={40} color="#E2E8F0" />
-                     <Text style={styles.emptyTxt}>Nenhuma academia encontrada.</Text>
-                   </View>
+                  <View style={styles.proEmptyState}>
+                    <Building2 size={40} color="#E2E8F0" />
+                    <Text style={styles.emptyTxt}>Nenhuma academia encontrada.</Text>
+                  </View>
                 )}
                 renderItem={({ item }: { item: any }) => (
-                  <TouchableOpacity 
-                    style={styles.proUserCard} 
-                    activeOpacity={0.8} 
+                  <TouchableOpacity
+                    style={styles.proUserCard}
+                    activeOpacity={0.8}
                     onPress={() => openGymDetails(item)}
                     onLongPress={() => toggleGymStatus(item.id_academia, item.nome, item.ativo)}
                   >
                     <View style={styles.proUserMain}>
-                      <View style={[styles.proAvatarContainer, { backgroundColor: '#F8FAFC' }]}>
+                      <View style={[styles.proAvatarContainer, { backgroundColor: "#F8FAFC" }]}>
                         <Building2 size={24} color="#64748B" />
                       </View>
-                      
+
                       <View style={{ flex: 1, marginLeft: 16 }}>
-                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                        <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
                           <Text style={[styles.proName, { flexShrink: 1 }]} numberOfLines={1}>
                             {item.nome}
                           </Text>
@@ -2616,24 +2841,39 @@ const AdminDashboardScreen: React.FC = () => {
                         <Text style={styles.proEmail} numberOfLines={1}>
                           {item.endereco_completo || item.endereco}
                         </Text>
-                        
+
                         <View style={[styles.proBadgeRow, { marginTop: 8 }]}>
-                          <View style={[styles.proBadge, { backgroundColor: item.ativo ? "#DCFCE7" : "#FEE2E2" }]}>
-                             <View style={[styles.dot, { backgroundColor: item.ativo ? "#10B981" : "#EF4444" }]} />
-                             <Text style={[styles.proBadgeText, { color: item.ativo ? "#106534" : "#991B1B" }]}>
-                               {item.ativo ? "Ativa" : "Bloqueada"}
-                             </Text>
+                          <View
+                            style={[
+                              styles.proBadge,
+                              { backgroundColor: item.ativo ? "#DCFCE7" : "#FEE2E2" },
+                            ]}
+                          >
+                            <View
+                              style={[
+                                styles.dot,
+                                { backgroundColor: item.ativo ? "#10B981" : "#EF4444" },
+                              ]}
+                            />
+                            <Text
+                              style={[
+                                styles.proBadgeText,
+                                { color: item.ativo ? "#106534" : "#991B1B" },
+                              ]}
+                            >
+                              {item.ativo ? "Ativa" : "Bloqueada"}
+                            </Text>
                           </View>
                           <View style={[styles.proBadge, { backgroundColor: "#EEF2FF" }]}>
-                             <Users size={12} color="#6366F1" style={{ marginRight: 4 }} />
-                             <Text style={[styles.proBadgeText, { color: "#6366F1" }]}>
-                               {item.trainers_count || 0} Trainers
-                             </Text>
+                            <Users size={12} color="#6366F1" style={{ marginRight: 4 }} />
+                            <Text style={[styles.proBadgeText, { color: "#6366F1" }]}>
+                              {item.trainers_count || 0} Trainers
+                            </Text>
                           </View>
                         </View>
                       </View>
-                      
-                      <View style={{ justifyContent: 'center', paddingLeft: 10 }}>
+
+                      <View style={{ justifyContent: "center", paddingLeft: 10 }}>
                         <ChevronRight size={20} color="#CBD5E1" />
                       </View>
                     </View>
@@ -2662,64 +2902,80 @@ const AdminDashboardScreen: React.FC = () => {
             </View>
 
             <View style={styles.searchContainer}>
-               <MapPin size={18} color="#94A3B8" style={styles.searchIcon} />
-               <TextInput 
-                 placeholder="Pesquisar no Google Maps..."
-                 placeholderTextColor="#94A3B8"
-                 style={styles.searchInput}
-                 value={googleSearchQuery}
-                 onChangeText={searchGoogleGyms}
-               />
-               {isSearchingGoogle && <ActivityIndicator color="#10B981" style={{ marginRight: 15 }} />}
+              <MapPin size={18} color="#94A3B8" style={styles.searchIcon} />
+              <TextInput
+                placeholder="Pesquisar no Google Maps..."
+                placeholderTextColor="#94A3B8"
+                style={styles.searchInput}
+                value={googleSearchQuery}
+                onChangeText={searchGoogleGyms}
+              />
+              {isSearchingGoogle && (
+                <ActivityIndicator color="#10B981" style={{ marginRight: 15 }} />
+              )}
             </View>
 
             <ScrollView style={{ marginTop: 15 }}>
-               {gymForm.nome ? (
-                 <View style={styles.googleDetailCard}>
-                    <View style={styles.googleHeader}>
-                       <Map size={40} color="#10B981" />
-                       <View style={{ flex: 1, marginLeft: 15 }}>
-                          <Text style={styles.googleGymName}>{gymForm.nome}</Text>
-                          <Text style={styles.googleGymAddr}>{gymForm.endereco_completo}</Text>
-                       </View>
+              {gymForm.nome ? (
+                <View style={styles.googleDetailCard}>
+                  <View style={styles.googleHeader}>
+                    <Map size={40} color="#10B981" />
+                    <View style={{ flex: 1, marginLeft: 15 }}>
+                      <Text style={styles.googleGymName}>{gymForm.nome}</Text>
+                      <Text style={styles.googleGymAddr}>{gymForm.endereco_completo}</Text>
                     </View>
-                    
-                    <View style={styles.googleStatsRow}>
-                       <View style={styles.googleStat}>
-                          <Star size={16} color="#F59E0B" fill="#F59E0B" />
-                          <Text style={styles.googleStatTxt}>{gymForm.rating} ({gymForm.user_ratings_total})</Text>
-                       </View>
-                       {gymForm.telefone && (
-                         <View style={styles.googleStat}>
-                            <PhoneCall size={16} color="#64748B" />
-                            <Text style={styles.googleStatTxt}>{gymForm.telefone}</Text>
-                         </View>
-                       )}
-                    </View>
+                  </View>
 
-                    <TouchableOpacity style={styles.confirmSaveBtn} onPress={saveNewGym} disabled={loadingSheet}>
-                       {loadingSheet ? <ActivityIndicator color="#fff" /> : <Text style={styles.confirmSaveBtnText}>Confirmar e Cadastrar</Text>}
-                    </TouchableOpacity>
-                    <TouchableOpacity style={styles.cancelBtn} onPress={() => setGymForm({})}>
-                       <Text style={styles.cancelBtnText}>Mudar Academia</Text>
-                    </TouchableOpacity>
-                 </View>
-               ) : (
-                 googleResults.map(place => (
-                   <TouchableOpacity 
-                     key={place.place_id} 
-                     style={styles.googleResultItem}
-                     onPress={() => selectGoogleGym(place.place_id)}
-                   >
-                     <MapPin size={20} color="#94A3B8" />
-                     <View style={{ flex: 1, marginLeft: 12 }}>
-                        <Text style={styles.googleResultTitle}>{place.structured_formatting?.main_text}</Text>
-                        <Text style={styles.googleResultSubtitle}>{place.structured_formatting?.secondary_text}</Text>
-                     </View>
-                     <ArrowRight size={18} color="#E2E8F0" />
-                   </TouchableOpacity>
-                 ))
-               )}
+                  <View style={styles.googleStatsRow}>
+                    <View style={styles.googleStat}>
+                      <Star size={16} color="#F59E0B" fill="#F59E0B" />
+                      <Text style={styles.googleStatTxt}>
+                        {gymForm.rating} ({gymForm.user_ratings_total})
+                      </Text>
+                    </View>
+                    {gymForm.telefone && (
+                      <View style={styles.googleStat}>
+                        <PhoneCall size={16} color="#64748B" />
+                        <Text style={styles.googleStatTxt}>{gymForm.telefone}</Text>
+                      </View>
+                    )}
+                  </View>
+
+                  <TouchableOpacity
+                    style={styles.confirmSaveBtn}
+                    onPress={saveNewGym}
+                    disabled={loadingSheet}
+                  >
+                    {loadingSheet ? (
+                      <ActivityIndicator color="#fff" />
+                    ) : (
+                      <Text style={styles.confirmSaveBtnText}>Confirmar e Cadastrar</Text>
+                    )}
+                  </TouchableOpacity>
+                  <TouchableOpacity style={styles.cancelBtn} onPress={() => setGymForm({})}>
+                    <Text style={styles.cancelBtnText}>Mudar Academia</Text>
+                  </TouchableOpacity>
+                </View>
+              ) : (
+                googleResults.map((place) => (
+                  <TouchableOpacity
+                    key={place.place_id}
+                    style={styles.googleResultItem}
+                    onPress={() => selectGoogleGym(place.place_id)}
+                  >
+                    <MapPin size={20} color="#94A3B8" />
+                    <View style={{ flex: 1, marginLeft: 12 }}>
+                      <Text style={styles.googleResultTitle}>
+                        {place.structured_formatting?.main_text}
+                      </Text>
+                      <Text style={styles.googleResultSubtitle}>
+                        {place.structured_formatting?.secondary_text}
+                      </Text>
+                    </View>
+                    <ArrowRight size={18} color="#E2E8F0" />
+                  </TouchableOpacity>
+                ))
+              )}
             </ScrollView>
           </BottomSheetView>
         </BottomSheet>
@@ -2737,137 +2993,255 @@ const AdminDashboardScreen: React.FC = () => {
             <View style={styles.sheetHeader}>
               <View style={{ flex: 1 }}>
                 <Text style={styles.sheetTitle}>{selectedGym?.nome}</Text>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4 }}>
-                   <View style={[styles.proBadge, { backgroundColor: selectedGym?.ativo ? "#DCFCE7" : "#FEE2E2", paddingVertical: 2 }]}>
-                      <View style={[styles.dot, { backgroundColor: selectedGym?.ativo ? "#10B981" : "#EF4444" }]} />
-                      <Text style={[styles.proBadgeText, { color: selectedGym?.ativo ? "#106534" : "#991B1B", fontSize: 9 }]}>
-                        {selectedGym?.ativo ? "OPERACIONAL" : "SUSPENSA"}
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginTop: 4 }}>
+                  <View
+                    style={[
+                      styles.proBadge,
+                      {
+                        backgroundColor: selectedGym?.ativo ? "#DCFCE7" : "#FEE2E2",
+                        paddingVertical: 2,
+                      },
+                    ]}
+                  >
+                    <View
+                      style={[
+                        styles.dot,
+                        { backgroundColor: selectedGym?.ativo ? "#10B981" : "#EF4444" },
+                      ]}
+                    />
+                    <Text
+                      style={[
+                        styles.proBadgeText,
+                        { color: selectedGym?.ativo ? "#106534" : "#991B1B", fontSize: 9 },
+                      ]}
+                    >
+                      {selectedGym?.ativo ? "OPERACIONAL" : "SUSPENSA"}
+                    </Text>
+                  </View>
+                  {selectedGym?.rating > 0 && (
+                    <View style={{ flexDirection: "row", alignItems: "center", gap: 2 }}>
+                      <Star size={12} color="#F59E0B" fill="#F59E0B" />
+                      <Text style={{ fontSize: 12, fontWeight: "700", color: "#B45309" }}>
+                        {selectedGym?.rating}
                       </Text>
-                   </View>
-                   {selectedGym?.rating > 0 && (
-                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2 }}>
-                        <Star size={12} color="#F59E0B" fill="#F59E0B" />
-                        <Text style={{ fontSize: 12, fontWeight: '700', color: '#B45309' }}>{selectedGym?.rating}</Text>
-                     </View>
-                   )}
+                    </View>
+                  )}
                 </View>
               </View>
-              <TouchableOpacity onPress={() => gymDetailSheetRef.current?.close()} style={styles.sheetCloseBtn}>
+              <TouchableOpacity
+                onPress={() => gymDetailSheetRef.current?.close()}
+                style={styles.sheetCloseBtn}
+              >
                 <X size={22} color="#64748B" />
               </TouchableOpacity>
             </View>
 
             <ScrollView showsVerticalScrollIndicator={false} style={{ flex: 1, marginTop: 20 }}>
-               {/* Contact & Info Section */}
-               <View style={{ backgroundColor: '#F8FAFC', padding: 20, borderRadius: 24, marginBottom: 25 }}>
-                  <Text style={{ fontSize: 13, fontWeight: '800', color: '#64748B', marginBottom: 15, textTransform: 'uppercase', letterSpacing: 0.5 }}>Info & Contato</Text>
-                  
-                  <View style={{ gap: 16 }}>
-                    <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 12 }}>
-                       <View style={{ width: 36, height: 36, backgroundColor: '#fff', borderRadius: 12, alignItems: 'center', justifyContent: 'center' }}>
-                          <MapPin size={18} color="#6366F1" />
-                       </View>
-                       <View style={{ flex: 1 }}>
-                          <Text style={{ fontSize: 14, fontWeight: '600', color: '#1E293B' }}>Endereço</Text>
-                          <Text style={{ fontSize: 13, color: '#64748B', marginTop: 2 }}>{selectedGym?.endereco_completo}</Text>
-                       </View>
-                    </View>
+              {/* Contact & Info Section */}
+              <View
+                style={{
+                  backgroundColor: "#F8FAFC",
+                  padding: 20,
+                  borderRadius: 24,
+                  marginBottom: 25,
+                }}
+              >
+                <Text
+                  style={{
+                    fontSize: 13,
+                    fontWeight: "800",
+                    color: "#64748B",
+                    marginBottom: 15,
+                    textTransform: "uppercase",
+                    letterSpacing: 0.5,
+                  }}
+                >
+                  Info & Contato
+                </Text>
 
-                    {(selectedGym?.telefone || selectedGym?.whatsapp) && (
-                      <View style={{ flexDirection: 'row', gap: 10, marginTop: 5 }}>
-                         {selectedGym?.telefone && (
-                           <TouchableOpacity 
-                             style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: '#fff', height: 48, borderRadius: 14, gap: 8, borderWidth: 1, borderColor: '#E2E8F0' }}
-                             onPress={() => Linking.openURL(`tel:${selectedGym.telefone}`)}
-                           >
-                              <Phone size={16} color="#1E293B" />
-                              <Text style={{ fontSize: 13, fontWeight: '700', color: '#1E293B' }}>Ligar</Text>
-                           </TouchableOpacity>
-                         )}
-                         {selectedGym?.whatsapp && (
-                           <TouchableOpacity 
-                             style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: '#DCFCE7', height: 48, borderRadius: 14, gap: 8 }}
-                             onPress={() => Linking.openURL(`https://wa.me/55${selectedGym.whatsapp.replace(/\D/g, "")}`)}
-                           >
-                              <MessageSquare size={16} color="#16A34A" />
-                              <Text style={{ fontSize: 13, fontWeight: '700', color: '#16A34A' }}>WhatsApp</Text>
-                           </TouchableOpacity>
-                         )}
-                      </View>
-                    )}
-
-                    <TouchableOpacity 
-                      style={{ 
-                        flexDirection: 'row', 
-                        alignItems: 'center', 
-                        justifyContent: 'center', 
-                        backgroundColor: selectedGym?.ativo ? '#FEF2F2' : '#F0FDF4', 
-                        height: 48, 
-                        borderRadius: 14, 
-                        gap: 8,
-                        marginTop: 10
+                <View style={{ gap: 16 }}>
+                  <View style={{ flexDirection: "row", alignItems: "flex-start", gap: 12 }}>
+                    <View
+                      style={{
+                        width: 36,
+                        height: 36,
+                        backgroundColor: "#fff",
+                        borderRadius: 12,
+                        alignItems: "center",
+                        justifyContent: "center",
                       }}
-                      onPress={() => toggleGymStatus(selectedGym.id_academia, selectedGym.nome, selectedGym.ativo)}
                     >
-                       <Shield size={16} color={selectedGym?.ativo ? '#DC2626' : '#16A34A'} />
-                       <Text style={{ fontSize: 13, fontWeight: '700', color: selectedGym?.ativo ? '#DC2626' : '#16A34A' }}>
-                         {selectedGym?.ativo ? "Bloquear Unidade" : "Ativar Unidade"}
-                       </Text>
-                    </TouchableOpacity>
-                  </View>
-               </View>
-
-               {/* Professionals Header */}
-               <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 15 }}>
-                  <View>
-                    <Text style={{ fontSize: 16, fontWeight: '800', color: '#1E293B' }}>Profissionais</Text>
-                    <Text style={{ fontSize: 12, color: '#64748B' }}>{gymTrainers.length} vinculados</Text>
-                  </View>
-                  <TouchableOpacity 
-                    style={[styles.addLinkBtn, { backgroundColor: '#BBF246' }]}
-                    onPress={() => {
-                      setTrainerSearchQuery("");
-                      if (adminTrainers.length === 0) fetchAdminTrainers(true);
-                      linkTrainerSheetRef.current?.expand();
-                    }}
-                  >
-                    <Plus size={16} color="#192126" />
-                    <Text style={[styles.addLinkBtnText, { color: '#192126' }]}>Vincular</Text>
-                  </TouchableOpacity>
-               </View>
-
-               {/* Professionals List */}
-               {loadingSheet ? (
-                  <ActivityIndicator color="#6366F1" style={{ marginTop: 30 }} />
-               ) : (
-                  gymTrainers.map(trainer => (
-                    <View key={trainer.id_us} style={[styles.proUserCard, { marginBottom: 12, padding: 12 }]}>
-                       <View style={styles.proUserMain}>
-                          <Image 
-                            source={{ uri: trainer.foto_url || trainer.avatar_url || "https://images.unsplash.com/photo-1594824476967-48c8b964273f?w=100" }} 
-                            style={[styles.proAvatar, { width: 44, height: 44, borderRadius: 22 }]} 
-                          />
-                          <View style={{ flex: 1, marginLeft: 12 }}>
-                             <Text style={[styles.proName, { fontSize: 14 }]}>{trainer.nome}</Text>
-                             <Text style={[styles.proEmail, { fontSize: 12 }]}>{trainer.email}</Text>
-                          </View>
-                          <TouchableOpacity 
-                            onPress={() => unlinkTrainer(trainer.id_us, trainer.nome)}
-                            style={{ width: 36, height: 36, borderRadius: 10, backgroundColor: '#FEF2F2', alignItems: 'center', justifyContent: 'center' }}
-                          >
-                             <Unlink size={18} color="#EF4444" />
-                          </TouchableOpacity>
-                       </View>
+                      <MapPin size={18} color="#6366F1" />
                     </View>
-                  ))
-               )}
-
-               {gymTrainers.length === 0 && !loadingSheet && (
-                  <View style={[styles.proEmptyState, { marginTop: 10 }]}>
-                     <Users size={32} color="#E2E8F0" />
-                     <Text style={[styles.emptyTxt, { fontSize: 13, marginTop: 8 }]}>Nenhum profissional vinculado a esta unidade.</Text>
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ fontSize: 14, fontWeight: "600", color: "#1E293B" }}>
+                        Endereço
+                      </Text>
+                      <Text style={{ fontSize: 13, color: "#64748B", marginTop: 2 }}>
+                        {selectedGym?.endereco_completo}
+                      </Text>
+                    </View>
                   </View>
-               )}
+
+                  {(selectedGym?.telefone || selectedGym?.whatsapp) && (
+                    <View style={{ flexDirection: "row", gap: 10, marginTop: 5 }}>
+                      {selectedGym?.telefone && (
+                        <TouchableOpacity
+                          style={{
+                            flex: 1,
+                            flexDirection: "row",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            backgroundColor: "#fff",
+                            height: 48,
+                            borderRadius: 14,
+                            gap: 8,
+                            borderWidth: 1,
+                            borderColor: "#E2E8F0",
+                          }}
+                          onPress={() => Linking.openURL(`tel:${selectedGym.telefone}`)}
+                        >
+                          <Phone size={16} color="#1E293B" />
+                          <Text style={{ fontSize: 13, fontWeight: "700", color: "#1E293B" }}>
+                            Ligar
+                          </Text>
+                        </TouchableOpacity>
+                      )}
+                      {selectedGym?.whatsapp && (
+                        <TouchableOpacity
+                          style={{
+                            flex: 1,
+                            flexDirection: "row",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            backgroundColor: "#DCFCE7",
+                            height: 48,
+                            borderRadius: 14,
+                            gap: 8,
+                          }}
+                          onPress={() =>
+                            Linking.openURL(
+                              `https://wa.me/55${selectedGym.whatsapp.replace(/\D/g, "")}`
+                            )
+                          }
+                        >
+                          <MessageSquare size={16} color="#16A34A" />
+                          <Text style={{ fontSize: 13, fontWeight: "700", color: "#16A34A" }}>
+                            WhatsApp
+                          </Text>
+                        </TouchableOpacity>
+                      )}
+                    </View>
+                  )}
+
+                  <TouchableOpacity
+                    style={{
+                      flexDirection: "row",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      backgroundColor: selectedGym?.ativo ? "#FEF2F2" : "#F0FDF4",
+                      height: 48,
+                      borderRadius: 14,
+                      gap: 8,
+                      marginTop: 10,
+                    }}
+                    onPress={() =>
+                      toggleGymStatus(selectedGym.id_academia, selectedGym.nome, selectedGym.ativo)
+                    }
+                  >
+                    <Shield size={16} color={selectedGym?.ativo ? "#DC2626" : "#16A34A"} />
+                    <Text
+                      style={{
+                        fontSize: 13,
+                        fontWeight: "700",
+                        color: selectedGym?.ativo ? "#DC2626" : "#16A34A",
+                      }}
+                    >
+                      {selectedGym?.ativo ? "Bloquear Unidade" : "Ativar Unidade"}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+
+              {/* Professionals Header */}
+              <View
+                style={{
+                  flexDirection: "row",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  marginBottom: 15,
+                }}
+              >
+                <View>
+                  <Text style={{ fontSize: 16, fontWeight: "800", color: "#1E293B" }}>
+                    Profissionais
+                  </Text>
+                  <Text style={{ fontSize: 12, color: "#64748B" }}>
+                    {gymTrainers.length} vinculados
+                  </Text>
+                </View>
+                <TouchableOpacity
+                  style={[styles.addLinkBtn, { backgroundColor: "#BBF246" }]}
+                  onPress={() => {
+                    setTrainerSearchQuery("");
+                    if (adminTrainers.length === 0) fetchAdminTrainers(true);
+                    linkTrainerSheetRef.current?.expand();
+                  }}
+                >
+                  <Plus size={16} color="#192126" />
+                  <Text style={[styles.addLinkBtnText, { color: "#192126" }]}>Vincular</Text>
+                </TouchableOpacity>
+              </View>
+
+              {/* Professionals List */}
+              {loadingSheet ? (
+                <ActivityIndicator color="#6366F1" style={{ marginTop: 30 }} />
+              ) : (
+                gymTrainers.map((trainer) => (
+                  <View
+                    key={trainer.id_us}
+                    style={[styles.proUserCard, { marginBottom: 12, padding: 12 }]}
+                  >
+                    <View style={styles.proUserMain}>
+                      <Image
+                        source={{
+                          uri:
+                            trainer.foto_url ||
+                            trainer.avatar_url ||
+                            "https://images.unsplash.com/photo-1594824476967-48c8b964273f?w=100",
+                        }}
+                        style={[styles.proAvatar, { width: 44, height: 44, borderRadius: 22 }]}
+                      />
+                      <View style={{ flex: 1, marginLeft: 12 }}>
+                        <Text style={[styles.proName, { fontSize: 14 }]}>{trainer.nome}</Text>
+                        <Text style={[styles.proEmail, { fontSize: 12 }]}>{trainer.email}</Text>
+                      </View>
+                      <TouchableOpacity
+                        onPress={() => unlinkTrainer(trainer.id_us, trainer.nome)}
+                        style={{
+                          width: 36,
+                          height: 36,
+                          borderRadius: 10,
+                          backgroundColor: "#FEF2F2",
+                          alignItems: "center",
+                          justifyContent: "center",
+                        }}
+                      >
+                        <Unlink size={18} color="#EF4444" />
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                ))
+              )}
+
+              {gymTrainers.length === 0 && !loadingSheet && (
+                <View style={[styles.proEmptyState, { marginTop: 10 }]}>
+                  <Users size={32} color="#E2E8F0" />
+                  <Text style={[styles.emptyTxt, { fontSize: 13, marginTop: 8 }]}>
+                    Nenhum profissional vinculado a esta unidade.
+                  </Text>
+                </View>
+              )}
             </ScrollView>
           </BottomSheetView>
         </BottomSheet>
@@ -2885,69 +3259,99 @@ const AdminDashboardScreen: React.FC = () => {
             <View style={styles.sheetHeader}>
               <View>
                 <Text style={styles.sheetTitle}>Vincular Profissional</Text>
-                <Text style={styles.sheetSubtitle}>Adicione personais à unidade{"\n"}{selectedGym?.nome}</Text>
+                <Text style={styles.sheetSubtitle}>
+                  Adicione personais à unidade{"\n"}
+                  {selectedGym?.nome}
+                </Text>
               </View>
-              <TouchableOpacity onPress={() => linkTrainerSheetRef.current?.close()} style={styles.sheetCloseBtn}>
+              <TouchableOpacity
+                onPress={() => linkTrainerSheetRef.current?.close()}
+                style={styles.sheetCloseBtn}
+              >
                 <X size={22} color="#64748B" />
               </TouchableOpacity>
             </View>
 
             <View style={[styles.searchContainer, { marginTop: 20 }]}>
-               <Search size={18} color="#94A3B8" style={styles.searchIcon} />
-               <TextInput 
-                 placeholder="Buscar por nome ou e-mail..."
-                 placeholderTextColor="#94A3B8"
-                 style={styles.searchInput}
-                 value={trainerSearchQuery}
-                 onChangeText={searchTrainersToLink}
-               />
-               {trainerSearchQuery.length > 0 && (
-                 <TouchableOpacity onPress={() => searchTrainersToLink("")} style={{ marginRight: 15 }}>
-                    <XCircle size={18} color="#94A3B8" />
-                 </TouchableOpacity>
-               )}
+              <Search size={18} color="#94A3B8" style={styles.searchIcon} />
+              <TextInput
+                placeholder="Buscar por nome ou e-mail..."
+                placeholderTextColor="#94A3B8"
+                style={styles.searchInput}
+                value={trainerSearchQuery}
+                onChangeText={searchTrainersToLink}
+              />
+              {trainerSearchQuery.length > 0 && (
+                <TouchableOpacity
+                  onPress={() => searchTrainersToLink("")}
+                  style={{ marginRight: 15 }}
+                >
+                  <XCircle size={18} color="#94A3B8" />
+                </TouchableOpacity>
+              )}
             </View>
 
             <View style={{ marginTop: 15, paddingHorizontal: 5 }}>
-               <Text style={{ fontSize: 12, fontWeight: '700', color: '#64748B', textTransform: 'uppercase' }}>
-                 Profissionais Disponíveis ({trainersAvailableToLink.length})
-               </Text>
+              <Text
+                style={{
+                  fontSize: 12,
+                  fontWeight: "700",
+                  color: "#64748B",
+                  textTransform: "uppercase",
+                }}
+              >
+                Profissionais Disponíveis ({trainersAvailableToLink.length})
+              </Text>
             </View>
 
-            <ScrollView 
-              showsVerticalScrollIndicator={false} 
+            <ScrollView
+              showsVerticalScrollIndicator={false}
               style={{ flex: 1, marginTop: 10 }}
               contentContainerStyle={{ paddingBottom: 50 }}
             >
-               {trainersAvailableToLink.map(trainer => (
-                 <TouchableOpacity 
-                   key={trainer.id_us} 
-                   style={[styles.proUserCard, { marginBottom: 10, padding: 12 }]}
-                   activeOpacity={0.7}
-                   onPress={() => linkTrainer(trainer.id_us)}
-                 >
-                    <View style={styles.proUserMain}>
-                       <Image 
-                         source={{ uri: trainer.foto_url || trainer.avatar_url || "https://images.unsplash.com/photo-1594824476967-48c8b964273f?w=100" }} 
-                         style={[styles.proAvatar, { width: 44, height: 44, borderRadius: 22 }]} 
-                       />
-                       <View style={{ flex: 1, marginLeft: 12 }}>
-                          <Text style={[styles.proName, { fontSize: 14 }]}>{trainer.nome}</Text>
-                          <Text style={[styles.proEmail, { fontSize: 12 }]}>{trainer.email}</Text>
-                       </View>
-                       <View style={{ width: 36, height: 36, borderRadius: 10, backgroundColor: '#F0FDF4', alignItems: 'center', justifyContent: 'center' }}>
-                          <Link size={18} color="#16A34A" />
-                       </View>
+              {trainersAvailableToLink.map((trainer) => (
+                <TouchableOpacity
+                  key={trainer.id_us}
+                  style={[styles.proUserCard, { marginBottom: 10, padding: 12 }]}
+                  activeOpacity={0.7}
+                  onPress={() => linkTrainer(trainer.id_us)}
+                >
+                  <View style={styles.proUserMain}>
+                    <Image
+                      source={{
+                        uri:
+                          trainer.foto_url ||
+                          trainer.avatar_url ||
+                          "https://images.unsplash.com/photo-1594824476967-48c8b964273f?w=100",
+                      }}
+                      style={[styles.proAvatar, { width: 44, height: 44, borderRadius: 22 }]}
+                    />
+                    <View style={{ flex: 1, marginLeft: 12 }}>
+                      <Text style={[styles.proName, { fontSize: 14 }]}>{trainer.nome}</Text>
+                      <Text style={[styles.proEmail, { fontSize: 12 }]}>{trainer.email}</Text>
                     </View>
-                 </TouchableOpacity>
-               ))}
-               
-               {trainersAvailableToLink.length === 0 && (
-                 <View style={[styles.proEmptyState, { marginTop: 40 }]}>
-                    <UserPlus size={40} color="#E2E8F0" />
-                    <Text style={styles.emptyTxt}>Nenhum profissional disponível para vínculo.</Text>
-                 </View>
-               )}
+                    <View
+                      style={{
+                        width: 36,
+                        height: 36,
+                        borderRadius: 10,
+                        backgroundColor: "#F0FDF4",
+                        alignItems: "center",
+                        justifyContent: "center",
+                      }}
+                    >
+                      <Link size={18} color="#16A34A" />
+                    </View>
+                  </View>
+                </TouchableOpacity>
+              ))}
+
+              {trainersAvailableToLink.length === 0 && (
+                <View style={[styles.proEmptyState, { marginTop: 40 }]}>
+                  <UserPlus size={40} color="#E2E8F0" />
+                  <Text style={styles.emptyTxt}>Nenhum profissional disponível para vínculo.</Text>
+                </View>
+              )}
             </ScrollView>
           </BottomSheetView>
         </BottomSheet>
@@ -2965,22 +3369,31 @@ const AdminDashboardScreen: React.FC = () => {
             <View style={[styles.sheetHeader, { marginBottom: 18 }]}>
               <View>
                 <Text style={styles.sheetTitle}>Gerenciar Personais</Text>
-                <Text style={styles.sheetSubtitle}>{adminTrainers.length} profissionais cadastrados</Text>
+                <Text style={styles.sheetSubtitle}>
+                  {adminTrainers.length} profissionais cadastrados
+                </Text>
               </View>
-              <TouchableOpacity onPress={() => trainersSheetRef.current?.close()} style={styles.sheetCloseBtn}>
+              <TouchableOpacity
+                onPress={() => trainersSheetRef.current?.close()}
+                style={styles.sheetCloseBtn}
+              >
                 <X size={22} color="#64748B" />
               </TouchableOpacity>
             </View>
 
             {/* Quick Stats: Activity Filters */}
             <View style={[styles.sheetStatsRow, { marginBottom: 15 }]}>
-              <TouchableOpacity 
+              <TouchableOpacity
                 activeOpacity={0.7}
                 style={[
-                  styles.sheetStatItem, 
-                  trainerListStatusFilter === 'all' && { backgroundColor: '#F1F5F9', borderColor: '#64748B', borderWidth: 2 }
+                  styles.sheetStatItem,
+                  trainerListStatusFilter === "all" && {
+                    backgroundColor: "#F1F5F9",
+                    borderColor: "#64748B",
+                    borderWidth: 2,
+                  },
                 ]}
-                onPress={() => setTrainerListStatusFilter('all')}
+                onPress={() => setTrainerListStatusFilter("all")}
               >
                 <Text style={[styles.sheetStatValue, { color: "#64748B" }]}>
                   {adminTrainers.length}
@@ -2988,30 +3401,38 @@ const AdminDashboardScreen: React.FC = () => {
                 <Text style={styles.sheetStatLabel}>Todos</Text>
               </TouchableOpacity>
 
-              <TouchableOpacity 
+              <TouchableOpacity
                 activeOpacity={0.7}
                 style={[
-                  styles.sheetStatItem, 
-                  trainerListStatusFilter === 'active' && { backgroundColor: '#F0FDF4', borderColor: '#16A34A', borderWidth: 2 }
+                  styles.sheetStatItem,
+                  trainerListStatusFilter === "active" && {
+                    backgroundColor: "#F0FDF4",
+                    borderColor: "#16A34A",
+                    borderWidth: 2,
+                  },
                 ]}
-                onPress={() => setTrainerListStatusFilter('active')}
+                onPress={() => setTrainerListStatusFilter("active")}
               >
                 <Text style={[styles.sheetStatValue, { color: "#16A34A" }]}>
-                  {adminTrainers.filter(u => u.ativo).length}
+                  {adminTrainers.filter((u) => u.ativo).length}
                 </Text>
                 <Text style={styles.sheetStatLabel}>Ativos</Text>
               </TouchableOpacity>
 
-              <TouchableOpacity 
+              <TouchableOpacity
                 activeOpacity={0.7}
                 style={[
-                  styles.sheetStatItem, 
-                  trainerListStatusFilter === 'blocked' && { backgroundColor: '#FEF2F2', borderColor: '#DC2626', borderWidth: 2 }
+                  styles.sheetStatItem,
+                  trainerListStatusFilter === "blocked" && {
+                    backgroundColor: "#FEF2F2",
+                    borderColor: "#DC2626",
+                    borderWidth: 2,
+                  },
                 ]}
-                onPress={() => setTrainerListStatusFilter('blocked')}
+                onPress={() => setTrainerListStatusFilter("blocked")}
               >
                 <Text style={[styles.sheetStatValue, { color: "#DC2626" }]}>
-                  {adminTrainers.filter(u => !u.ativo).length}
+                  {adminTrainers.filter((u) => !u.ativo).length}
                 </Text>
                 <Text style={styles.sheetStatLabel}>Bloqueados</Text>
               </TouchableOpacity>
@@ -3019,19 +3440,22 @@ const AdminDashboardScreen: React.FC = () => {
 
             {/* Search Bar */}
             <View style={[styles.searchContainer, { marginBottom: 10 }]}>
-               <Search size={18} color="#94A3B8" style={styles.searchIcon} />
-               <TextInput 
-                 placeholder="Buscar por nome ou e-mail..."
-                 placeholderTextColor="#94A3B8"
-                 style={styles.searchInput}
-                 value={trainerListSearchQuery}
-                 onChangeText={setTrainerListSearchQuery}
-               />
-               {trainerListSearchQuery.length > 0 && (
-                 <TouchableOpacity onPress={() => setTrainerListSearchQuery("")} style={{ marginRight: 15 }}>
-                   <XCircle size={18} color="#94A3B8" />
-                 </TouchableOpacity>
-               )}
+              <Search size={18} color="#94A3B8" style={styles.searchIcon} />
+              <TextInput
+                placeholder="Buscar por nome ou e-mail..."
+                placeholderTextColor="#94A3B8"
+                style={styles.searchInput}
+                value={trainerListSearchQuery}
+                onChangeText={setTrainerListSearchQuery}
+              />
+              {trainerListSearchQuery.length > 0 && (
+                <TouchableOpacity
+                  onPress={() => setTrainerListSearchQuery("")}
+                  style={{ marginRight: 15 }}
+                >
+                  <XCircle size={18} color="#94A3B8" />
+                </TouchableOpacity>
+              )}
             </View>
 
             {loadingSheet ? (
@@ -3044,52 +3468,72 @@ const AdminDashboardScreen: React.FC = () => {
                 style={{ flex: 1, marginTop: 5 }}
                 contentContainerStyle={{ paddingBottom: insets.bottom + 150 }}
                 ListEmptyComponent={() => (
-                   <View style={styles.proEmptyState}>
-                     <Users size={40} color="#E2E8F0" />
-                     <Text style={styles.emptyTxt}>Nenhum personal encontrado.</Text>
-                   </View>
+                  <View style={styles.proEmptyState}>
+                    <Users size={40} color="#E2E8F0" />
+                    <Text style={styles.emptyTxt}>Nenhum personal encontrado.</Text>
+                  </View>
                 )}
                 renderItem={({ item }: { item: any }) => (
-                  <TouchableOpacity 
-                    style={styles.proUserCard} 
-                    activeOpacity={0.8} 
+                  <TouchableOpacity
+                    style={styles.proUserCard}
+                    activeOpacity={0.8}
                     onPress={() => openUserDetail(item)}
                   >
                     <View style={styles.proUserMain}>
                       <View style={styles.proAvatarContainer}>
                         <Image
                           source={{
-                            uri: item.foto_url || item.avatar_url || "https://images.unsplash.com/photo-1594824476967-48c8b964273f?w=100&h=100&fit=crop",
+                            uri:
+                              item.foto_url ||
+                              item.avatar_url ||
+                              "https://images.unsplash.com/photo-1594824476967-48c8b964273f?w=100&h=100&fit=crop",
                           }}
                           style={styles.proAvatar}
                         />
                       </View>
-                      
+
                       <View style={{ flex: 1, marginLeft: 16 }}>
-                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                        <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
                           <Text style={[styles.proName, { flexShrink: 1 }]} numberOfLines={1}>
                             {item.nome}
                           </Text>
-                          {String(item.role || item.tipo).toLowerCase().includes('admin') && (
-                            <ShieldCheck size={14} color="#6366F1" />
-                          )}
+                          {String(item.role || item.tipo)
+                            .toLowerCase()
+                            .includes("admin") && <ShieldCheck size={14} color="#6366F1" />}
                         </View>
                         <Text style={styles.proEmail}>{item.email}</Text>
-                        
+
                         <View style={[styles.proBadgeRow, { marginTop: 8 }]}>
                           <View style={[styles.proBadge, { backgroundColor: "#F0FDF4" }]}>
-                             <Text style={[styles.proBadgeText, { color: "#16A34A" }]}>PERSONAL</Text>
+                            <Text style={[styles.proBadgeText, { color: "#16A34A" }]}>
+                              PERSONAL
+                            </Text>
                           </View>
-                          <View style={[styles.proBadge, { backgroundColor: item.ativo ? "#DCFCE7" : "#FEE2E2" }]}>
-                             <View style={[styles.dot, { backgroundColor: item.ativo ? "#10B981" : "#EF4444" }]} />
-                             <Text style={[styles.proBadgeText, { color: item.ativo ? "#106534" : "#991B1B" }]}>
-                               {item.ativo ? "Ativo" : "Bloqueado"}
-                             </Text>
+                          <View
+                            style={[
+                              styles.proBadge,
+                              { backgroundColor: item.ativo ? "#DCFCE7" : "#FEE2E2" },
+                            ]}
+                          >
+                            <View
+                              style={[
+                                styles.dot,
+                                { backgroundColor: item.ativo ? "#10B981" : "#EF4444" },
+                              ]}
+                            />
+                            <Text
+                              style={[
+                                styles.proBadgeText,
+                                { color: item.ativo ? "#106534" : "#991B1B" },
+                              ]}
+                            >
+                              {item.ativo ? "Ativo" : "Bloqueado"}
+                            </Text>
                           </View>
                         </View>
                       </View>
-                      
-                      <View style={{ justifyContent: 'center', paddingLeft: 10 }}>
+
+                      <View style={{ justifyContent: "center", paddingLeft: 10 }}>
                         <ChevronRight size={20} color="#CBD5E1" />
                       </View>
                     </View>
@@ -3113,50 +3557,71 @@ const AdminDashboardScreen: React.FC = () => {
             <View style={styles.sheetHeader}>
               <View>
                 <Text style={styles.sheetTitle}>Controle de Renovação</Text>
-                <Text style={styles.sheetSubtitle}>{rawExpiringUsers.length} mensardes rastreados</Text>
+                <Text style={styles.sheetSubtitle}>
+                  {rawExpiringUsers.length} mensardes rastreados
+                </Text>
               </View>
-              <TouchableOpacity onPress={() => expiringSheetRef.current?.close()} style={styles.sheetCloseBtn}>
+              <TouchableOpacity
+                onPress={() => expiringSheetRef.current?.close()}
+                style={styles.sheetCloseBtn}
+              >
                 <X size={22} color="#64748B" />
               </TouchableOpacity>
             </View>
 
             {/* Quick Stats: Plan Filters */}
             <View style={styles.sheetStatsRow}>
-              <TouchableOpacity 
+              <TouchableOpacity
                 activeOpacity={0.7}
                 style={[
-                  styles.sheetStatItem, 
-                  expiringPlanFilter === 'premium' && { backgroundColor: '#EEF2FF', borderColor: '#6366F1', borderWidth: 2 }
+                  styles.sheetStatItem,
+                  expiringPlanFilter === "premium" && {
+                    backgroundColor: "#EEF2FF",
+                    borderColor: "#6366F1",
+                    borderWidth: 2,
+                  },
                 ]}
-                onPress={() => setExpiringPlanFilter(expiringPlanFilter === 'premium' ? 'all' : 'premium')}
+                onPress={() =>
+                  setExpiringPlanFilter(expiringPlanFilter === "premium" ? "all" : "premium")
+                }
               >
                 <Text style={[styles.sheetStatValue, { color: "#6366F1" }]}>
-                  {rawExpiringUsers.filter(u => {
-                    const plan = (u.plan || u.plano || "").toLowerCase();
-                    return plan.includes('premium') || plan.includes('gold');
-                  }).length}
+                  {
+                    rawExpiringUsers.filter((u) => {
+                      const plan = (u.plan || u.plano || "").toLowerCase();
+                      return plan.includes("premium") || plan.includes("gold");
+                    }).length
+                  }
                 </Text>
                 <Text style={styles.sheetStatLabel}>Premium</Text>
               </TouchableOpacity>
 
-              <TouchableOpacity 
+              <TouchableOpacity
                 activeOpacity={0.7}
                 style={[
-                  styles.sheetStatItem, 
-                  expiringPlanFilter === 'familia' && { backgroundColor: '#ECFEFF', borderColor: '#06B6D4', borderWidth: 2 }
+                  styles.sheetStatItem,
+                  expiringPlanFilter === "familia" && {
+                    backgroundColor: "#ECFEFF",
+                    borderColor: "#06B6D4",
+                    borderWidth: 2,
+                  },
                 ]}
-                onPress={() => setExpiringPlanFilter(expiringPlanFilter === 'familia' ? 'all' : 'familia')}
+                onPress={() =>
+                  setExpiringPlanFilter(expiringPlanFilter === "familia" ? "all" : "familia")
+                }
               >
                 <Text style={[styles.sheetStatValue, { color: "#06B6D4" }]}>
-                  {rawExpiringUsers.filter(u => {
-                    const plan = (u.plan || u.plano || "").toLowerCase();
-                    return plan.includes('familia') || plan.includes('family');
-                  }).length}
+                  {
+                    rawExpiringUsers.filter((u) => {
+                      const plan = (u.plan || u.plano || "").toLowerCase();
+                      return plan.includes("familia") || plan.includes("family");
+                    }).length
+                  }
                 </Text>
                 <Text style={styles.sheetStatLabel}>Família</Text>
               </TouchableOpacity>
             </View>
-            
+
             {/* Search Bar */}
             <View style={styles.searchContainer}>
               <Search size={18} color="#94A3B8" style={styles.searchIcon} />
@@ -3179,27 +3644,32 @@ const AdminDashboardScreen: React.FC = () => {
               keyExtractor={(item: any) => (item.id_us || item.id).toString()}
               showsVerticalScrollIndicator={false}
               contentContainerStyle={{ paddingBottom: insets.bottom + 40, paddingTop: 10 }}
-              ListEmptyComponent={() => !loadingSheet && (
-                <View style={[styles.proEmptyState, { marginTop: 80 }]}>
-                   <Bell size={48} color="#E2E8F0" />
-                   <Text style={styles.emptyTxt}>Nenhuma renovação pendente para os próximos dias.</Text>
-                </View>
-              )}
+              ListEmptyComponent={() =>
+                !loadingSheet && (
+                  <View style={[styles.proEmptyState, { marginTop: 80 }]}>
+                    <Bell size={48} color="#E2E8F0" />
+                    <Text style={styles.emptyTxt}>
+                      Nenhuma renovação pendente para os próximos dias.
+                    </Text>
+                  </View>
+                )
+              }
               renderItem={({ item }: { item: any }) => {
                 const planType = (item.plano || item.plan || item.nome_plano || "").toLowerCase();
-                const isPremium = planType.includes('premium') || planType.includes('gold');
-                const isFamilia = planType.includes('familia') || planType.includes('family');
-                
+                const isPremium = planType.includes("premium") || planType.includes("gold");
+                const isFamilia = planType.includes("familia") || planType.includes("family");
+
                 // --- LÓGICA DE CÁLCULO DE DATA ---
                 const rawActivation = item.created_at || item.activated_at || item.data_ativacao;
-                let displayExpiry = item.vencimento || item.validade || item.expires_at || item.data_expiracao;
+                let displayExpiry =
+                  item.vencimento || item.validade || item.expires_at || item.data_expiracao;
 
                 if ((!displayExpiry || displayExpiry === "Em análise") && rawActivation) {
                   try {
                     const actDate = new Date(rawActivation);
                     // Adiciona 1 mês por padrão para planos mensais
                     actDate.setMonth(actDate.getMonth() + 1);
-                    displayExpiry = actDate.toLocaleDateString('pt-BR');
+                    displayExpiry = actDate.toLocaleDateString("pt-BR");
                   } catch (e) {
                     displayExpiry = "Em análise";
                   }
@@ -3208,59 +3678,142 @@ const AdminDashboardScreen: React.FC = () => {
                 // Cálculo de dias restantes (aproximado)
                 let daysLeft = 30;
                 let progress = 0.5;
-                if (displayExpiry && displayExpiry.includes('/')) {
-                   const [d, m, y] = displayExpiry.split('/').map(Number);
-                   const expiryObj = new Date(y, m - 1, d);
-                   const diffTime = expiryObj.getTime() - new Date().getTime();
-                   daysLeft = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-                   // ProgressBar logic (assumindo ciclo de 30 dias)
-                   progress = Math.max(0, Math.min(1, (30 - daysLeft) / 30));
+                if (displayExpiry && displayExpiry.includes("/")) {
+                  const [d, m, y] = displayExpiry.split("/").map(Number);
+                  const expiryObj = new Date(y, m - 1, d);
+                  const diffTime = expiryObj.getTime() - new Date().getTime();
+                  daysLeft = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                  // ProgressBar logic (assumindo ciclo de 30 dias)
+                  progress = Math.max(0, Math.min(1, (30 - daysLeft) / 30));
                 }
 
                 const isCritical = daysLeft <= 7 && daysLeft >= 0;
                 const isExpired = daysLeft < 0;
 
                 const displayDays = isExpired ? 0 : daysLeft;
-                const semTextTitle = isExpired ? '#475569' : (isCritical ? '#EF4444' : '#1E293B');
-                const semTextLabel = isExpired ? '#94A3B8' : (isCritical ? '#EF4444' : '#64748B');
-                
+                const semTextTitle = isExpired ? "#475569" : isCritical ? "#EF4444" : "#1E293B";
+                const semTextLabel = isExpired ? "#94A3B8" : isCritical ? "#EF4444" : "#64748B";
+
                 // --- DIAGNÓSTICO PARA VALIDAÇÃO ---
-                const rawStart = item.created_at || item.activated_at || item.data_ativacao || "Não informado";
-                const rawEnd = item.vencimento || item.validade || item.expires_at || item.data_expiracao || "Nulo no DB";
+                const rawStart =
+                  item.created_at || item.activated_at || item.data_ativacao || "Não informado";
+                const rawEnd =
+                  item.vencimento ||
+                  item.validade ||
+                  item.expires_at ||
+                  item.data_expiracao ||
+                  "Nulo no DB";
 
                 return (
-                  <View style={[styles.compactRowCard, isCritical && { borderColor: '#FEE2E2', backgroundColor: '#FFFBFA' }, isExpired && { borderColor: '#E2E8F0', backgroundColor: '#F8FAFC' }]}>
+                  <View
+                    style={[
+                      styles.compactRowCard,
+                      isCritical && { borderColor: "#FEE2E2", backgroundColor: "#FFFBFA" },
+                      isExpired && { borderColor: "#E2E8F0", backgroundColor: "#F8FAFC" },
+                    ]}
+                  >
                     <View style={styles.compactRowMain}>
                       <Image
-                        source={{ uri: item.foto_url || item.avatar_url || "https://images.unsplash.com/photo-1633332755192-727a05c4013d?w=100" }}
+                        source={{
+                          uri:
+                            item.foto_url ||
+                            item.avatar_url ||
+                            "https://images.unsplash.com/photo-1633332755192-727a05c4013d?w=100",
+                        }}
                         style={[styles.compactAvatar, isExpired && { opacity: 0.6 }]}
                       />
                       <View style={{ flex: 1, marginLeft: 12 }}>
-                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                           <Text style={[styles.compactName, isExpired && { color: '#475569' }]} numberOfLines={1}>{item.nome}</Text>
-                           <View style={[styles.compactPlanBadge, { backgroundColor: isExpired ? '#E2E8F0' : (isPremium ? '#F3E8FF' : '#E0F2FE') }]}>
-                             <Text style={[styles.compactPlanText, { color: isExpired ? '#64748B' : (isPremium ? '#9333EA' : '#0284C7') }]}>
-                                {isPremium ? 'PREMIUM' : 'FAMÍLIA'}
-                             </Text>
-                           </View>
+                        <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                          <Text
+                            style={[styles.compactName, isExpired && { color: "#475569" }]}
+                            numberOfLines={1}
+                          >
+                            {item.nome}
+                          </Text>
+                          <View
+                            style={[
+                              styles.compactPlanBadge,
+                              {
+                                backgroundColor: isExpired
+                                  ? "#E2E8F0"
+                                  : isPremium
+                                    ? "#F3E8FF"
+                                    : "#E0F2FE",
+                              },
+                            ]}
+                          >
+                            <Text
+                              style={[
+                                styles.compactPlanText,
+                                {
+                                  color: isExpired ? "#64748B" : isPremium ? "#9333EA" : "#0284C7",
+                                },
+                              ]}
+                            >
+                              {isPremium ? "PREMIUM" : "FAMÍLIA"}
+                            </Text>
+                          </View>
                         </View>
-                        
+
                         <View style={styles.compactDatesRow}>
-                           <Text style={styles.compactDateLabel}>Início: <Text style={styles.compactDateValue}>{rawStart.split('T')[0].split('-').reverse().slice(0,2).join('/')}</Text></Text>
-                           <Text style={styles.compactDateDot}> • </Text>
-                           <Text style={styles.compactDateLabel}>Renov.: <Text style={[styles.compactDateValue, isCritical && {color: '#EF4444'}, isExpired && {color: '#64748B'}]}>{displayExpiry.split('/').slice(0,2).join('/')}</Text></Text>
+                          <Text style={styles.compactDateLabel}>
+                            Início:{" "}
+                            <Text style={styles.compactDateValue}>
+                              {rawStart.split("T")[0].split("-").reverse().slice(0, 2).join("/")}
+                            </Text>
+                          </Text>
+                          <Text style={styles.compactDateDot}> • </Text>
+                          <Text style={styles.compactDateLabel}>
+                            Renov.:{" "}
+                            <Text
+                              style={[
+                                styles.compactDateValue,
+                                isCritical && { color: "#EF4444" },
+                                isExpired && { color: "#64748B" },
+                              ]}
+                            >
+                              {displayExpiry.split("/").slice(0, 2).join("/")}
+                            </Text>
+                          </Text>
                         </View>
                       </View>
-                      
-                      <View style={[styles.compactDaysBox, { borderLeftColor: isExpired ? '#CBD5E1' : (isCritical ? '#FEE2E2' : '#F1F5F9') }]}>
-                         <Text style={[styles.compactDaysNumber, { color: semTextTitle }]}>{displayDays}</Text>
-                         <Text style={[styles.compactDaysLabel, { color: semTextLabel }]}>{isExpired ? 'VENCIDO' : 'DIAS'}</Text>
+
+                      <View
+                        style={[
+                          styles.compactDaysBox,
+                          {
+                            borderLeftColor: isExpired
+                              ? "#CBD5E1"
+                              : isCritical
+                                ? "#FEE2E2"
+                                : "#F1F5F9",
+                          },
+                        ]}
+                      >
+                        <Text style={[styles.compactDaysNumber, { color: semTextTitle }]}>
+                          {displayDays}
+                        </Text>
+                        <Text style={[styles.compactDaysLabel, { color: semTextLabel }]}>
+                          {isExpired ? "VENCIDO" : "DIAS"}
+                        </Text>
                       </View>
                     </View>
-                    
+
                     {/* Linha de progresso ultra-fina no rodapé do card */}
                     <View style={styles.compactProgressBg}>
-                       <View style={[styles.compactProgressFill, { width: `${(1 - progress) * 100}%`, backgroundColor: isExpired ? '#94A3B8' : (isCritical ? '#EF4444' : '#E2E8F0') }]} />
+                      <View
+                        style={[
+                          styles.compactProgressFill,
+                          {
+                            width: `${(1 - progress) * 100}%`,
+                            backgroundColor: isExpired
+                              ? "#94A3B8"
+                              : isCritical
+                                ? "#EF4444"
+                                : "#E2E8F0",
+                          },
+                        ]}
+                      />
                     </View>
                   </View>
                 );
@@ -3282,9 +3835,14 @@ const AdminDashboardScreen: React.FC = () => {
             <View style={styles.sheetHeader}>
               <View>
                 <Text style={styles.sheetTitle}>Catálogo Estratégico</Text>
-                <Text style={styles.sheetSubtitle}>{adminPlans.length} Modelos de cobrança ativos</Text>
+                <Text style={styles.sheetSubtitle}>
+                  {adminPlans.length} Modelos de cobrança ativos
+                </Text>
               </View>
-              <TouchableOpacity onPress={() => plansSheetRef.current?.close()} style={styles.sheetCloseBtn}>
+              <TouchableOpacity
+                onPress={() => plansSheetRef.current?.close()}
+                style={styles.sheetCloseBtn}
+              >
                 <X size={22} color="#64748B" />
               </TouchableOpacity>
             </View>
@@ -3293,65 +3851,89 @@ const AdminDashboardScreen: React.FC = () => {
               data={adminPlans}
               keyExtractor={(item: any) => item.id.toString()}
               showsVerticalScrollIndicator={false}
-              contentContainerStyle={{ 
+              contentContainerStyle={{
                 paddingBottom: insets.bottom + 120,
-                paddingTop: 10
+                paddingTop: 10,
               }}
-              ListEmptyComponent={() => !loadingSheet && (
-                <View style={[styles.proEmptyState, { marginTop: 80 }]}>
-                   <CreditCard size={48} color="#E2E8F0" />
-                   <Text style={styles.emptyTxt}>Nenhum plano disponível.</Text>
-                </View>
-              )}
+              ListEmptyComponent={() =>
+                !loadingSheet && (
+                  <View style={[styles.proEmptyState, { marginTop: 80 }]}>
+                    <CreditCard size={48} color="#E2E8F0" />
+                    <Text style={styles.emptyTxt}>Nenhum plano disponível.</Text>
+                  </View>
+                )
+              }
               renderItem={({ item }: { item: any }) => {
                 const planName = item.name.toLowerCase();
-                const isPremium = planName.includes('premium') || planName.includes('gold') || planName.includes('vip');
-                const isFamilia = planName.includes('familia') || planName.includes('family') || planName.includes('combo');
-                
+                const isPremium =
+                  planName.includes("premium") ||
+                  planName.includes("gold") ||
+                  planName.includes("vip");
+                const isFamilia =
+                  planName.includes("familia") ||
+                  planName.includes("family") ||
+                  planName.includes("combo");
+
                 let accentColor = "#64748B"; // Default
                 if (isPremium) accentColor = "#6366F1";
                 if (isFamilia) accentColor = "#06B6D4";
 
                 return (
-                  <TouchableOpacity 
-                    key={item.id} 
-                    style={[styles.premiumPlanCard, { borderLeftColor: accentColor, borderLeftWidth: 4 }]}
+                  <TouchableOpacity
+                    key={item.id}
+                    style={[
+                      styles.premiumPlanCard,
+                      { borderLeftColor: accentColor, borderLeftWidth: 4 },
+                    ]}
                     onPress={() => openEditPlan(item)}
                     activeOpacity={0.85}
                   >
                     <View style={styles.stripePlanRow}>
                       <View style={styles.stripePlanInfo}>
-                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                        <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
                           <Text style={styles.premiumPlanName}>{item.name}</Text>
                           {isPremium && (
-                            <View style={[styles.proBadge, { backgroundColor: '#EEF2FF' }]}>
-                               <Star size={10} color="#6366F1" fill="#6366F1" />
-                               <Text style={[styles.proBadgeText, { color: '#6366F1', marginLeft: 4 }]}>Popular</Text>
+                            <View style={[styles.proBadge, { backgroundColor: "#EEF2FF" }]}>
+                              <Star size={10} color="#6366F1" fill="#6366F1" />
+                              <Text
+                                style={[styles.proBadgeText, { color: "#6366F1", marginLeft: 4 }]}
+                              >
+                                Popular
+                              </Text>
                             </View>
                           )}
                         </View>
                         <Text style={[styles.premiumPlanPrice, { color: accentColor }]}>
                           {formatCurrency(item.price)}
-                          <Text style={styles.premiumPlanInterval}> / {item.interval === 'month' ? 'mês' : 'ano'}</Text>
+                          <Text style={styles.premiumPlanInterval}>
+                            {" "}
+                            / {item.interval === "month" ? "mês" : "ano"}
+                          </Text>
                         </Text>
                       </View>
-                      
-                      <TouchableOpacity 
+
+                      <TouchableOpacity
                         style={styles.premiumDeleteBtn}
                         onPress={() => deletePlan(item.id, item.name)}
                       >
                         <Trash2 size={18} color="#EF4444" />
                       </TouchableOpacity>
                     </View>
-                    
+
                     <View style={styles.premiumFeatureSummary}>
-                       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                          <Layers size={14} color="#94A3B8" />
-                          <Text style={styles.premiumFeatureText}>
-                             {(Array.isArray(item.features) ? item.features : JSON.parse(item.features || '[]')).length} vantagens exclusivas
-                          </Text>
-                       </View>
-                       <ChevronRight size={18} color="#CBD5E1" />
+                      <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                        <Layers size={14} color="#94A3B8" />
+                        <Text style={styles.premiumFeatureText}>
+                          {
+                            (Array.isArray(item.features)
+                              ? item.features
+                              : JSON.parse(item.features || "[]")
+                            ).length
+                          }{" "}
+                          vantagens exclusivas
+                        </Text>
+                      </View>
+                      <ChevronRight size={18} color="#CBD5E1" />
                     </View>
                   </TouchableOpacity>
                 );
@@ -3360,19 +3942,16 @@ const AdminDashboardScreen: React.FC = () => {
 
             {/* Premium FAB for Creation */}
             <View style={[styles.premiumFabContainer, { bottom: insets.bottom + 20 }]}>
-               <TouchableOpacity 
-                 style={styles.premiumFAB}
-                 onPress={() => openEditPlan()}
-                 activeOpacity={0.9}
-               >
-                 <LinearGradient
-                   colors={['#1E293B', '#0F172A']}
-                   style={styles.premiumFABGradient}
-                 >
-                   <Plus size={24} color="#fff" />
-                   <Text style={styles.premiumFABText}>Novo Modelo</Text>
-                 </LinearGradient>
-               </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.premiumFAB}
+                onPress={() => openEditPlan()}
+                activeOpacity={0.9}
+              >
+                <LinearGradient colors={["#1E293B", "#0F172A"]} style={styles.premiumFABGradient}>
+                  <Plus size={24} color="#fff" />
+                  <Text style={styles.premiumFABText}>Novo Modelo</Text>
+                </LinearGradient>
+              </TouchableOpacity>
             </View>
           </View>
         </BottomSheet>
@@ -3388,16 +3967,19 @@ const AdminDashboardScreen: React.FC = () => {
           <BottomSheetView style={[styles.sheetContent, { flex: 1 }]}>
             <View style={styles.sheetHeader}>
               <View>
-                <Text style={styles.sheetTitle}>{editingPlan ? 'Editar Plano' : 'Novo Plano'}</Text>
+                <Text style={styles.sheetTitle}>{editingPlan ? "Editar Plano" : "Novo Plano"}</Text>
                 <Text style={styles.sheetSubtitle}>Configure os detalhes do produto</Text>
               </View>
-              <TouchableOpacity onPress={() => editPlanSheetRef.current?.close()} style={styles.sheetCloseBtn}>
+              <TouchableOpacity
+                onPress={() => editPlanSheetRef.current?.close()}
+                style={styles.sheetCloseBtn}
+              >
                 <X size={22} color="#64748B" />
               </TouchableOpacity>
             </View>
 
-            <ScrollView 
-              style={{ marginTop: 20 }} 
+            <ScrollView
+              style={{ marginTop: 20 }}
               showsVerticalScrollIndicator={false}
               contentContainerStyle={{ paddingBottom: insets.bottom + 40 }}
             >
@@ -3406,19 +3988,19 @@ const AdminDashboardScreen: React.FC = () => {
                 <TextInput
                   style={styles.stripeInput}
                   value={planForm.name}
-                  onChangeText={(val) => setPlanForm(f => ({ ...f, name: val }))}
+                  onChangeText={(val) => setPlanForm((f) => ({ ...f, name: val }))}
                   placeholder="Ex: Plano Gold"
                   placeholderTextColor="#94A3B8"
                 />
               </View>
 
-              <View style={{ flexDirection: 'row', gap: 16 }}>
+              <View style={{ flexDirection: "row", gap: 16 }}>
                 <View style={[styles.proFormGroup, { flex: 1 }]}>
                   <Text style={styles.stripeLabel}>PREÇO (R$)</Text>
                   <TextInput
                     style={styles.stripeInput}
                     value={planForm.price}
-                    onChangeText={(val) => setPlanForm(f => ({ ...f, price: val }))}
+                    onChangeText={(val) => setPlanForm((f) => ({ ...f, price: val }))}
                     placeholder="0.00"
                     placeholderTextColor="#94A3B8"
                     keyboardType="numeric"
@@ -3427,18 +4009,38 @@ const AdminDashboardScreen: React.FC = () => {
                 <View style={[styles.proFormGroup, { flex: 1 }]}>
                   <Text style={styles.stripeLabel}>INTERVALO</Text>
                   <View style={styles.stripeIntervalRow}>
-                     <TouchableOpacity 
-                       style={[styles.stripeIntervalBtn, planForm.interval === 'month' && styles.stripeIntervalBtnActive]}
-                       onPress={() => setPlanForm(f => ({ ...f, interval: 'month' }))}
-                     >
-                       <Text style={[styles.stripeIntervalText, planForm.interval === 'month' && styles.stripeIntervalTextActive]}>Mês</Text>
-                     </TouchableOpacity>
-                     <TouchableOpacity 
-                       style={[styles.stripeIntervalBtn, planForm.interval === 'year' && styles.stripeIntervalBtnActive]}
-                       onPress={() => setPlanForm(f => ({ ...f, interval: 'year' }))}
-                     >
-                       <Text style={[styles.stripeIntervalText, planForm.interval === 'year' && styles.stripeIntervalTextActive]}>Ano</Text>
-                     </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[
+                        styles.stripeIntervalBtn,
+                        planForm.interval === "month" && styles.stripeIntervalBtnActive,
+                      ]}
+                      onPress={() => setPlanForm((f) => ({ ...f, interval: "month" }))}
+                    >
+                      <Text
+                        style={[
+                          styles.stripeIntervalText,
+                          planForm.interval === "month" && styles.stripeIntervalTextActive,
+                        ]}
+                      >
+                        Mês
+                      </Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[
+                        styles.stripeIntervalBtn,
+                        planForm.interval === "year" && styles.stripeIntervalBtnActive,
+                      ]}
+                      onPress={() => setPlanForm((f) => ({ ...f, interval: "year" }))}
+                    >
+                      <Text
+                        style={[
+                          styles.stripeIntervalText,
+                          planForm.interval === "year" && styles.stripeIntervalTextActive,
+                        ]}
+                      >
+                        Ano
+                      </Text>
+                    </TouchableOpacity>
                   </View>
                 </View>
               </View>
@@ -3446,9 +4048,9 @@ const AdminDashboardScreen: React.FC = () => {
               <View style={styles.proFormGroup}>
                 <Text style={styles.stripeLabel}>DESCRIÇÃO</Text>
                 <TextInput
-                  style={[styles.stripeInput, { height: 80, textAlignVertical: 'top' }]}
+                  style={[styles.stripeInput, { height: 80, textAlignVertical: "top" }]}
                   value={planForm.description}
-                  onChangeText={(val) => setPlanForm(f => ({ ...f, description: val }))}
+                  onChangeText={(val) => setPlanForm((f) => ({ ...f, description: val }))}
                   placeholder="Breve descrição do plano..."
                   placeholderTextColor="#94A3B8"
                   multiline
@@ -3458,34 +4060,34 @@ const AdminDashboardScreen: React.FC = () => {
               <View style={styles.proFormGroup}>
                 <Text style={styles.stripeLabel}>BENEFÍCIOS E VANTAGENS</Text>
                 <View style={styles.stripeFeatureInputRow}>
-                   <TextInput
-                     style={[styles.stripeInput, { flex: 1, marginTop: 0 }]}
-                     value={newFeature}
-                     onChangeText={setNewFeature}
-                     placeholder="Adicionar benefício..."
-                     placeholderTextColor="#94A3B8"
-                     onSubmitEditing={addFeature}
-                   />
-                   <TouchableOpacity style={styles.stripeAddFeatureBtn} onPress={addFeature}>
-                      <Plus size={20} color="#fff" />
-                   </TouchableOpacity>
+                  <TextInput
+                    style={[styles.stripeInput, { flex: 1, marginTop: 0 }]}
+                    value={newFeature}
+                    onChangeText={setNewFeature}
+                    placeholder="Adicionar benefício..."
+                    placeholderTextColor="#94A3B8"
+                    onSubmitEditing={addFeature}
+                  />
+                  <TouchableOpacity style={styles.stripeAddFeatureBtn} onPress={addFeature}>
+                    <Plus size={20} color="#fff" />
+                  </TouchableOpacity>
                 </View>
 
                 <View style={{ marginTop: 12, gap: 8 }}>
-                   {planForm.features.map((feat, idx) => (
-                     <View key={idx} style={styles.stripeFeatureItem}>
-                        <Check size={14} color="#10B981" />
-                        <Text style={styles.stripeFeatureText}>{feat}</Text>
-                        <TouchableOpacity onPress={() => removeFeature(idx)}>
-                           <X size={14} color="#94A3B8" />
-                        </TouchableOpacity>
-                     </View>
-                   ))}
+                  {planForm.features.map((feat, idx) => (
+                    <View key={idx} style={styles.stripeFeatureItem}>
+                      <Check size={14} color="#10B981" />
+                      <Text style={styles.stripeFeatureText}>{feat}</Text>
+                      <TouchableOpacity onPress={() => removeFeature(idx)}>
+                        <X size={14} color="#94A3B8" />
+                      </TouchableOpacity>
+                    </View>
+                  ))}
                 </View>
               </View>
 
-              <TouchableOpacity 
-                style={styles.stripeSaveBtn} 
+              <TouchableOpacity
+                style={styles.stripeSaveBtn}
                 onPress={savePlanEdits}
                 disabled={loadingSheet}
               >
@@ -3493,7 +4095,7 @@ const AdminDashboardScreen: React.FC = () => {
                   <ActivityIndicator color="#fff" />
                 ) : (
                   <Text style={styles.stripeSaveBtnText}>
-                    {editingPlan ? 'Atualizar Plano' : 'Criar Plano no Stripe'}
+                    {editingPlan ? "Atualizar Plano" : "Criar Plano no Stripe"}
                   </Text>
                 )}
               </TouchableOpacity>
@@ -3517,43 +4119,144 @@ const AdminDashboardScreen: React.FC = () => {
                     <Text style={styles.sheetTitle}>Perfil do Usuário</Text>
                     <Text style={styles.sheetSubtitle}>Visão detalhada do membro</Text>
                   </View>
-                  <TouchableOpacity onPress={() => userDetailSheetRef.current?.close()} style={styles.sheetCloseBtn}>
+                  <TouchableOpacity
+                    onPress={() => userDetailSheetRef.current?.close()}
+                    style={styles.sheetCloseBtn}
+                  >
                     <X size={22} color="#64748B" />
                   </TouchableOpacity>
                 </View>
 
-                <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40 }}>
+                <ScrollView
+                  showsVerticalScrollIndicator={false}
+                  contentContainerStyle={{ paddingBottom: 40 }}
+                >
                   {/* Perfil Principal */}
-                  <View style={{ alignItems: 'center', marginTop: 30, marginBottom: 24 }}>
-                    <View style={{ padding: 4, borderRadius: 60, borderWidth: 2, borderColor: '#BBF246' }}>
-                      <Image 
-                        source={{ uri: selectedUserDetail.foto_url || "https://images.unsplash.com/photo-1633332755192-727a05c4013d?w=200&h=200&fit=crop" }}
+                  <View style={{ alignItems: "center", marginTop: 30, marginBottom: 24 }}>
+                    <View
+                      style={{
+                        padding: 4,
+                        borderRadius: 60,
+                        borderWidth: 2,
+                        borderColor: "#BBF246",
+                      }}
+                    >
+                      <Image
+                        source={{
+                          uri:
+                            selectedUserDetail.foto_url ||
+                            "https://images.unsplash.com/photo-1633332755192-727a05c4013d?w=200&h=200&fit=crop",
+                        }}
                         style={{ width: 110, height: 110, borderRadius: 55 }}
                       />
                     </View>
-                    <Text style={{ fontSize: 24, fontWeight: '800', color: '#1E293B', marginTop: 16 }}>
+                    <Text
+                      style={{ fontSize: 24, fontWeight: "800", color: "#1E293B", marginTop: 16 }}
+                    >
                       {selectedUserDetail.nome}
                     </Text>
-                    <Text style={{ fontSize: 14, color: '#64748B', marginTop: 4 }}>
+                    <Text style={{ fontSize: 14, color: "#64748B", marginTop: 4 }}>
                       {selectedUserDetail.email}
                     </Text>
                   </View>
 
                   {/* Cards de Status */}
-                  <View style={{ flexDirection: 'row', gap: 12, paddingHorizontal: 20 }}>
-                    <View style={{ flex: 1, backgroundColor: '#F8FAFC', padding: 16, borderRadius: 20, borderWidth: 1, borderColor: '#E2E8F0' }}>
-                      <Text style={{ fontSize: 10, color: '#94A3B8', fontWeight: '800', textTransform: 'uppercase', marginBottom: 8 }}>Plano Atual</Text>
-                      <View style={{ alignSelf: 'flex-start', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8, backgroundColor: selectedUserDetail.plan && selectedUserDetail.plan !== 'FREE' ? '#EEF2FF' : '#F1F5F9' }}>
-                        <Text style={{ color: selectedUserDetail.plan && selectedUserDetail.plan !== 'FREE' ? '#6366F1' : '#64748B', fontWeight: '700', fontSize: 12 }}>
+                  <View style={{ flexDirection: "row", gap: 12, paddingHorizontal: 20 }}>
+                    <View
+                      style={{
+                        flex: 1,
+                        backgroundColor: "#F8FAFC",
+                        padding: 16,
+                        borderRadius: 20,
+                        borderWidth: 1,
+                        borderColor: "#E2E8F0",
+                      }}
+                    >
+                      <Text
+                        style={{
+                          fontSize: 10,
+                          color: "#94A3B8",
+                          fontWeight: "800",
+                          textTransform: "uppercase",
+                          marginBottom: 8,
+                        }}
+                      >
+                        Plano Atual
+                      </Text>
+                      <View
+                        style={{
+                          alignSelf: "flex-start",
+                          paddingHorizontal: 8,
+                          paddingVertical: 4,
+                          borderRadius: 8,
+                          backgroundColor:
+                            selectedUserDetail.plan && selectedUserDetail.plan !== "FREE"
+                              ? "#EEF2FF"
+                              : "#F1F5F9",
+                        }}
+                      >
+                        <Text
+                          style={{
+                            color:
+                              selectedUserDetail.plan && selectedUserDetail.plan !== "FREE"
+                                ? "#6366F1"
+                                : "#64748B",
+                            fontWeight: "700",
+                            fontSize: 12,
+                          }}
+                        >
                           {selectedUserDetail.plan || "FREE"}
                         </Text>
                       </View>
                     </View>
-                    <View style={{ flex: 1, backgroundColor: '#F8FAFC', padding: 16, borderRadius: 20, borderWidth: 1, borderColor: '#E2E8F0' }}>
-                      <Text style={{ fontSize: 10, color: '#94A3B8', fontWeight: '800', textTransform: 'uppercase', marginBottom: 8 }}>Status de Conta</Text>
-                      <View style={{ alignSelf: 'flex-start', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8, backgroundColor: selectedUserDetail.ativo ? '#DCFCE7' : '#FEE2E2', flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                        <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: selectedUserDetail.ativo ? '#10B981' : '#EF4444' }} />
-                        <Text style={{ color: selectedUserDetail.ativo ? '#106534' : '#991B1B', fontWeight: '700', fontSize: 12 }}>
+                    <View
+                      style={{
+                        flex: 1,
+                        backgroundColor: "#F8FAFC",
+                        padding: 16,
+                        borderRadius: 20,
+                        borderWidth: 1,
+                        borderColor: "#E2E8F0",
+                      }}
+                    >
+                      <Text
+                        style={{
+                          fontSize: 10,
+                          color: "#94A3B8",
+                          fontWeight: "800",
+                          textTransform: "uppercase",
+                          marginBottom: 8,
+                        }}
+                      >
+                        Status de Conta
+                      </Text>
+                      <View
+                        style={{
+                          alignSelf: "flex-start",
+                          paddingHorizontal: 8,
+                          paddingVertical: 4,
+                          borderRadius: 8,
+                          backgroundColor: selectedUserDetail.ativo ? "#DCFCE7" : "#FEE2E2",
+                          flexDirection: "row",
+                          alignItems: "center",
+                          gap: 4,
+                        }}
+                      >
+                        <View
+                          style={{
+                            width: 6,
+                            height: 6,
+                            borderRadius: 3,
+                            backgroundColor: selectedUserDetail.ativo ? "#10B981" : "#EF4444",
+                          }}
+                        />
+                        <Text
+                          style={{
+                            color: selectedUserDetail.ativo ? "#106534" : "#991B1B",
+                            fontWeight: "700",
+                            fontSize: 12,
+                          }}
+                        >
                           {selectedUserDetail.ativo ? "Ativo" : "Bloqueado"}
                         </Text>
                       </View>
@@ -3562,33 +4265,78 @@ const AdminDashboardScreen: React.FC = () => {
 
                   {/* Detalhes Técnicos */}
                   <View style={{ marginTop: 24, paddingHorizontal: 20 }}>
-                    <Text style={{ fontSize: 14, fontWeight: '800', color: '#1E293B', marginBottom: 16 }}>Informações Gerais</Text>
-                    
+                    <Text
+                      style={{
+                        fontSize: 14,
+                        fontWeight: "800",
+                        color: "#1E293B",
+                        marginBottom: 16,
+                      }}
+                    >
+                      Informações Gerais
+                    </Text>
+
                     <View style={{ gap: 12 }}>
-                      <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#F8FAFC', padding: 16, borderRadius: 16 }}>
+                      <View
+                        style={{
+                          flexDirection: "row",
+                          alignItems: "center",
+                          backgroundColor: "#F8FAFC",
+                          padding: 16,
+                          borderRadius: 16,
+                        }}
+                      >
                         <Mail size={18} color="#64748B" />
                         <View style={{ marginLeft: 12 }}>
-                          <Text style={{ fontSize: 10, color: '#94A3B8', fontWeight: '700' }}>E-MAIL</Text>
-                          <Text style={{ fontSize: 14, color: '#1E293B', fontWeight: '600' }}>{selectedUserDetail.email}</Text>
+                          <Text style={{ fontSize: 10, color: "#94A3B8", fontWeight: "700" }}>
+                            E-MAIL
+                          </Text>
+                          <Text style={{ fontSize: 14, color: "#1E293B", fontWeight: "600" }}>
+                            {selectedUserDetail.email}
+                          </Text>
                         </View>
                       </View>
 
-                      <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#F8FAFC', padding: 16, borderRadius: 16 }}>
+                      <View
+                        style={{
+                          flexDirection: "row",
+                          alignItems: "center",
+                          backgroundColor: "#F8FAFC",
+                          padding: 16,
+                          borderRadius: 16,
+                        }}
+                      >
                         <Calendar size={18} color="#64748B" />
                         <View style={{ marginLeft: 12 }}>
-                          <Text style={{ fontSize: 10, color: '#94A3B8', fontWeight: '700' }}>MEMBRO DESDE</Text>
-                          <Text style={{ fontSize: 14, color: '#1E293B', fontWeight: '600' }}>
-                            {selectedUserDetail.created_at ? new Date(selectedUserDetail.created_at).toLocaleDateString('pt-BR') : 'N/A'}
+                          <Text style={{ fontSize: 10, color: "#94A3B8", fontWeight: "700" }}>
+                            MEMBRO DESDE
+                          </Text>
+                          <Text style={{ fontSize: 14, color: "#1E293B", fontWeight: "600" }}>
+                            {selectedUserDetail.created_at
+                              ? new Date(selectedUserDetail.created_at).toLocaleDateString("pt-BR")
+                              : "N/A"}
                           </Text>
                         </View>
                       </View>
 
                       {selectedUserDetail.cref && (
-                        <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#F8FAFC', padding: 16, borderRadius: 16 }}>
+                        <View
+                          style={{
+                            flexDirection: "row",
+                            alignItems: "center",
+                            backgroundColor: "#F8FAFC",
+                            padding: 16,
+                            borderRadius: 16,
+                          }}
+                        >
                           <Shield size={18} color="#64748B" />
                           <View style={{ marginLeft: 12 }}>
-                            <Text style={{ fontSize: 10, color: '#94A3B8', fontWeight: '700' }}>REGISTRO PROFISSIONAL (CREF)</Text>
-                            <Text style={{ fontSize: 14, color: '#1E293B', fontWeight: '600' }}>{selectedUserDetail.cref}</Text>
+                            <Text style={{ fontSize: 10, color: "#94A3B8", fontWeight: "700" }}>
+                              REGISTRO PROFISSIONAL (CREF)
+                            </Text>
+                            <Text style={{ fontSize: 14, color: "#1E293B", fontWeight: "600" }}>
+                              {selectedUserDetail.cref}
+                            </Text>
                           </View>
                         </View>
                       )}
@@ -3596,19 +4344,39 @@ const AdminDashboardScreen: React.FC = () => {
                   </View>
 
                   {/* Ações Rápidas */}
-                  <View style={{ marginTop: 30, paddingHorizontal: 20, flexDirection: 'row', gap: 12 }}>
-                    <TouchableOpacity 
-                      style={{ flex: 1, backgroundColor: '#192126', height: 56, borderRadius: 16, alignItems: 'center', justifyContent: 'center' }}
+                  <View
+                    style={{ marginTop: 30, paddingHorizontal: 20, flexDirection: "row", gap: 12 }}
+                  >
+                    <TouchableOpacity
+                      style={{
+                        flex: 1,
+                        backgroundColor: "#192126",
+                        height: 56,
+                        borderRadius: 16,
+                        alignItems: "center",
+                        justifyContent: "center",
+                      }}
                       onPress={() => changeUserPlan(selectedUserDetail)}
                     >
-                      <Text style={{ color: '#fff', fontWeight: '700' }}>Gerenciar Plano</Text>
+                      <Text style={{ color: "#fff", fontWeight: "700" }}>Gerenciar Plano</Text>
                     </TouchableOpacity>
-                    
-                    <TouchableOpacity 
-                      style={{ width: 56, height: 56, backgroundColor: '#F1F5F9', borderRadius: 16, alignItems: 'center', justifyContent: 'center' }}
+
+                    <TouchableOpacity
+                      style={{
+                        width: 56,
+                        height: 56,
+                        backgroundColor: "#F1F5F9",
+                        borderRadius: 16,
+                        alignItems: "center",
+                        justifyContent: "center",
+                      }}
                       onPress={() => toggleUserStatus(selectedUserDetail.id_us)}
                     >
-                      {selectedUserDetail.ativo ? <XCircle size={22} color="#EF4444" /> : <CheckCircle size={22} color="#10B981" />}
+                      {selectedUserDetail.ativo ? (
+                        <XCircle size={22} color="#EF4444" />
+                      ) : (
+                        <CheckCircle size={22} color="#10B981" />
+                      )}
                     </TouchableOpacity>
                   </View>
                 </ScrollView>
@@ -3617,6 +4385,266 @@ const AdminDashboardScreen: React.FC = () => {
           </BottomSheetView>
         </BottomSheet>
 
+        {/* ── SHEET: DETALHE DE CHURN ── */}
+        <BottomSheet
+          ref={churnDetailSheetRef}
+          index={-1}
+          snapPoints={["70%"]}
+          enablePanDownToClose
+          backdropComponent={renderBackdrop}
+          backgroundStyle={{ borderRadius: 32 }}
+        >
+          <BottomSheetView style={styles.sheetContent}>
+            <View style={styles.sheetHeader}>
+              <Text style={styles.sheetTitle}>Análise de Churn</Text>
+              <TouchableOpacity onPress={() => churnDetailSheetRef.current?.close()}>
+                <X size={24} color="#64748B" />
+              </TouchableOpacity>
+            </View>
+            <ScrollView style={{ marginTop: 20 }}>
+              <View style={styles.dbAuditBox}>
+                <Text
+                  style={{ fontSize: 13, fontWeight: "700", color: "#1E293B", marginBottom: 10 }}
+                >
+                  Motivos de Cancelamento
+                </Text>
+                {data?.churnBreakdown?.length ? (
+                  data.churnBreakdown.map((item, i) => (
+                    <View key={i} style={styles.dbAuditRow}>
+                      <Text style={styles.dbAuditLabel}>{item.label}</Text>
+                      <Text style={styles.dbAuditValue}>{item.value}</Text>
+                    </View>
+                  ))
+                ) : (
+                  <Text
+                    style={{ fontSize: 12, color: "#94A3B8", textAlign: "center", padding: 20 }}
+                  >
+                    Dados de motivos indisponíveis para este período.
+                  </Text>
+                )}
+              </View>
+              <View
+                style={{ marginTop: 20, padding: 15, backgroundColor: "#F8FAFC", borderRadius: 20 }}
+              >
+                <Text style={{ fontSize: 12, color: "#64748B", lineHeight: 18 }}>
+                  * A taxa de churn está 1.2% menor que o mês anterior. Recomendamos campanhas de
+                  {'retenção para o grupo "Preço / Renovação".'}
+                </Text>
+              </View>
+            </ScrollView>
+          </BottomSheetView>
+        </BottomSheet>
+
+        {/* ── SHEET: DETALHE DE LTV ── */}
+        <BottomSheet
+          ref={ltvDetailSheetRef}
+          index={-1}
+          snapPoints={["60%"]}
+          enablePanDownToClose
+          backdropComponent={renderBackdrop}
+          backgroundStyle={{ borderRadius: 32 }}
+        >
+          <BottomSheetView style={styles.sheetContent}>
+            <View style={styles.sheetHeader}>
+              <Text style={styles.sheetTitle}>Métrica de LTV</Text>
+              <TouchableOpacity onPress={() => ltvDetailSheetRef.current?.close()}>
+                <X size={24} color="#64748B" />
+              </TouchableOpacity>
+            </View>
+            <View style={{ marginTop: 20, gap: 15 }}>
+              <View
+                style={{
+                  padding: 20,
+                  backgroundColor: "#F0FDF4",
+                  borderRadius: 24,
+                  alignItems: "center",
+                }}
+              >
+                <Text
+                  style={{
+                    fontSize: 12,
+                    fontWeight: "700",
+                    color: "#16A34A",
+                    textTransform: "uppercase",
+                  }}
+                >
+                  LTV Projetado Médio
+                </Text>
+                <Text style={{ fontSize: 32, fontWeight: "900", color: "#16A34A", marginTop: 5 }}>
+                  {formatCurrency(data?.ltv?.value || 0)}
+                </Text>
+              </View>
+              <View style={{ gap: 10 }}>
+                <Text style={{ fontSize: 14, fontWeight: "800", color: "#1E293B" }}>
+                  Breakdown por Plano
+                </Text>
+                {data?.ltvBreakdown?.length ? (
+                  data.ltvBreakdown.map((p, i) => (
+                    <View
+                      key={i}
+                      style={{
+                        flexDirection: "row",
+                        justifyContent: "space-between",
+                        padding: 12,
+                        backgroundColor: "#F8FAFC",
+                        borderRadius: 14,
+                      }}
+                    >
+                      <Text style={{ fontWeight: "700", color: "#475569" }}>{p.plan}</Text>
+                      <Text style={{ fontWeight: "800", color: "#1E293B" }}>
+                        {formatCurrency(p.val)}
+                      </Text>
+                    </View>
+                  ))
+                ) : (
+                  <Text
+                    style={{ fontSize: 12, color: "#94A3B8", textAlign: "center", padding: 20 }}
+                  >
+                    Detalhamento por plano ainda não calculado.
+                  </Text>
+                )}
+              </View>
+            </View>
+          </BottomSheetView>
+        </BottomSheet>
+
+        {/* ── SHEET: MIX DE RECEITA ── */}
+        <BottomSheet
+          ref={revenueMixSheetRef}
+          index={-1}
+          snapPoints={["80%"]}
+          enablePanDownToClose
+          backdropComponent={renderBackdrop}
+          backgroundStyle={{ borderRadius: 32 }}
+        >
+          <BottomSheetView style={styles.sheetContent}>
+            <View style={styles.sheetHeader}>
+              <Text style={styles.sheetTitle}>Mix de Receita</Text>
+              <TouchableOpacity onPress={() => revenueMixSheetRef.current?.close()}>
+                <X size={24} color="#64748B" />
+              </TouchableOpacity>
+            </View>
+            <BottomSheetFlatList
+              data={
+                data?.planDistribution || [
+                  { label: "Premium", count: 45, color: "#6366F1" },
+                  { label: "Ouro", count: 30, color: "#F59E0B" },
+                  { label: "Basic", count: 25, color: "#94A3B8" },
+                ]
+              }
+              keyExtractor={(item: any, i: number) => i.toString()}
+              style={{ marginTop: 20 }}
+              renderItem={({ item }: { item: any }) => (
+                <View
+                  style={{
+                    flexDirection: "row",
+                    alignItems: "center",
+                    gap: 15,
+                    padding: 16,
+                    backgroundColor: "#F8FAFC",
+                    borderRadius: 20,
+                    marginBottom: 10,
+                  }}
+                >
+                  <View
+                    style={{ width: 12, height: 12, borderRadius: 6, backgroundColor: item.color }}
+                  />
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ fontSize: 14, fontWeight: "800", color: "#1E293B" }}>
+                      {item.label}
+                    </Text>
+                    <Text style={{ fontSize: 12, color: "#64748B" }}>
+                      {item.count}% da receita total
+                    </Text>
+                  </View>
+                  <ArrowRight size={18} color="#CBD5E1" />
+                </View>
+              )}
+            />
+          </BottomSheetView>
+        </BottomSheet>
+
+        {/* ── SHEET: AUDITORIA DE UNIDADES ── */}
+        <BottomSheet
+          ref={unitAuditSheetRef}
+          index={-1}
+          snapPoints={["90%"]}
+          enablePanDownToClose
+          backdropComponent={renderBackdrop}
+          backgroundStyle={{ borderRadius: 32 }}
+        >
+          <BottomSheetView style={styles.sheetContent}>
+            <View style={styles.sheetHeader}>
+              <Text style={styles.sheetTitle}>Performance de Unidades</Text>
+              <TouchableOpacity onPress={() => unitAuditSheetRef.current?.close()}>
+                <X size={24} color="#64748B" />
+              </TouchableOpacity>
+            </View>
+            <ScrollView style={{ marginTop: 20 }}>
+              <Text
+                style={{
+                  fontSize: 12,
+                  fontWeight: "800",
+                  color: "#94A3B8",
+                  textTransform: "uppercase",
+                  marginBottom: 15,
+                }}
+              >
+                Ranking de Faturamento
+              </Text>
+              {data?.topUnits?.length ? (
+                data.topUnits.map((gym, i) => (
+                  <View
+                    key={i}
+                    style={{
+                      padding: 16,
+                      backgroundColor: "#fff",
+                      borderRadius: 20,
+                      borderWidth: 1,
+                      borderColor: "#F1F5F9",
+                      marginBottom: 12,
+                    }}
+                  >
+                    <View
+                      style={{
+                        flexDirection: "row",
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                      }}
+                    >
+                      <View>
+                        <Text style={{ fontSize: 15, fontWeight: "800", color: "#1E293B" }}>
+                          {gym.name}
+                        </Text>
+                        <Text style={{ fontSize: 12, color: "#64748B" }}>
+                          {gym.members} membros ativos
+                        </Text>
+                      </View>
+                      <View style={{ alignItems: "flex-end" }}>
+                        <Text style={{ fontSize: 15, fontWeight: "900", color: "#1E293B" }}>
+                          {formatCurrency(gym.rev)}
+                        </Text>
+                        <Text
+                          style={{
+                            fontSize: 11,
+                            fontWeight: "700",
+                            color: gym.grow.startsWith("+") ? "#10B981" : "#EF4444",
+                          }}
+                        >
+                          {gym.grow}
+                        </Text>
+                      </View>
+                    </View>
+                  </View>
+                ))
+              ) : (
+                <Text style={{ fontSize: 12, color: "#94A3B8", textAlign: "center", padding: 20 }}>
+                  Nenhuma unidade encontrada.
+                </Text>
+              )}
+            </ScrollView>
+          </BottomSheetView>
+        </BottomSheet>
       </SafeAreaView>
     </GestureHandlerRootView>
   );
@@ -3998,182 +5026,364 @@ const styles = StyleSheet.create({
 
   // Pro Admin Sheet Styles
   sheetSubtitle: { fontSize: 13, color: "#94A3B8", fontWeight: "600", marginTop: 2 },
-  sheetCloseBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: "#F1F5F9", alignItems: "center", justifyContent: "center" },
-  sheetStatsRow: { flexDirection: 'row', justifyContent: 'space-between', gap: 12 },
-  sheetStatItem: { flex: 1, backgroundColor: '#F8FAFC', padding: 12, borderRadius: 16, alignItems: 'center', borderWidth: 1, borderColor: '#F1F5F9' },
-  sheetStatValue: { fontSize: 18, fontWeight: '900', color: '#1E293B' },
-  sheetStatLabel: { fontSize: 10, fontWeight: '700', color: '#94A3B8', marginTop: 2, textTransform: 'uppercase' },
-  
-  searchContainer: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#F1F5F9', marginTop: 20, paddingHorizontal: 16, height: 48, borderRadius: 14 },
+  sheetCloseBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: "#F1F5F9",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  sheetStatsRow: { flexDirection: "row", justifyContent: "space-between", gap: 12 },
+  sheetStatItem: {
+    flex: 1,
+    backgroundColor: "#F8FAFC",
+    padding: 12,
+    borderRadius: 16,
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: "#F1F5F9",
+  },
+  sheetStatValue: { fontSize: 18, fontWeight: "900", color: "#1E293B" },
+  sheetStatLabel: {
+    fontSize: 10,
+    fontWeight: "700",
+    color: "#94A3B8",
+    marginTop: 2,
+    textTransform: "uppercase",
+  },
+
+  searchContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#F1F5F9",
+    marginTop: 20,
+    paddingHorizontal: 16,
+    height: 48,
+    borderRadius: 14,
+  },
   searchIcon: { marginRight: 10 },
-  searchInput: { flex: 1, fontSize: 14, fontWeight: '600', color: '#1E293B' },
+  searchInput: { flex: 1, fontSize: 14, fontWeight: "600", color: "#1E293B" },
 
-  proUserCard: { backgroundColor: '#fff', borderRadius: 20, marginBottom: 12, padding: 12, borderBottomWidth: 1, borderBottomColor: '#F1F5F9' },
-  proUserMain: { flexDirection: 'row', alignItems: 'center' },
-  proAvatarContainer: { position: 'relative' },
-  proAvatar: { width: 50, height: 50, borderRadius: 25, backgroundColor: '#E2E8F0' },
-  proName: { fontSize: 15, fontWeight: '800', color: '#1E293B' },
-  proEmail: { fontSize: 12, color: '#94A3B8', marginTop: 2 },
-  proBadgeRow: { flexDirection: 'row', gap: 8, marginTop: 8 },
-  proBadge: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8, gap: 4 },
-  proBadgeText: { fontSize: 10, fontWeight: '800', textTransform: 'uppercase' },
+  proUserCard: {
+    backgroundColor: "#fff",
+    borderRadius: 20,
+    marginBottom: 12,
+    padding: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: "#F1F5F9",
+  },
+  proUserMain: { flexDirection: "row", alignItems: "center" },
+  proAvatarContainer: { position: "relative" },
+  proAvatar: { width: 50, height: 50, borderRadius: 25, backgroundColor: "#E2E8F0" },
+  proName: { fontSize: 15, fontWeight: "800", color: "#1E293B" },
+  proEmail: { fontSize: 12, color: "#94A3B8", marginTop: 2 },
+  proBadgeRow: { flexDirection: "row", gap: 8, marginTop: 8 },
+  proBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+    gap: 4,
+  },
+  proBadgeText: { fontSize: 10, fontWeight: "800", textTransform: "uppercase" },
   dot: { width: 4, height: 4, borderRadius: 2 },
-  proActionBtn: { width: 40, height: 40, borderRadius: 12, backgroundColor: '#F8FAFC', alignItems: 'center', justifyContent: 'center' },
-  proEmptyState: { alignItems: 'center', marginTop: 60, gap: 12 },
-  
-  proFilterRow: { flexDirection: 'row', gap: 8, marginTop: 16, paddingHorizontal: 4 },
-  proFilterChip: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20, backgroundColor: '#F1F5F9', borderWidth: 1, borderColor: 'transparent' },
-  proFilterChipActive: { backgroundColor: '#fff', borderColor: '#10B981' },
-  proFilterText: { fontSize: 12, fontWeight: '700', color: '#64748B' },
-  proFilterTextActive: { color: '#10B981' },
+  proActionBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    backgroundColor: "#F8FAFC",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  proEmptyState: { alignItems: "center", marginTop: 60, gap: 12 },
 
-  inputLabel: { fontSize: 13, fontWeight: '700', color: '#64748B', marginBottom: 8, marginLeft: 4 },
-  formInput: { backgroundColor: '#F1F5F9', borderRadius: 12, paddingHorizontal: 16, height: 52, fontSize: 14, fontWeight: '600', color: '#1E293B' },
-  savePlanBtn: { backgroundColor: '#10B981', height: 56, borderRadius: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, marginTop: 10 },
-  savePlanBtnText: { fontSize: 16, fontWeight: '800', color: '#fff' },
+  proFilterRow: { flexDirection: "row", gap: 8, marginTop: 16, paddingHorizontal: 4 },
+  proFilterChip: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    backgroundColor: "#F1F5F9",
+    borderWidth: 1,
+    borderColor: "transparent",
+  },
+  proFilterChipActive: { backgroundColor: "#fff", borderColor: "#10B981" },
+  proFilterText: { fontSize: 12, fontWeight: "700", color: "#64748B" },
+  proFilterTextActive: { color: "#10B981" },
 
-  addLinkBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#DCFCE7', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 10 },
-  addLinkBtnText: { fontSize: 13, fontWeight: '700', color: '#10B981' },
-  trainerLinkCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#F8FAFC', padding: 12, borderRadius: 16, marginBottom: 10, borderWidth: 1, borderColor: '#F1F5F9' },
+  inputLabel: { fontSize: 13, fontWeight: "700", color: "#64748B", marginBottom: 8, marginLeft: 4 },
+  formInput: {
+    backgroundColor: "#F1F5F9",
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    height: 52,
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#1E293B",
+  },
+  savePlanBtn: {
+    backgroundColor: "#10B981",
+    height: 56,
+    borderRadius: 16,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 10,
+    marginTop: 10,
+  },
+  savePlanBtnText: { fontSize: 16, fontWeight: "800", color: "#fff" },
+
+  addLinkBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    backgroundColor: "#DCFCE7",
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 10,
+  },
+  addLinkBtnText: { fontSize: 13, fontWeight: "700", color: "#10B981" },
+  trainerLinkCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#F8FAFC",
+    padding: 12,
+    borderRadius: 16,
+    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: "#F1F5F9",
+  },
   trainerLinkAvatar: { width: 44, height: 44, borderRadius: 22 },
-  trainerLinkName: { fontSize: 14, fontWeight: '800', color: '#1E293B' },
-  trainerLinkEmail: { fontSize: 11, color: '#94A3B8' },
-  unlinkBtn: { width: 36, height: 36, borderRadius: 10, backgroundColor: '#FEE2E2', alignItems: 'center', justifyContent: 'center' },
+  trainerLinkName: { fontSize: 14, fontWeight: "800", color: "#1E293B" },
+  trainerLinkEmail: { fontSize: 11, color: "#94A3B8" },
+  unlinkBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    backgroundColor: "#FEE2E2",
+    alignItems: "center",
+    justifyContent: "center",
+  },
 
-  addGymHeaderBtn: { width: 34, height: 34, borderRadius: 10, backgroundColor: '#10B981', alignItems: 'center', justifyContent: "center" },
-  googleResultItem: { flexDirection: 'row', alignItems: 'center', padding: 16, borderBottomWidth: 1, borderBottomColor: '#F1F5F9' },
-  googleResultTitle: { fontSize: 14, fontWeight: '700', color: '#1E293B' },
-  googleResultSubtitle: { fontSize: 11, color: '#64748B', marginTop: 2 },
-  googleDetailCard: { backgroundColor: '#F8FAFC', borderRadius: 24, padding: 20, borderWidth: 1, borderColor: '#F1F5F9' },
-  googleHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 20 },
-  googleGymName: { fontSize: 18, fontWeight: '800', color: '#1E293B' },
-  googleGymAddr: { fontSize: 13, color: '#64748B', marginTop: 4 },
-  googleStatsRow: { flexDirection: 'row', gap: 15, marginBottom: 25 },
-  googleStat: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#fff', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20, borderWidth: 1, borderColor: '#F1F5F9' },
-  googleStatTxt: { fontSize: 12, fontWeight: '700', color: '#475569' },
-  confirmSaveBtn: { backgroundColor: '#10B981', height: 56, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
-  confirmSaveBtnText: { fontSize: 16, fontWeight: '800', color: '#fff' },
-  cancelBtn: { alignItems: 'center', marginTop: 15 },
-  cancelBtnText: { fontSize: 14, fontWeight: '700', color: '#94A3B8' },
+  addGymHeaderBtn: {
+    width: 34,
+    height: 34,
+    borderRadius: 10,
+    backgroundColor: "#10B981",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  googleResultItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: "#F1F5F9",
+  },
+  googleResultTitle: { fontSize: 14, fontWeight: "700", color: "#1E293B" },
+  googleResultSubtitle: { fontSize: 11, color: "#64748B", marginTop: 2 },
+  googleDetailCard: {
+    backgroundColor: "#F8FAFC",
+    borderRadius: 24,
+    padding: 20,
+    borderWidth: 1,
+    borderColor: "#F1F5F9",
+  },
+  googleHeader: { flexDirection: "row", alignItems: "center", marginBottom: 20 },
+  googleGymName: { fontSize: 18, fontWeight: "800", color: "#1E293B" },
+  googleGymAddr: { fontSize: 13, color: "#64748B", marginTop: 4 },
+  googleStatsRow: { flexDirection: "row", gap: 15, marginBottom: 25 },
+  googleStat: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    backgroundColor: "#fff",
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: "#F1F5F9",
+  },
+  googleStatTxt: { fontSize: 12, fontWeight: "700", color: "#475569" },
+  confirmSaveBtn: {
+    backgroundColor: "#10B981",
+    height: 56,
+    borderRadius: 16,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  confirmSaveBtnText: { fontSize: 16, fontWeight: "800", color: "#fff" },
+  cancelBtn: { alignItems: "center", marginTop: 15 },
+  cancelBtnText: { fontSize: 14, fontWeight: "700", color: "#94A3B8" },
 
   // Stripe Style Management
-  addPlanHeaderBtn: { width: 36, height: 36, borderRadius: 10, backgroundColor: '#6366F1', alignItems: 'center', justifyContent: 'center' },
+  addPlanHeaderBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    backgroundColor: "#6366F1",
+    alignItems: "center",
+    justifyContent: "center",
+  },
   stripePlanCard: {
-    backgroundColor: '#fff',
+    backgroundColor: "#fff",
     borderRadius: 20,
     padding: 20,
     marginBottom: 16,
     borderWidth: 1,
-    borderColor: '#F1F5F9',
-    shadowColor: '#000',
+    borderColor: "#F1F5F9",
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
     shadowRadius: 10,
     elevation: 2,
   },
-  stripePlanRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  stripePlanRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
   stripePlanInfo: { flex: 1 },
-  stripePlanName: { fontSize: 16, fontWeight: '800', color: '#1E293B' },
-  stripePlanPrice: { fontSize: 24, fontWeight: '900', color: '#1E293B', marginTop: 4 },
-  stripePlanInterval: { fontSize: 14, fontWeight: '600', color: '#94A3B8' },
-  stripeActionBtn: { width: 36, height: 36, borderRadius: 10, backgroundColor: '#FEE2E2', alignItems: 'center', justifyContent: 'center' },
-  stripeFeaturePreview: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 12, paddingTop: 12, borderTopWidth: 1, borderTopColor: '#F8FAFC' },
-  stripeFeatureCount: { fontSize: 12, fontWeight: '700', color: '#6366F1' },
+  stripePlanName: { fontSize: 16, fontWeight: "800", color: "#1E293B" },
+  stripePlanPrice: { fontSize: 24, fontWeight: "900", color: "#1E293B", marginTop: 4 },
+  stripePlanInterval: { fontSize: 14, fontWeight: "600", color: "#94A3B8" },
+  stripeActionBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    backgroundColor: "#FEE2E2",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  stripeFeaturePreview: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    marginTop: 12,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: "#F8FAFC",
+  },
+  stripeFeatureCount: { fontSize: 12, fontWeight: "700", color: "#6366F1" },
 
   proFormGroup: { marginBottom: 20 },
-  stripeLabel: { fontSize: 10, fontWeight: '800', color: '#64748B', marginBottom: 8, textTransform: 'uppercase', letterSpacing: 1 },
+  stripeLabel: {
+    fontSize: 10,
+    fontWeight: "800",
+    color: "#64748B",
+    marginBottom: 8,
+    textTransform: "uppercase",
+    letterSpacing: 1,
+  },
   stripeInput: {
-    backgroundColor: '#F8FAFC',
+    backgroundColor: "#F8FAFC",
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: "#E2E8F0",
     borderRadius: 12,
     paddingHorizontal: 16,
     height: 52,
     fontSize: 15,
-    fontWeight: '600',
-    color: '#1E293B',
+    fontWeight: "600",
+    color: "#1E293B",
   },
-  stripeIntervalRow: { flexDirection: 'row', backgroundColor: '#F1F5F9', borderRadius: 12, padding: 4, height: 52 },
-  stripeIntervalBtn: { flex: 1, alignItems: 'center', justifyContent: 'center', borderRadius: 10 },
-  stripeIntervalBtnActive: { backgroundColor: '#fff', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4, elevation: 2 },
-  stripeIntervalText: { fontSize: 13, fontWeight: '700', color: '#64748B' },
-  stripeIntervalTextActive: { color: '#6366F1' },
-  
-  stripeFeatureInputRow: { flexDirection: 'row', gap: 10, alignItems: 'center' },
-  stripeAddFeatureBtn: { width: 52, height: 52, borderRadius: 12, backgroundColor: '#6366F1', alignItems: 'center', justifyContent: 'center' },
+  stripeIntervalRow: {
+    flexDirection: "row",
+    backgroundColor: "#F1F5F9",
+    borderRadius: 12,
+    padding: 4,
+    height: 52,
+  },
+  stripeIntervalBtn: { flex: 1, alignItems: "center", justifyContent: "center", borderRadius: 10 },
+  stripeIntervalBtnActive: {
+    backgroundColor: "#fff",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  stripeIntervalText: { fontSize: 13, fontWeight: "700", color: "#64748B" },
+  stripeIntervalTextActive: { color: "#6366F1" },
+
+  stripeFeatureInputRow: { flexDirection: "row", gap: 10, alignItems: "center" },
+  stripeAddFeatureBtn: {
+    width: 52,
+    height: 52,
+    borderRadius: 12,
+    backgroundColor: "#6366F1",
+    alignItems: "center",
+    justifyContent: "center",
+  },
   stripeFeatureItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 10,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: "#F8FAFC",
     padding: 12,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#F1F5F9',
+    borderColor: "#F1F5F9",
   },
-  stripeFeatureText: { flex: 1, fontSize: 14, fontWeight: '600', color: '#475569' },
+  stripeFeatureText: { flex: 1, fontSize: 14, fontWeight: "600", color: "#475569" },
   stripeSaveBtn: {
-    backgroundColor: '#1E293B',
+    backgroundColor: "#1E293B",
     height: 56,
     borderRadius: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
     marginTop: 20,
-    shadowColor: '#000',
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.2,
     shadowRadius: 10,
     elevation: 4,
   },
-  stripeSaveBtnText: { fontSize: 16, fontWeight: '800', color: '#fff' },
+  stripeSaveBtnText: { fontSize: 16, fontWeight: "800", color: "#fff" },
 
   // Ultra-Premium Plan Styles
   premiumPlanCard: {
-    backgroundColor: '#fff',
+    backgroundColor: "#fff",
     borderRadius: 24,
     padding: 20,
     marginBottom: 16,
     marginHorizontal: 4,
-    shadowColor: '#000',
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.08,
     shadowRadius: 15,
     elevation: 3,
   },
-  premiumPlanName: { fontSize: 18, fontWeight: '900', color: '#1E293B' },
-  premiumPlanPrice: { fontSize: 28, fontWeight: '900', marginTop: 6 },
-  premiumPlanInterval: { fontSize: 14, fontWeight: '600', color: '#94A3B8' },
-  premiumDeleteBtn: { 
-    width: 40, 
-    height: 40, 
-    borderRadius: 14, 
-    backgroundColor: '#FFF1F2', 
-    alignItems: 'center', 
-    justifyContent: 'center' 
+  premiumPlanName: { fontSize: 18, fontWeight: "900", color: "#1E293B" },
+  premiumPlanPrice: { fontSize: 28, fontWeight: "900", marginTop: 6 },
+  premiumPlanInterval: { fontSize: 14, fontWeight: "600", color: "#94A3B8" },
+  premiumDeleteBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 14,
+    backgroundColor: "#FFF1F2",
+    alignItems: "center",
+    justifyContent: "center",
   },
-  premiumFeatureSummary: { 
-    flexDirection: 'row', 
-    justifyContent: 'space-between', 
-    alignItems: 'center', 
-    marginTop: 16, 
-    paddingTop: 16, 
-    borderTopWidth: 1, 
-    borderTopColor: '#F8FAFC' 
+  premiumFeatureSummary: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginTop: 16,
+    paddingTop: 16,
+    borderTopWidth: 1,
+    borderTopColor: "#F8FAFC",
   },
-  premiumFeatureText: { fontSize: 13, fontWeight: '700', color: '#64748B' },
-  
+  premiumFeatureText: { fontSize: 13, fontWeight: "700", color: "#64748B" },
+
   premiumFabContainer: {
-    position: 'absolute',
+    position: "absolute",
     left: 20,
     right: 20,
-    alignItems: 'center',
+    alignItems: "center",
   },
   premiumFAB: {
-    width: '100%',
+    width: "100%",
     height: 60,
     borderRadius: 20,
-    overflow: 'hidden',
-    shadowColor: '#000',
+    overflow: "hidden",
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: 10 },
     shadowOpacity: 0.3,
     shadowRadius: 20,
@@ -4181,150 +5391,182 @@ const styles = StyleSheet.create({
   },
   premiumFABGradient: {
     flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
     gap: 12,
   },
   premiumFABText: {
-    color: '#fff',
+    color: "#fff",
     fontSize: 16,
-    fontWeight: '800',
+    fontWeight: "800",
     letterSpacing: 0.5,
   },
 
   // Expiring User Special Styles
   expiringUserCard: {
-    backgroundColor: '#fff',
+    backgroundColor: "#fff",
     borderRadius: 20,
     padding: 16,
     marginBottom: 12,
     borderWidth: 1,
-    borderColor: '#F1F5F9',
+    borderColor: "#F1F5F9",
   },
   expiringAvatar: { width: 44, height: 44, borderRadius: 22 },
-  expiringName: { fontSize: 14, fontWeight: '800', color: '#1E293B' },
-  expiringDetail: { fontSize: 12, color: '#64748B', marginTop: 2 },
+  expiringName: { fontSize: 14, fontWeight: "800", color: "#1E293B" },
+  expiringDetail: { fontSize: 12, color: "#64748B", marginTop: 2 },
   planTypeBadge: { paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6 },
-  planTypeBadgeText: { fontSize: 9, fontWeight: '900' },
-  countdownBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 10 },
-  countdownText: { fontSize: 10, fontWeight: '800', color: '#EF4444' },
-  notifyBtn: { width: 34, height: 34, borderRadius: 10, backgroundColor: '#F1F5F9', alignItems: 'center', justifyContent: 'center' },
+  planTypeBadgeText: { fontSize: 9, fontWeight: "900" },
+  countdownBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 10,
+  },
+  countdownText: { fontSize: 10, fontWeight: "800", color: "#EF4444" },
+  notifyBtn: {
+    width: 34,
+    height: 34,
+    borderRadius: 10,
+    backgroundColor: "#F1F5F9",
+    alignItems: "center",
+    justifyContent: "center",
+  },
 
   // Ultra-Premium Renewal Management
   premiumExpiringCard: {
-    backgroundColor: '#fff',
+    backgroundColor: "#fff",
     borderRadius: 20,
     padding: 16,
     marginBottom: 12,
     borderWidth: 1,
-    borderColor: '#F1F5F9',
-    shadowColor: '#000',
+    borderColor: "#F1F5F9",
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.04,
     shadowRadius: 8,
     elevation: 2,
   },
   criticalCard: {
-    borderColor: '#FEE2E2',
-    backgroundColor: '#FFFBFA',
+    borderColor: "#FEE2E2",
+    backgroundColor: "#FFFBFA",
   },
   alertDot: {
-    position: 'absolute',
+    position: "absolute",
     bottom: -2,
     right: -2,
     width: 16,
     height: 16,
     borderRadius: 8,
-    backgroundColor: '#EF4444',
+    backgroundColor: "#EF4444",
     borderWidth: 2,
-    borderColor: '#fff',
-    alignItems: 'center',
-    justifyContent: 'center',
+    borderColor: "#fff",
+    alignItems: "center",
+    justifyContent: "center",
   },
-  expiryInfoRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4 },
-  expiryDateText: { fontWeight: '800', color: '#1E293B', fontSize: 13 },
+  expiryInfoRow: { flexDirection: "row", alignItems: "center", gap: 6, marginTop: 4 },
+  expiryDateText: { fontWeight: "800", color: "#1E293B", fontSize: 13 },
   renewalProgressContainer: {
     height: 4,
-    backgroundColor: '#F1F5F9',
+    backgroundColor: "#F1F5F9",
     borderRadius: 2,
     marginTop: 10,
-    overflow: 'hidden',
+    overflow: "hidden",
   },
   renewalProgressBar: {
-    height: '100%',
+    height: "100%",
     borderRadius: 2,
   },
-  daysLeftText: { fontSize: 11, fontWeight: '800', marginBottom: 4, textTransform: 'uppercase' },
+  daysLeftText: { fontSize: 11, fontWeight: "800", marginBottom: 4, textTransform: "uppercase" },
   quickActionBtn: {
     width: 36,
     height: 36,
     borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
   },
 
   // Audit Styles
   dbAuditBox: {
-    backgroundColor: '#F8FAFC',
+    backgroundColor: "#F8FAFC",
     borderRadius: 12,
     padding: 8,
     gap: 4,
     borderWidth: 1,
-    borderColor: '#F1F5F9',
+    borderColor: "#F1F5F9",
   },
-  dbAuditRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  dbAuditLabel: { fontSize: 9, fontWeight: '700', color: '#94A3B8', textTransform: 'uppercase' },
-  dbAuditValue: { fontSize: 10, fontWeight: '800', color: '#475569' },
+  dbAuditRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
+  dbAuditLabel: { fontSize: 9, fontWeight: "700", color: "#94A3B8", textTransform: "uppercase" },
+  dbAuditValue: { fontSize: 10, fontWeight: "800", color: "#475569" },
 
   // Clean Renewal Styles
   cleanRenewalCard: {
-    backgroundColor: '#fff',
+    backgroundColor: "#fff",
     borderRadius: 24,
     padding: 20,
     marginBottom: 16,
     borderWidth: 1,
-    borderColor: '#F8FAFC',
-    shadowColor: '#000',
+    borderColor: "#F8FAFC",
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.02,
     shadowRadius: 10,
     elevation: 2,
   },
-  cleanRenewalRow: { flexDirection: 'row', alignItems: 'center' },
-  cleanAvatar: { width: 52, height: 52, borderRadius: 18, backgroundColor: '#F1F5F9' },
-  cleanNameText: { fontSize: 16, fontWeight: '800', color: '#1E293B' },
-  cleanPlanLabel: { fontSize: 13, color: '#64748B', marginTop: 2 },
-  cleanStatusText: { fontSize: 11, fontWeight: '900', textTransform: 'uppercase', letterSpacing: 0.5 },
+  cleanRenewalRow: { flexDirection: "row", alignItems: "center" },
+  cleanAvatar: { width: 52, height: 52, borderRadius: 18, backgroundColor: "#F1F5F9" },
+  cleanNameText: { fontSize: 16, fontWeight: "800", color: "#1E293B" },
+  cleanPlanLabel: { fontSize: 13, color: "#64748B", marginTop: 2 },
+  cleanStatusText: {
+    fontSize: 11,
+    fontWeight: "900",
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+  },
   cleanTimelineContainer: { marginTop: 16 },
-  cleanTimelineInfo: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 },
-  cleanDateText: { fontSize: 11, fontWeight: '700', color: '#94A3B8' },
-  cleanProgressBarBg: { height: 6, backgroundColor: '#F1F5F9', borderRadius: 3, overflow: 'hidden' },
-  cleanProgressBarFill: { height: '100%', borderRadius: 3 },
+  cleanTimelineInfo: { flexDirection: "row", justifyContent: "space-between", marginBottom: 6 },
+  cleanDateText: { fontSize: 11, fontWeight: "700", color: "#94A3B8" },
+  cleanProgressBarBg: {
+    height: 6,
+    backgroundColor: "#F1F5F9",
+    borderRadius: 3,
+    overflow: "hidden",
+  },
+  cleanProgressBarFill: { height: "100%", borderRadius: 3 },
 
   // Compact Renewal Row Styles
   compactRowCard: {
-    backgroundColor: '#fff',
+    backgroundColor: "#fff",
     borderRadius: 16,
     marginBottom: 10,
     borderWidth: 1,
-    borderColor: '#F8FAFC',
-    overflow: 'hidden',
+    borderColor: "#F8FAFC",
+    overflow: "hidden",
   },
-  compactRowMain: { flexDirection: 'row', padding: 12, alignItems: 'center' },
-  compactAvatar: { width: 40, height: 40, borderRadius: 12, backgroundColor: '#F1F5F9' },
-  compactName: { fontSize: 14, fontWeight: '700', color: '#1E293B', flexShrink: 1 },
+  compactRowMain: { flexDirection: "row", padding: 12, alignItems: "center" },
+  compactAvatar: { width: 40, height: 40, borderRadius: 12, backgroundColor: "#F1F5F9" },
+  compactName: { fontSize: 14, fontWeight: "700", color: "#1E293B", flexShrink: 1 },
   compactPlanBadge: { paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6 },
-  compactPlanText: { fontSize: 9, fontWeight: '800' },
-  compactDatesRow: { flexDirection: 'row', alignItems: 'center', marginTop: 4 },
-  compactDateLabel: { fontSize: 11, color: '#94A3B8' },
-  compactDateValue: { fontWeight: '700', color: '#475569' },
-  compactDateDot: { fontSize: 10, color: '#CBD5E1', marginHorizontal: 4 },
-  compactDaysBox: { alignItems: 'center', justifyContent: 'center', paddingLeft: 12, borderLeftWidth: 1, borderLeftColor: '#F1F5F9', marginLeft: 12, minWidth: 46 },
-  compactDaysNumber: { fontSize: 18, fontWeight: '800', lineHeight: 20 },
-  compactDaysLabel: { fontSize: 8, fontWeight: '700' },
-  compactProgressBg: { height: 2, backgroundColor: '#F8FAFC', width: '100%' },
-  compactProgressFill: { height: '100%' },
+  compactPlanText: { fontSize: 9, fontWeight: "800" },
+  compactDatesRow: { flexDirection: "row", alignItems: "center", marginTop: 4 },
+  compactDateLabel: { fontSize: 11, color: "#94A3B8" },
+  compactDateValue: { fontWeight: "700", color: "#475569" },
+  compactDateDot: { fontSize: 10, color: "#CBD5E1", marginHorizontal: 4 },
+  compactDaysBox: {
+    alignItems: "center",
+    justifyContent: "center",
+    paddingLeft: 12,
+    borderLeftWidth: 1,
+    borderLeftColor: "#F1F5F9",
+    marginLeft: 12,
+    minWidth: 46,
+  },
+  compactDaysNumber: { fontSize: 18, fontWeight: "800", lineHeight: 20 },
+  compactDaysLabel: { fontSize: 8, fontWeight: "700" },
+  compactProgressBg: { height: 2, backgroundColor: "#F8FAFC", width: "100%" },
+  compactProgressFill: { height: "100%" },
 });
 
 export default AdminDashboardScreen;

@@ -267,7 +267,6 @@ const ProfilePFScreen = () => {
     }
   };
 
-
   const handleCreatePost = () => {
     setSelectedPost(null); // Garante que é um novo post
     setIsPostSheetOpen(true);
@@ -459,7 +458,7 @@ const ProfilePFScreen = () => {
                 <User size={18} color="#1E293B" />
                 <Text style={styles.ownProfileButtonText}>Perfil</Text>
               </TouchableOpacity>
-              
+
               <TouchableOpacity
                 style={styles.ownProfileButton}
                 onPress={() => setConfigModalVisible(true)}
@@ -583,16 +582,22 @@ const ProfilePFScreen = () => {
         <View style={styles.loadingOverlay}>
           <View style={styles.manageModal}>
             <Text style={styles.manageTitle}>Configurações</Text>
-            <TouchableOpacity style={styles.manageOption} onPress={() => {
-              setConfigModalVisible(false);
-              navigation.navigate("ArchivedPostsScreen");
-            }}>
+            <TouchableOpacity
+              style={styles.manageOption}
+              onPress={() => {
+                setConfigModalVisible(false);
+                navigation.navigate("ArchivedPostsScreen");
+              }}
+            >
               <Text style={styles.manageOptionText}>Posts Arquivados</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.manageOption} onPress={() => {
-              setConfigModalVisible(false);
-              navigation.navigate("ConfigScreen");
-            }}>
+            <TouchableOpacity
+              style={styles.manageOption}
+              onPress={() => {
+                setConfigModalVisible(false);
+                navigation.navigate("ConfigScreen");
+              }}
+            >
               <Text style={styles.manageOptionText}>Configurações da Conta</Text>
             </TouchableOpacity>
             <TouchableOpacity

@@ -16,7 +16,16 @@ export interface Notification {
   id: string;
   title: string;
   message: string;
-  type?: "info" | "success" | "warning" | "error" | "like" | "comment" | "follow" | "like_diet" | "comment_diet";
+  type?:
+    | "info"
+    | "success"
+    | "warning"
+    | "error"
+    | "like"
+    | "comment"
+    | "follow"
+    | "like_diet"
+    | "comment_diet";
   timestamp: Date;
   read: boolean;
   userImage?: string;
@@ -183,7 +192,7 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({ chil
 
   useEffect(() => {
     if (!user) return;
-    
+
     // 1. Initial Fetch
     fetchRemoteData();
 
@@ -192,13 +201,13 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({ chil
     if (!userId) return;
 
     const channel = supabase
-      .channel('notifications-changes')
+      .channel("notifications-changes")
       .on(
-        'postgres_changes',
+        "postgres_changes",
         {
-          event: '*',
-          schema: 'public',
-          table: 'notifications',
+          event: "*",
+          schema: "public",
+          table: "notifications",
           filter: `user_id=eq.${userId}`,
         },
         () => {

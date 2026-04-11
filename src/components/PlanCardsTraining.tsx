@@ -139,10 +139,7 @@ const PlanTile: React.FC<{ plan: Plan; index: number; onPress?: (plan: Plan) => 
               </View>
 
               {/* Botão Play sempre fixo à direita */}
-              <TouchableOpacity 
-                style={styles.playIconButton}
-                onPress={() => onPress?.(plan)}
-              >
+              <TouchableOpacity style={styles.playIconButton} onPress={() => onPress?.(plan)}>
                 <Play size={14} fill="#192126" color="#192126" />
               </TouchableOpacity>
             </View>

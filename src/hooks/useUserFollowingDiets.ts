@@ -112,7 +112,7 @@ export const useUserFollowingDiets = (): UseUserFollowingDietsReturn => {
         });
 
         const newDiets = response.data.diets;
-        
+
         // Mapear dietas para o formato de Post que o PostCard espera
         const mappedDiets = newDiets.map((diet: Diet) => ({
           post_id: diet.id_dieta,
@@ -125,15 +125,19 @@ export const useUserFollowingDiets = (): UseUserFollowingDietsReturn => {
             is_verified: false, // Dietas não têm verificação
             is_following: true, // Já sabemos que estamos seguindo pois filtramos por usuários seguidos
           },
-          media: diet.imageurl ? [{
-            media_id: `${diet.id_dieta}_media_1`,
-            media_url: diet.imageurl,
-            thumbnail_url: diet.imageurl,
-            media_type: "image",
-            width: 1080, // Valores padrão
-            height: 1080,
-            position: 0,
-          }] : [],
+          media: diet.imageurl
+            ? [
+                {
+                  media_id: `${diet.id_dieta}_media_1`,
+                  media_url: diet.imageurl,
+                  thumbnail_url: diet.imageurl,
+                  media_type: "image",
+                  width: 1080, // Valores padrão
+                  height: 1080,
+                  position: 0,
+                },
+              ]
+            : [],
           caption: diet.descricao || "",
           location: null,
           hashtags: [],

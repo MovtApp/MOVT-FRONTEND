@@ -333,9 +333,7 @@ const DietFormSheet: React.FC<DietFormSheetProps> = ({
         nestedScrollEnabled={true}
       >
         <View style={styles.headerRow}>
-          <Text style={styles.sheetTitle}>
-            {isAddingNewDiet ? "Nova Dieta" : "Editar Dieta"}
-          </Text>
+          <Text style={styles.sheetTitle}>{isAddingNewDiet ? "Nova Dieta" : "Editar Dieta"}</Text>
         </View>
 
         <View style={styles.formSection}>

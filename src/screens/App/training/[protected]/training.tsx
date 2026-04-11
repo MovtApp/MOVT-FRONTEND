@@ -165,8 +165,8 @@ const TrainingDetails: React.FC = () => {
 
       {/* FIXED BOTTOM BUTTON */}
       <View style={styles.buttonContainer}>
-        <TouchableOpacity 
-          style={styles.startButton} 
+        <TouchableOpacity
+          style={styles.startButton}
           onPress={() => navigation.navigate("ActiveWorkout", { training })}
           activeOpacity={0.8}
         >

@@ -86,139 +86,144 @@ export const NotificationDrawerContent = ({ navigation }: any) => {
         style={[
           modalStyles.header,
           {
-            paddingTop: Platform.OS === "android" ? (insets.top > 0 ? insets.top + 20 : 40) : Math.max(insets.top, 20),
+            paddingTop:
+              Platform.OS === "android"
+                ? insets.top > 0
+                  ? insets.top + 20
+                  : 40
+                : Math.max(insets.top, 20),
           },
         ]}
       >
-                <View style={modalStyles.headerLeft}>
-                  <Text style={modalStyles.title}>Notificações</Text>
-                  {totalUnread > 0 && (
-                    <View style={modalStyles.badgeContainer}>
-                      <Text style={modalStyles.badgeText}>{totalUnread}</Text>
-                    </View>
+        <View style={modalStyles.headerLeft}>
+          <Text style={modalStyles.title}>Notificações</Text>
+          {totalUnread > 0 && (
+            <View style={modalStyles.badgeContainer}>
+              <Text style={modalStyles.badgeText}>{totalUnread}</Text>
+            </View>
+          )}
+        </View>
+        <TouchableOpacity style={modalStyles.markAllButton} onPress={markAllAsRead}>
+          <Text style={modalStyles.markAllText}>Limpar</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={modalStyles.closeButton} onPress={() => navigation.closeDrawer()}>
+          <X size={24} color="#000" />
+        </TouchableOpacity>
+      </View>
+
+      <ScrollView style={modalStyles.content} contentContainerStyle={{ flexGrow: 1 }}>
+        {/* Solicitações de Seguidores */}
+        {followRequests.length > 0 && (
+          <View style={modalStyles.section}>
+            <Text style={modalStyles.sectionTitle}>Solicitações</Text>
+            {followRequests.map((req) => (
+              <View key={`req-${req.id}`} style={modalStyles.requestItem}>
+                <Image
+                  source={{ uri: req.photo || "https://i.pravatar.cc/150" }}
+                  style={modalStyles.requestAvatar}
+                />
+                <View style={modalStyles.requestInfo}>
+                  <Text style={modalStyles.requestUser}>@{req.username}</Text>
+                  <Text style={modalStyles.requestText}>quer te seguir</Text>
+                </View>
+                <View style={modalStyles.requestActions}>
+                  <TouchableOpacity
+                    onPress={() => respondToFollowRequest(req.id, true)}
+                    style={[modalStyles.requestActionBtn, modalStyles.acceptBtn]}
+                  >
+                    <Check size={16} color="#FFF" />
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    onPress={() => respondToFollowRequest(req.id, false)}
+                    style={[modalStyles.requestActionBtn, modalStyles.rejectBtn]}
+                  >
+                    <X size={16} color="#000" />
+                  </TouchableOpacity>
+                </View>
+              </View>
+            ))}
+          </View>
+        )}
+
+        {notifications.length === 0 && followRequests.length === 0 ? (
+          <View style={modalStyles.emptyContainer}>
+            <Bell size={48} color="#D1D5DB" />
+            <Text style={modalStyles.emptyText}>Sem notificações</Text>
+            <Text style={modalStyles.emptySubtext}>
+              Suas atividades aparecerão aqui quando alguém interagir com você
+            </Text>
+          </View>
+        ) : (
+          <View style={modalStyles.section}>
+            {followRequests.length > 0 && (
+              <Text style={[modalStyles.sectionTitle, { marginTop: 20 }]}>Atividade</Text>
+            )}
+            {notifications.map((notification) => (
+              <TouchableOpacity
+                key={notification.id}
+                style={[
+                  modalStyles.notificationItem,
+                  !notification.read && modalStyles.unreadNotification,
+                ]}
+                onPress={() => {
+                  markAsRead(notification.id);
+                  // Redireciona se for curtida ou comentário e tiver o ID do post
+                  if (
+                    (notification.type === "like" || notification.type === "comment") &&
+                    notification.reference_id
+                  ) {
+                    navigation.closeDrawer();
+                    (navigation as any).navigate("AppDrawer", {
+                      screen: "HomeStack",
+                      params: {
+                        screen: "PostDetailScreen",
+                        params: { postId: notification.reference_id },
+                      },
+                    });
+                  } else if (
+                    (notification.type === "like_diet" || notification.type === "comment_diet") &&
+                    notification.reference_id
+                  ) {
+                    // Redireciona para a tela de detalhes da dieta
+                    navigation.closeDrawer();
+                    (navigation as any).navigate("AppDrawer", {
+                      screen: "diet",
+                      params: {
+                        screen: "DietDetailsScreen",
+                        params: { mealId: notification.reference_id },
+                      },
+                    });
+                  }
+                }}
+              >
+                <View style={modalStyles.iconContainer}>
+                  {notification.userImage ? (
+                    <Image
+                      source={{ uri: notification.userImage }}
+                      style={modalStyles.miniAvatar}
+                    />
+                  ) : (
+                    renderNotificationIcon(notification.type)
                   )}
                 </View>
-                <TouchableOpacity style={modalStyles.markAllButton} onPress={markAllAsRead}>
-                  <Text style={modalStyles.markAllText}>Limpar</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={modalStyles.closeButton} onPress={() => navigation.closeDrawer()}>
-                  <X size={24} color="#000" />
-                </TouchableOpacity>
-              </View>
-
-              <ScrollView style={modalStyles.content} contentContainerStyle={{ flexGrow: 1 }}>
-                {/* Solicitações de Seguidores */}
-                {followRequests.length > 0 && (
-                  <View style={modalStyles.section}>
-                    <Text style={modalStyles.sectionTitle}>Solicitações</Text>
-                    {followRequests.map((req) => (
-                      <View key={`req-${req.id}`} style={modalStyles.requestItem}>
-                        <Image
-                          source={{ uri: req.photo || "https://i.pravatar.cc/150" }}
-                          style={modalStyles.requestAvatar}
-                        />
-                        <View style={modalStyles.requestInfo}>
-                          <Text style={modalStyles.requestUser}>@{req.username}</Text>
-                          <Text style={modalStyles.requestText}>quer te seguir</Text>
-                        </View>
-                        <View style={modalStyles.requestActions}>
-                          <TouchableOpacity
-                            onPress={() => respondToFollowRequest(req.id, true)}
-                            style={[modalStyles.requestActionBtn, modalStyles.acceptBtn]}
-                          >
-                            <Check size={16} color="#FFF" />
-                          </TouchableOpacity>
-                          <TouchableOpacity
-                            onPress={() => respondToFollowRequest(req.id, false)}
-                            style={[modalStyles.requestActionBtn, modalStyles.rejectBtn]}
-                          >
-                            <X size={16} color="#000" />
-                          </TouchableOpacity>
-                        </View>
-                      </View>
-                    ))}
-                  </View>
-                )}
-
-                {notifications.length === 0 && followRequests.length === 0 ? (
-                  <View style={modalStyles.emptyContainer}>
-                    <Bell size={48} color="#D1D5DB" />
-                    <Text style={modalStyles.emptyText}>Sem notificações</Text>
-                    <Text style={modalStyles.emptySubtext}>
-                      Suas atividades aparecerão aqui quando alguém interagir com você
-                    </Text>
-                  </View>
-                ) : (
-                  <View style={modalStyles.section}>
-                    {followRequests.length > 0 && (
-                      <Text style={[modalStyles.sectionTitle, { marginTop: 20 }]}>Atividade</Text>
-                    )}
-                    {notifications.map((notification) => (
-                      <TouchableOpacity
-                        key={notification.id}
-                        style={[
-                          modalStyles.notificationItem,
-                          !notification.read && modalStyles.unreadNotification,
-                        ]}
-                        onPress={() => {
-                          markAsRead(notification.id);
-                          // Redireciona se for curtida ou comentário e tiver o ID do post
-                          if ((notification.type === 'like' || notification.type === 'comment') && notification.reference_id) {
-                            navigation.closeDrawer();
-                            (navigation as any).navigate('AppDrawer', {
-                              screen: 'HomeStack',
-                              params: {
-                                screen: 'PostDetailScreen',
-                                params: { postId: notification.reference_id }
-                              }
-                            });
-                          } else if ((notification.type === 'like_diet' || notification.type === 'comment_diet') && notification.reference_id) {
-                            // Redireciona para a tela de detalhes da dieta
-                            navigation.closeDrawer();
-                            (navigation as any).navigate('AppDrawer', {
-                              screen: 'diet',
-                              params: {
-                                screen: 'DietDetailsScreen',
-                                params: { mealId: notification.reference_id }
-                              }
-                            });
-                          }
-                        }}
-                      >
-                        <View style={modalStyles.iconContainer}>
-                          {notification.userImage ? (
-                            <Image
-                              source={{ uri: notification.userImage }}
-                              style={modalStyles.miniAvatar}
-                            />
-                          ) : (
-                            renderNotificationIcon(notification.type)
-                          )}
-                        </View>
-                        <View style={modalStyles.notificationContent}>
-                          <Text
-                            style={[
-                              modalStyles.notificationTitle,
-                              !notification.read && modalStyles.unreadTitle,
-                            ]}
-                          >
-                            {notification.username
-                              ? `@${notification.username}`
-                              : notification.title}
-                          </Text>
-                          <Text style={modalStyles.notificationMessage}>
-                            {notification.message}
-                          </Text>
-                          <Text style={modalStyles.timeText}>
-                            {formatTime(notification.timestamp)}
-                          </Text>
-                        </View>
-                        {!notification.read && <View style={modalStyles.unreadIndicator} />}
-                      </TouchableOpacity>
-                    ))}
-                  </View>
-                )}
-            </ScrollView>
+                <View style={modalStyles.notificationContent}>
+                  <Text
+                    style={[
+                      modalStyles.notificationTitle,
+                      !notification.read && modalStyles.unreadTitle,
+                    ]}
+                  >
+                    {notification.username ? `@${notification.username}` : notification.title}
+                  </Text>
+                  <Text style={modalStyles.notificationMessage}>{notification.message}</Text>
+                  <Text style={modalStyles.timeText}>{formatTime(notification.timestamp)}</Text>
+                </View>
+                {!notification.read && <View style={modalStyles.unreadIndicator} />}
+              </TouchableOpacity>
+            ))}
+          </View>
+        )}
+      </ScrollView>
     </View>
   );
 };
