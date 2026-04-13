@@ -271,7 +271,9 @@ const CommunityScreen: React.FC = () => {
             })}
           </View>
         )}
-        <FooterVersion style={styles.footer} />
+        <View style={{ paddingHorizontal: 25 }}>
+          <FooterVersion />
+        </View>
       </ScrollView>
 
       {isAdmin && (
@@ -295,11 +297,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "#fff",
-  },
-  footer: {
-    paddingHorizontal: 30,
-    marginVertical: 40,
-    alignItems: "center",
   },
   contentHeader: {
     paddingHorizontal: 25,

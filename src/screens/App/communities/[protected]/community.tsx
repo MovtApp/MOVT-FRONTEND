@@ -76,7 +76,7 @@ const CommunityDetails = () => {
 
     if (isMember) {
       // Simulação de navegação direta para o Centro da Tribo
-      Alert.alert("Sucesso", "Acessando o Centro de Treinamento da Tribo...");
+      Alert.alert("Sucesso", "Você já faz parte da comunidade!");
       return;
     }
 
@@ -166,9 +166,7 @@ const CommunityDetails = () => {
 
         {/* Title & Description */}
         <View style={styles.infoSection}>
-          <Text style={styles.communityTitle}>
-            {community.nome}
-          </Text>
+          <Text style={styles.communityTitle}>{community.nome}</Text>
           <Text style={styles.description}>
             {community.descricao ||
               "Esta comunidade é uma oportunidade para se conectar e desafiar juntos. Organizada por uma comunidade acolhedora, o evento foca no apoio mútuo e no fortalecimento de laços."}

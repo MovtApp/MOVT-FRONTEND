@@ -22,12 +22,7 @@ import {
   FlatList as GestureHandlerFlatList,
   GestureHandlerRootView,
 } from "react-native-gesture-handler";
-import {
-  BottomSheetModal,
-  BottomSheetView,
-  BottomSheetTextInput,
-  BottomSheetBackdrop,
-} from "@gorhom/bottom-sheet";
+
 import { useNavigation } from "@react-navigation/native";
 import { DietFeedItem } from "../../hooks/useSelfDiets";
 import { COLORS } from "../../styles/colors";
@@ -141,7 +136,8 @@ const DietCard: React.FC<DietCardProps> = ({ diet, onShare }) => {
   const [loading, setLoading] = useState(false);
 
   // Estados dos Comentários
-  const commentsSheetRef = useRef<BottomSheetModal>(null);
+  const [showCommentsModal, setShowCommentsModal] = useState(false);
+  const flatListGestureRef = useRef<any>(null);
   const [comments, setComments] = useState<any[]>([]);
   const [loadingComments, setLoadingComments] = useState(false);
   const [modalCommentText, setModalCommentText] = useState("");
@@ -151,7 +147,7 @@ const DietCard: React.FC<DietCardProps> = ({ diet, onShare }) => {
   const handleOpenComments = () => {
     console.log("[DietCard] Opening comments modal for diet:", diet.id_dieta);
     fetchComments();
-    commentsSheetRef.current?.present();
+    setShowCommentsModal(true);
   };
   const [heartAnim] = useState(new Animated.Value(0));
 
@@ -291,10 +287,10 @@ const DietCard: React.FC<DietCardProps> = ({ diet, onShare }) => {
       const response = await api.post(`/dietas/${diet.id_dieta}/comment`, {
         texto: modalCommentText,
       });
-      if (response.data.success && Array.isArray(response.data.data)) {
+      if (response.data.success) {
         setModalCommentText("");
-        setComments(response.data.data);
-        setCommentsCount(response.data.data.length);
+        fetchComments();
+        setCommentsCount((prev) => prev + 1);
       }
     } catch (error) {
       console.error("Erro ao comentar na dieta:", error);
@@ -306,7 +302,7 @@ const DietCard: React.FC<DietCardProps> = ({ diet, onShare }) => {
 
   const handleDeleteComment = async (commentId: string | number) => {
     try {
-      await api.delete(`/dietas/comments/${commentId}`);
+      await api.delete(`/dietas/${diet.id_dieta}/comment/${commentId}`);
       setComments((prev) => prev.filter((c) => String(c.id) !== String(commentId)));
       setCommentsCount((prev) => Math.max(0, prev - 1));
     } catch (error) {
@@ -469,85 +465,107 @@ const DietCard: React.FC<DietCardProps> = ({ diet, onShare }) => {
         <Text style={styles.timestamp}>{getRelativeTime(diet.created_at)}</Text>
       </View>
 
-      {/* ─── Modal de Comentários (Agora usando BottomSheetModal padrão MOVT) ─── */}
-      <BottomSheetModal
-        ref={commentsSheetRef}
-        index={0}
-        snapPoints={["60%", "90%"]}
-        backdropComponent={(props) => (
-          <BottomSheetBackdrop {...props} disappearsOnIndex={-1} appearsOnIndex={0} />
-        )}
-        keyboardBlurBehavior="restore"
+      {/* ─── Modal Premium Original de Comentários idêntico ao PostCard ─── */}
+      <Modal
+        visible={showCommentsModal}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowCommentsModal(false)}
       >
-        <BottomSheetView style={styles.modalContent}>
-          <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>Comentários</Text>
-            <TouchableOpacity onPress={() => commentsSheetRef.current?.dismiss()}>
-              <Ionicons name="close" size={24} color={COLORS.grayscale[100]} />
-            </TouchableOpacity>
-          </View>
-
-          {loadingComments ? (
-            <ActivityIndicator
-              size="large"
-              color={COLORS.primary_green}
-              style={{ marginTop: 40, flex: 1 }}
-            />
-          ) : (
-            <GestureHandlerFlatList
-              data={comments}
-              keyExtractor={(item, index) => `diet-comment-${item.id ?? index}`}
-              renderItem={({ item }) => (
-                <DietCommentItem
-                  item={item}
-                  currentUserId={currentUserId!}
-                  dietAuthorId={diet.id_us}
-                  onDelete={handleDeleteComment}
-                />
-              )}
-              ListEmptyComponent={
-                <Text style={styles.noComments}>
-                  Nenhum comentário nesta dieta. Seja o primeiro! 💬
-                </Text>
-              }
-              style={styles.modalList}
-            />
-          )}
-
-          <View
-            style={[
-              styles.commentInputContainer,
-              { paddingBottom: Platform.OS === "ios" ? 20 : 10 },
-            ]}
+        <GestureHandlerRootView style={{ flex: 1 }}>
+          <KeyboardAvoidingView
+            style={{ flex: 1 }}
+            behavior={Platform.OS === "ios" ? "padding" : "height"}
           >
-            <BottomSheetTextInput
-              style={styles.commentInput}
-              placeholder="Comentar nesta dieta..."
-              placeholderTextColor={COLORS.grayscale[45]}
-              value={modalCommentText}
-              onChangeText={setModalCommentText}
-              onSubmitEditing={handleSubmitComment}
-              returnKeyType="send"
-              editable={!isSubmittingComment}
-            />
-            <TouchableOpacity
-              onPress={handleSubmitComment}
-              disabled={!modalCommentText.trim() || isSubmittingComment}
-              style={styles.sendButton}
-            >
-              {isSubmittingComment ? (
-                <ActivityIndicator size="small" color={COLORS.primary_green} />
-              ) : (
-                <Ionicons
-                  name="send"
-                  size={20}
-                  color={modalCommentText.trim() ? COLORS.primary_green : COLORS.grayscale[30]}
-                />
-              )}
-            </TouchableOpacity>
-          </View>
-        </BottomSheetView>
-      </BottomSheetModal>
+            <View style={styles.modalOverlay}>
+              {/* Backdrop transparente que fecha o modal */}
+              <TouchableOpacity
+                style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0 }}
+                activeOpacity={1}
+                onPress={() => setShowCommentsModal(false)}
+              />
+
+              <View style={styles.modalContent}>
+                <View style={styles.modalIndicator} />
+
+                <View style={styles.modalHeader}>
+                  <Text style={styles.modalTitle}>Comentários</Text>
+                  <TouchableOpacity onPress={() => setShowCommentsModal(false)}>
+                    <Ionicons name="close" size={24} color={COLORS.grayscale[100]} />
+                  </TouchableOpacity>
+                </View>
+
+                {loadingComments ? (
+                  <ActivityIndicator
+                    size="large"
+                    color={COLORS.primary_green}
+                    style={{ marginTop: 40, flex: 1 }}
+                  />
+                ) : (
+                  <GestureHandlerFlatList
+                    ref={flatListGestureRef}
+                    data={comments}
+                    keyExtractor={(item, index) => `diet-comment-${item.id ?? index}`}
+                    renderItem={({ item }) => (
+                      <DietCommentItem
+                        item={item}
+                        currentUserId={currentUserId!}
+                        dietAuthorId={diet.id_us}
+                        onDelete={handleDeleteComment}
+                      />
+                    )}
+                    ListEmptyComponent={
+                      <Text style={styles.noComments}>
+                        Nenhum comentário nesta dieta. Seja o primeiro! 💬
+                      </Text>
+                    }
+                    style={styles.modalList}
+                    contentContainerStyle={
+                      comments.length === 0 ? { flex: 1 } : { paddingBottom: 8 }
+                    }
+                  />
+                )}
+
+                {/* Input de Comentário (Tratamento de teclado) */}
+                <View
+                  style={[
+                    styles.commentInputContainer,
+                    isKeyboardVisible && Platform.OS === "ios" && { paddingBottom: 8 },
+                  ]}
+                >
+                  <TextInput
+                    style={styles.commentInput}
+                    placeholder="Escreva um comentário..."
+                    placeholderTextColor={COLORS.grayscale[45]}
+                    value={modalCommentText}
+                    onChangeText={setModalCommentText}
+                    onSubmitEditing={handleSubmitComment}
+                    returnKeyType="send"
+                    editable={!isSubmittingComment}
+                  />
+                  <TouchableOpacity
+                    onPress={handleSubmitComment}
+                    disabled={!modalCommentText.trim() || isSubmittingComment}
+                    style={styles.sendButton}
+                  >
+                    {isSubmittingComment ? (
+                      <ActivityIndicator size="small" color={COLORS.primary_green} />
+                    ) : (
+                      <Ionicons
+                        name="send"
+                        size={20}
+                        color={
+                          modalCommentText.trim() ? COLORS.primary_green : COLORS.grayscale[30]
+                        }
+                      />
+                    )}
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </View>
+          </KeyboardAvoidingView>
+        </GestureHandlerRootView>
+      </Modal>
     </View>
   );
 };

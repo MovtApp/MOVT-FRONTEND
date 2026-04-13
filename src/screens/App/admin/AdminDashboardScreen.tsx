@@ -13,12 +13,15 @@ import {
   Image,
   TextInput,
   Linking,
+  Modal,
+  KeyboardAvoidingView,
 } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import BottomSheet, {
   BottomSheetView,
   BottomSheetBackdrop,
   BottomSheetFlatList,
+  BottomSheetScrollView,
 } from "@gorhom/bottom-sheet";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
@@ -75,6 +78,10 @@ import BackButton from "../../../components/BackButton";
 import { api } from "../../../services/api";
 import * as ImagePicker from "expo-image-picker";
 import DecisionBI from "./components/DecisionBI";
+import DateTimePickerModal from "react-native-modal-datetime-picker";
+import CommunityManagementSheet, {
+  CommunityManagementSheetRef,
+} from "./[protected]/components/CommunityManagementSheet";
 
 const PolarChartAny = PolarChart as any;
 
@@ -199,6 +206,8 @@ const AdminDashboardScreen: React.FC = () => {
   const historySheetRef = React.useRef<BottomSheet>(null);
   const activePlansSheetRef = React.useRef<BottomSheet>(null);
   const userDetailSheetRef = React.useRef<BottomSheet>(null);
+  // Ref para Gestão de Comunidades (componente dedicado)
+  const adminCommSheetRef = React.useRef<CommunityManagementSheetRef>(null);
 
   // Novos Refs para BI Estratégico
   const churnDetailSheetRef = React.useRef<BottomSheet>(null);
@@ -263,6 +272,9 @@ const AdminDashboardScreen: React.FC = () => {
   const [adminExpiring, setAdminExpiring] = useState<any[]>([]);
   const [adminPlans, setAdminPlans] = useState<any[]>([]);
   const [loadingSheet, setLoadingSheet] = useState(false);
+
+  // Contador de comunidades para exibição no painel
+  const [adminCommunitiesCount, setAdminCommunitiesCount] = useState(0);
   const [fetchingHistory, setFetchingHistory] = useState(false);
   const [selectedAppt, setSelectedAppt] = useState<any | null>(null);
   const [isUploading, setIsUploading] = useState(false);
@@ -430,6 +442,14 @@ const AdminDashboardScreen: React.FC = () => {
   useEffect(() => {
     fetchData(activeTab, filterStatus);
     fetchAdminPlans(false); // Carrega contador em background logo no início
+    // Carrega contador de comunidades para exibição no painel
+    api
+      .get("/comunidades")
+      .then((r) => {
+        const list = r.data.data || r.data;
+        setAdminCommunitiesCount(Array.isArray(list) ? list.length : 0);
+      })
+      .catch(() => {});
   }, [fetchData, activeTab, filterStatus]);
 
   const fetchAdminUsers = async () => {
@@ -509,6 +529,8 @@ const AdminDashboardScreen: React.FC = () => {
       setLoadingSheet(false);
     }
   };
+
+  // ─────────────────────────────────────────────────────────────────────────────
 
   const fetchAdminPlans = async (shouldExpand: boolean = true) => {
     try {
@@ -1372,6 +1394,20 @@ const AdminDashboardScreen: React.FC = () => {
                 </View>
                 <View style={styles.statusValueRow}>
                   <Text style={styles.statusValue}>{adminPlans.length}</Text>
+                  <ChevronRight size={16} color="#94A3B8" />
+                </View>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.statusItem}
+                onPress={() => adminCommSheetRef.current?.open()}
+              >
+                <View style={styles.statusIndicator}>
+                  <View style={[styles.statusDot, { backgroundColor: "#EC4899" }]} />
+                  <Text style={styles.statusLabel}>Comunidades</Text>
+                </View>
+                <View style={styles.statusValueRow}>
+                  <Text style={styles.statusValue}>{adminCommunitiesCount}</Text>
                   <ChevronRight size={16} color="#94A3B8" />
                 </View>
               </TouchableOpacity>
@@ -4645,6 +4681,20 @@ const AdminDashboardScreen: React.FC = () => {
             </ScrollView>
           </BottomSheetView>
         </BottomSheet>
+
+        {/* ── GESTÃO DE COMUNIDADES (componente dedicado) ── */}
+        <CommunityManagementSheet
+          ref={adminCommSheetRef}
+          onClose={() => {
+            api
+              .get("/comunidades")
+              .then((r) => {
+                const list = r.data.data || r.data;
+                setAdminCommunitiesCount(Array.isArray(list) ? list.length : 0);
+              })
+              .catch(() => {});
+          }}
+        />
       </SafeAreaView>
     </GestureHandlerRootView>
   );
@@ -5567,6 +5617,201 @@ const styles = StyleSheet.create({
   compactDaysLabel: { fontSize: 8, fontWeight: "700" },
   compactProgressBg: { height: 2, backgroundColor: "#F8FAFC", width: "100%" },
   compactProgressFill: { height: "100%" },
+
+  // ── Community Management Styles ───────────────────────────────────────────────
+  commCreateBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#BBF246",
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 12,
+    gap: 6,
+  },
+  commCreateBtnTxt: { color: "#1E293B", fontWeight: "700", fontSize: 14 },
+  commSearchBar: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#F1F5F9",
+    paddingHorizontal: 14,
+    height: 46,
+    borderRadius: 14,
+    marginBottom: 14,
+    gap: 8,
+  },
+  commSearchInput: { flex: 1, fontSize: 14, fontWeight: "600", color: "#1E293B" },
+  commItemRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#fff",
+    borderRadius: 18,
+    padding: 12,
+    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: "#F1F5F9",
+    ...Platform.select({
+      ios: {
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.04,
+        shadowRadius: 6,
+      },
+      android: { elevation: 1 },
+    }),
+  },
+  commItemImageWrap: {
+    width: 54,
+    height: 54,
+    borderRadius: 14,
+    overflow: "hidden",
+    marginRight: 12,
+    backgroundColor: "#FDF2F8",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  commItemImage: { width: "100%", height: "100%" },
+  commItemImagePlaceholder: {
+    width: "100%",
+    height: "100%",
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "#FDF2F8",
+  },
+  commItemTitle: { fontSize: 15, fontWeight: "800", color: "#1E293B", marginBottom: 6 },
+  commItemBadges: { flexDirection: "row", gap: 6 },
+  commBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    backgroundColor: "#EEF2FF",
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+  },
+  commBadgeTxt: { fontSize: 10, fontWeight: "700" },
+  commItemActions: { flexDirection: "row", gap: 8, marginLeft: 8 },
+  commIconBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    backgroundColor: "#EEF2FF",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  commIconBtnRed: { backgroundColor: "#FEF2F2" },
+  // Form styles
+  commMediaArea: {
+    width: "100%",
+    height: 170,
+    backgroundColor: "#F1F5F9",
+    borderRadius: 18,
+    overflow: "hidden",
+    borderWidth: 1.5,
+    borderStyle: "dashed",
+    borderColor: "#CBD5E1",
+    marginBottom: 18,
+  },
+  commRemoveImageBtn: {
+    position: "absolute",
+    top: 10,
+    right: 10,
+    backgroundColor: "rgba(239,68,68,0.85)",
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    justifyContent: "center",
+    alignItems: "center",
+    zIndex: 10,
+  },
+  commMediaPlaceholder: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    gap: 8,
+  },
+  commMediaPlaceholderTxt: { fontSize: 13, color: "#94A3B8", fontWeight: "600" },
+  commFormGroup: { marginBottom: 16 },
+  commLabel: { fontSize: 13, fontWeight: "700", color: "#475569", marginBottom: 8 },
+  commInput: {
+    backgroundColor: "#F8FAFC",
+    borderWidth: 1.5,
+    borderColor: "#E2E8F0",
+    borderRadius: 14,
+    paddingHorizontal: 14,
+    paddingVertical: Platform.OS === "ios" ? 13 : 10,
+    fontSize: 14,
+    color: "#1E293B",
+    fontWeight: "500",
+  },
+  commChip: {
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 10,
+    borderWidth: 1.5,
+    borderColor: "#E2E8F0",
+    backgroundColor: "#F8FAFC",
+  },
+  commChipActive: { backgroundColor: "#BBF246", borderColor: "#BBF246" },
+  commChipTxt: { fontSize: 13, color: "#64748B", fontWeight: "600" },
+  commChipTxtActive: { color: "#1E293B", fontWeight: "700" },
+  commSaveBtn: {
+    backgroundColor: "#BBF246",
+    paddingVertical: 16,
+    borderRadius: 16,
+    alignItems: "center",
+    marginTop: 24,
+  },
+  commSaveBtnTxt: { color: "#1E293B", fontSize: 16, fontWeight: "800" },
+  // Modal
+  commModalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 20,
+  },
+  commModalContent: {
+    width: "100%",
+    backgroundColor: "#fff",
+    borderRadius: 24,
+    padding: 24,
+  },
+  commModalHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 8,
+  },
+  commModalTitle: { fontSize: 20, fontWeight: "800", color: "#1E293B" },
+  commModalSubtitle: { fontSize: 14, color: "#64748B", marginBottom: 20 },
+  commModalInput: {
+    backgroundColor: "#F8FAFC",
+    borderWidth: 1.5,
+    borderColor: "#E2E8F0",
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    fontSize: 16,
+    color: "#1E293B",
+    fontWeight: "600",
+    marginBottom: 24,
+  },
+  commModalCancelBtn: {
+    flex: 1,
+    paddingVertical: 14,
+    borderRadius: 12,
+    alignItems: "center",
+    backgroundColor: "#F1F5F9",
+  },
+  commModalCancelTxt: { color: "#64748B", fontSize: 15, fontWeight: "700" },
+  commModalSaveBtn: {
+    flex: 1,
+    paddingVertical: 14,
+    borderRadius: 12,
+    alignItems: "center",
+    backgroundColor: "#BBF246",
+  },
+  commModalSaveTxt: { color: "#1E293B", fontSize: 15, fontWeight: "700" },
 });
 
 export default AdminDashboardScreen;

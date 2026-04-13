@@ -13,7 +13,17 @@ import {
   Keyboard,
   FlatList,
   ActivityIndicator,
+  Modal,
+  TextInput,
+  KeyboardAvoidingView,
 } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
+import {
+  Swipeable,
+  FlatList as GestureHandlerFlatList,
+  GestureHandlerRootView,
+} from "react-native-gesture-handler";
+import { getRelativeTime } from "../../../utils/timeUtils";
 import {
   Clock4,
   Flame,
@@ -33,12 +43,92 @@ import BottomSheet, {
 } from "@gorhom/bottom-sheet";
 import { api } from "../../../services/api";
 import { useAuth } from "../../../hooks/useAuth";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import SharePostSheet from "../../../components/SharePostSheet";
 import DietFormSheet from "../../../components/DietFormSheet";
 import BackButton from "../../../components/BackButton";
 import { COLORS } from "../../../styles/colors";
 
 const { width } = Dimensions.get("window");
+
+// ─── CommentItem com Swipe-to-Delete (Adaptado do PostCard) ─────────────────
+interface DietCommentItemProps {
+  item: any;
+  currentUserId: string | number;
+  dietAuthorId: string | number;
+  onDelete: (id: string | number) => void;
+}
+
+const DietCommentItem: React.FC<DietCommentItemProps> = ({
+  item,
+  currentUserId,
+  dietAuthorId,
+  onDelete,
+}) => {
+  const isCommentOwner = String(item.user_id) === String(currentUserId);
+  const isDietOwner = String(dietAuthorId) === String(currentUserId);
+  const canDelete = isCommentOwner || isDietOwner;
+
+  const renderRightActions = (
+    _progress: Animated.AnimatedInterpolation<number>,
+    dragX: Animated.AnimatedInterpolation<number>
+  ) => {
+    const scale = dragX.interpolate({
+      inputRange: [-72, 0],
+      outputRange: [1, 0.5],
+      extrapolate: "clamp",
+    });
+
+    return (
+      <View style={styles.swipeDeleteContainer}>
+        <TouchableOpacity
+          style={styles.swipeDeleteBtn}
+          onPress={() => {
+            Alert.alert("Excluir comentário", "Tem certeza que deseja excluir este comentário?", [
+              { text: "Cancelar", style: "cancel" },
+              { text: "Excluir", style: "destructive", onPress: () => onDelete(item.id) },
+            ]);
+          }}
+        >
+          <Animated.View style={{ transform: [{ scale }] }}>
+            <Ionicons name="trash" size={22} color="#fff" />
+          </Animated.View>
+        </TouchableOpacity>
+      </View>
+    );
+  };
+
+  const content = (
+    <View style={styles.commentItem}>
+      <Image
+        source={{
+          uri: item.photo || item.avatar_autor_url || "https://gravatar.com/avatar?d=identicon",
+        }}
+        style={styles.commentAvatar}
+      />
+      <View style={styles.commentContent}>
+        <View style={{ flexDirection: "row", alignItems: "center", flexWrap: "wrap" }}>
+          <Text style={styles.commentUser}>{item.username || item.nome_autor || "Usuário"}</Text>
+          <Text style={styles.commentDate}> · {getRelativeTime(item.created_at)}</Text>
+        </View>
+        <Text style={styles.commentBody}>{item.comentario || item.texto}</Text>
+      </View>
+    </View>
+  );
+
+  if (!canDelete) return content;
+
+  return (
+    <Swipeable
+      renderRightActions={renderRightActions}
+      friction={2}
+      rightThreshold={40}
+      overshootRight={false}
+    >
+      {content}
+    </Swipeable>
+  );
+};
 
 interface DietDetailsScreenProps {
   route?: { params?: { meal?: any; mealId?: string | number } };
@@ -47,6 +137,15 @@ interface DietDetailsScreenProps {
 
 const DietDetailsScreen: React.FC<DietDetailsScreenProps> = ({ route, navigation }) => {
   const { user } = useAuth();
+  const insets = useSafeAreaInsets();
+  const moreBtnTop =
+    Platform.OS === "android"
+      ? insets.top > 0
+        ? insets.top + 20
+        : 40
+      : insets.top > 0
+        ? insets.top
+        : 20;
   const initialMeal = route?.params?.meal || {};
   const [meal, setMeal] = useState(initialMeal);
   const [isLiked, setIsLiked] = useState(false);
@@ -60,12 +159,29 @@ const DietDetailsScreen: React.FC<DietDetailsScreenProps> = ({ route, navigation
   const [sheetIndex, setSheetIndex] = useState(-1);
 
   const shareSheetRef = useRef<any>(null);
-  const commentsSheetRef = useRef<any>(null);
+  const [showCommentsModal, setShowCommentsModal] = useState(false);
+  const flatListGestureRef = useRef<any>(null);
 
   const [comments, setComments] = useState<any[]>([]);
   const [loadingComments, setLoadingComments] = useState(false);
   const [commentText, setCommentText] = useState("");
   const [isKeyboardVisible, setKeyboardVisible] = useState(false);
+  const [isSubmittingComment, setIsSubmittingComment] = useState(false);
+
+  useEffect(() => {
+    const keyboardDidShowListener = Keyboard.addListener(
+      Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow",
+      () => setKeyboardVisible(true)
+    );
+    const keyboardDidHideListener = Keyboard.addListener(
+      Platform.OS === "ios" ? "keyboardWillHide" : "keyboardDidHide",
+      () => setKeyboardVisible(false)
+    );
+    return () => {
+      keyboardDidHideListener.remove();
+      keyboardDidShowListener.remove();
+    };
+  }, []);
 
   useEffect(() => {
     const fetchMealById = async (id: string | number) => {
@@ -147,6 +263,7 @@ const DietDetailsScreen: React.FC<DietDetailsScreenProps> = ({ route, navigation
 
   const handlePostComment = async () => {
     if (!commentText.trim()) return;
+    setIsSubmittingComment(true);
     const id = meal.id_dieta || meal.id;
     try {
       const response = await api.post(`/dietas/${id}/comment`, {
@@ -154,12 +271,14 @@ const DietDetailsScreen: React.FC<DietDetailsScreenProps> = ({ route, navigation
       });
       if (response.data.success) {
         setCommentText("");
-        setComments(response.data.data);
-        setCommentsCount(response.data.data.length);
+        fetchComments();
+        setCommentsCount((prev: number) => prev + 1);
       }
     } catch (error) {
       console.error("Erro ao comentar na dieta:", error);
       Alert.alert("Erro", "Não foi possível enviar seu comentário.");
+    } finally {
+      setIsSubmittingComment(false);
     }
   };
 
@@ -168,7 +287,19 @@ const DietDetailsScreen: React.FC<DietDetailsScreenProps> = ({ route, navigation
   };
 
   const handleComment = () => {
-    commentsSheetRef.current?.present();
+    fetchComments();
+    setShowCommentsModal(true);
+  };
+
+  const handleDeleteComment = async (commentId: string | number) => {
+    try {
+      await api.delete(`/dietas/${meal.id_dieta || meal.id}/comment/${commentId}`);
+      setComments((prev: any[]) => prev.filter((c) => String(c.id) !== String(commentId)));
+      setCommentsCount((prev: number) => Math.max(0, prev - 1));
+    } catch (error) {
+      console.error("Erro ao deletar comentário da dieta:", error);
+      Alert.alert("Erro", "Não foi possível excluir o comentário.");
+    }
   };
 
   const handleMorePress = () => {
@@ -247,10 +378,15 @@ const DietDetailsScreen: React.FC<DietDetailsScreenProps> = ({ route, navigation
           )}
 
           {/* Back Button Component */}
-          <BackButton style={styles.backBtn} />
+          <View style={styles.backBtnWrapper}>
+            <BackButton autoTopInset />
+          </View>
 
           {Number(meal.id_us) === Number(user?.id) && (
-            <TouchableOpacity style={styles.moreBtn} onPress={handleMorePress}>
+            <TouchableOpacity
+              style={[styles.moreBtn, { top: moreBtnTop }]}
+              onPress={handleMorePress}
+            >
               <MoreVertical size={22} color="#fff" />
             </TouchableOpacity>
           )}
@@ -308,10 +444,15 @@ const DietDetailsScreen: React.FC<DietDetailsScreenProps> = ({ route, navigation
 
             {/* Author Small */}
             <View style={styles.authorSmall}>
-              {meal?.authorAvatar && (
-                <Image source={{ uri: meal.authorAvatar }} style={styles.authorAvatarSm} />
-              )}
-              <Text style={styles.authorNameSm}>{meal?.authorName || "MOVT User"}</Text>
+              {meal?.authorAvatar || meal?.avatar_autor_url ? (
+                <Image
+                  source={{ uri: meal.authorAvatar || meal.avatar_autor_url }}
+                  style={styles.authorAvatarSm}
+                />
+              ) : null}
+              <Text style={styles.authorNameSm}>
+                {meal?.authorName || meal?.nome_autor || "MOVT User"}
+              </Text>
             </View>
           </View>
 
@@ -428,70 +569,105 @@ const DietDetailsScreen: React.FC<DietDetailsScreenProps> = ({ route, navigation
         </View>
       )}
 
-      {/* --- Modal de Comentários (Mesma estrutura do PostCard/DietCard) --- */}
-      <BottomSheetModal
-        ref={commentsSheetRef}
-        index={0}
-        snapPoints={["60%", "90%"]}
-        backdropComponent={(props) => (
-          <BottomSheetBackdrop {...props} disappearsOnIndex={-1} appearsOnIndex={0} />
-        )}
-        keyboardBlurBehavior="restore"
+      {/* --- Modal Premium Original de Comentários idêntico ao PostCard --- */}
+      <Modal
+        visible={showCommentsModal}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowCommentsModal(false)}
       >
-        <BottomSheetView style={styles.modalContent}>
-          <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>Comentários</Text>
-          </View>
+        <GestureHandlerRootView style={{ flex: 1 }}>
+          <KeyboardAvoidingView
+            style={{ flex: 1 }}
+            behavior={Platform.OS === "ios" ? "padding" : "height"}
+          >
+            <View style={styles.modalOverlay}>
+              {/* Backdrop transparente que fecha o modal */}
+              <TouchableOpacity
+                style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0 }}
+                activeOpacity={1}
+                onPress={() => setShowCommentsModal(false)}
+              />
 
-          <FlatList
-            data={comments}
-            keyExtractor={(item, index) => (item.id_comentario || index).toString()}
-            style={styles.modalList}
-            renderItem={({ item }) => (
-              <View style={styles.commentItem}>
-                <Image
-                  source={{ uri: item.avatar_autor_url || "https://via.placeholder.com/150" }}
-                  style={styles.commentAvatar}
-                />
-                <View style={styles.commentContent}>
-                  <Text style={styles.commentUser}>{item.nome_autor}</Text>
-                  <Text style={styles.commentBody}>{item.texto}</Text>
+              <View style={styles.modalContent}>
+                <View style={styles.modalIndicator} />
+
+                <View style={styles.modalHeader}>
+                  <Text style={styles.modalTitle}>Comentários</Text>
+                  <TouchableOpacity onPress={() => setShowCommentsModal(false)}>
+                    <Ionicons name="close" size={24} color={COLORS.grayscale[100]} />
+                  </TouchableOpacity>
+                </View>
+
+                {loadingComments ? (
+                  <ActivityIndicator
+                    size="large"
+                    color={COLORS.primary_green}
+                    style={{ marginTop: 40, flex: 1 }}
+                  />
+                ) : (
+                  <GestureHandlerFlatList
+                    ref={flatListGestureRef}
+                    data={comments}
+                    keyExtractor={(item, index) => `diet-comment-${item.id ?? index}`}
+                    renderItem={({ item }) => (
+                      <DietCommentItem
+                        item={item}
+                        currentUserId={user?.id || user?.id_us!}
+                        dietAuthorId={meal.id_us}
+                        onDelete={handleDeleteComment}
+                      />
+                    )}
+                    ListEmptyComponent={
+                      <Text style={styles.noComments}>
+                        Nenhum comentário nesta dieta. Seja o primeiro! 💬
+                      </Text>
+                    }
+                    style={styles.modalList}
+                    contentContainerStyle={
+                      comments.length === 0 ? { flex: 1 } : { paddingBottom: 8 }
+                    }
+                  />
+                )}
+
+                {/* Input de Comentário (Tratamento de teclado) */}
+                <View
+                  style={[
+                    styles.commentInputContainer,
+                    isKeyboardVisible && Platform.OS === "ios" && { paddingBottom: 8 },
+                  ]}
+                >
+                  <TextInput
+                    style={styles.commentInput}
+                    placeholder="Escreva um comentário..."
+                    placeholderTextColor={COLORS.grayscale[45]}
+                    value={commentText}
+                    onChangeText={setCommentText}
+                    onSubmitEditing={handlePostComment}
+                    returnKeyType="send"
+                    editable={!isSubmittingComment}
+                  />
+                  <TouchableOpacity
+                    onPress={handlePostComment}
+                    disabled={!commentText.trim() || isSubmittingComment}
+                    style={styles.sendButton}
+                  >
+                    {isSubmittingComment ? (
+                      <ActivityIndicator size="small" color={COLORS.primary_green} />
+                    ) : (
+                      <Ionicons
+                        name="send"
+                        size={20}
+                        color={commentText.trim() ? COLORS.primary_green : COLORS.grayscale[30]}
+                      />
+                    )}
+                  </TouchableOpacity>
                 </View>
               </View>
-            )}
-            ListEmptyComponent={() => (
-              <View
-                style={{ flex: 1, justifyContent: "center", alignItems: "center", paddingTop: 40 }}
-              >
-                {loadingComments ? (
-                  <ActivityIndicator color={COLORS.primary_green} />
-                ) : (
-                  <Text style={{ color: "#64748B" }}>Nenhum comentário ainda.</Text>
-                )}
-              </View>
-            )}
-          />
-
-          <View
-            style={[styles.commentInputContainer, { paddingBottom: isKeyboardVisible ? 10 : 20 }]}
-          >
-            <Image
-              source={{ uri: user?.photo || "https://via.placeholder.com/150" }}
-              style={styles.inputAvatar}
-            />
-            <BottomSheetTextInput
-              style={styles.commentInput}
-              placeholder="Escreva um comentário..."
-              value={commentText}
-              onChangeText={setCommentText}
-              multiline
-            />
-            <TouchableOpacity onPress={handlePostComment} style={styles.sendButton}>
-              <Text style={styles.postButton}>Publicar</Text>
-            </TouchableOpacity>
-          </View>
-        </BottomSheetView>
-      </BottomSheetModal>
+            </View>
+          </KeyboardAvoidingView>
+        </GestureHandlerRootView>
+      </Modal>
     </View>
   );
 };
@@ -539,9 +715,9 @@ const styles = StyleSheet.create({
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 3,
   },
-  backBtn: {
+  backBtnWrapper: {
     position: "absolute",
-    top: Platform.OS === "ios" ? 50 : 20,
+    top: 0,
     left: 20,
     zIndex: 100,
   },
@@ -741,22 +917,39 @@ const styles = StyleSheet.create({
     pointerEvents: "box-none",
   },
   // Modal Comments Styles
-  modalContent: {
+  modalOverlay: {
     flex: 1,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    justifyContent: "flex-end",
+  },
+  modalContent: {
+    backgroundColor: COLORS.grayscale[0],
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    height: "70%",
     paddingTop: 12,
+  },
+  modalIndicator: {
+    width: 40,
+    height: 4,
+    backgroundColor: COLORS.grayscale[20],
+    borderRadius: 2,
+    alignSelf: "center",
+    marginBottom: 16,
   },
   modalHeader: {
     flexDirection: "row",
-    justifyContent: "center",
+    justifyContent: "space-between",
     alignItems: "center",
+    paddingHorizontal: 16,
     paddingBottom: 16,
     borderBottomWidth: 0.5,
-    borderBottomColor: "#F1F5F9",
+    borderBottomColor: COLORS.grayscale[10],
   },
   modalTitle: {
     fontSize: 16,
-    fontWeight: "800",
-    color: "#1E293B",
+    fontWeight: "700",
+    color: COLORS.grayscale[100],
   },
   modalList: {
     flex: 1,
@@ -765,62 +958,87 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     padding: 16,
     borderBottomWidth: 0.5,
-    borderBottomColor: "#F8FAFC",
+    borderBottomColor: COLORS.grayscale[5],
   },
   commentAvatar: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
     marginRight: 12,
-    backgroundColor: "#F1F5F9",
   },
   commentContent: {
     flex: 1,
   },
   commentUser: {
     fontSize: 13,
-    fontWeight: "800",
-    color: "#1E293B",
+    fontWeight: "700",
+    color: COLORS.grayscale[100],
     marginBottom: 2,
+  },
+  commentDate: {
+    fontSize: 12,
+    color: COLORS.grayscale[30],
+    lineHeight: 18,
   },
   commentBody: {
     fontSize: 13,
-    color: "#475569",
+    color: COLORS.grayscale[80],
     lineHeight: 18,
   },
   commentInputContainer: {
     flexDirection: "row",
     alignItems: "center",
-    paddingHorizontal: 16,
+    paddingHorizontal: 8,
     paddingVertical: 12,
     borderTopWidth: 0.5,
-    borderTopColor: "#F1F5F9",
-    backgroundColor: "#fff",
+    borderTopColor: COLORS.grayscale[10],
+    backgroundColor: COLORS.grayscale[0],
+    paddingBottom: Platform.OS === "ios" ? 24 : 12,
   },
   inputAvatar: {
     width: 32,
     height: 32,
     borderRadius: 16,
-    marginRight: 12,
+    marginRight: 11,
   },
   commentInput: {
     flex: 1,
-    minHeight: 40,
-    backgroundColor: "#F8FAFC",
+    height: 40,
+    backgroundColor: COLORS.grayscale[5],
     borderRadius: 20,
     paddingHorizontal: 16,
-    paddingTop: 10,
-    paddingBottom: 10,
     fontSize: 14,
-    color: "#1E293B",
+    color: COLORS.grayscale[100],
   },
   sendButton: {
     marginLeft: 12,
+    padding: 4,
   },
   postButton: {
     fontSize: 14,
-    fontWeight: "800",
-    color: "#BBF246",
+    fontWeight: "700",
+    color: COLORS.primary_green,
+    marginLeft: 10,
+  },
+  noComments: {
+    textAlign: "center",
+    marginTop: 40,
+    color: COLORS.grayscale[45],
+    fontSize: 14,
+  },
+  // Swipe-to-delete styles
+  swipeDeleteContainer: {
+    justifyContent: "center",
+    alignItems: "center",
+    width: 72,
+    backgroundColor: "#EF4444",
+    borderRadius: 0,
+  },
+  swipeDeleteBtn: {
+    width: 72,
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
   },
 });
 
