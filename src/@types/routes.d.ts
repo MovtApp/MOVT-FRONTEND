@@ -104,6 +104,7 @@ export type AppStackParamList = {
   ArchivedPostsScreen: undefined;
   EditProfileScreen: undefined;
   AdminDashboard: undefined;
+  ExpectationRealityScreen: undefined;
 };
 
 export interface Community {

@@ -143,3 +143,7 @@ babel.config.js
 *.config.js
 *.config.cjs
 *.config.mjs
+
+# Expo Prebuild
+/android
+/ios

@@ -17,6 +17,7 @@ import DietFormSheet from "../../../components/DietFormSheet";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { AppStackParamList, DietMeal } from "../../../@types/routes";
 import Header from "../../../components/Header";
+import { useAppData } from "@contexts/AppDataContext";
 
 const DietScreen: React.FC<NativeStackScreenProps<AppStackParamList, "DietScreen">> = ({
   navigation,
@@ -24,7 +25,7 @@ const DietScreen: React.FC<NativeStackScreenProps<AppStackParamList, "DietScreen
 }) => {
   const [search, setSearch] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("all");
-  const [dietMeals, setDietMeals] = useState<DietMeal[]>([]);
+  const { dietMeals, fetchDietMeals } = useAppData();
   const [isFormSheetOpen, setIsFormSheetOpen] = useState(false);
   const [formInitialData, setFormInitialData] = useState<DietMeal | undefined>(undefined);
   const dietFormSheetRef = useRef<any>(null);
@@ -63,57 +64,9 @@ const DietScreen: React.FC<NativeStackScreenProps<AppStackParamList, "DietScreen
     }
   };
 
-  const fetchMeals = useCallback(async () => {
-    try {
-      const sessionId = await AsyncStorage.getItem("userSessionId");
-      if (!sessionId) {
-        Alert.alert("Erro", "Sessão não encontrada. Faça login novamente.");
-        return;
-      }
-
-      const response = await api.get("/dietas", {
-        headers: {
-          Authorization: `Bearer ${sessionId}`,
-        },
-        params: {
-          categoria: selectedCategory === "all" ? undefined : selectedCategory,
-          mine: "true",
-        },
-      });
-      const mappedMeals: DietMeal[] = (response.data.data || []).map((backendMeal: any) => {
-        console.log("🖼️ Mapeando dieta:", backendMeal.title, "ImageURL:", backendMeal.imageUrl);
-        return {
-          id: String(backendMeal.id_dieta),
-          id_dieta: String(backendMeal.id_dieta),
-          title: backendMeal.title || "Sem título",
-          calories: backendMeal.calories || "0 kcal",
-          minutes: backendMeal.minutes || "0 min",
-          imageUrl: backendMeal.imageUrl || "https://via.placeholder.com/150",
-          authorName: backendMeal.nome_autor || "Você",
-          authorAvatar: backendMeal.avatar_autor_url || "https://via.placeholder.com/30",
-          description: backendMeal.description || "",
-          fat: backendMeal.fat || "0 g",
-          protein: backendMeal.protein || "0 g",
-          carbs: backendMeal.carbs || "0 g",
-          categoria: backendMeal.categoria || undefined,
-          id_us: backendMeal.id_us,
-          calorias: backendMeal.calories ? parseInt(backendMeal.calories) : undefined,
-          tempo_preparo: backendMeal.minutes ? parseInt(backendMeal.minutes) : undefined,
-        };
-      });
-      const uniqueMeals = Array.from(new Map(mappedMeals.map((meal) => [meal.id, meal])).values());
-      console.log("Dietas mapeadas com sucesso.");
-      setDietMeals(uniqueMeals);
-    } catch (error) {
-      console.error("Erro ao buscar dietas:", error);
-      console.error("Detalhes do erro:", (error as any).response?.data || (error as any).message);
-      Alert.alert("Erro", "Não foi possível carregar as dietas.");
-    }
-  }, [selectedCategory]);
-
   useEffect(() => {
-    fetchMeals();
-  }, [selectedCategory, fetchMeals]);
+    fetchDietMeals(selectedCategory);
+  }, [selectedCategory, fetchDietMeals]);
 
   const handleAddDiet = () => {
     setFormInitialData(undefined);
@@ -163,7 +116,7 @@ const DietScreen: React.FC<NativeStackScreenProps<AppStackParamList, "DietScreen
                 )
               );
               Alert.alert("Sucesso", "Dietas excluídas com sucesso!");
-              fetchMeals();
+              fetchDietMeals();
             } catch (error) {
               console.error("Erro ao excluir dietas:", error);
               Alert.alert("Erro", "Não foi possível excluir as dietas.");
@@ -339,7 +292,7 @@ const DietScreen: React.FC<NativeStackScreenProps<AppStackParamList, "DietScreen
           bottomSheetRef={dietFormSheetRef}
           sheetIndex={sheetIndex}
           setSheetIndex={setSheetIndex}
-          onSuccess={fetchMeals}
+          onSuccess={fetchDietMeals}
         />
       </View>
     </View>

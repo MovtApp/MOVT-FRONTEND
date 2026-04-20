@@ -23,6 +23,7 @@ import Animated, {
   Easing,
   FadeInDown,
 } from "react-native-reanimated";
+import { getHealthMetricData } from "../../../../services/caloriesService";
 
 // Fallback extremamente seguro para Animated.View
 const ReanimatedView = typeof Animated !== "undefined" && Animated?.View ? Animated.View : View;
@@ -117,12 +118,37 @@ const StepsProgressChart: React.FC<{
 
 const StepsScreen: React.FC = () => {
   const [stepsData, setStepsData] = useState({
-    steps: 8432,
+    steps: 0,
     goal: 10000,
-    calories: 342,
-    kilometers: 6.2,
-    minutes: 48,
+    calories: 0,
+    kilometers: 0,
+    minutes: 0,
   });
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    fetchStepsData();
+  }, []);
+
+  const fetchStepsData = async () => {
+    try {
+      setIsLoading(true);
+      const data = await getHealthMetricData("steps", "1d");
+      if (data && data.data) {
+        setStepsData({
+          steps: data.totalValue || 0,
+          goal: data.dailyGoal || 10000,
+          calories: Math.round((data.totalValue || 0) * 0.04), // Estimativa de calorias por passo
+          kilometers: parseFloat(((data.totalValue || 0) * 0.000762).toFixed(2)),
+          minutes: Math.round((data.totalValue || 0) / 100),
+        });
+      }
+    } catch (error) {
+      console.error("Erro ao buscar passos:", error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const handleEditGoal = () => {
     if (Platform.OS === "ios" || Platform.OS === "android") {
@@ -148,7 +174,7 @@ const StepsScreen: React.FC = () => {
     }
   };
 
-  const progress = stepsData.steps / stepsData.goal;
+  const progress = stepsData.goal > 0 ? stepsData.steps / stepsData.goal : 0;
 
   return (
     <SafeAreaView style={styles.safeArea} edges={["top"]}>

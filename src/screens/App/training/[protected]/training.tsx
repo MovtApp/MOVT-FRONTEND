@@ -7,173 +7,206 @@ import {
   ScrollView,
   TouchableOpacity,
   StatusBar,
+  Dimensions,
+  Platform,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRoute, RouteProp, useNavigation } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import { Play } from "lucide-react-native";
-import BackButton from "@components/BackButton";
-import { StatsCard } from "@components/StatsCard";
-import { AppStackParamList, Training } from "../../../../@types/routes";
+import { Play, Clock, Flame, Zap, Info } from "lucide-react-native";
+import { LinearGradient } from "expo-linear-gradient";
+import { AppStackParamList } from "../../../../@types/routes";
 import { FooterVersion } from "@components/FooterVersion";
+import BackButton from "@components/BackButton";
+
+const { width } = Dimensions.get("window");
 
 type TrainingDetailsRouteProp = RouteProp<AppStackParamList, "TrainingDetails">;
 type NavigationProp = NativeStackNavigationProp<AppStackParamList>;
-
-interface ExerciseVariation {
-  id: string;
-  nome: string;
-  duracao: string;
-  imageUrl: string;
-}
 
 const TrainingDetails: React.FC = () => {
   const route = useRoute<TrainingDetailsRouteProp>();
   const navigation = useNavigation<NavigationProp>();
   const { training } = route.params || {};
 
-  // Mock data para variações do exercício
-  const exerciseVariations: ExerciseVariation[] = [
-    {
-      id: "1",
-      nome: "Prancha Lateral",
-      duracao: "00:30",
-      imageUrl: "https://images.unsplash.com/photo-1571019614242-c5c5dee9f50b?q=80&w=400",
-    },
-    {
-      id: "2",
-      nome: "Prancha com Elevação",
-      duracao: "01:00",
-      imageUrl: "https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?q=80&w=400",
-    },
-    {
-      id: "3",
-      nome: "Prancha com Toque no Ombro",
-      duracao: "00:45",
-      imageUrl: "https://images.unsplash.com/photo-1518611012118-696072aa579a?q=80&w=400",
-    },
-    {
-      id: "4",
-      nome: "Prancha com Deslocamento",
-      duracao: "00:40",
-      imageUrl: "https://images.unsplash.com/photo-1517836357463-d25dfeac3438?q=80&w=400",
-    },
-    {
-      id: "5",
-      nome: "Prancha com Flexão de Braços",
-      duracao: "00:50",
-      imageUrl: "https://images.unsplash.com/photo-1534438327276-14e5300c3a48?q=80&w=400",
-    },
-    {
-      id: "6",
-      nome: "Prancha de Escorregamento",
-      duracao: "00:35",
-      imageUrl: "https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?q=80&w=400",
-    },
-    {
-      id: "7",
-      nome: "Prancha Inclinada",
-      duracao: "00:55",
-      imageUrl: "https://images.unsplash.com/photo-1517836357463-d25dfeac3438?q=80&w=400",
-    },
-    {
-      id: "8",
-      nome: "Prancha Dinâmica",
-      duracao: "01:10",
-      imageUrl: "https://images.unsplash.com/photo-1571019614242-c5c5dee9f50b?q=80&w=400",
-    },
-  ];
-
   if (!training) {
     return (
-      <SafeAreaView style={styles.container}>
-        <View style={styles.header}>
-          <BackButton />
-        </View>
-        <View style={styles.errorContainer}>
-          <Text style={styles.errorText}>Exercício não encontrado.</Text>
-        </View>
-      </SafeAreaView>
+      <View style={styles.errorContainer}>
+        <Text style={styles.errorText}>Treino não encontrado.</Text>
+        <TouchableOpacity style={styles.backBtnError} onPress={() => navigation.goBack()}>
+          <Text style={styles.backBtnErrorText}>Voltar</Text>
+        </TouchableOpacity>
+      </View>
     );
   }
 
-  return (
-    <SafeAreaView style={styles.container} edges={["top", "bottom"]}>
-      <StatusBar barStyle="dark-content" backgroundColor="#fff" />
+  const exercicios = training.exercicios || [];
 
-      {/* Header */}
-      <View style={styles.header}>
-        <BackButton />
-        <Text style={styles.exerciseTitle} numberOfLines={1}>
-          {training.nome}
-        </Text>
-        <View style={{ width: 46 }} />
-      </View>
+  return (
+    <View style={styles.container}>
+      <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
-        {/* Main Exercise Image */}
-        <View style={[styles.mainImageContainer, { marginBottom: 30 }]}>
+        {/* ─── Hero Image Section ─── */}
+        <View style={styles.heroContainer}>
           <Image
-            source={{ uri: training.imageurl || "https://via.placeholder.com/400" }}
-            style={styles.mainImage}
+            source={{
+              uri:
+                training.imageurl ||
+                "https://res.cloudinary.com/ditlmzgrh/image/upload/v1757229915/image_71_jntmsv.jpg",
+            }}
+            style={styles.heroImage}
             resizeMode="cover"
           />
-
-          <StatsCard
-            time={training.duracao}
-            calories={training.calorias}
-            style={{ position: "absolute", bottom: -20 }}
+          <LinearGradient
+            colors={["rgba(0,0,0,0.4)", "transparent", "rgba(0,0,0,0.8)", "#fff"]}
+            style={styles.heroGradient}
+            locations={[0, 0.3, 0.7, 1]}
           />
-        </View>
 
-        {/* Exercise Name */}
-        <Text style={styles.exerciseName}>{training.nome}</Text>
-
-        {/* Description */}
-        <Text style={styles.description}>
-          {training.descricao ||
-            "O Plank com Peso é uma variação da prancha tradicional, onde um disco de peso é colocado nas costas para aumentar a resistência. Ele fortalece o core, melhora a estabilidade, glúteos e pernas, ajudando na estabilização, postura e prevenção de lesões lombares."}
-        </Text>
-
-        {/* Variations Section */}
-        <View style={styles.variationsSection}>
-          <View style={styles.variationsHeader}>
-            <Text style={styles.variationsTitle}>Variações</Text>
-            <Text style={styles.variationsCount}>1/{exerciseVariations.length}</Text>
+          {/* Floating Header Controls */}
+          <View style={styles.absoluteHeader}>
+            <BackButton autoTopInset />
           </View>
 
-          {exerciseVariations.map((variation) => (
-            <TouchableOpacity key={variation.id} style={styles.variationCard} activeOpacity={0.7}>
-              <Image
-                source={{ uri: variation.imageUrl }}
-                style={styles.variationImage}
-                resizeMode="cover"
-              />
-              <View style={styles.variationInfo}>
-                <Text style={styles.variationName}>{variation.nome}</Text>
-                <Text style={styles.variationDuration}>{variation.duracao}</Text>
+          {/* Training Main Info */}
+          <View style={styles.heroInfoContent}>
+            <View style={styles.categoryBadge}>
+              <Text style={styles.categoryBadgeText}>{training.categoria || "Geral"}</Text>
+            </View>
+            <Text style={styles.mainTitle}>{training.nome}</Text>
+          </View>
+        </View>
+
+        {/* ─── Stats Dashboard Card ─── */}
+        <View style={styles.statsContainer}>
+          <View style={styles.statsCard}>
+            <View style={styles.statBox}>
+              <View style={[styles.statIconWrap, { backgroundColor: "#EEF2FF" }]}>
+                <Clock size={18} color="#6366F1" />
               </View>
-              <TouchableOpacity style={styles.variationPlayButton}>
-                <Play size={16} color="#192126" fill="#192126" strokeWidth={2.5} />
-              </TouchableOpacity>
-            </TouchableOpacity>
-          ))}
+              <Text style={styles.statVal}>{training.duracao || "30 min"}</Text>
+              <Text style={styles.statLabel}>Tempo</Text>
+            </View>
+
+            <View style={styles.statDivider} />
+
+            <View style={styles.statBox}>
+              <View style={[styles.statIconWrap, { backgroundColor: "#FFF7ED" }]}>
+                <Flame size={18} color="#F97316" />
+              </View>
+              <Text style={styles.statVal}>{training.calorias || "250 Kcal"}</Text>
+              <Text style={styles.statLabel}>Queima</Text>
+            </View>
+
+            <View style={styles.statDivider} />
+
+            <View style={styles.statBox}>
+              <View style={[styles.statIconWrap, { backgroundColor: "#F7FEE7" }]}>
+                <Zap size={18} color="#BBF246" fill="#BBF246" />
+              </View>
+              <Text style={styles.statVal}>{training.nivel || "Iniciante"}</Text>
+              <Text style={styles.statLabel}>Dificuldade</Text>
+            </View>
+          </View>
+        </View>
+
+        {/* ─── About Section ─── */}
+        <View style={styles.sectionPadding}>
+          <View style={styles.rowCenter}>
+            <Text style={styles.sectionTitle}>Sobre o Treino</Text>
+            <Info size={16} color="#94A3B8" />
+          </View>
+          <Text style={styles.descriptionText}>
+            {training.descricao ||
+              "Este treino foi planejado para maximizar seus resultados, focando na técnica correta e na intensidade necessária para sua evolução."}
+          </Text>
+        </View>
+
+        {/* ─── Exercises List ─── */}
+        <View style={styles.sectionPadding}>
+          <View style={styles.variationsHeader}>
+            <Text style={styles.sectionTitle}>Roteiro de Exercícios</Text>
+            <View style={styles.countBadge}>
+              <Text style={styles.countBadgeText}>{exercicios.length} total</Text>
+            </View>
+          </View>
+
+          {exercicios.length > 0 ? (
+            exercicios.map((ex: any, idx: number) => (
+              <View key={idx} style={styles.exerciseCard}>
+                <View style={styles.exCardHeader}>
+                  <View style={styles.exNumberBox}>
+                    <Text style={styles.exNumberText}>{String(idx + 1).padStart(2, "0")}</Text>
+                  </View>
+                  <View style={styles.exMainInfo}>
+                    <Text style={styles.exName}>{ex.nome}</Text>
+                    <View style={styles.exSpecsRow}>
+                      <View style={styles.exSpecItem}>
+                        <Text style={styles.exSpecVal}>{ex.series}</Text>
+                        <Text style={styles.exSpecLabel}>Séries</Text>
+                      </View>
+                      <View style={styles.exSpecDot} />
+                      <View style={styles.exSpecItem}>
+                        <Text style={styles.exSpecVal}>{ex.repeticoes}</Text>
+                        <Text style={styles.exSpecLabel}>Reps</Text>
+                      </View>
+                      {ex.descanso && (
+                        <>
+                          <View style={styles.exSpecDot} />
+                          <View style={styles.exSpecItem}>
+                            <Text style={styles.exSpecVal}>{ex.descanso}</Text>
+                            <Text style={styles.exSpecLabel}>Rest</Text>
+                          </View>
+                        </>
+                      )}
+                    </View>
+                  </View>
+                  <View style={styles.exPlayTrigger}>
+                    <Play size={14} color="#fff" fill="#fff" />
+                  </View>
+                </View>
+                {ex.observacoes && (
+                  <View style={styles.obsBox}>
+                    <Text style={styles.obsText}>💡 {ex.observacoes}</Text>
+                  </View>
+                )}
+              </View>
+            ))
+          ) : (
+            <View style={styles.emptyExercises}>
+              <Zap size={32} color="#E2E8F0" />
+              <Text style={styles.emptyText}>
+                Este treino ainda não possui exercícios cadastrados.
+              </Text>
+            </View>
+          )}
         </View>
 
         <FooterVersion style={styles.footer} />
       </ScrollView>
 
-      {/* FIXED BOTTOM BUTTON */}
-      <View style={styles.buttonContainer}>
+      {/* ─── Bottom CTA ─── */}
+      <SafeAreaView edges={["bottom"]} style={styles.bottomNav}>
         <TouchableOpacity
-          style={styles.startButton}
+          style={styles.startBtn}
           onPress={() => navigation.navigate("ActiveWorkout", { training })}
-          activeOpacity={0.8}
+          activeOpacity={0.9}
         >
-          <Text style={styles.startButtonText}>INICIAR TREINO</Text>
+          <LinearGradient
+            colors={["#BBF246", "#A3E635"]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+            style={styles.startBtnGradient}
+          >
+            <Text style={styles.startBtnText}>COMEÇAR AGORA</Text>
+            <View style={styles.startBtnArrow}>
+              <Play size={12} fill="#1E293B" color="#1E293B" />
+            </View>
+          </LinearGradient>
         </TouchableOpacity>
-      </View>
-    </SafeAreaView>
+      </SafeAreaView>
+    </View>
   );
 };
 
@@ -182,187 +215,327 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: "#fff",
   },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: 20,
-    paddingVertical: 10,
+  scrollContent: {
+    paddingBottom: 120,
   },
   errorContainer: {
     flex: 1,
     alignItems: "center",
     justifyContent: "center",
+    backgroundColor: "#fff",
+    padding: 40,
   },
   errorText: {
     fontSize: 16,
-    color: "#6B7280",
+    color: "#64748B",
+    marginBottom: 20,
+    fontWeight: "600",
   },
-  scrollContent: {
-    paddingBottom: 100, // Increased to accommodate button
+  backBtnError: {
+    paddingHorizontal: 30,
+    paddingVertical: 12,
+    backgroundColor: "#1E293B",
+    borderRadius: 12,
   },
-  exerciseTitle: {
-    fontSize: 20,
-    fontWeight: "bold",
-    color: "#192126",
-    textAlign: "center",
-  },
-  mainImageContainer: {
-    paddingHorizontal: 20,
-    marginBottom: 16,
-    marginTop: 20,
-  },
-  mainImage: {
-    width: "100%",
-    height: 200,
-    borderRadius: 16,
-    backgroundColor: "#F3F4F6",
-  },
-  statsBadgesContainer: {
-    position: "absolute",
-    bottom: 12,
-    left: 32,
-    right: 32,
-    flexDirection: "row",
-    gap: 10,
-  },
-  statBadge: {
-    flex: 1,
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#192126",
-    paddingVertical: 8,
-    paddingHorizontal: 10,
-    borderRadius: 10,
-    gap: 8,
-  },
-  statIconBox: {
-    width: 32,
-    height: 32,
-    borderRadius: 8,
-    backgroundColor: "#BBF246",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  statTextContainer: {
-    flex: 1,
-  },
-  statLabel: {
-    fontSize: 9,
-    color: "#9CA3AF",
-    fontWeight: "500",
-    marginBottom: 1,
-  },
-  statValue: {
-    fontSize: 11,
+  backBtnErrorText: {
     color: "#fff",
-    fontWeight: "bold",
+    fontWeight: "700",
   },
-  exerciseName: {
-    fontSize: 18,
-    fontWeight: "bold",
-    color: "#192126",
+
+  // Hero Section
+  heroContainer: {
+    height: width * 1.1,
+    width: "100%",
+    position: "relative",
+  },
+  heroImage: {
+    width: "100%",
+    height: "100%",
+  },
+  heroGradient: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  absoluteHeader: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
     paddingHorizontal: 20,
-    marginBottom: 10,
+    paddingTop: 10,
+    zIndex: 10,
   },
-  description: {
-    fontSize: 13,
-    color: "#4B5563",
-    lineHeight: 20,
-    paddingHorizontal: 20,
-    marginBottom: 24,
+  heroInfoContent: {
+    position: "absolute",
+    bottom: 40,
+    left: 24,
+    right: 24,
   },
-  variationsSection: {
-    paddingHorizontal: 20,
-  },
-  variationsHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
+  categoryBadge: {
+    backgroundColor: "rgba(187, 242, 70, 0.9)",
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 8,
+    alignSelf: "flex-start",
     marginBottom: 12,
   },
-  variationsTitle: {
-    fontSize: 16,
-    fontWeight: "bold",
-    color: "#192126",
+  categoryBadgeText: {
+    fontSize: 10,
+    fontWeight: "900",
+    color: "#1E293B",
+    textTransform: "uppercase",
   },
-  variationsCount: {
-    fontSize: 13,
-    color: "#6B7280",
-    fontWeight: "500",
+  mainTitle: {
+    fontSize: 34,
+    fontWeight: "900",
+    color: "#1E293B",
+    letterSpacing: -1,
   },
-  variationCard: {
+
+  // Stats Dashboard
+  statsContainer: {
+    marginTop: -30,
+    paddingHorizontal: 20,
+    zIndex: 20,
+  },
+  statsCard: {
     flexDirection: "row",
+    backgroundColor: "#fff",
+    borderRadius: 24,
+    padding: 20,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.08,
+    shadowRadius: 20,
+    elevation: 10,
     alignItems: "center",
-    backgroundColor: "#374151",
-    borderRadius: 12,
-    padding: 10,
-    marginBottom: 10,
-    gap: 10,
+    justifyContent: "space-between",
   },
-  variationImage: {
-    width: 48,
-    height: 48,
-    borderRadius: 8,
-    backgroundColor: "#4B5563",
-  },
-  variationInfo: {
+  statBox: {
+    alignItems: "center",
     flex: 1,
   },
-  variationName: {
-    fontSize: 13,
-    fontWeight: "600",
-    color: "#fff",
-    marginBottom: 3,
+  statIconWrap: {
+    width: 36,
+    height: 36,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 8,
   },
-  variationDuration: {
+  statVal: {
+    fontSize: 14,
+    fontWeight: "900",
+    color: "#1E293B",
+    marginBottom: 2,
+  },
+  statLabel: {
+    fontSize: 10,
+    color: "#94A3B8",
+    fontWeight: "700",
+    textTransform: "uppercase",
+  },
+  statDivider: {
+    width: 1,
+    height: 40,
+    backgroundColor: "#F1F5F9",
+  },
+
+  // Content Sections
+  sectionPadding: {
+    paddingHorizontal: 24,
+    marginTop: 32,
+  },
+  rowCenter: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginBottom: 12,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: "900",
+    color: "#1E293B",
+    letterSpacing: -0.5,
+  },
+  descriptionText: {
+    fontSize: 14,
+    lineHeight: 22,
+    color: "#64748B",
+    fontWeight: "500",
+  },
+
+  // Exercises List
+  variationsHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 16,
+  },
+  countBadge: {
+    backgroundColor: "#F1F5F9",
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+  },
+  countBadgeText: {
     fontSize: 11,
-    color: "#9CA3AF",
+    fontWeight: "800",
+    color: "#475569",
   },
-  variationPlayButton: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: "#BBF246",
+  exerciseCard: {
+    backgroundColor: "#fff",
+    borderRadius: 20,
+    padding: 16,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: "#F1F5F9",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.02,
+    shadowRadius: 10,
+    elevation: 2,
+  },
+  exCardHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 14,
+  },
+  exNumberBox: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    backgroundColor: "#F8FAFC",
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+  },
+  exNumberText: {
+    fontSize: 14,
+    fontWeight: "900",
+    color: "#94A3B8",
+  },
+  exMainInfo: {
+    flex: 1,
+  },
+  exName: {
+    fontSize: 16,
+    fontWeight: "800",
+    color: "#1E293B",
+    marginBottom: 6,
+  },
+  exSpecsRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+  exSpecItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+  },
+  exSpecVal: {
+    fontSize: 13,
+    fontWeight: "900",
+    color: "#6366F1",
+  },
+  exSpecLabel: {
+    fontSize: 11,
+    color: "#94A3B8",
+    fontWeight: "700",
+    textTransform: "uppercase",
+  },
+  exSpecDot: {
+    width: 3,
+    height: 3,
+    borderRadius: 2,
+    backgroundColor: "#CBD5E1",
+  },
+  exPlayTrigger: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: "#1E293B",
     alignItems: "center",
     justifyContent: "center",
   },
-  buttonContainer: {
+  obsBox: {
+    marginTop: 14,
+    backgroundColor: "#F8FAFC",
+    padding: 10,
+    borderRadius: 10,
+    borderLeftWidth: 3,
+    borderLeftColor: "#BBF246",
+  },
+  obsText: {
+    fontSize: 12,
+    color: "#64748B",
+    fontStyle: "italic",
+    lineHeight: 18,
+  },
+  emptyExercises: {
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 40,
+    backgroundColor: "#F8FAFC",
+    borderRadius: 24,
+    borderWidth: 2,
+    borderColor: "#F1F5F9",
+    borderStyle: "dashed",
+  },
+  emptyText: {
+    fontSize: 13,
+    color: "#94A3B8",
+    textAlign: "center",
+    marginTop: 12,
+    fontWeight: "600",
+    paddingHorizontal: 40,
+  },
+
+  // Bottom Nav
+  bottomNav: {
     position: "absolute",
     bottom: 0,
     left: 0,
     right: 0,
-    backgroundColor: "#fff",
+    backgroundColor: "transparent",
     paddingHorizontal: 20,
-    paddingVertical: 12,
-    paddingBottom: 25,
-    borderTopWidth: 1,
-    borderTopColor: "#F3F4F6",
-    zIndex: 10,
+    paddingBottom: Platform.OS === "ios" ? 10 : 30,
   },
-  startButton: {
-    backgroundColor: "#BBF246",
-    height: 56,
-    borderRadius: 16,
+  startBtn: {
+    borderRadius: 20,
+    overflow: "hidden",
+    shadowColor: "#BBF246",
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.3,
+    shadowRadius: 15,
+    elevation: 8,
+  },
+  startBtnGradient: {
+    height: 64,
+    flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    shadowColor: "#BBF246",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 4,
+    gap: 12,
   },
-  startButtonText: {
-    color: "#192126",
+  startBtnText: {
     fontSize: 16,
     fontWeight: "900",
-    letterSpacing: 1,
+    color: "#1E293B",
+    letterSpacing: 0.5,
+  },
+  startBtnArrow: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: "rgba(30,41,59,0.1)",
+    alignItems: "center",
+    justifyContent: "center",
   },
   footer: {
-    marginTop: 20,
-    paddingHorizontal: 20,
-    alignItems: "center",
-    marginBottom: 120, // To give space for fixed button
+    marginTop: 40,
+    paddingHorizontal: 30,
+    alignItems: "flex-start",
   },
 });
 

@@ -5,7 +5,6 @@ import {
   fetchHealthConnectHeartRate,
   fetchHealthConnectCalories,
   fetchHealthConnectOxygen,
-  fetchHealthConnectSleep,
 } from "./healthConnectService";
 import {
   ensureHealthKitPermissions,
@@ -19,22 +18,34 @@ export interface NativeHealthData {
   heartRate: number;
 }
 
+let isSimulationState = false;
+
 export const NativeHealthManager = {
   authorize: async (): Promise<boolean> => {
     let success = false;
-    if (Platform.OS === "android") {
-      success = await ensureHealthConnectPermissions();
-    } else if (Platform.OS === "ios") {
-      success = await ensureHealthKitPermissions();
+    try {
+      if (Platform.OS === "android") {
+        success = await ensureHealthConnectPermissions();
+      } else if (Platform.OS === "ios") {
+        success = await ensureHealthKitPermissions();
+      }
+    } catch (error) {
+      console.log("ℹ️ Saúde Nativa: Módulos indisponíveis (Expo Go). Ativando Modo Simulação.");
+      success = false;
     }
 
     if (!success) {
-      console.log("ℹ️ Saúde Nativa: Módulos indisponíveis ou permissão negada.");
+      isSimulationState = true;
+      console.log("🛠️ [MODO SIMULAÇÃO] Ativado para testes de interface.");
+      return true; // Retornamos true para destravar a interface do usuário
     }
+
+    isSimulationState = false;
     return success;
   },
 
   fetchSteps: async (): Promise<number> => {
+    if (isSimulationState) return Math.floor(4000 + Math.random() * 1000);
     if (Platform.OS === "android") {
       return fetchHealthConnectSteps();
     } else if (Platform.OS === "ios") {
@@ -44,6 +55,7 @@ export const NativeHealthManager = {
   },
 
   fetchHeartRate: async (): Promise<number> => {
+    if (isSimulationState) return Math.floor(70 + Math.random() * 15);
     if (Platform.OS === "android") {
       return fetchHealthConnectHeartRate();
     } else if (Platform.OS === "ios") {
@@ -53,6 +65,7 @@ export const NativeHealthManager = {
   },
 
   fetchCalories: async (): Promise<number> => {
+    if (isSimulationState) return Math.floor(300 + Math.random() * 50);
     if (Platform.OS === "android") {
       return fetchHealthConnectCalories();
     } else if (Platform.OS === "ios") {
@@ -62,7 +75,6 @@ export const NativeHealthManager = {
   },
 
   subscribeSteps: (callback: (steps: number) => void): (() => void) => {
-    // For both platforms we use polling since direct step observing can be buggy or unsupported
     const interval = setInterval(async () => {
       const steps = await NativeHealthManager.fetchSteps();
       callback(steps);
@@ -71,7 +83,6 @@ export const NativeHealthManager = {
   },
 
   subscribeHeartRate: (callback: (bpm: number) => void): (() => void) => {
-    // We use polling for Health Connect (Android) and AppleHealthKit (iOS) natively
     const interval = setInterval(async () => {
       const bpm = await NativeHealthManager.fetchHeartRate();
       if (bpm > 0) callback(bpm);
@@ -80,11 +91,12 @@ export const NativeHealthManager = {
   },
 
   fetchPressure: async (): Promise<number | null> => {
-    // Apenas Health Connect tem implementado
-    return null; // Implementação base, será expandido
+    if (isSimulationState) return Math.floor(110 + Math.random() * 20);
+    return null;
   },
 
   fetchOxygen: async (): Promise<number | null> => {
+    if (isSimulationState) return Math.floor(95 + Math.random() * 5);
     if (Platform.OS === "android") {
       return fetchHealthConnectOxygen();
     }

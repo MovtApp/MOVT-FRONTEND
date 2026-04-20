@@ -52,6 +52,7 @@ import AdminDashboardScreen from "../screens/App/admin/AdminDashboardScreen";
 
 import ActiveWorkout from "../screens/App/training/[protected]/activeWorkout";
 import LanguageScreen from "../screens/App/config/LanguageScreen";
+import ExpectationRealityScreen from "../screens/App/biometrics/ExpectationRealityScreen";
 
 const Stack = createNativeStackNavigator<AppStackParamList>();
 const LeftDrawer = createDrawerNavigator();
@@ -109,6 +110,7 @@ function AppLayout() {
         <Stack.Screen name="ArchivedPostsScreen" component={ArchivedPostsScreen} />
         <Stack.Screen name="EditProfileScreen" component={EditProfileScreen} />
         <Stack.Screen name="AdminDashboard" component={AdminDashboardScreen} />
+        <Stack.Screen name="ExpectationRealityScreen" component={ExpectationRealityScreen} />
       </Stack.Navigator>
       <BottomNavigationBar />
     </View>

@@ -380,8 +380,8 @@ const CyclingScreen: React.FC = () => {
                   <TrendingUp size={24} color="#3B82F6" />
                 </View>
                 <View>
-                  <Text style={styles.insightLabel}>Sua melhor performance</Text>
-                  <Text style={styles.insightValue}>+15% em relação à última semana</Text>
+                  <Text style={styles.insightLabel}>Sua performance</Text>
+                  <Text style={styles.insightValue}>Acompanhe sua evolução semanal</Text>
                 </View>
               </View>
               <ChevronRight size={20} color="#3B82F6" />
@@ -392,7 +392,7 @@ const CyclingScreen: React.FC = () => {
             <View style={styles.smallStatCard}>
               <Heart size={20} color="#EF4444" />
               <Text style={styles.smallStatLabel}>BPM Médio</Text>
-              <Text style={styles.smallStatValue}>142</Text>
+              <Text style={styles.smallStatValue}>--</Text>
             </View>
             <View style={styles.smallStatCard}>
               <Flame size={20} color="#F97316" />
@@ -402,7 +402,7 @@ const CyclingScreen: React.FC = () => {
             <View style={styles.smallStatCard}>
               <Droplets size={20} color="#3B82F6" />
               <Text style={styles.smallStatLabel}>Hidratação</Text>
-              <Text style={styles.smallStatValue}>1.2L</Text>
+              <Text style={styles.smallStatValue}>0L</Text>
             </View>
           </View>
         </View>
@@ -484,7 +484,7 @@ const CyclingScreen: React.FC = () => {
 
             <TouchableOpacity
               style={styles.bsCloseBtn}
-              onPress={() => Alert.alert("Compartilhar", "Postando no Feed do MOVT...")}
+              onPress={() => Alert.alert("Em breve", "Postando no Feed do MOVT...")}
             >
               <Text style={styles.bsCloseBtnText}>Postar no Feed do App</Text>
             </TouchableOpacity>

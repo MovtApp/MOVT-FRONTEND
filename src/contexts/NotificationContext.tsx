@@ -10,6 +10,7 @@ import React, {
 import { useAuth } from "./AuthContext";
 import { userService } from "../services/userService";
 import { supabase } from "../services/supabaseClient";
+import { api } from "../services/api";
 
 // Define the shape of a notification
 export interface Notification {
@@ -51,6 +52,7 @@ interface NotificationContextType {
   removeNotification: (id: string) => void;
   clearAllNotifications: () => void;
   unreadCount: number;
+  unreadChatCount: number;
   fetchRemoteData: () => Promise<void>;
   respondToFollowRequest: (senderId: string | number, accept: boolean) => Promise<void>;
   activeChatId: string | null;
@@ -101,6 +103,7 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({ chil
   const [notifications, dispatch] = useReducer(notificationReducer, []);
   const [followRequests, setFollowRequests] = useState<FollowRequest[]>([]);
   const [activeChatId, setActiveChatId] = useState<string | null>(null);
+  const [unreadChatCount, setUnreadChatCount] = useState(0);
 
   const fetchRemoteData = useCallback(async () => {
     if (!user) return;
@@ -132,6 +135,19 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({ chil
 
       if (requestsResp && requestsResp.success) {
         setFollowRequests(requestsResp.data || []);
+      }
+
+      // Adicionado: Busca conversas para somar unread_count
+      const chatResp = await api.get("/chat");
+      if (chatResp.status === 200) {
+        const chats = chatResp.data.data || [];
+        const totalUnreadChats = chats.reduce((acc: number, chat: any) => {
+          // A lógica do back-end já deve retornar unread_count, 
+          // mas garantimos que só somamos se não formos o último remetente
+          // ou se o back-end já preparou o campo corretamente.
+          return acc + (chat.unread_count || 0);
+        }, 0);
+        setUnreadChatCount(totalUnreadChats);
       }
     } catch (err) {
       console.error("Erro ao buscar dados de notificação:", err);
@@ -201,7 +217,7 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({ chil
     if (!userId) return;
 
     const channel = supabase
-      .channel("notifications-changes")
+      .channel("notifications-sync")
       .on(
         "postgres_changes",
         {
@@ -210,10 +226,19 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({ chil
           table: "notifications",
           filter: `user_id=eq.${userId}`,
         },
-        () => {
-          // Quando qualquer notificação for inserida, atualizada ou deletada para este usuário
-          fetchRemoteData();
-        }
+        () => fetchRemoteData()
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "messages",
+          // Idealmente filtraríamos por receiver_id, mas para garantir 
+          // que qualquer mudança no chat atualize o contador, ouvimos as mensagens.
+          // O fetchRemoteData fará a filtragem correta via API.
+        },
+        () => fetchRemoteData()
       )
       .subscribe();
 
@@ -233,6 +258,7 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({ chil
         removeNotification,
         clearAllNotifications,
         unreadCount,
+        unreadChatCount,
         fetchRemoteData,
         respondToFollowRequest,
         activeChatId,

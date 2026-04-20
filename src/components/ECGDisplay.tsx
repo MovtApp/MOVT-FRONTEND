@@ -129,9 +129,15 @@ const ECGDisplay: React.FC<ECGDisplayProps> = ({
 
   // Obter o valor atual da animação
   const displayOffset = useRef(0);
-  offsetAnim.addListener(({ value }) => {
-    displayOffset.current = value;
-  });
+
+  useEffect(() => {
+    const listener = offsetAnim.addListener(({ value }) => {
+      displayOffset.current = value;
+    });
+    return () => {
+      offsetAnim.removeListener(listener);
+    };
+  }, [offsetAnim]);
 
   const pathData = React.useMemo(() => {
     return generateECGWaveform(displayOffset.current, bpm || 60);

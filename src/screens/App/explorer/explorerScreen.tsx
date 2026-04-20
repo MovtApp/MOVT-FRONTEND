@@ -25,6 +25,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import Header from "../../../components/Header";
 import SearchInput from "../../../components/SearchInput";
 import { FooterVersion } from "@components/FooterVersion";
+import { useAppData } from "@contexts/AppDataContext";
 
 const { width } = Dimensions.get("window");
 
@@ -70,164 +71,8 @@ interface Story {
 
 type FeedCategory = "all" | "workout" | "diet" | "community" | "trending";
 
-// --- Mock Data ---
-const STORIES_DATA: Story[] = [
-  {
-    id: "s1",
-    user: {
-      id: "u1",
-      name: "Ana Paula",
-      username: "@anap",
-      avatar: "https://i.pravatar.cc/150?img=1",
-    },
-    gradient: ["#BBF246", "#7EC850"],
-    viewed: false,
-  },
-  {
-    id: "s2",
-    user: {
-      id: "u2",
-      name: "Carlos",
-      username: "@carlos",
-      avatar: "https://i.pravatar.cc/150?img=12",
-    },
-    gradient: ["#FF6B6B", "#EE5A6F"],
-    viewed: false,
-  },
-  {
-    id: "s3",
-    user: {
-      id: "u3",
-      name: "Julia",
-      username: "@ju",
-      avatar: "https://i.pravatar.cc/150?img=5",
-    },
-    gradient: ["#4ECDC4", "#44A08D"],
-    viewed: true,
-  },
-  {
-    id: "s4",
-    user: {
-      id: "u4",
-      name: "Pedro",
-      username: "@pedro",
-      avatar: "https://i.pravatar.cc/150?img=8",
-    },
-    gradient: ["#F7B731", "#F79F1F"],
-    viewed: false,
-  },
-  {
-    id: "s5",
-    user: {
-      id: "u5",
-      name: "Sofia",
-      username: "@sofia",
-      avatar: "https://i.pravatar.cc/150?img=9",
-    },
-    gradient: ["#A29BFE", "#6C5CE7"],
-    viewed: true,
-  },
-];
-
-const POSTS_DATA: Post[] = [
-  {
-    id: "p1",
-    user: {
-      id: "u1",
-      name: "Ana Paula Santos",
-      username: "@anap_fit",
-      avatar: "https://i.pravatar.cc/150?img=1",
-      isVerified: true,
-    },
-    type: "workout",
-    timeAgo: "2h",
-    content: {
-      title: "Corrida Matinal Completa! 🏃‍♀️",
-      description:
-        "Que energia incrível hoje! Consegui bater meu recorde pessoal de 5km. A consistência está valendo a pena! 💪",
-      imageUrl:
-        "https://images.unsplash.com/photo-1476480862126-209bfaa8edc8?q=80&w=2670&auto=format&fit=crop",
-      stats: [
-        { label: "Distância", value: "5.2 km", color: "#BBF246" },
-        { label: "Tempo", value: "26:45", color: "#4ECDC4" },
-        { label: "Calorias", value: "385 kcal", color: "#FF6B6B" },
-      ],
-    },
-    metrics: { likes: 234, comments: 28, saves: 45, liked: true, saved: false },
-  },
-  {
-    id: "p2",
-    user: {
-      id: "u2",
-      name: "Carlos Silva",
-      username: "@carlos.nutrition",
-      avatar: "https://i.pravatar.cc/150?img=12",
-      isVerified: true,
-    },
-    type: "diet",
-    timeAgo: "5h",
-    content: {
-      title: "Refeição Pós-Treino Perfeita 🥗",
-      description:
-        "Foco total na recuperação muscular! Proteínas de qualidade + carboidratos complexos = combinação vencedora.",
-      imageUrl:
-        "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?q=80&w=2680&auto=format&fit=crop",
-      stats: [
-        { label: "Proteína", value: "52g", color: "#BBF246" },
-        { label: "Carboidratos", value: "68g", color: "#F7B731" },
-        { label: "Calorias", value: "620 kcal", color: "#FF6B6B" },
-      ],
-    },
-    metrics: { likes: 189, comments: 15, saves: 67, liked: false, saved: true },
-  },
-  {
-    id: "p3",
-    user: {
-      id: "u3",
-      name: "Julia Costa",
-      username: "@juju.wellness",
-      avatar: "https://i.pravatar.cc/150?img=5",
-    },
-    type: "achievement",
-    timeAgo: "8h",
-    content: {
-      title: "30 Dias de Yoga Consecutivos! 🧘‍♀️✨",
-      description:
-        "Completei meu desafio de 30 dias! A transformação mental foi ainda maior que a física. Gratidão por cada momento.",
-      imageUrl:
-        "https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?q=80&w=2620&auto=format&fit=crop",
-      stats: [
-        { label: "Dias", value: "30", color: "#A29BFE" },
-        { label: "Horas", value: "15h", color: "#4ECDC4" },
-        { label: "Sessões", value: "30", color: "#BBF246" },
-      ],
-    },
-    metrics: { likes: 456, comments: 89, saves: 123, liked: true, saved: true },
-  },
-  {
-    id: "p4",
-    user: {
-      id: "u4",
-      name: "Pedro Oliveira",
-      username: "@pedro.strong",
-      avatar: "https://i.pravatar.cc/150?img=8",
-    },
-    type: "community",
-    timeAgo: "12h",
-    content: {
-      title: "Treino em Grupo - Domingo 7h 🏋️",
-      description:
-        "Galera, vamos treinar juntos esse domingo! Treino funcional ao ar livre no Parque Ibirapuera. Todos os níveis são bem-vindos!",
-      imageUrl:
-        "https://images.unsplash.com/photo-1517836357463-d25dfeac3438?q=80&w=2670&auto=format&fit=crop",
-      stats: [
-        { label: "Confirmados", value: "12", color: "#BBF246" },
-        { label: "Interessados", value: "28", color: "#F7B731" },
-      ],
-    },
-    metrics: { likes: 98, comments: 34, saves: 21, liked: false, saved: false },
-  },
-];
+// --- Mock Data (To be replaced by API in next phase) ---
+const STORIES_DATA: Story[] = [];
 
 const CATEGORIES: { id: FeedCategory; label: string; icon: any }[] = [
   { id: "all", label: "Tudo", icon: Activity },
@@ -376,16 +221,38 @@ const PostCard: React.FC<{ post: Post }> = ({ post }) => {
 
 // --- Main Screen ---
 const ExplorerScreen: React.FC = () => {
+  const { feedPosts, loadingFeedPosts, fetchFeedData } = useAppData();
   const [search, setSearch] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<FeedCategory>("all");
 
   const filteredPosts = useMemo(() => {
-    if (selectedCategory === "all") return POSTS_DATA;
+    let baseData = (feedPosts || []).map((p: any) => ({
+      ...p,
+      id: String(p.id_post || p.id),
+      user: p.user || {
+        name: p.nome_us || "Usuário MOVT",
+        username: p.username || "@usuario",
+        avatar:
+          p.avatar_url ||
+          "https://res.cloudinary.com/ditlmzgrh/image/upload/v1757229915/image_71_jntmsv.jpg",
+      },
+      content: {
+        description: p.legenda || p.content?.description || "",
+        imageUrl: p.media_url || p.content?.imageUrl,
+      },
+      metrics: {
+        likes: parseInt(p.likes_count || 0),
+        comments: parseInt(p.comments_count || 0),
+        liked: !!p.isLiked,
+      },
+    }));
+
+    if (selectedCategory === "all") return baseData;
     if (selectedCategory === "trending") {
-      return [...POSTS_DATA].sort((a, b) => b.metrics.likes - a.metrics.likes);
+      return [...baseData].sort((a, b) => b.metrics.likes - a.metrics.likes);
     }
-    return POSTS_DATA.filter((post) => post.type === selectedCategory);
-  }, [selectedCategory]);
+    return baseData.filter((post: any) => post.type === selectedCategory);
+  }, [selectedCategory, feedPosts]);
 
   return (
     <SafeAreaView style={styles.container} edges={["top"]}>
@@ -403,21 +270,25 @@ const ExplorerScreen: React.FC = () => {
           onChangeText={setSearch}
           placeholder="Buscar pessoas, treinos, receitas..."
           icon={<Search size={20} color="#888" />}
+          refreshing={loadingFeedPosts}
+          onRefresh={() => fetchFeedData(true)}
         />
 
         {/* Stories */}
-        <View style={styles.storiesSection}>
-          <Text style={styles.sectionTitle}>Stories</Text>
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.storiesContent}
-          >
-            {STORIES_DATA.map((story) => (
-              <StoryItem key={story.id} story={story} />
-            ))}
-          </ScrollView>
-        </View>
+        {STORIES_DATA.length > 0 && (
+          <View style={styles.storiesSection}>
+            <Text style={styles.sectionTitle}>Stories</Text>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.storiesContent}
+            >
+              {STORIES_DATA.map((story) => (
+                <StoryItem key={story.id} story={story} />
+              ))}
+            </ScrollView>
+          </View>
+        )}
 
         {/* Categories */}
         <View style={styles.categoriesSection}>

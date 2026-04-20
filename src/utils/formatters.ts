@@ -1,9 +1,10 @@
-export const getTodayKey = (prefix: string, date?: Date): string => {
+export const getTodayKey = (prefix: string, date?: Date, userId?: string | number): string => {
   const d = date || new Date();
   const yyyy = d.getFullYear();
   const mm = String(d.getMonth() + 1).padStart(2, "0");
   const dd = String(d.getDate()).padStart(2, "0");
-  return `${prefix}:${yyyy}-${mm}-${dd}`;
+  const userPrefix = userId ? `user_${userId}:` : "";
+  return `${userPrefix}${prefix}:${yyyy}-${mm}-${dd}`;
 };
 
 export const formatTime = (date: Date) => {

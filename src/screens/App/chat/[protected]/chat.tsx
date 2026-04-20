@@ -254,7 +254,12 @@ const Chat = () => {
       headerTitleAlign: "center",
       headerTitle: () => <Text style={styles.headerTitleText}>{participantName || "Chat"}</Text>,
       headerLeft: () => (
-        <View style={{ marginLeft: 15 }}>
+        <View
+          style={{
+            marginLeft: 15,
+            marginTop: Platform.select({ android: 4, ios: 0 }),
+          }}
+        >
           <BackButton />
         </View>
       ),

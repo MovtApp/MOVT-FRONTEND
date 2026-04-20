@@ -2,6 +2,7 @@ import { useState, useCallback, useEffect } from "react";
 import { useAuth } from "../contexts/AuthContext";
 import { api } from "../services/api";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { useAppData } from "../contexts/AppDataContext";
 
 /** A diet shaped as a generic feed item so FeedScreen can merge it with posts */
 export interface DietFeedItem {
@@ -34,8 +35,15 @@ interface UseSelfDietsReturn {
 
 export const useSelfDiets = (onlyMine: boolean = true): UseSelfDietsReturn => {
   const { user } = useAuth();
-  const [diets, setDiets] = useState<DietFeedItem[]>([]);
+  const { feedDiets } = useAppData();
+  const [diets, setDiets] = useState<DietFeedItem[]>(!onlyMine ? feedDiets : []);
   const [isLoading, setIsLoading] = useState(false);
+
+  useEffect(() => {
+    if (!onlyMine && feedDiets.length > 0 && diets.length === 0) {
+      setDiets(feedDiets);
+    }
+  }, [feedDiets, onlyMine]);
 
   const fetchDiets = useCallback(async () => {
     if (!user?.id) return;

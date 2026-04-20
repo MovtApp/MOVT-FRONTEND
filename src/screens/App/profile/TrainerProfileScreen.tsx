@@ -55,19 +55,8 @@ export function TrainerProfileScreen() {
   const [fetchedTrainer, setFetchedTrainer] = useState<any | null>(null);
   const [postsList, setPostsList] = useState<any[]>([]);
 
-  const mock = {
-    id: "1",
-    name: "Oliver Augusto",
-    username: "Oliver_guto",
-    avatarUrl: "https://res.cloudinary.com/ditlmzgrh/image/upload/v1757838100/image_qbpvr6.jpg",
-    coverUrl: "https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?w=1200&h=400&fit=crop",
-    isOnline: true,
-    location: "São Paulo",
-    hasCurriculum: true,
-  };
-
-  const data = trainer || mock;
-  const effectiveCover = coverUri || fetchedTrainer?.coverUrl || data.coverUrl || "";
+  const data = fetchedTrainer || trainer;
+  const effectiveCover = coverUri || data?.coverUrl || data?.cover_url || "";
 
   useEffect(() => {
     const id = trainerId;
@@ -246,6 +235,21 @@ export function TrainerProfileScreen() {
       Alert.alert("Erro", err?.message || "Erro ao processar ação. Verifique sua conexão.");
     }
   };
+
+  if (!data) {
+    return (
+      <View
+        style={{
+          flex: 1,
+          justifyContent: "center",
+          alignItems: "center",
+          backgroundColor: "#14161A",
+        }}
+      >
+        <ActivityIndicator size="large" color="#10B981" />
+      </View>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.container}>

@@ -67,7 +67,20 @@ const challengeData: Challenge[] = [
   },
 ];
 
-const ChallengesSection: React.FC = () => {
+interface ChallengeItem {
+  image: { uri: string };
+  title: string;
+  id: string;
+}
+
+interface ChallengesSectionProps {
+  challenges?: ChallengeItem[];
+  onPress?: (item: ChallengeItem) => void;
+}
+
+const ChallengesSection: React.FC<ChallengesSectionProps> = ({ challenges, onPress }) => {
+  const data = challenges && challenges.length > 0 ? challenges : challengeData;
+
   return (
     <View style={styles.section}>
       <View style={styles.header}>
@@ -77,12 +90,12 @@ const ChallengesSection: React.FC = () => {
         </View>
       </View>
       <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-        {challengeData.map((challenge) => (
+        {data.map((challenge) => (
           <ChallengeCard
             key={challenge.id}
             image={challenge.image}
             title={challenge.title}
-            onPress={() => {}} // Removido console.log
+            onPress={() => onPress?.(challenge)}
           />
         ))}
       </ScrollView>

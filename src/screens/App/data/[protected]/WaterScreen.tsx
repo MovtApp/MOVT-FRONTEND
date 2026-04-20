@@ -15,6 +15,8 @@ import {
   Platform,
 } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { getHealthMetricData, saveHealthMetricData } from "../../../../services/caloriesService";
+
 import BackButton from "../../../../components/BackButton";
 import DataPillNavigator from "../../../../components/data/DataPillNavigator";
 import { AppStackParamList } from "../../../../@types/routes";
@@ -74,15 +76,13 @@ const WaterScreen: React.FC = () => {
   useEffect(() => {
     const load = async () => {
       try {
-        const key = getTodayKey();
-        const raw = await AsyncStorage.getItem(key);
-        if (raw) {
-          const parsed: StoredWaterData = JSON.parse(raw);
-          setConsumedMl(typeof parsed.consumedMl === "number" ? parsed.consumedMl : 0);
-        } else {
-          setConsumedMl(0);
+        const data = await getHealthMetricData("water", "1d");
+        if (data && data.data) {
+          setConsumedMl(data.totalValue || 0);
+          setGoalMl(data.dailyGoal || DEFAULT_GOAL_ML);
         }
-      } catch {
+      } catch (error) {
+        console.error("Erro ao buscar dados de água:", error);
         setConsumedMl(0);
       }
     };
@@ -90,9 +90,11 @@ const WaterScreen: React.FC = () => {
   }, []);
 
   const persist = async (nextConsumed: number) => {
-    const key = getTodayKey();
-    const data: StoredWaterData = { consumedMl: nextConsumed };
-    await AsyncStorage.setItem(key, JSON.stringify(data));
+    try {
+      await saveHealthMetricData("water", nextConsumed);
+    } catch (error) {
+      console.error("Erro ao salvar dados de água:", error);
+    }
   };
 
   const handleAddCup = () => {

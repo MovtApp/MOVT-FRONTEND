@@ -82,8 +82,13 @@ import DateTimePickerModal from "react-native-modal-datetime-picker";
 import CommunityManagementSheet, {
   CommunityManagementSheetRef,
 } from "./[protected]/components/CommunityManagementSheet";
+import WorkoutManagementSheet, {
+  WorkoutManagementSheetRef,
+} from "./[protected]/components/WorkoutManagementSheet";
+import { useAppData } from "../../../contexts/AppDataContext";
 
 const PolarChartAny = PolarChart as any;
+const CartesianChartAny = CartesianChart as any;
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -165,6 +170,13 @@ interface DashboardData {
   churnBreakdown?: { label: string; value: string }[];
   ltvBreakdown?: { plan: string; val: number }[];
   topUnits?: { name: string; members: number; rev: number; grow: string }[];
+  operations?: {
+    activeGyms: number;
+    pendingRegistrations: number;
+    totalWorkouts: number;
+    totalCommunities: number;
+    totalStripePlans: number;
+  };
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -175,10 +187,27 @@ const AdminDashboardScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
   const { state, isActive } = useChartPressState({ x: "", y: { total: 0 } });
 
-  const [loading, setLoading] = useState(true);
+  // Controle de Renderização Tardia (Lazy)
+  const [renderedSheets, setRenderedSheets] = useState<Record<string, boolean>>({});
+
+  const markSheetAsRendered = useCallback((sheetId: string) => {
+    setRenderedSheets((prev) => (prev[sheetId] ? prev : { ...prev, [sheetId]: true }));
+  }, []);
+
+  const {
+    adminDashboardData: data,
+    loadingAdminDashboard: loading,
+    fetchAdminDashboardData: fetchData,
+    adminUsers,
+    setAdminUsers,
+    adminTrainers,
+    setAdminTrainers,
+    adminGyms,
+    setAdminGyms,
+  } = useAppData();
+
   const [refreshing, setRefreshing] = useState(false);
   const [activeTab, setActiveTab] = useState<"day" | "month" | "year">("day");
-  const [data, setData] = useState<DashboardData | null>(null);
 
   // Estados de Filtro
   const [filterStatus, setFilterStatus] = useState<string>("all");
@@ -208,6 +237,7 @@ const AdminDashboardScreen: React.FC = () => {
   const userDetailSheetRef = React.useRef<BottomSheet>(null);
   // Ref para Gestão de Comunidades (componente dedicado)
   const adminCommSheetRef = React.useRef<CommunityManagementSheetRef>(null);
+  const adminWorkoutSheetRef = React.useRef<WorkoutManagementSheetRef>(null);
 
   // Novos Refs para BI Estratégico
   const churnDetailSheetRef = React.useRef<BottomSheet>(null);
@@ -218,7 +248,7 @@ const AdminDashboardScreen: React.FC = () => {
   const [selectedUserDetail, setSelectedUserDetail] = useState<any>(null);
   const [selectedClient, setSelectedClient] = useState<PersonalClient | null>(null);
   const [clientHistory, setClientHistory] = useState<any[]>([]);
-  const [adminUsers, setAdminUsers] = useState<any[]>([]);
+  // adminUsers vem do contexto
   const [userSearchQuery, setUserSearchQuery] = useState("");
   const [userStatusFilter, setUserStatusFilter] = useState<"all" | "active" | "blocked">("all");
   const [userRoleFilter, setUserRoleFilter] = useState<
@@ -241,16 +271,17 @@ const AdminDashboardScreen: React.FC = () => {
   const [googleResults, setGoogleResults] = useState<any[]>([]);
   const [isSearchingGoogle, setIsSearchingGoogle] = useState(false);
   const [gymForm, setGymForm] = useState<any>({});
-  const [adminTrainers, setAdminTrainers] = useState<any[]>([]);
+  // adminTrainers vem do contexto
   const [trainerListSearchQuery, setTrainerListSearchQuery] = useState("");
   const [trainerListStatusFilter, setTrainerListStatusFilter] = useState<
     "all" | "active" | "blocked"
   >("all");
-  const [adminGyms, setAdminGyms] = useState<any[]>([]);
+  // adminGyms vem do contexto
   const [gymListSearchQuery, setGymListSearchQuery] = useState("");
   const [gymListStatusFilter, setGymListStatusFilter] = useState<"all" | "active" | "blocked">(
     "all"
   );
+  const [loadingSheet, setLoadingSheet] = useState(false);
 
   const filteredAdminGyms = useMemo(() => {
     return adminGyms.filter((g) => {
@@ -270,8 +301,8 @@ const AdminDashboardScreen: React.FC = () => {
   }, [adminGyms, gymListSearchQuery, gymListStatusFilter]);
 
   const [adminExpiring, setAdminExpiring] = useState<any[]>([]);
+  // adminPlans vem do contexto se necessário, mas mantemos o local se for específico da aba
   const [adminPlans, setAdminPlans] = useState<any[]>([]);
-  const [loadingSheet, setLoadingSheet] = useState(false);
 
   // Contador de comunidades para exibição no painel
   const [adminCommunitiesCount, setAdminCommunitiesCount] = useState(0);
@@ -423,91 +454,47 @@ const AdminDashboardScreen: React.FC = () => {
   const [comentarioTecnico, setComentarioTecnico] = useState("");
   const [notaAluno, setNotaAluno] = useState(5);
 
-  const fetchData = useCallback(async (tab: string = "month", status: string = "all") => {
-    try {
-      const response = await api.get(`/admin/dashboard-stats`, {
-        params: { tab, status },
-      });
-      if (response.data.success) {
-        setData(response.data);
-      }
-    } catch (error) {
-      console.error("Erro ao carregar Dashboard Admin:", error);
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  }, []);
+  // useAppData já carregado no topo do componente
 
   useEffect(() => {
-    fetchData(activeTab, filterStatus);
-    fetchAdminPlans(false); // Carrega contador em background logo no início
-    // Carrega contador de comunidades para exibição no painel
-    api
-      .get("/comunidades")
-      .then((r) => {
-        const list = r.data.data || r.data;
-        setAdminCommunitiesCount(Array.isArray(list) ? list.length : 0);
-      })
-      .catch(() => {});
-  }, [fetchData, activeTab, filterStatus]);
+    fetchData(false, activeTab, filterStatus);
+    fetchAdminPlans(false);
+  }, [activeTab, filterStatus]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await fetchData();
+    setRefreshing(false);
+  }, [fetchData]);
+
+  const openFilter = () => {
+    markSheetAsRendered("filter");
+    filterSheetRef.current?.expand();
+  };
 
   const fetchAdminUsers = async () => {
-    try {
-      setLoadingSheet(true);
-      usersSheetRef.current?.expand();
-      const response = await api.get("/admin/all-users");
-      setAdminUsers(response.data.users || []);
-    } catch (err) {
-      console.error("Erro ao buscar usuários:", err);
-    } finally {
-      setLoadingSheet(false);
-    }
+    markSheetAsRendered("users");
+    usersSheetRef.current?.expand();
   };
 
   const fetchActivePlansList = async () => {
-    try {
-      setLoadingSheet(true);
-      activePlansSheetRef.current?.expand();
-      if (adminUsers.length === 0) {
-        const response = await api.get("/admin/all-users");
-        setAdminUsers(response.data.users || []);
-      }
-    } catch (err) {
-      console.error("Erro ao buscar usuarios para planos:", err);
-    } finally {
-      setLoadingSheet(false);
-    }
+    markSheetAsRendered("activePlans");
+    activePlansSheetRef.current?.expand();
   };
 
   const fetchAdminTrainers = async (silent: boolean = false) => {
-    try {
-      setLoadingSheet(true);
-      if (!silent) trainersSheetRef.current?.expand();
-      const response = await api.get("/admin/trainers");
-      setAdminTrainers(response.data.users || []);
-    } catch (err) {
-      console.error("Erro ao buscar personais:", err);
-    } finally {
-      setLoadingSheet(false);
-    }
+    markSheetAsRendered("trainers");
+    if (!silent) trainersSheetRef.current?.expand();
   };
 
   const fetchAdminGyms = async () => {
-    try {
-      setLoadingSheet(true);
-      gymsSheetRef.current?.expand();
-      const response = await api.get("/admin/gyms");
-      setAdminGyms(response.data.data || []);
-    } catch (err) {
-      console.error("Erro ao buscar academias:", err);
-    } finally {
-      setLoadingSheet(false);
-    }
+    markSheetAsRendered("gyms");
+    gymsSheetRef.current?.expand();
   };
 
   const fetchAdminExpiring = async () => {
     try {
+      markSheetAsRendered("expiring");
       setLoadingSheet(true);
       expiringSheetRef.current?.expand();
 
@@ -535,6 +522,7 @@ const AdminDashboardScreen: React.FC = () => {
   const fetchAdminPlans = async (shouldExpand: boolean = true) => {
     try {
       if (shouldExpand) {
+        markSheetAsRendered("plans");
         setLoadingSheet(true);
         plansSheetRef.current?.expand();
       }
@@ -889,7 +877,7 @@ const AdminDashboardScreen: React.FC = () => {
         if (selectedUserDetail?.id_us === userId) {
           setSelectedUserDetail((prev: any) => ({ ...prev, plan: newPlan }));
         }
-        fetchData(activeTab, filterStatus);
+        fetchData();
         Alert.alert("Sucesso", `O plano de foi alterado para ${newPlan.toUpperCase()}.`);
       }
     } catch (err) {
@@ -924,7 +912,7 @@ const AdminDashboardScreen: React.FC = () => {
             prev.map((u) => (u.id_us === userId ? { ...u, role: newRole } : u))
           );
           // Recarregar KPIs para atualizar os contadores no topo
-          fetchData(activeTab, filterStatus);
+          fetchData();
           Alert.alert("Sucesso", "Papel do usuário atualizado com sucesso!");
         }
       } catch (err) {
@@ -945,10 +933,7 @@ const AdminDashboardScreen: React.FC = () => {
     }
   };
 
-  const onRefresh = useCallback(() => {
-    setRefreshing(true);
-    fetchData(activeTab, filterStatus);
-  }, [fetchData, activeTab, filterStatus]);
+  // Moved to top of component
 
   const handleAction = async (id: number, status: string) => {
     try {
@@ -957,7 +942,7 @@ const AdminDashboardScreen: React.FC = () => {
         "Sucesso",
         status === "confirmado" ? "Agendamento aprovado!" : "Agendamento recusado."
       );
-      fetchData(activeTab, filterStatus);
+      fetchData();
     } catch {
       Alert.alert("Erro", "Falha ao processar ação.");
     }
@@ -1000,20 +985,15 @@ const AdminDashboardScreen: React.FC = () => {
       evaluationSheetRef.current?.close();
       // Recarregar histórico
       if (selectedClient) openClientHistory(selectedClient);
-      fetchData(activeTab, filterStatus);
+      fetchData();
     } catch (error) {
       Alert.alert("Erro", "Falha ao salvar avaliação.");
     }
   };
 
-  const openFilter = () => {
-    setTempStatus(filterStatus);
-    filterSheetRef.current?.expand();
-  };
-
   const applyFilters = () => {
     setFilterStatus(tempStatus);
-    fetchData(activeTab, tempStatus);
+    fetchData();
     filterSheetRef.current?.close();
   };
 
@@ -1056,7 +1036,7 @@ const AdminDashboardScreen: React.FC = () => {
             "Sucesso",
             `Comprovante validado pela IA!\nValor lido: R$ ${response.data.data.amount}\nPagador: ${response.data.data.payer || "Não identificado"}`
           );
-          fetchData(activeTab, filterStatus);
+          fetchData();
           paymentsSheetRef.current?.close();
         }
       }
@@ -1068,11 +1048,12 @@ const AdminDashboardScreen: React.FC = () => {
     }
   };
 
-  const formatCurrency = (val: number) => {
+  const formatCurrency = (val: number | null | undefined) => {
+    const safeVal = val ?? 0;
     return new Intl.NumberFormat("pt-BR", {
       style: "currency",
       currency: "BRL",
-    }).format(val);
+    }).format(safeVal);
   };
 
   const performanceData = useMemo(() => {
@@ -1080,8 +1061,8 @@ const AdminDashboardScreen: React.FC = () => {
       return { rate: 0, status: "", color: "#94A3B8", bg: "transparent" };
 
     const distro = data.statusDistribution;
-    const total = distro.reduce((acc, curr) => acc + (curr.count || 0), 0);
-    const confirmed = distro.find((d) => d.label?.toLowerCase() === "confirmado")?.count || 0;
+    const total = distro.reduce((acc: number, curr: any) => acc + (curr.count || 0), 0);
+    const confirmed = distro.find((d: any) => d.label?.toLowerCase() === "confirmado")?.count || 0;
     const rate = total > 0 ? Math.round((confirmed / total) * 100) : 0;
 
     if (rate >= 90) return { rate, status: "Excelente", color: "#10B981", bg: "#DCFCE7" };
@@ -1199,7 +1180,7 @@ const AdminDashboardScreen: React.FC = () => {
     []
   );
 
-  if (loading) {
+  if (loading && !data) {
     return (
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color="#10B981" />
@@ -1226,7 +1207,9 @@ const AdminDashboardScreen: React.FC = () => {
             {(["day", "month", "year"] as const).map((tab) => (
               <TouchableOpacity
                 key={tab}
-                onPress={() => setActiveTab(tab)}
+                onPress={() => {
+                  setActiveTab(tab);
+                }}
                 style={[styles.tab, activeTab === tab && styles.activeTab]}
               >
                 <Text style={[styles.tabText, activeTab === tab && styles.activeTabText]}>
@@ -1261,12 +1244,18 @@ const AdminDashboardScreen: React.FC = () => {
                 <Text style={styles.sectionSubtitle}>Baseado em sessões confirmadas</Text>
               </View>
               <View style={{ alignItems: "flex-end" }}>
-                <Text style={styles.revenueValue}>
-                  {formatCurrency(data?.revenue.current ?? 0)}
-                </Text>
-                <Text style={[styles.growthText, { color: "#10B981" }]}>
-                  {data?.revenue.growth} vs período ant.
-                </Text>
+-                <Text style={styles.revenueValue}>
+-                  {formatCurrency(data?.revenue.current ?? 0)}
+-                </Text>
+-                <Text style={[styles.growthText, { color: "#10B981" }]}>
+-                  {data?.revenue?.growth} vs período ant.
+-                </Text>
++                <Text style={styles.revenueValue}>
++                  {formatCurrency(data?.revenue?.current ?? 0)}
++                </Text>
++                <Text style={[styles.growthText, { color: "#10B981" }]}>
++                  {data?.revenue?.growth || "0%"} vs período ant.
++                </Text>
               </View>
             </View>
           </View>
@@ -1291,7 +1280,7 @@ const AdminDashboardScreen: React.FC = () => {
                 }
 
                 return (
-                  <CartesianChart
+                  <CartesianChartAny
                     data={chartData}
                     xKey="label"
                     yKeys={["total"]}
@@ -1299,7 +1288,7 @@ const AdminDashboardScreen: React.FC = () => {
                     domainPadding={{ top: 20, left: 10, right: 10 }}
                     chartPressState={state}
                   >
-                    {({ points, chartBounds }) => (
+                    {({ points, chartBounds }: any) => (
                       <>
                         <Area
                           points={points.total}
@@ -1328,7 +1317,7 @@ const AdminDashboardScreen: React.FC = () => {
                         )}
                       </>
                     )}
-                  </CartesianChart>
+                  </CartesianChartAny>
                 );
               })()}
             </View>
@@ -1355,7 +1344,7 @@ const AdminDashboardScreen: React.FC = () => {
                 </View>
                 <View style={styles.statusValueRow}>
                   <Text style={styles.statusValue}>
-                    {kpisData.find((k) => k.id === "users")?.value ?? 0}
+                    {kpisData.find((k: any) => k.id === "users")?.value ?? 0}
                   </Text>
                   <ChevronRight size={16} color="#94A3B8" />
                 </View>
@@ -1368,7 +1357,7 @@ const AdminDashboardScreen: React.FC = () => {
                 </View>
                 <View style={styles.statusValueRow}>
                   <Text style={styles.statusValue}>
-                    {kpisData.find((k) => k.id === "trainers")?.value ?? 0}
+                    {kpisData.find((k: any) => k.id === "trainers")?.value ?? 0}
                   </Text>
                   <ChevronRight size={16} color="#94A3B8" />
                 </View>
@@ -1381,7 +1370,7 @@ const AdminDashboardScreen: React.FC = () => {
                 </View>
                 <View style={styles.statusValueRow}>
                   <Text style={styles.statusValue}>
-                    {kpisData.find((k) => k.id === "gyms")?.value ?? 0}
+                    {kpisData.find((k: any) => k.id === "gyms")?.value ?? 0}
                   </Text>
                   <ChevronRight size={16} color="#94A3B8" />
                 </View>
@@ -1408,6 +1397,20 @@ const AdminDashboardScreen: React.FC = () => {
                 </View>
                 <View style={styles.statusValueRow}>
                   <Text style={styles.statusValue}>{adminCommunitiesCount}</Text>
+                  <ChevronRight size={16} color="#94A3B8" />
+                </View>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.statusItem}
+                onPress={() => adminWorkoutSheetRef.current?.open()}
+              >
+                <View style={styles.statusIndicator}>
+                  <View style={[styles.statusDot, { backgroundColor: "#BBF246" }]} />
+                  <Text style={styles.statusLabel}>Gestão de Treinos</Text>
+                </View>
+                <View style={styles.statusValueRow}>
+                  <Text style={styles.statusValue}>{data?.operations?.totalWorkouts || 0}</Text>
                   <ChevronRight size={16} color="#94A3B8" />
                 </View>
               </TouchableOpacity>
@@ -1494,55 +1497,56 @@ const AdminDashboardScreen: React.FC = () => {
               </TouchableOpacity>
             </View>
             <ScrollView style={{ marginTop: 10 }}>
-              {data?.appointments?.map((item) => (
-                <View key={item.id_agendamento} style={styles.pendingCard}>
-                  <View style={styles.pendingRow}>
-                    <Image
-                      source={
-                        item.user_avatar
-                          ? { uri: item.user_avatar }
-                          : { uri: "https://via.placeholder.com/40" }
-                      }
-                      style={styles.avatar}
-                    />
-                    <View style={{ flex: 1, marginLeft: 12 }}>
-                      <Text style={styles.clientName}>{item.user_name}</Text>
-                      <Text style={styles.clientMeta}>
-                        {item.data_agendamento} • {item.hora_inicio}
-                      </Text>
-                    </View>
-                    <View
-                      style={[
-                        styles.statusBadge,
-                        {
-                          backgroundColor:
-                            item.status === "confirmado"
-                              ? "#DCFCE7"
-                              : item.status === "pendente"
-                                ? "#FEF3C7"
-                                : "#FEE2E2",
-                        },
-                      ]}
-                    >
-                      <Text
+              {renderedSheets["appointments"] &&
+                data?.appointments?.map((item: PendingAppointment) => (
+                  <View key={item.id_agendamento} style={styles.pendingCard}>
+                    <View style={styles.pendingRow}>
+                      <Image
+                        source={
+                          item.user_avatar
+                            ? { uri: item.user_avatar }
+                            : { uri: "https://via.placeholder.com/40" }
+                        }
+                        style={styles.avatar}
+                      />
+                      <View style={{ flex: 1, marginLeft: 12 }}>
+                        <Text style={styles.clientName}>{item.user_name}</Text>
+                        <Text style={styles.clientMeta}>
+                          {item.data_agendamento} • {item.hora_inicio}
+                        </Text>
+                      </View>
+                      <View
                         style={[
-                          styles.statusBadgeText,
+                          styles.statusBadge,
                           {
-                            color:
+                            backgroundColor:
                               item.status === "confirmado"
-                                ? "#166534"
+                                ? "#DCFCE7"
                                 : item.status === "pendente"
-                                  ? "#D97706"
-                                  : "#991B1B",
+                                  ? "#FEF3C7"
+                                  : "#FEE2E2",
                           },
                         ]}
                       >
-                        {item.status.toUpperCase()}
-                      </Text>
+                        <Text
+                          style={[
+                            styles.statusBadgeText,
+                            {
+                              color:
+                                item.status === "confirmado"
+                                  ? "#166534"
+                                  : item.status === "pendente"
+                                    ? "#D97706"
+                                    : "#991B1B",
+                            },
+                          ]}
+                        >
+                          {item.status.toUpperCase()}
+                        </Text>
+                      </View>
                     </View>
                   </View>
-                </View>
-              ))}
+                ))}
               {data?.appointments?.length === 0 && (
                 <Text style={styles.emptyTxt}>Nenhum agendamento encontrado.</Text>
               )}
@@ -1574,8 +1578,10 @@ const AdminDashboardScreen: React.FC = () => {
                 </Text>
               </View>
               {data?.appointments
-                ?.filter((a) => a.status === "confirmado" || a.status === "concluido")
-                .map((item) => (
+                ?.filter(
+                  (a: PendingAppointment) => a.status === "confirmado" || a.status === "concluido"
+                )
+                .map((item: PendingAppointment) => (
                   <View key={item.id_agendamento} style={styles.revenueItem}>
                     <View style={styles.revenueItemLeft}>
                       <Text style={styles.revenueItemName}>{item.user_name}</Text>
@@ -1605,7 +1611,7 @@ const AdminDashboardScreen: React.FC = () => {
               </TouchableOpacity>
             </View>
             <ScrollView style={{ marginTop: 20 }}>
-              {data?.pending?.map((item) => (
+              {data?.pending?.map((item: PendingAppointment) => (
                 <View key={item.id_agendamento} style={styles.pendingCard}>
                   <View style={styles.pendingRow}>
                     <Image
@@ -1690,32 +1696,33 @@ const AdminDashboardScreen: React.FC = () => {
               </TouchableOpacity>
             </View>
             <ScrollView style={{ marginTop: 20 }}>
-              {data?.clients?.map((item) => (
-                <TouchableOpacity
-                  key={item.id_us}
-                  style={styles.pendingCard}
-                  onPress={() => openClientHistory(item)}
-                >
-                  <View style={styles.pendingRow}>
-                    <Image
-                      source={
-                        item.avatar_url
-                          ? { uri: item.avatar_url }
-                          : { uri: "https://via.placeholder.com/40" }
-                      }
-                      style={styles.avatar}
-                    />
-                    <View style={{ flex: 1, marginLeft: 12 }}>
-                      <Text style={styles.clientName}>{item.nome}</Text>
-                      <Text style={styles.clientMeta}>
-                        {item.total_appointments} agendamentos • Último:{" "}
-                        {item.last_appointment || "Nunca"}
-                      </Text>
+              {renderedSheets["clients"] &&
+                data?.clients?.map((item: PersonalClient) => (
+                  <TouchableOpacity
+                    key={item.id_us}
+                    style={styles.pendingCard}
+                    onPress={() => openClientHistory(item)}
+                  >
+                    <View style={styles.pendingRow}>
+                      <Image
+                        source={
+                          item.avatar_url
+                            ? { uri: item.avatar_url }
+                            : { uri: "https://via.placeholder.com/40" }
+                        }
+                        style={styles.avatar}
+                      />
+                      <View style={{ flex: 1, marginLeft: 12 }}>
+                        <Text style={styles.clientName}>{item.nome}</Text>
+                        <Text style={styles.clientMeta}>
+                          {item.total_appointments} agendamentos • Último:{" "}
+                          {item.last_appointment || "Nunca"}
+                        </Text>
+                      </View>
+                      <ChevronRight size={16} color="#94A3B8" />
                     </View>
-                    <ChevronRight size={16} color="#94A3B8" />
-                  </View>
-                </TouchableOpacity>
-              ))}
+                  </TouchableOpacity>
+                ))}
               {data?.clients?.length === 0 && (
                 <Text style={styles.emptyTxt}>Nenhum cliente cadastrado.</Text>
               )}
@@ -1787,8 +1794,9 @@ const AdminDashboardScreen: React.FC = () => {
                   </Text>
                   <Text style={{ fontSize: 12, color: "#64748B" }}>
                     Você aprovou{" "}
-                    {data?.statusDistribution?.find((d) => d.label.toLowerCase() === "confirmado")
-                      ?.count || 0}{" "}
+                    {data?.statusDistribution?.find(
+                      (d: any) => d.label.toLowerCase() === "confirmado"
+                    )?.count || 0}{" "}
                     sessões este mês.
                   </Text>
                 </View>
@@ -2068,7 +2076,7 @@ const AdminDashboardScreen: React.FC = () => {
               </TouchableOpacity>
             </View>
             <ScrollView style={{ marginTop: 20 }}>
-              {data?.reviews?.map((item) => {
+              {data?.reviews?.map((item: any) => {
                 const isPositive = (item.ratingProfessional + item.ratingTraining) / 2 >= 4;
                 return (
                   <View key={item.id} style={styles.pendingCard}>
@@ -2175,7 +2183,7 @@ const AdminDashboardScreen: React.FC = () => {
               </TouchableOpacity>
             </View>
             <ScrollView style={{ marginTop: 20 }}>
-              {data?.receiptHistory?.map((item) => (
+              {data?.receiptHistory?.map((item: any) => (
                 <View key={item.id_agendamento} style={styles.pendingCard}>
                   <View style={styles.pendingRow}>
                     <Image
@@ -4445,7 +4453,7 @@ const AdminDashboardScreen: React.FC = () => {
                   Motivos de Cancelamento
                 </Text>
                 {data?.churnBreakdown?.length ? (
-                  data.churnBreakdown.map((item, i) => (
+                  data.churnBreakdown.map((item: any, i: number) => (
                     <View key={i} style={styles.dbAuditRow}>
                       <Text style={styles.dbAuditLabel}>{item.label}</Text>
                       <Text style={styles.dbAuditValue}>{item.value}</Text>
@@ -4515,7 +4523,7 @@ const AdminDashboardScreen: React.FC = () => {
                   Breakdown por Plano
                 </Text>
                 {data?.ltvBreakdown?.length ? (
-                  data.ltvBreakdown.map((p, i) => (
+                  data.ltvBreakdown.map((p: any, i: number) => (
                     <View
                       key={i}
                       style={{
@@ -4629,7 +4637,7 @@ const AdminDashboardScreen: React.FC = () => {
                 Ranking de Faturamento
               </Text>
               {data?.topUnits?.length ? (
-                data.topUnits.map((gym, i) => (
+                data.topUnits.map((gym: any, i: number) => (
                   <View
                     key={i}
                     style={{
@@ -4695,6 +4703,8 @@ const AdminDashboardScreen: React.FC = () => {
               .catch(() => {});
           }}
         />
+
+        <WorkoutManagementSheet ref={adminWorkoutSheetRef} />
       </SafeAreaView>
     </GestureHandlerRootView>
   );

@@ -113,7 +113,9 @@ const PlanTile: React.FC<{ plan: Plan; index: number; onPress?: (plan: Plan) => 
               <View style={{ flex: 1, paddingRight: 8 }}>
                 <Text style={styles.categoryText}>{plan.category || "Treino"}</Text>
                 <Text style={styles.planTitle} numberOfLines={1} ellipsizeMode="tail">
-                  {plan.title}
+                  {(plan.title?.length || 0) > 22
+                    ? `${plan.title.substring(0, 22)}...`
+                    : plan.title}
                 </Text>
               </View>
               {/* Índice sempre visível como na imagem 1 */}
@@ -126,7 +128,11 @@ const PlanTile: React.FC<{ plan: Plan; index: number; onPress?: (plan: Plan) => 
               <View style={styles.badgesGroup}>
                 <View style={styles.badge}>
                   <Clock size={10} color="#6B7280" />
-                  <Text style={styles.badgeText}>{plan.description}</Text>
+                  <Text style={styles.badgeText} numberOfLines={1} ellipsizeMode="tail">
+                    {(plan.description?.length || 0) > 15
+                      ? `${plan.description.substring(0, 15)}...`
+                      : plan.description}
+                  </Text>
                 </View>
                 <View style={styles.badge}>
                   <Repeat size={10} color="#6B7280" />

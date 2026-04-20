@@ -65,9 +65,10 @@ const MiniRadarChart: React.FC<MiniRadarChartProps> = ({
   const levels = 5;
 
   const getValues = (data: RadarData) => {
-    return RADAR_LABELS.map((_, i) => {
-      const key = Object.keys(data)[i] as keyof RadarData;
-      return (data[key] / MAX_VALUE) * radius;
+    const keys: (keyof RadarData)[] = ["water", "sleep", "steps", "bpm", "imc", "calories"];
+    return keys.map((key) => {
+      const val = data[key] ?? 0;
+      return (val / MAX_VALUE) * radius;
     });
   };
 

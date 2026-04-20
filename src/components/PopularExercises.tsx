@@ -86,8 +86,10 @@ const ExerciseCard: React.FC<{
             style={styles.gradient}
           >
             {/* Título no meio superior da área do gradiente */}
-            <Text style={styles.exerciseTitle} numberOfLines={2}>
-              {exercise.title}
+            <Text style={styles.exerciseTitle} numberOfLines={1}>
+              {(exercise.title?.length || 0) > 22
+                ? `${exercise.title.substring(0, 22)}...`
+                : exercise.title}
             </Text>
 
             {/* Rodapé: tags + botão play */}

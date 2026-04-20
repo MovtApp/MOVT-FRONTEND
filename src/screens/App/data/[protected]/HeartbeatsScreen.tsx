@@ -37,6 +37,8 @@ import Animated, {
   withTiming,
 } from "react-native-reanimated";
 import { NativeHealthManager } from "../../../../services/nativeHealthManager";
+import { getHealthMetricData } from "../../../../services/caloriesService";
+import { bluetoothService } from "../../../../services/bluetoothService";
 
 // Fallback seguro para ReanimatedView
 const ReanimatedView = Animated ? Animated.View : View;
@@ -75,6 +77,7 @@ const HeartbeatsScreen: React.FC = () => {
   const [isAuthorized, setIsAuthorized] = useState<boolean>(false);
   const [svgContent, setSvgContent] = useState<string | null>(null);
   const [isDeviceModalVisible, setIsDeviceModalVisible] = useState(false);
+  const [isUsingBluetooth, setIsUsingBluetooth] = useState(false);
 
   const scale = useSharedValue(1);
 
@@ -121,24 +124,38 @@ const HeartbeatsScreen: React.FC = () => {
   // Iniciar checagem de autorização nativa ao abrir a tela
   useEffect(() => {
     const checkNativeConnection = async () => {
-      // Tentativa ligeira de autorização
+      setIsLoading(true);
+      // Primeiro, tenta buscar histórico do nosso backend
+      try {
+        const [hrData, oxyData] = await Promise.all([
+          getHealthMetricData("heartrate", "1d"),
+          getHealthMetricData("oxygen", "1d"),
+        ]);
+
+        if (hrData && hrData.totalValue) setHeartRate(hrData.totalValue);
+        if (oxyData && oxyData.totalValue) setOxygen(oxyData.totalValue);
+      } catch (error) {
+        console.error("Erro ao buscar histórico do backend:", error);
+      }
+
+      // Se já estiver usando Bluetooth, não tenta conectar no Nativo
+      if (isUsingBluetooth) {
+        setIsLoading(false);
+        return;
+      }
+
+      // Depois tenta autorização nativa
       const success = await NativeHealthManager.authorize();
       setIsAuthorized(success);
 
       if (success) {
         setConnectionStatus("connected");
         setConnectionMessage(
-          "Monitorando " + (Platform.OS === "ios" ? "Apple Watch" : "Android Watch")
+          "Relógio Pareado (" + (Platform.OS === "ios" ? "Apple" : "Google Health") + ")"
         );
 
-        // Pre-carga
         const bpm = await NativeHealthManager.fetchHeartRate();
-        const oxygen = await NativeHealthManager.fetchOxygen();
-        const pressure = await NativeHealthManager.fetchPressure();
-
         if (bpm) setHeartRate(bpm);
-        if (oxygen) setOxygen(oxygen);
-        if (pressure) setPressure(pressure);
 
         setIsLoading(false);
       } else {
@@ -148,11 +165,11 @@ const HeartbeatsScreen: React.FC = () => {
       }
     };
     checkNativeConnection();
-  }, [user?.id]);
+  }, [user?.id, isUsingBluetooth]);
 
   // Handle subscription to heart rate if authorized
   useEffect(() => {
-    if (!isAuthorized) return;
+    if (!isAuthorized || isUsingBluetooth) return;
 
     const cancelSubscription = NativeHealthManager.subscribeHeartRate((bpm) => {
       setHeartRate(bpm);
@@ -160,7 +177,30 @@ const HeartbeatsScreen: React.FC = () => {
     });
 
     return () => cancelSubscription();
-  }, [isAuthorized]);
+  }, [isAuthorized, isUsingBluetooth]);
+
+  const handleDeviceSelected = async (device: any) => {
+    setIsUsingBluetooth(true);
+    setConnectionStatus("connecting");
+    setConnectionMessage("Conectando ao Bluetooth...");
+
+    // Se o device vier do scanner real, ele terá a propriedade 'rawDevice' ou será o próprio objeto
+    const targetDevice = device.rawDevice || device;
+
+    const success = await bluetoothService.connectToDevice(targetDevice, (bpm) => {
+      setHeartRate(bpm);
+      setConnectionStatus("connected");
+      setConnectionMessage(`Bluetooth: ${device.name || "Relógio"}`);
+      setLastUpdate(new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }));
+    });
+
+    if (!success) {
+      setConnectionStatus("error");
+      setConnectionMessage("Erro na conexão Bluetooth");
+      setIsUsingBluetooth(false);
+      Alert.alert("Erro", "Não foi possível conectar ao relógio via Bluetooth.");
+    }
+  };
 
   const handleConnectDevice = async () => {
     setConnectionStatus("connecting");
@@ -336,6 +376,7 @@ const HeartbeatsScreen: React.FC = () => {
         <DeviceSelectorModal
           isVisible={isDeviceModalVisible}
           onClose={() => setIsDeviceModalVisible(false)}
+          onDeviceSelected={handleDeviceSelected}
         />
       </View>
     </SafeAreaView>

@@ -11,6 +11,7 @@ import { LocationProvider } from "@contexts/LocationContext";
 import { NotificationProvider } from "@contexts/NotificationContext";
 import { BottomNavProvider } from "@contexts/BottomNavContext";
 import { BottomSheetModalProvider } from "@gorhom/bottom-sheet";
+import { AppDataProvider } from "@contexts/AppDataContext";
 import { StatusBar, ActivityIndicator, View } from "react-native";
 import {
   useFonts,
@@ -77,7 +78,9 @@ export default function App() {
         <StatusBar barStyle={"dark-content"} />
         <BottomSheetModalProvider>
           <AuthProvider>
-            <AppContent />
+            <AppDataProvider>
+              <AppContent />
+            </AppDataProvider>
           </AuthProvider>
         </BottomSheetModalProvider>
         <FlashMessage position="top" />

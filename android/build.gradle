@@ -1,27 +1,13 @@
-ext {
-    ndkVersion = "23.1.7779620"
-}
-
-subprojects {
-    afterEvaluate { project ->
-        if (project.plugins.hasPlugin("com.android.application") || project.plugins.hasPlugin("com.android.library")) {
-            project.android {
-                try {
-                    externalNativeBuild {
-                        cmake {
-                            cppFlags "-fexceptions", "-frtti", "-std=c++17", "-DFOLLY_MOBILE=1", "-DFOLLY_USE_LIBCPP=1", "-D_DISABLE_EXTENDED_ALIGNED_STORAGE", "-D_LIBCPP_ENABLE_CXX17_REMOVED_FEATURES"
-                        }
-                    }
-                } catch (Exception e) {
-                    // Ignora se o módulo não tiver suporte a CMake nativo
-                }
-            }
-        }
-    }
-}
-
+// Top-level build file where you can add configuration options common to all sub-projects/modules.
 
 buildscript {
+  ext {
+    buildToolsVersion = "35.0.0"
+    minSdkVersion = 26
+    compileSdkVersion = 35
+    targetSdkVersion = 35
+    ndkVersion = "26.3.11579264"
+  }
   repositories {
     google()
     mavenCentral()

@@ -21,35 +21,7 @@ export interface Plan {
   id: string;
 }
 
-const planData: Plan[] = [
-  {
-    id: "1",
-    title: "Flexão de braços",
-    description: "10 min",
-    level: "Iniciante",
-    calories: "9 - 18 Kcal",
-    imageUrl:
-      "https://img.freepik.com/free-photo/attractive-muscular-guy-doing-push-ups-exercises-workout-outdoors_8353-6810.jpg?t=st=1758299243~exp=1758302843~hmac=866e9287d1c5a35e749499d3834583b6d760a6f73f43fb417f8e6e4902d86482&w=1480",
-  },
-  {
-    id: "2",
-    title: "Desenvolvimento Ombro",
-    description: "15 min",
-    level: "Intermediário",
-    calories: "18 - 24 Kcal",
-    imageUrl:
-      "https://img.freepik.com/free-photo/back-view-woman-exercising-with-dumbbells_23-2147789670.jpg?t=st=1758299206~exp=1758302806~hmac=bff78dbb457f1c6240bcc258cbbe9b600464ea7ddb82594670b14a3dc2148004&w=1480",
-  },
-  {
-    id: "3",
-    title: "Puxada frontal",
-    description: "12 min",
-    level: "Avançado",
-    calories: "12 - 18 Kcal",
-    imageUrl:
-      "https://img.freepik.com/free-photo/side-view-man-working-out-gym-with-medical-mask-his-forearm_23-2148769885.jpg?t=st=1758299397~exp=1758302997~hmac=dab2f29800d935c2c137bfb5c63b70efa494456a6f61ba060c7285eef018c745&w=1480",
-  },
-];
+const planData: Plan[] = [];
 
 const SmallPlanCard: React.FC<{ plan: Plan; onPress?: () => void }> = ({ plan, onPress }) => {
   const scale = useRef(new Animated.Value(1)).current;
@@ -109,13 +81,17 @@ const SmallPlanCard: React.FC<{ plan: Plan; onPress?: () => void }> = ({ plan, o
             </View>
 
             <Text style={styles.planTitle} numberOfLines={1}>
-              {plan.title}
+              {(plan.title?.length || 0) > 20 ? `${plan.title.substring(0, 20)}...` : plan.title}
             </Text>
 
             <View style={styles.infoRow}>
               <View style={styles.infoItem}>
                 <Clock size={12} color="#9CA3AF" />
-                <Text style={styles.infoText}>{plan.description}</Text>
+                <Text style={styles.infoText}>
+                  {(plan.description?.length || 0) > 15
+                    ? `${plan.description.substring(0, 15)}...`
+                    : plan.description}
+                </Text>
               </View>
               <View style={styles.separator} />
               <View style={styles.infoItem}>

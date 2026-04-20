@@ -11,4 +11,11 @@
 -keep class com.swmansion.reanimated.** { *; }
 -keep class com.facebook.react.turbomodule.** { *; }
 
+# Shopify Skia
+-keep class com.shopify.reactnative.skia.** { *; }
+
+# Victory Native
+-keep class com.horcrux.svg.** { *; }
+-keep class com.victory.native.** { *; }
+
 # Add any project specific keep options here:

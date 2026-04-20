@@ -89,7 +89,7 @@ const BottomNavigationBar = () => {
   const [activeTab, setActiveTab] = useState<keyof AppStackParamList>("HomeScreen");
   const currentScreen = useNavigationState((state) => getDeepRouteName(state) ?? null);
   const { isVisible: isVisibleFromContext } = useBottomNav();
-  const { unreadCount: unreadChatCount } = useNotifications();
+  const { unreadChatCount } = useNotifications();
 
   const bottomInset = useMemo(() => {
     if (Platform.OS === "android") {

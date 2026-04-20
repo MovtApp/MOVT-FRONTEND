@@ -26,20 +26,14 @@ import {
 } from "../../services/wearOsHealthService";
 import { useAuth } from "../../contexts/AuthContext";
 import Animated, { FadeInDown } from "react-native-reanimated";
-import { BleManager, Device } from "react-native-ble-plx";
+import { bluetoothService } from "../../services/bluetoothService";
 
 interface DeviceSelectorModalProps {
   isVisible: boolean;
   onClose: () => void;
 }
 
-// Inicializa o BleManager com segurança para evitar erros no Expo Go
-let bleManager: BleManager | null = null;
-try {
-  bleManager = new BleManager();
-} catch (error) {
-  console.log("Bluetooth nativo não disponível (Expo Go ou Emulador)");
-}
+// Manager global já é tratado pelo bluetoothService
 
 const DeviceSelectorModal: React.FC<DeviceSelectorModalProps> = ({ isVisible, onClose }) => {
   const { user } = useAuth();
@@ -109,96 +103,48 @@ const DeviceSelectorModal: React.FC<DeviceSelectorModalProps> = ({ isVisible, on
   }, [isVisible, loadRegisteredDevices, stopScanning]);
 
   const startScan = useCallback(async () => {
-    const hasPermission = await requestPermissions();
+    const hasPermission = await bluetoothService.requestPermissions();
     if (!hasPermission) {
       console.warn("Permissão de Bluetooth negada.");
       return;
     }
 
-    // Limpa qualquer scan anterior
-    stopScanning();
-
     setIsScanning(true);
     setScanResults([]);
-    scanningRef.current = true;
 
-    if (!bleManager) {
-      console.warn("Hardware Bluetooth não detectado. Usando simulação.");
-      // Simulação básica (relógio 1)
-      setTimeout(() => {
-        if (scanningRef.current) {
-          setScanResults((prev) => [
-            ...prev,
-            {
-              name: "Relógio de Teste (Simulador)",
-              model: "MOVT-DEMO-01",
-              id: "mock-1",
-            },
-          ]);
-        }
-      }, 1000);
-    } else {
-      bleManager.startDeviceScan(null, { allowDuplicates: false }, (error, device) => {
-        if (error) {
-          console.error("Erro no scan:", error);
-          stopScanning();
-          return;
-        }
-
-        if (device && (device.name || device.localName)) {
-          const deviceName = device.name || device.localName || "Dispositivo desconhecido";
-
-          setScanResults((prev) => {
-            if (prev.find((d) => d.id === device.id)) return prev;
-            return [
-              ...prev,
-              {
-                name: deviceName,
-                model: device.id,
-                id: device.id,
-              },
-            ];
-          });
-        }
+    bluetoothService.scanDevices((device) => {
+      setScanResults((prev) => {
+        if (prev.find((d) => d.id === device.id)) return prev;
+        return [
+          ...prev,
+          {
+            name: device.name || device.localName || "Relógio Bluetooth",
+            model: device.id,
+            id: device.id,
+            rawDevice: device,
+          },
+        ];
       });
-    }
+    });
 
-    // Simulador de Fallback: Galaxy Watch 6
+    // Timeout de 15 segundos
     setTimeout(() => {
-      if (scanningRef.current) {
-        setScanResults((prev) => {
-          const mockId = "dev-mock-galaxy-6";
-          if (prev.find((d) => d.id === mockId)) return prev;
-          return [
-            ...prev,
-            {
-              name: "Galaxy Watch 6 (Simulado)",
-              model: "SM-R930",
-              id: mockId,
-            },
-          ];
-        });
-      }
-    }, 1500);
-
-    // Timeout padrão de 20 segundos para parar automaticamente
-    scanTimeoutRef.current = setTimeout(() => {
-      console.log("Tempo de busca esgotado (timeout padrão)");
       stopScanning();
-    }, 20000);
+    }, 15000);
   }, [stopScanning]);
 
-  const handleRegister = async (device: { name: string; model: string }) => {
+  const handleRegister = async (device: any) => {
     if (!user?.id) return;
     setIsLoading(true);
     try {
       await registerWearOsDevice(parseInt(user.id, 10), {
         deviceName: device.name,
         deviceModel: device.model,
-        deviceType: "Wear OS",
+        deviceType: "Bluetooth BLE",
       });
       await loadRegisteredDevices();
       setScanResults([]);
+      // Fecha e notifica a tela principal se necessário
     } catch (error) {
       console.error("Error registering device:", error);
     } finally {

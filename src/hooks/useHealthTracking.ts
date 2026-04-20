@@ -73,7 +73,7 @@ export const useHealthTracking = (userId: string | undefined, targetDate?: Date)
       const roundedCalories = Math.round(calories * 100) / 100;
       setDailyCalories(roundedCalories);
 
-      const key = getTodayKey("calories", targetDate);
+      const key = getTodayKey("calories", targetDate, userId);
       await AsyncStorage.setItem(key, JSON.stringify({ calories: roundedCalories }));
     } catch (error) {
       console.error("Erro ao calcular/salvar calorias:", error);
@@ -87,12 +87,12 @@ export const useHealthTracking = (userId: string | undefined, targetDate?: Date)
   // Load static daily data
   const loadDailyData = useCallback(async () => {
     try {
-      const waterKey = getTodayKey("water", targetDate);
-      const calKey = getTodayKey("calories", targetDate);
-      const sleepKey = getTodayKey("sleep", targetDate);
-      const stepsKey = getTodayKey("steps", targetDate);
-      const trainingKey = getTodayKey("training", targetDate);
-      const hrKey = getTodayKey("heartRate", targetDate);
+      const waterKey = getTodayKey("water", targetDate, userId);
+      const calKey = getTodayKey("calories", targetDate, userId);
+      const sleepKey = getTodayKey("sleep", targetDate, userId);
+      const stepsKey = getTodayKey("steps", targetDate, userId);
+      const trainingKey = getTodayKey("training", targetDate, userId);
+      const hrKey = getTodayKey("heartRate", targetDate, userId);
 
       const [waterRaw, calRaw, sleepRaw, stepsRaw, trainingRaw, hrRaw] = await Promise.all([
         AsyncStorage.getItem(waterKey),
@@ -126,19 +126,19 @@ export const useHealthTracking = (userId: string | undefined, targetDate?: Date)
         setSleepMinutes(0);
       }
 
+      if (trainingRaw) {
+        const parsed = JSON.parse(trainingRaw);
+        setTrainingTime(parsed.duration || 0);
+      } else {
+        setTrainingTime(0);
+      }
+
       if (!isToday) {
         if (stepsRaw) {
           const parsed = JSON.parse(stepsRaw);
           setStepsToday(parsed.steps || 0);
         } else {
           setStepsToday(0);
-        }
-
-        if (trainingRaw) {
-          const parsed = JSON.parse(trainingRaw);
-          setTrainingTime(parsed.duration || 0);
-        } else {
-          setTrainingTime(0);
         }
 
         if (hrRaw) {
@@ -159,16 +159,30 @@ export const useHealthTracking = (userId: string | undefined, targetDate?: Date)
     }, [loadDailyData])
   );
 
-  // Training Timer Logic
+  // Training Timer Logic with Auto-Save
   useEffect(() => {
     if (isWalking && isToday) {
       if (!trainingIntervalRef.current) {
-        trainingIntervalRef.current = setInterval(() => {
-          setTrainingTime((prev) => prev + 1);
+        trainingIntervalRef.current = setInterval(async () => {
+          setTrainingTime((prev) => {
+            const next = prev + 1;
+            // Salva a cada 30 segundos de movimento contínuo ou ao final
+            if (next % 30 === 0) {
+              const key = getTodayKey("training", targetDate, userId);
+              AsyncStorage.setItem(key, JSON.stringify({ duration: next }));
+            }
+            return next;
+          });
         }, 1000);
       }
     } else {
       if (trainingIntervalRef.current) {
+        // Salva o valor final ao parar
+        const saveFinal = async () => {
+          const key = getTodayKey("training", targetDate, userId);
+          await AsyncStorage.setItem(key, JSON.stringify({ duration: trainingTime }));
+        };
+        saveFinal();
         clearInterval(trainingIntervalRef.current);
         trainingIntervalRef.current = null;
       }
@@ -179,7 +193,7 @@ export const useHealthTracking = (userId: string | undefined, targetDate?: Date)
         trainingIntervalRef.current = null;
       }
     };
-  }, [isWalking, isToday]);
+  }, [isWalking, isToday, trainingTime, targetDate, userId]);
 
   // Native Health Verification (Google Fit/HealthKit)
   useFocusEffect(
@@ -375,8 +389,9 @@ export const useHealthTracking = (userId: string | undefined, targetDate?: Date)
         const mm = String(d.getMonth() + 1).padStart(2, "0");
         const dd = String(d.getDate()).padStart(2, "0");
         const dateStr = `${yyyy}-${mm}-${dd}`;
+        const userPrefix = userId ? `user_${userId}:` : "";
 
-        prefixes.forEach((p) => allKeys.push(`${p}:${dateStr}`));
+        prefixes.forEach((p) => allKeys.push(`${userPrefix}${p}:${dateStr}`));
       }
 
       const results = await AsyncStorage.multiGet(allKeys);
@@ -404,15 +419,16 @@ export const useHealthTracking = (userId: string | undefined, targetDate?: Date)
         const mm = String(d.getMonth() + 1).padStart(2, "0");
         const dd = String(d.getDate()).padStart(2, "0");
         const dateStr = `${yyyy}-${mm}-${dd}`;
+        const userPrefix = userId ? `user_${userId}:` : "";
 
-        const dayWater = dataMap[`water:${dateStr}`]?.consumedMl || 0;
-        const dayCal = dataMap[`calories:${dateStr}`]?.calories || 0;
+        const dayWater = dataMap[`${userPrefix}water:${dateStr}`]?.consumedMl || 0;
+        const dayCal = dataMap[`${userPrefix}calories:${dateStr}`]?.calories || 0;
         const daySleep =
-          (dataMap[`sleep:${dateStr}`]?.hours || 0) * 60 +
-          (dataMap[`sleep:${dateStr}`]?.minutes || 0);
-        const daySteps = dataMap[`steps:${dateStr}`]?.steps || 0;
-        const dayTrain = dataMap[`training:${dateStr}`]?.duration || 0;
-        const dayHR = dataMap[`heartRate:${dateStr}`]?.heartRate || 0;
+          (dataMap[`${userPrefix}sleep:${dateStr}`]?.hours || 0) * 60 +
+          (dataMap[`${userPrefix}sleep:${dateStr}`]?.minutes || 0);
+        const daySteps = dataMap[`${userPrefix}steps:${dateStr}`]?.steps || 0;
+        const dayTrain = dataMap[`${userPrefix}training:${dateStr}`]?.duration || 0;
+        const dayHR = dataMap[`${userPrefix}heartRate:${dateStr}`]?.heartRate || 0;
 
         stats.water += dayWater;
         stats.calories += dayCal;

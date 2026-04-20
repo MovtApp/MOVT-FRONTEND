@@ -1,6 +1,7 @@
 import { useState, useCallback, useEffect } from "react";
 import { useAuth } from "../contexts/AuthContext";
 import { api } from "../services/api";
+import { useAppData } from "../contexts/AppDataContext";
 
 interface Post {
   post_id: string;
@@ -51,11 +52,19 @@ interface UseFeedReturn {
 
 export const useFeed = (userId: string | undefined): UseFeedReturn => {
   const { user } = useAuth();
-  const [posts, setPosts] = useState<Post[]>([]);
+  const { feedPosts } = useAppData();
+  const [posts, setPosts] = useState<Post[]>(feedPosts || []);
   const [isLoading, setIsLoading] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [hasMore, setHasMore] = useState(true);
   const [cursor, setCursor] = useState<string | null>(null);
+
+  // Se o contexto mudar (primeiro fetch finalizado), atualiza posts iniciais
+  useEffect(() => {
+    if (feedPosts.length > 0 && posts.length === 0) {
+      setPosts(feedPosts);
+    }
+  }, [feedPosts]);
 
   const loadPosts = useCallback(
     async (reset = false) => {

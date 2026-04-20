@@ -17,9 +17,12 @@ export interface CalorieStats {
 export type TimeframeType = "1d" | "1s" | "1m" | "1a" | "Tudo";
 
 /**
- * Busca dados de calorias do backend com base no timeframe selecionado
+ * Busca dados de qualquer métrica de saúde do backend
  */
-export const getCaloriesData = async (timeframe: TimeframeType = "1d"): Promise<CalorieStats> => {
+export const getHealthMetricData = async (
+  metric: string,
+  timeframe: TimeframeType = "1d"
+): Promise<CalorieStats> => {
   try {
     const sessionId = await AsyncStorage.getItem("userSessionId");
 
@@ -27,7 +30,7 @@ export const getCaloriesData = async (timeframe: TimeframeType = "1d"): Promise<
       throw new Error("Sessão não encontrada. Faça login novamente.");
     }
 
-    const response = await api.get("/dados/calories", {
+    const response = await api.get(`/dados/${metric}`, {
       headers: {
         Authorization: `Bearer ${sessionId}`,
       },
@@ -36,14 +39,34 @@ export const getCaloriesData = async (timeframe: TimeframeType = "1d"): Promise<
       },
     });
 
-    return response.data;
-  } catch (error: any) {
-    console.error("❌ Erro ao buscar dados de calorias:", error);
+    // Mapeia o campo 'value' da API genérica para o campo 'calories' usado pelas interfaces existentes
+    const formattedData = response.data.data.map((item: any) => ({
+      ...item,
+      calories: item.value,
+    }));
 
-    // Retorna dados mockados em caso de erro (para desenvolvimento)
-    return getMockCaloriesData(timeframe);
+    return {
+      totalCalories: response.data.totalValue,
+      remainingCalories: response.data.dailyGoal - response.data.totalValue,
+      dailyGoal: response.data.dailyGoal,
+      data: formattedData,
+    };
+  } catch (error: any) {
+    console.error(`❌ Erro ao buscar dados de ${metric}:`, error);
+    return {
+      totalCalories: 0,
+      remainingCalories: 10000,
+      dailyGoal: 10000,
+      data: [],
+    };
   }
 };
+
+/**
+ * Busca dados de calorias do backend com base no timeframe selecionado
+ */
+export const getCaloriesData = (timeframe: TimeframeType = "1d"): Promise<CalorieStats> =>
+  getHealthMetricData("calories", timeframe);
 
 /**
  * Salva dados de calorias no backend

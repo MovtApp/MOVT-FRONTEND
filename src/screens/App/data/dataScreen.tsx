@@ -26,6 +26,8 @@ import {
   Droplets,
   Activity,
   ArrowRight,
+  ScanFace,
+  Sparkles,
 } from "lucide-react-native";
 import { useAuth } from "../../../contexts/AuthContext";
 import ECGDisplay from "../../../components/ECGDisplay";
@@ -221,7 +223,15 @@ const DataScreen: React.FC = () => {
   const waterProgress = Math.max(0, Math.min(1, waterConsumedMl / waterGoalMl));
   const stepsProgress = stepsGoal > 0 ? Math.min(1, stepsToday / stepsGoal) : 0;
   const stepsProgressPercent = Math.round(Math.max(0, Math.min(1, stepsProgress)) * 100);
-  const formattedSteps = stepsLoading ? "--" : stepsToday.toLocaleString("pt-BR");
+  const formattedSteps = useMemo(() => {
+    if (stepsLoading) return "--";
+    try {
+      return (stepsToday || 0).toLocaleString("pt-BR");
+    } catch (e) {
+      return (stepsToday || 0).toString();
+    }
+  }, [stepsLoading, stepsToday]);
+
   const stepsStatusText = stepsLoading ? "Sincronizando..." : isWalking ? "Contando agora" : "";
   const formattedTrainingTime = formatTrainingTime(trainingTime);
 
@@ -240,9 +250,28 @@ const DataScreen: React.FC = () => {
   };
 
   const getMonthAndYear = (date: Date) => {
-    const options: Intl.DateTimeFormatOptions = { month: "long", year: "numeric" };
-    const formattedDate = date.toLocaleDateString("pt-BR", options);
-    return formattedDate.charAt(0).toUpperCase() + formattedDate.slice(1);
+    try {
+      const options: Intl.DateTimeFormatOptions = { month: "long", year: "numeric" };
+      const formattedDate = date.toLocaleDateString("pt-BR", options);
+      if (!formattedDate) return "";
+      return formattedDate.charAt(0).toUpperCase() + formattedDate.slice(1);
+    } catch (e) {
+      const months = [
+        "Janeiro",
+        "Fevereiro",
+        "Março",
+        "Abril",
+        "Maio",
+        "Junho",
+        "Julho",
+        "Agosto",
+        "Setembro",
+        "Outubro",
+        "Novembro",
+        "Dezembro",
+      ];
+      return `${months[date.getMonth()]} de ${date.getFullYear()}`;
+    }
   };
 
   const getDaysInMonth = (date: Date) => {
@@ -384,12 +413,8 @@ const DataScreen: React.FC = () => {
                 </View>
               </TouchableOpacity>
 
-              {/* Training Time Card */}
-              <TouchableOpacity
-                activeOpacity={0.8}
-                style={[styles.card, styles.smallCard]}
-                onPress={() => navigation.navigate("TrainingScreen" as never)}
-              >
+              {/* Training Time Card - Now passive display only */}
+              <View style={[styles.card, styles.smallCard]}>
                 <LinearGradient
                   colors={["rgba(138, 43, 226, 0.1)", "rgba(138, 43, 226, 0.05)"]}
                   style={[StyleSheet.absoluteFill, { borderRadius: 20 }]}
@@ -402,13 +427,17 @@ const DataScreen: React.FC = () => {
                   >
                     <Timer size={18} color="#8A2BE2" />
                   </View>
-                  <ArrowRight size={16} color="#9CA3AF" />
+                  {isWalking && (
+                    <Animated.View entering={FadeInDown} style={styles.activePulse}>
+                      <View style={styles.pulseDot} />
+                    </Animated.View>
+                  )}
                 </View>
                 <View>
-                  <Text style={styles.cardLabel}>Tempo</Text>
+                  <Text style={styles.cardLabel}>Tempo Ativo</Text>
                   <Text style={styles.cardValueMedium}>{formattedTrainingTime}</Text>
                 </View>
-              </TouchableOpacity>
+              </View>
             </View>
 
             {/* Right Column - Results (Radar) */}
@@ -441,6 +470,28 @@ const DataScreen: React.FC = () => {
               </View>
             </TouchableOpacity>
           </View>
+
+          {/* Expectation x Reality Card - Professional Clean Version */}
+          <TouchableOpacity
+            activeOpacity={0.7}
+            style={styles.comparisonCard}
+            onPress={() => navigation.navigate("ExpectationRealityScreen" as never)}
+          >
+            <LinearGradient
+              colors={["rgba(99, 102, 241, 0.08)", "rgba(167, 139, 250, 0.03)"]}
+              style={[StyleSheet.absoluteFill, { borderRadius: 20 }]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+            />
+            <View style={styles.comparisonContent}>
+              <View style={{ flex: 1, marginLeft: 16 }}>
+                <Text style={styles.comparisonTitle}>Expectativa x Realidade</Text>
+                <Text style={styles.comparisonSubTitle}>Comparativo anatômico e metas físicas</Text>
+              </View>
+
+              <ArrowRight size={18} color="#94A3B8" />
+            </View>
+          </TouchableOpacity>
 
           {/* Row 2: Steps & Heart Rate */}
           <View style={styles.rowContainer}>
@@ -1000,6 +1051,56 @@ const styles = StyleSheet.create({
     borderRadius: 30,
     borderWidth: 2,
     borderColor: "rgba(187, 242, 70, 0.5)",
+  },
+  comparisonCard: {
+    marginHorizontal: 20,
+    backgroundColor: "#FFFFFF",
+    borderRadius: 20,
+    marginBottom: 16,
+    height: 88,
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: "#F3F4FB",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  comparisonContent: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 16,
+  },
+  comparisonIconBox: {
+    width: 48,
+    height: 48,
+    borderRadius: 14,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  comparisonTitle: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: "#1E293B",
+  },
+  comparisonSubTitle: {
+    fontSize: 12,
+    color: "#64748B",
+    fontWeight: "500",
+    marginTop: 2,
+  },
+  activePulse: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    backgroundColor: "rgba(138, 43, 226, 0.1)",
+    borderRadius: 12,
+  },
+  pulseDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: "#8A2BE2",
   },
 });
 

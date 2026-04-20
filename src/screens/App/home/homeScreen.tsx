@@ -36,6 +36,7 @@ import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { AppStackParamList } from "../../../@types/routes";
 import { useAuth } from "@contexts/AuthContext";
 import { FooterVersion } from "@components/FooterVersion";
+import { useAppData } from "@contexts/AppDataContext";
 
 interface ExerciseItem {
   id: string;
@@ -45,43 +46,7 @@ interface ExerciseItem {
   imageUrl: string;
 }
 
-const exerciseData: ExerciseItem[] = [
-  {
-    id: "1",
-    title: "Agachamento",
-    calories: "180 - 250 Kcal",
-    minutes: "15 min",
-    imageUrl: "https://res.cloudinary.com/ditlmzgrh/image/upload/v1757229915/image_71_jntmsv.jpg",
-  },
-  {
-    id: "2",
-    title: "Supino",
-    calories: "150 - 200 Kcal",
-    minutes: "12 min",
-    imageUrl: "https://res.cloudinary.com/ditlmzgrh/image/upload/v1757229915/image_txncpp.jpg",
-  },
-  {
-    id: "3",
-    title: "Remada curvada",
-    calories: "160 - 220 Kcal",
-    minutes: "12 min",
-    imageUrl: "https://res.cloudinary.com/ditlmzgrh/image/upload/v1757229918/image_75_drh4vh.jpg",
-  },
-  {
-    id: "4",
-    title: "Levantamento Terra",
-    calories: "160 - 220 Kcal",
-    minutes: "15 min",
-    imageUrl: "https://res.cloudinary.com/ditlmzgrh/image/upload/v1757229918/image111_gu6iim.jpg",
-  },
-  {
-    id: "5",
-    title: "Puxada na Barra",
-    calories: "140 - 200 Kcal",
-    minutes: "12 min",
-    imageUrl: "https://res.cloudinary.com/ditlmzgrh/image/upload/v1757229918/image_73_co9eqf.jpg",
-  },
-];
+const exerciseData: ExerciseItem[] = [];
 
 const HomeScreen: React.FC = () => {
   const [search, setSearch] = useState("");
@@ -95,79 +60,40 @@ const HomeScreen: React.FC = () => {
   const searchTimeout = useRef<NodeJS.Timeout | null>(null);
 
   const [selectedSpecialty, setSelectedSpecialty] = useState<string | null>(null);
-  const [trainings, setTrainings] = useState<ExerciseItem[]>(exerciseData);
-  const [loadingTrainings, setLoadingTrainings] = useState(false);
-  const [dailyPlans, setDailyPlans] = useState<any[]>([]);
-  const [loadingPlans, setLoadingPlans] = useState(false);
+  const {
+    trainings,
+    loadingTrainings,
+    dailyPlans,
+    loadingDailyPlans: loadingPlans,
+    fetchHomeData,
+  } = useAppData();
+
+  // ─── Treinos organizados por seção da Home ────────────────────────────────
+  const trainingsBySection = useMemo(() => {
+    const mapT = (t: any) => ({
+      id: String(t.id_treino ?? t.id ?? ""),
+      title: t.nome ?? t.title ?? "",
+      imageUrl: t.imageurl ?? t.imageUrl ?? "",
+      calories: t.calorias ?? t.calories ?? "",
+      minutes: t.duracao ?? t.minutes ?? "",
+      level: t.nivel ?? "Iniciante",
+      description: t.descricao ?? "",
+    });
+    return {
+      allMapped: trainings.map(mapT),
+      popular: trainings.filter((t: any) => t.secao_home === "popular").map(mapT),
+      plano_do_dia: trainings.filter((t: any) => t.secao_home === "plano_do_dia").map(mapT),
+      melhores_para_voce: trainings
+        .filter((t: any) => t.secao_home === "melhores_para_voce")
+        .map(mapT),
+      desafio: trainings.filter((t: any) => t.secao_home === "desafio").map(mapT),
+      aquecimento: trainings.filter((t: any) => t.secao_home === "aquecimento").map(mapT),
+    };
+  }, [trainings]);
 
   useEffect(() => {
-    const fetchTrainings = async () => {
-      if (!user?.sessionId) return;
-      try {
-        setLoadingTrainings(true);
-        const { api } = await import("@services/api");
-        const resp = await api.get("/treinos", {
-          params: { specialty: selectedSpecialty },
-          headers: { Authorization: `Bearer ${user.sessionId}` },
-        });
-        if (resp.data?.data) {
-          const apiTrainings = resp.data.data.map((t: any) => ({
-            id: String(t.id),
-            title: t.title,
-            calories: t.calories,
-            minutes: t.minutes,
-            imageUrl:
-              t.image_url ||
-              "https://res.cloudinary.com/ditlmzgrh/image/upload/v1757229915/image_71_jntmsv.jpg",
-          }));
-          setTrainings(apiTrainings.length > 0 ? apiTrainings : exerciseData);
-        }
-      } catch (err) {
-        console.error("Erro ao buscar treinos:", err);
-        setTrainings(exerciseData);
-      } finally {
-        setLoadingTrainings(false);
-      }
-    };
-
-    fetchTrainings();
-  }, [selectedSpecialty, user?.sessionId]);
-
-  useEffect(() => {
-    const fetchDailyPlans = async () => {
-      if (!user?.sessionId) return;
-      try {
-        setLoadingPlans(true);
-        const { api } = await import("@services/api");
-        // Ajuste o endpoint conforme sua tabela (ex: /daily-plans ou /treinos/daily)
-        const resp = await api.get("/treinos", {
-          params: { isDaily: true },
-          headers: { Authorization: `Bearer ${user.sessionId}` },
-        });
-
-        if (resp.data?.data) {
-          const apiPlans = resp.data.data.map((t: any) => ({
-            id: String(t.id),
-            title: t.title,
-            description: t.description || t.minutes,
-            sets: t.sets || "3 séries",
-            calories: t.calories,
-            category: t.category || "Fitness",
-            imageUrl:
-              t.image_url ||
-              "https://res.cloudinary.com/ditlmzgrh/image/upload/v1757513125/prancha_g1v30x.png",
-          }));
-          setDailyPlans(apiPlans);
-        }
-      } catch (err) {
-        console.error("Erro ao buscar planos diários:", err);
-      } finally {
-        setLoadingPlans(false);
-      }
-    };
-
-    fetchDailyPlans();
-  }, [user?.sessionId]);
+    fetchHomeData(selectedSpecialty);
+  }, [selectedSpecialty, fetchHomeData]);
 
   const performSearch = useCallback(
     async (query: string) => {
@@ -363,11 +289,11 @@ const HomeScreen: React.FC = () => {
                       </View>
 
                       {/* Removemos o badge de texto para 'user', 'trainer', 'personal' e 'community' conforme solicitado */}
-                      {result.type.toLowerCase() !== "user" &&
-                        result.type.toLowerCase() !== "trainer" &&
-                        result.type.toLowerCase() !== "personal" &&
-                        result.type.toLowerCase() !== "community" &&
-                        result.type.toLowerCase() !== "communities" && (
+                      {result.type?.toLowerCase() !== "user" &&
+                        result.type?.toLowerCase() !== "trainer" &&
+                        result.type?.toLowerCase() !== "personal" &&
+                        result.type?.toLowerCase() !== "community" &&
+                        result.type?.toLowerCase() !== "communities" && (
                           <View
                             style={{
                               backgroundColor: getBadgeColor(result.type),
@@ -412,7 +338,11 @@ const HomeScreen: React.FC = () => {
         />
         <Communities />
         <PopularExercises
-          trainings={trainings}
+          trainings={
+            trainingsBySection.popular.length > 0
+              ? trainingsBySection.popular
+              : trainingsBySection.allMapped
+          }
           selectedSpecialty={selectedSpecialty}
           loadingTrainings={loadingTrainings}
           onPressExercise={handleTrainingPress}
@@ -422,13 +352,48 @@ const HomeScreen: React.FC = () => {
           title="Melhor treino de superiores"
           imageUrl="https://img.freepik.com/free-photo/view-woman-helping-man-exercise-gym_52683-98092.jpg?t=st=1758297406~exp=1758301006~hmac=66860a69d0b54e22b28d0831392e01278764d6b6d47e956a9576e041c9e016c2&w=1480"
           onPress={() => {
-            // Caso queira um treino específico para o banner, pode definir aqui
             Alert.alert("Destaque", "Este treino está em destaque para você!");
           }}
         />
-        <TheBestForYou onPressPlan={handleTrainingPress} />
-        <ChallengesSection />
-        <HeatingScreen />
+        <TheBestForYou
+          onPressPlan={handleTrainingPress}
+          planData={(trainingsBySection.melhores_para_voce.length > 0
+            ? trainingsBySection.melhores_para_voce
+            : trainingsBySection.allMapped
+          ).slice(0, 4)}
+        />
+        <ChallengesSection
+          challenges={
+            trainingsBySection.desafio.length > 0
+              ? trainingsBySection.desafio.map((t) => ({
+                  id: t.id,
+                  title: t.title,
+                  image: { uri: t.imageUrl },
+                }))
+              : undefined
+          }
+          onPress={(item) => {
+            const training = trainings.find((t: any) => String(t.id_treino) === item.id);
+            if (training) handleTrainingPress(training);
+          }}
+        />
+        <HeatingScreen
+          heatingData={
+            trainingsBySection.aquecimento.length > 0
+              ? trainingsBySection.aquecimento.map((t) => ({
+                  id: t.id,
+                  title: t.title,
+                  imageUrl: t.imageUrl,
+                  level: t.level,
+                  minutes: t.minutes,
+                }))
+              : undefined
+          }
+          onPressItem={(item) => {
+            const training = trainings.find((t: any) => String(t.id_treino) === item.id);
+            if (training) handleTrainingPress(training);
+          }}
+        />
         <FooterVersion style={styles.footer} />
       </ScrollView>
     </View>

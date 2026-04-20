@@ -1,4 +1,4 @@
-import React, { useRef, useCallback } from "react";
+import React, { useRef, useCallback, useEffect, useMemo } from "react";
 import {
   View,
   Text,
@@ -24,11 +24,22 @@ import axios from "axios";
 import * as WebBrowser from "expo-web-browser";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useAuth } from "../../../contexts/AuthContext";
+import { useAppData } from "../../../contexts/AppDataContext";
 import StripePlansSheet, {
   StripePlansSheetRef,
 } from "../admin/[protected]/components/StripePlansSheet";
-import { Settings, Zap, Users, Gift, Shield, Star, Clock, CheckCircle, Lock, Unlock } from "lucide-react-native";
-
+import {
+  Settings,
+  Zap,
+  Users,
+  Gift,
+  Shield,
+  Star,
+  Clock,
+  CheckCircle,
+  Lock,
+  Unlock,
+} from "lucide-react-native";
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL || "http://10.0.2.2:3000";
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
@@ -126,8 +137,7 @@ const PLAN_CONFIG: Record<
 };
 
 const PlanScreen: React.FC = () => {
-  const [plans, setPlans] = React.useState<Plan[]>([]);
-  const [loading, setLoading] = React.useState(true);
+  const { stripePlans, loadingStripePlans: loading, fetchStripePlans } = useAppData();
   const [subscribing, setSubscribing] = React.useState(false);
   const [activeIndex, setActiveIndex] = React.useState(0);
   const [familyMembers, setFamilyMembers] = React.useState(2);
@@ -151,36 +161,33 @@ const PlanScreen: React.FC = () => {
 
   const getConfig = (planType: string) => PLAN_CONFIG[planType] || PLAN_CONFIG.free;
 
-  React.useEffect(() => {
-    const fetchPlans = async () => {
-      try {
-        const response = await axios.get(`${API_URL}/api/plans`);
-        const order = ["free", "premium", "family", "familia"];
-        const sorted = response.data.sort((a: Plan, b: Plan) => {
-          const ia = order.indexOf(getPlanType(a));
-          const ib = order.indexOf(getPlanType(b));
-          return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib);
+  useEffect(() => {
+    fetchStripePlans();
+  }, [fetchStripePlans]);
+
+  const plans = useMemo(() => {
+    const order = ["free", "premium", "family", "familia"];
+    return [...stripePlans].sort((a: Plan, b: Plan) => {
+      const ia = order.indexOf(getPlanType(a));
+      const ib = order.indexOf(getPlanType(b));
+      return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib);
+    });
+  }, [stripePlans]);
+
+  useEffect(() => {
+    if (plans.length > 0) {
+      const premiumIdx = plans.findIndex((p: Plan) => getPlanType(p) === "premium");
+      const defaultIdx = premiumIdx >= 0 ? premiumIdx : 0;
+      setActiveIndex(defaultIdx);
+      setTimeout(() => {
+        flatListRef.current?.scrollToIndex({
+          index: defaultIdx,
+          animated: false,
+          viewOffset: 0,
         });
-        setPlans(sorted);
-        // scroll to premium by default
-        const premiumIdx = sorted.findIndex((p: Plan) => getPlanType(p) === "premium");
-        const defaultIdx = premiumIdx >= 0 ? premiumIdx : 0;
-        setActiveIndex(defaultIdx);
-        setTimeout(() => {
-          flatListRef.current?.scrollToIndex({
-            index: defaultIdx,
-            animated: false,
-            viewOffset: 0,
-          });
-        }, 100);
-      } catch (e) {
-        console.error("Erro ao buscar planos:", e);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchPlans();
-  }, []);
+      }, 100);
+    }
+  }, [plans]);
 
   const animateFeatures = useCallback(() => {
     featuresOpacity.setValue(0);
@@ -291,26 +298,27 @@ const PlanScreen: React.FC = () => {
             <View style={styles.priceRow}>
               <Text style={[styles.priceCurrency, { color: cfg.textColor }]}>R$</Text>
               <Text style={[styles.priceValue, { color: cfg.textColor }]}>
-                {((pType === "family" || pType === "familia")
-                  ? (familyMembers <= 3 ? 69.90 : familyMembers <= 6 ? 124.90 : 199.90)
+                {(pType === "family" || pType === "familia"
+                  ? familyMembers <= 3
+                    ? 69.9
+                    : familyMembers <= 6
+                      ? 124.9
+                      : 199.9
                   : item.price
                 )
                   .toFixed(2)
                   .replace(".", ",")}
-
               </Text>
             </View>
             <Text style={[styles.priceInterval, { color: cfg.textColor }]}>
               {pType === "family" || pType === "familia"
-                ? `${familyMembers} membros · R$ ${((familyMembers <= 3 ? 69.90 : familyMembers <= 6 ? 124.90 : 199.90) / familyMembers).toFixed(2).replace(".", ",")} cada`
+                ? `${familyMembers} membros · R$ ${((familyMembers <= 3 ? 69.9 : familyMembers <= 6 ? 124.9 : 199.9) / familyMembers).toFixed(2).replace(".", ",")} cada`
                 : item.interval === "year"
                   ? "por ano"
                   : item.interval === "month"
                     ? "por mês"
                     : "acesso limitado"}
             </Text>
-
-
 
             {/* Divider */}
             <View style={[styles.cardDivider, { backgroundColor: cfg.textColor + "33" }]} />
@@ -479,7 +487,6 @@ const PlanScreen: React.FC = () => {
                 <Text style={styles.stepperHint}>
                   Valor total atualizado no card principal e botão abaixo ⚡
                 </Text>
-
               </View>
             )}
           </Animated.View>
@@ -514,14 +521,16 @@ const PlanScreen: React.FC = () => {
                       {isFree
                         ? "Plano Atual"
                         : `Assinar ${activeConfig.label} · R$ ${(isFamilyPlan
-                            ? (familyMembers <= 3 ? 69.90 : familyMembers <= 6 ? 124.90 : 199.90)
+                            ? familyMembers <= 3
+                              ? 69.9
+                              : familyMembers <= 6
+                                ? 124.9
+                                : 199.9
                             : activePlan?.price
                           )
                             .toFixed(2)
                             .replace(".", ",")}`}
                     </Text>
-
-
                   </>
                 )}
               </LinearGradient>

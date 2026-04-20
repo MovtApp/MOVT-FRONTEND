@@ -23,6 +23,7 @@ import { useAuth } from "@contexts/AuthContext";
 import { listCommunities } from "@services/communityService";
 import Communities from "@components/Communities";
 import { FooterVersion } from "@components/FooterVersion";
+import { useAppData } from "@contexts/AppDataContext";
 import { AppStackParamList, Community } from "../../../@types/routes";
 import CommunityManagementSheet, {
   CommunityManagementSheetRef,
@@ -43,8 +44,7 @@ const CommunityScreen: React.FC = () => {
   const { user } = useAuth();
   const navigation = useNavigation<NativeStackNavigationProp<AppStackParamList>>();
   const route = useRoute<RouteProp<AppStackParamList, "CommunityScreen">>(); // Hook to access route params
-  const [communities, setCommunities] = useState<Community[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { communities, loadingCommunities: loading, fetchCommunities } = useAppData();
   const [activeBannerIndex, setActiveBannerIndex] = useState(0);
   const [selectedCategory, setSelectedCategory] = useState(route.params?.category || "Todas");
   const scrollX = useRef(new Animated.Value(0)).current;
@@ -55,43 +55,18 @@ const CommunityScreen: React.FC = () => {
   const isAdmin = user?.id === "15" || String(user?.id_us) === "15";
 
   useEffect(() => {
-    if (isFocused) {
-      fetchCommunities();
-    }
-  }, [isFocused]);
-
-  useEffect(() => {
     if (route.params?.category) {
       setSelectedCategory(route.params.category);
     }
   }, [route.params?.category]);
 
   useEffect(() => {
-    if (user?.sessionId) {
-      fetchCommunities();
+    if (isFocused || user?.sessionId) {
+      fetchCommunities(selectedCategory);
     }
-  }, [user, selectedCategory]);
+  }, [isFocused, user, selectedCategory, fetchCommunities]);
 
-  const fetchCommunities = async () => {
-    try {
-      setLoading(true);
-      if (user?.sessionId) {
-        const data = await listCommunities(user.sessionId, selectedCategory);
-        let formattedData: Community[] = [];
-        if (Array.isArray(data)) {
-          formattedData = data;
-        } else if (data && Array.isArray(data.data)) {
-          formattedData = data.data;
-        }
-        setCommunities(formattedData);
-      }
-    } catch (error) {
-      console.error("Erro ao buscar comunidades:", error);
-      Alert.alert("Erro", "Não foi possível carregar as comunidades.");
-    } finally {
-      setLoading(false);
-    }
-  };
+  // Removido local fetchCommunities para usar o do AppDataContext
 
   const handleScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
     const index = event.nativeEvent.contentOffset.x / ITEM_WIDTH;

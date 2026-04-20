@@ -69,8 +69,23 @@
           "bluetoothAlwaysPermission": "Este aplicativo usa Bluetooth para conectar e sincronizar dados com seu relógio inteligente."
         }
       ],
-      "react-native-health-connect"
+      "react-native-health-connect",
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "minSdkVersion": 26,
+            "compileSdkVersion": 35,
+            "targetSdkVersion": 35,
+            "ndkVersion": "26.1.10909125",
+            "extraQueryParams": {
+              "stl": "c++_shared"
+            }
+          }
+        }
+      ]
     ],
+
     "extra": {
       "eas": {
         "projectId": "2d73320b-52df-4407-83d5-c827a5a55f27"
