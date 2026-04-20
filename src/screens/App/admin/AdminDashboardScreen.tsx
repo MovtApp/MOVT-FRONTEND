@@ -2092,7 +2092,13 @@ const AdminDashboardScreen: React.FC = () => {
                       <View style={{ flex: 1, marginLeft: 12 }}>
                         <Text style={styles.clientName}>{item.user_name}</Text>
                         <Text style={styles.clientMeta}>
-                          {new Date(item.created_at).toLocaleDateString("pt-BR")}
+                          {(() => {
+                            try {
+                              return new Date(item.created_at).toLocaleDateString("pt-BR");
+                            } catch (e) {
+                              return new Date(item.created_at).toISOString().split('T')[0];
+                            }
+                          })()}
                         </Text>
                       </View>
                       <View
@@ -2197,7 +2203,13 @@ const AdminDashboardScreen: React.FC = () => {
                     <View style={{ flex: 1, marginLeft: 12 }}>
                       <Text style={styles.clientName}>{item.user_name}</Text>
                       <Text style={styles.clientMeta}>
-                        {new Date(item.data_agendamento).toLocaleDateString("pt-BR")} •{" "}
+                        {(() => {
+                          try {
+                            return new Date(item.data_agendamento).toLocaleDateString("pt-BR");
+                          } catch (e) {
+                            return new Date(item.data_agendamento).toISOString().split('T')[0];
+                          }
+                        })()} •{" "}
                         {item.hora_inicio}
                       </Text>
                       <Text
@@ -3713,7 +3725,11 @@ const AdminDashboardScreen: React.FC = () => {
                     const actDate = new Date(rawActivation);
                     // Adiciona 1 mês por padrão para planos mensais
                     actDate.setMonth(actDate.getMonth() + 1);
-                    displayExpiry = actDate.toLocaleDateString("pt-BR");
+                    try {
+                      displayExpiry = actDate.toLocaleDateString("pt-BR");
+                    } catch (e) {
+                      displayExpiry = actDate.toISOString().split('T')[0];
+                    }
                   } catch (e) {
                     displayExpiry = "Em análise";
                   }
@@ -4357,7 +4373,13 @@ const AdminDashboardScreen: React.FC = () => {
                           </Text>
                           <Text style={{ fontSize: 14, color: "#1E293B", fontWeight: "600" }}>
                             {selectedUserDetail.created_at
-                              ? new Date(selectedUserDetail.created_at).toLocaleDateString("pt-BR")
+                              ? (() => {
+                                  try {
+                                    return new Date(selectedUserDetail.created_at).toLocaleDateString("pt-BR");
+                                  } catch (e) {
+                                    return new Date(selectedUserDetail.created_at).toISOString().split('T')[0];
+                                  }
+                                })()
                               : "N/A"}
                           </Text>
                         </View>

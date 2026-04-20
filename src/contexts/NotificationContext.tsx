@@ -142,9 +142,11 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({ chil
       if (chatResp.status === 200) {
         const chats = chatResp.data.data || [];
         const totalUnreadChats = chats.reduce((acc: number, chat: any) => {
-          // A lógica do back-end já deve retornar unread_count, 
-          // mas garantimos que só somamos se não formos o último remetente
-          // ou se o back-end já preparou o campo corretamente.
+          // Fallback: Se o usuário logado for o último que enviou mensagem, 
+          // não deveria haver notificações não lidas para ele nesse chat.
+          const isLastSenderMe = String(chat.last_message_sender_id) === String(user.id);
+          if (isLastSenderMe) return acc;
+          
           return acc + (chat.unread_count || 0);
         }, 0);
         setUnreadChatCount(totalUnreadChats);
