@@ -6,7 +6,7 @@ buildscript {
     minSdkVersion = 26
     compileSdkVersion = 35
     targetSdkVersion = 35
-    ndkVersion = "27.0.12077973"
+    ndkVersion = "26.3.11579264"
   }
   repositories {
     google()
@@ -29,3 +29,11 @@ allprojects {
 
 apply plugin: "expo-root-project"
 apply plugin: "com.facebook.react.rootproject"
+
+subprojects {
+    afterEvaluate { project ->
+        if (project.hasProperty("android") && project.android.hasProperty("externalNativeBuild") && project.android.externalNativeBuild.cmake) {
+            project.android.defaultConfig.externalNativeBuild.cmake.cppFlags += " -include ${rootProject.projectDir}/app/src/main/jni/std_format_fix.h"
+        }
+    }
+}
