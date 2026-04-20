@@ -31,9 +31,22 @@ apply plugin: "expo-root-project"
 apply plugin: "com.facebook.react.rootproject"
 
 subprojects {
-    afterEvaluate { project ->
-        if (project.hasProperty("android") && project.android.hasProperty("externalNativeBuild") && project.android.externalNativeBuild.cmake) {
-            project.android.defaultConfig.externalNativeBuild.cmake.cppFlags += " -include ${rootProject.projectDir}/app/src/main/jni/std_format_fix.h"
+    def applyCppFix = { p ->
+        if (p.hasProperty("android")) {
+            try {
+                def cmake = p.android.defaultConfig.externalNativeBuild.cmake
+                if (cmake != null) {
+                    cmake.cppFlags += " -include ${rootProject.projectDir}/app/src/main/jni/std_format_fix.h"
+                }
+            } catch (Exception e) {
+                // Some projects might not have the expected structure, skip them
+            }
         }
+    }
+
+    if (it.state.executed) {
+        applyCppFix(it)
+    } else {
+        it.afterEvaluate { applyCppFix(it) }
     }
 }
