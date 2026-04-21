@@ -142,11 +142,11 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({ chil
       if (chatResp.status === 200) {
         const chats = chatResp.data.data || [];
         const totalUnreadChats = chats.reduce((acc: number, chat: any) => {
-          // Fallback: Se o usuário logado for o último que enviou mensagem, 
+          // Fallback: Se o usuário logado for o último que enviou mensagem,
           // não deveria haver notificações não lidas para ele nesse chat.
           const isLastSenderMe = String(chat.last_message_sender_id) === String(user.id);
           if (isLastSenderMe) return acc;
-          
+
           return acc + (chat.unread_count || 0);
         }, 0);
         setUnreadChatCount(totalUnreadChats);
@@ -236,7 +236,7 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({ chil
           event: "*",
           schema: "public",
           table: "messages",
-          // Idealmente filtraríamos por receiver_id, mas para garantir 
+          // Idealmente filtraríamos por receiver_id, mas para garantir
           // que qualquer mudança no chat atualize o contador, ouvimos as mensagens.
           // O fetchRemoteData fará a filtragem correta via API.
         },

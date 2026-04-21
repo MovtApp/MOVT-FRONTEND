@@ -521,7 +521,16 @@ const DataScreen: React.FC = () => {
                 </View>
                 <View style={styles.stepsData}>
                   <Text style={styles.cardValueMove}>{formattedSteps}</Text>
-                  <Text style={styles.cardSubText}>Meta: {stepsGoal.toLocaleString("pt-BR")}</Text>
+                  <Text style={styles.cardSubText}>
+                    Meta:{" "}
+                    {(() => {
+                      try {
+                        return stepsGoal.toLocaleString("pt-BR");
+                      } catch (e) {
+                        return stepsGoal.toString();
+                      }
+                    })()}
+                  </Text>
                   {isWalking && <Text style={styles.liveTag}>• Andando</Text>}
                 </View>
               </View>

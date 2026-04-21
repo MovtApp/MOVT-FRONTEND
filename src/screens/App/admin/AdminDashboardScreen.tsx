@@ -1050,10 +1050,14 @@ const AdminDashboardScreen: React.FC = () => {
 
   const formatCurrency = (val: number | null | undefined) => {
     const safeVal = val ?? 0;
-    return new Intl.NumberFormat("pt-BR", {
-      style: "currency",
-      currency: "BRL",
-    }).format(safeVal);
+    try {
+      return new Intl.NumberFormat("pt-BR", {
+        style: "currency",
+        currency: "BRL",
+      }).format(safeVal);
+    } catch (e) {
+      return `R$ ${safeVal.toFixed(2).replace(".", ",")}`;
+    }
   };
 
   const performanceData = useMemo(() => {
@@ -1244,18 +1248,22 @@ const AdminDashboardScreen: React.FC = () => {
                 <Text style={styles.sectionSubtitle}>Baseado em sessões confirmadas</Text>
               </View>
               <View style={{ alignItems: "flex-end" }}>
--                <Text style={styles.revenueValue}>
--                  {formatCurrency(data?.revenue.current ?? 0)}
--                </Text>
--                <Text style={[styles.growthText, { color: "#10B981" }]}>
--                  {data?.revenue?.growth} vs período ant.
--                </Text>
-+                <Text style={styles.revenueValue}>
-+                  {formatCurrency(data?.revenue?.current ?? 0)}
-+                </Text>
-+                <Text style={[styles.growthText, { color: "#10B981" }]}>
-+                  {data?.revenue?.growth || "0%"} vs período ant.
-+                </Text>
+                -{" "}
+                <Text style={styles.revenueValue}>
+                  - {formatCurrency(data?.revenue.current ?? 0)}-{" "}
+                </Text>
+                -{" "}
+                <Text style={[styles.growthText, { color: "#10B981" }]}>
+                  - {data?.revenue?.growth} vs período ant. -{" "}
+                </Text>
+                +{" "}
+                <Text style={styles.revenueValue}>
+                  + {formatCurrency(data?.revenue?.current ?? 0)}+{" "}
+                </Text>
+                +{" "}
+                <Text style={[styles.growthText, { color: "#10B981" }]}>
+                  + {data?.revenue?.growth || "0%"} vs período ant. +{" "}
+                </Text>
               </View>
             </View>
           </View>
@@ -2096,7 +2104,7 @@ const AdminDashboardScreen: React.FC = () => {
                             try {
                               return new Date(item.created_at).toLocaleDateString("pt-BR");
                             } catch (e) {
-                              return new Date(item.created_at).toISOString().split('T')[0];
+                              return new Date(item.created_at).toISOString().split("T")[0];
                             }
                           })()}
                         </Text>
@@ -2207,10 +2215,10 @@ const AdminDashboardScreen: React.FC = () => {
                           try {
                             return new Date(item.data_agendamento).toLocaleDateString("pt-BR");
                           } catch (e) {
-                            return new Date(item.data_agendamento).toISOString().split('T')[0];
+                            return new Date(item.data_agendamento).toISOString().split("T")[0];
                           }
-                        })()} •{" "}
-                        {item.hora_inicio}
+                        })()}{" "}
+                        • {item.hora_inicio}
                       </Text>
                       <Text
                         style={{ fontSize: 13, fontWeight: "800", color: "#10B981", marginTop: 4 }}
@@ -3728,7 +3736,7 @@ const AdminDashboardScreen: React.FC = () => {
                     try {
                       displayExpiry = actDate.toLocaleDateString("pt-BR");
                     } catch (e) {
-                      displayExpiry = actDate.toISOString().split('T')[0];
+                      displayExpiry = actDate.toISOString().split("T")[0];
                     }
                   } catch (e) {
                     displayExpiry = "Em análise";
@@ -4375,9 +4383,13 @@ const AdminDashboardScreen: React.FC = () => {
                             {selectedUserDetail.created_at
                               ? (() => {
                                   try {
-                                    return new Date(selectedUserDetail.created_at).toLocaleDateString("pt-BR");
+                                    return new Date(
+                                      selectedUserDetail.created_at
+                                    ).toLocaleDateString("pt-BR");
                                   } catch (e) {
-                                    return new Date(selectedUserDetail.created_at).toISOString().split('T')[0];
+                                    return new Date(selectedUserDetail.created_at)
+                                      .toISOString()
+                                      .split("T")[0];
                                   }
                                 })()
                               : "N/A"}
