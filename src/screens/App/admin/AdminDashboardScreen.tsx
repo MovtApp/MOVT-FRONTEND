@@ -1267,6 +1267,7 @@ const AdminDashboardScreen: React.FC = () => {
 
           {/* Gráfico de Volume */}
           <View style={styles.chartCardCustom}>
+            <View style={{ height: 180, marginTop: 10 }}>
               {(() => {
                 const chartData = (data?.chartData || []).map((item: any) => ({
                   ...item,

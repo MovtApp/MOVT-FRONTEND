@@ -145,5 +145,5 @@ babel.config.js
 *.config.mjs
 
 # Expo Prebuild
-# /android
-# /ios
+/android
+/ios
