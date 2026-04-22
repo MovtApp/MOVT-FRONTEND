@@ -1049,14 +1049,21 @@ const AdminDashboardScreen: React.FC = () => {
   };
 
   const formatCurrency = (val: number | null | undefined) => {
-    const safeVal = val ?? 0;
+    const safeVal = Number(val) || 0;
     try {
-      return new Intl.NumberFormat("pt-BR", {
-        style: "currency",
-        currency: "BRL",
-      }).format(safeVal);
+      if (typeof Intl !== "undefined" && Intl.NumberFormat) {
+        return new Intl.NumberFormat("pt-BR", {
+          style: "currency",
+          currency: "BRL",
+        }).format(safeVal);
+      }
+      throw new Error("Intl not available");
     } catch (e) {
-      return `R$ ${safeVal.toFixed(2).replace(".", ",")}`;
+      // Fallback robusto sem Intl
+      const formatted = safeVal.toFixed(2).replace(".", ",");
+      const parts = formatted.split(",");
+      parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+      return `R$ ${parts.join(",")}`;
     }
   };
 
@@ -1138,11 +1145,11 @@ const AdminDashboardScreen: React.FC = () => {
         </View>
         <Text style={styles.kpiValue}>
           {(() => {
-            const labelLower = (item.label || "").toLowerCase();
+            const labelLower = (item?.label || "").toLowerCase();
             // Bifurcação 1: Planos Ativos (Assinantes Pagantes Reais)
-            if (labelLower.includes("planos ativos") || item.id === "active_plans") {
-              return adminUsers.filter((u) => {
-                const p = (u.plan || u.plano || "").toLowerCase();
+            if (labelLower.includes("planos ativos") || item?.id === "active_plans") {
+              return (adminUsers || []).filter((u) => {
+                const p = (u?.plan || u?.plano || "").toLowerCase();
                 return (
                   p.includes("premium") ||
                   p.includes("gold") ||
@@ -1153,13 +1160,13 @@ const AdminDashboardScreen: React.FC = () => {
             }
             // Bifurcação 2: Planos Gerais (Produtos Cadastrados no Stripe)
             if (
-              (item.id === "plans" || item.id === "stripe_plans") &&
+              (item?.id === "plans" || item?.id === "stripe_plans") &&
               !labelLower.includes("ativo")
             ) {
-              return adminPlans.length;
+              return (adminPlans || []).length;
             }
             // Fallback: Default backend value
-            return item.value;
+            return item?.value ?? 0;
           })()}
         </Text>
         <Text style={styles.kpiLabel}>{item.label}</Text>
@@ -1248,21 +1255,11 @@ const AdminDashboardScreen: React.FC = () => {
                 <Text style={styles.sectionSubtitle}>Baseado em sessões confirmadas</Text>
               </View>
               <View style={{ alignItems: "flex-end" }}>
-                -{" "}
                 <Text style={styles.revenueValue}>
-                  - {formatCurrency(data?.revenue.current ?? 0)}-{" "}
+                  {formatCurrency(data?.revenue?.current ?? 0)}
                 </Text>
-                -{" "}
                 <Text style={[styles.growthText, { color: "#10B981" }]}>
-                  - {data?.revenue?.growth} vs período ant. -{" "}
-                </Text>
-                +{" "}
-                <Text style={styles.revenueValue}>
-                  + {formatCurrency(data?.revenue?.current ?? 0)}+{" "}
-                </Text>
-                +{" "}
-                <Text style={[styles.growthText, { color: "#10B981" }]}>
-                  + {data?.revenue?.growth || "0%"} vs período ant. +{" "}
+                  {data?.revenue?.growth || "0%"} vs período ant.
                 </Text>
               </View>
             </View>
@@ -1270,9 +1267,12 @@ const AdminDashboardScreen: React.FC = () => {
 
           {/* Gráfico de Volume */}
           <View style={styles.chartCardCustom}>
-            <View style={{ height: 180, marginTop: 10 }}>
               {(() => {
-                const chartData = data?.chartData || [];
+                const chartData = (data?.chartData || []).map((item: any) => ({
+                  ...item,
+                  total: Number.isFinite(Number(item?.total)) ? Number(item.total) : 0,
+                  label: String(item?.label || ""),
+                }));
 
                 if (chartData.length === 0) {
                   return (

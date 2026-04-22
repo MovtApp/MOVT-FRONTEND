@@ -26,9 +26,28 @@ export function getRelativeTime(date: string | Date): string {
   if (diffYears < 5) return diffYears === 1 ? "1 ano" : `${diffYears} anos`;
 
   // 5+ anos: exibe a data absoluta curta (ex: "12 mar 2018")
-  return past.toLocaleDateString("pt-BR", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-  });
+  // 5+ anos: exibe a data absoluta curta (ex: "12 mar 2018")
+  try {
+    return past.toLocaleDateString("pt-BR", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+    });
+  } catch (e) {
+    const monthsShort = [
+      "jan",
+      "fev",
+      "mar",
+      "abr",
+      "mai",
+      "jun",
+      "jul",
+      "ago",
+      "set",
+      "out",
+      "nov",
+      "dez",
+    ];
+    return `${past.getDate()} ${monthsShort[past.getMonth()]} ${past.getFullYear()}`;
+  }
 }

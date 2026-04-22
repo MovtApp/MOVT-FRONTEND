@@ -220,9 +220,12 @@ const DataScreen: React.FC = () => {
   const flatListRef = useRef<FlatList>(null);
 
   const waterGoalMl = 2000;
-  const waterProgress = Math.max(0, Math.min(1, waterConsumedMl / waterGoalMl));
-  const stepsProgress = stepsGoal > 0 ? Math.min(1, stepsToday / stepsGoal) : 0;
-  const stepsProgressPercent = Math.round(Math.max(0, Math.min(1, stepsProgress)) * 100);
+  const waterProgress = isFinite(waterConsumedMl / waterGoalMl)
+    ? Math.max(0, Math.min(1, waterConsumedMl / waterGoalMl))
+    : 0;
+  const stepsProgress =
+    stepsGoal > 0 && isFinite(stepsToday / stepsGoal) ? Math.min(1, stepsToday / stepsGoal) : 0;
+  const stepsProgressPercent = Math.round(stepsProgress * 100);
   const formattedSteps = useMemo(() => {
     if (stepsLoading) return "--";
     try {

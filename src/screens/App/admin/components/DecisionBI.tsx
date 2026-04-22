@@ -31,15 +31,20 @@ const DecisionBI: React.FC<DecisionBIProps> = ({
   onOpenRevenue,
   onOpenUnits,
 }) => {
-  const planRevenue = data?.planDistribution || [
+  const planRevenue = (data?.planDistribution || [
     { label: "Premium", count: 45, color: "#6366F1" },
     { label: "Ouro", count: 30, color: "#F59E0B" },
     { label: "Basic", count: 25, color: "#94A3B8" },
-  ];
+  ]).map((item: any) => ({
+    ...item,
+    count: Number.isFinite(Number(item?.count)) ? Number(item.count) : 0,
+    label: String(item?.label || ""),
+    color: String(item?.color || "#94A3B8"),
+  }));
 
-  const churnRate = data?.churn?.rate || "0.0";
-  const churnCount = data?.churn?.count || 0;
-  const ltvValue = data?.ltv?.value || 0;
+  const churnRate = String(data?.churn?.rate || "0.0");
+  const churnCount = Number(data?.churn?.count || 0);
+  const ltvValue = Number(data?.ltv?.value || 0);
 
   return (
     <View style={styles.container}>
