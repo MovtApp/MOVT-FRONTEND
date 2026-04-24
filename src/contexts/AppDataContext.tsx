@@ -30,7 +30,7 @@ interface AppDataContextData {
   setAdminTrainers: React.Dispatch<React.SetStateAction<any[]>>;
   adminGyms: any[];
   setAdminGyms: React.Dispatch<React.SetStateAction<any[]>>;
-  fetchHomeData: (specialty?: string | null) => Promise<void>;
+  fetchHomeData: (specialty?: string | null, force?: boolean) => Promise<void>;
   fetchDietMeals: (category?: string) => Promise<void>;
   fetchCommunities: (category?: string) => Promise<void>;
   fetchStripePlans: () => Promise<void>;
@@ -109,6 +109,44 @@ export const AppDataProvider: React.FC<{ children: React.ReactNode }> = ({ child
       return true;
     }
     return false;
+  };
+
+  // --- HELPER DE SANITIZAÇÃO ---
+  const sanitizeList = (list: any[]) => {
+    if (!Array.isArray(list)) return [];
+    return list.map((item) => {
+      if (!item) return item;
+      return {
+        ...item,
+        nome: item.nome || item.name || "",
+        email: item.email || "",
+        plan: item.plan || item.plano || "FREE",
+        plano: item.plano || item.plan || "FREE",
+        role: item.role || item.tipo || item.role_name || "client_pf",
+        status: item.status || (item.ativo ? "active" : "blocked"),
+        label: item.label || item.nome || "",
+      };
+    });
+  };
+
+  const sanitizeAdminStats = (data: any) => {
+    if (!data) return data;
+    const sanitized = { ...data };
+    if (Array.isArray(sanitized.statusDistribution)) {
+      sanitized.statusDistribution = sanitized.statusDistribution.map((d: any) => ({
+        ...d,
+        label: d.label || "",
+        count: Number(d.count || 0),
+      }));
+    }
+    if (Array.isArray(sanitized.planDistribution)) {
+      sanitized.planDistribution = sanitized.planDistribution.map((d: any) => ({
+        ...d,
+        label: d.label || "",
+        count: Number(d.count || 0),
+      }));
+    }
+    return sanitized;
   };
 
   const fetchHomeData = useCallback(
@@ -331,19 +369,20 @@ export const AppDataProvider: React.FC<{ children: React.ReactNode }> = ({ child
         ]);
 
         if (statsResp.data.success) {
-          setAdminDashboardData(statsResp.data);
-          saveCache("adminDashboardData", statsResp.data);
+          const sanitizedStats = sanitizeAdminStats(statsResp.data);
+          setAdminDashboardData(sanitizedStats);
+          saveCache("adminDashboardData", sanitizedStats);
         }
 
-        const uList = usersResp.data.users || [];
+        const uList = sanitizeList(usersResp.data.users || []);
         setAdminUsers(uList);
         saveCache("adminUsers", uList);
 
-        const tList = trainersResp.data.users || [];
+        const tList = sanitizeList(trainersResp.data.users || []);
         setAdminTrainers(tList);
         saveCache("adminTrainers", tList);
 
-        const gList = gymsResp.data.data || [];
+        const gList = sanitizeList(gymsResp.data.data || []);
         setAdminGyms(gList);
         saveCache("adminGyms", gList);
       } catch (error) {

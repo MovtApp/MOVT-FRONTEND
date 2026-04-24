@@ -21,6 +21,8 @@ export interface NativeHealthData {
 let isSimulationState = false;
 
 export const NativeHealthManager = {
+  isSimulation: (): boolean => isSimulationState,
+
   authorize: async (): Promise<boolean> => {
     let success = false;
     try {
@@ -37,7 +39,7 @@ export const NativeHealthManager = {
     if (!success) {
       isSimulationState = true;
       console.log("🛠️ [MODO SIMULAÇÃO] Ativado para testes de interface.");
-      return true; // Retornamos true para destravar a interface do usuário
+      return false;
     }
 
     isSimulationState = false;
@@ -45,7 +47,7 @@ export const NativeHealthManager = {
   },
 
   fetchSteps: async (): Promise<number> => {
-    if (isSimulationState) return Math.floor(4000 + Math.random() * 1000);
+    if (isSimulationState) return 0;
     if (Platform.OS === "android") {
       return fetchHealthConnectSteps();
     } else if (Platform.OS === "ios") {
@@ -55,7 +57,7 @@ export const NativeHealthManager = {
   },
 
   fetchHeartRate: async (): Promise<number> => {
-    if (isSimulationState) return Math.floor(70 + Math.random() * 15);
+    if (isSimulationState) return 0;
     if (Platform.OS === "android") {
       return fetchHealthConnectHeartRate();
     } else if (Platform.OS === "ios") {
@@ -65,7 +67,7 @@ export const NativeHealthManager = {
   },
 
   fetchCalories: async (): Promise<number> => {
-    if (isSimulationState) return Math.floor(300 + Math.random() * 50);
+    if (isSimulationState) return 0;
     if (Platform.OS === "android") {
       return fetchHealthConnectCalories();
     } else if (Platform.OS === "ios") {
@@ -91,12 +93,12 @@ export const NativeHealthManager = {
   },
 
   fetchPressure: async (): Promise<number | null> => {
-    if (isSimulationState) return Math.floor(110 + Math.random() * 20);
+    if (isSimulationState) return 0;
     return null;
   },
 
   fetchOxygen: async (): Promise<number | null> => {
-    if (isSimulationState) return Math.floor(95 + Math.random() * 5);
+    if (isSimulationState) return 0;
     if (Platform.OS === "android") {
       return fetchHealthConnectOxygen();
     }

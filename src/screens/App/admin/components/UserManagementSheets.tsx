@@ -130,10 +130,12 @@ const UserManagementSheets: React.FC<UserManagementSheetsProps> = (props) => {
             >
               <Text style={[styles.sheetStatValue, { color: "#16A34A" }]}>
                 {
-                  adminUsers.filter((u) =>
-                    String(u.role || "")
-                      .toLowerCase()
-                      .includes("personal")
+                  (Array.isArray(adminUsers) ? adminUsers : []).filter(
+                    (u) =>
+                      u &&
+                      String(u?.role || u?.tipo || u?.role_name || "")
+                        .toLowerCase()
+                        .includes("personal")
                   ).length
                 }
               </Text>
@@ -160,7 +162,7 @@ const UserManagementSheets: React.FC<UserManagementSheetsProps> = (props) => {
               keyExtractor={(item: any) => String(item?.id_us || Math.random())}
               style={{ flex: 1, marginTop: 15 }}
               contentContainerStyle={{ paddingBottom: insets.bottom + 150 }}
-              renderItem={({ item }) => (
+              renderItem={({ item }: { item: any }) => (
                 <TouchableOpacity style={styles.proUserCard} onPress={() => openUserDetail(item)}>
                   <View style={styles.proUserMain}>
                     <Image

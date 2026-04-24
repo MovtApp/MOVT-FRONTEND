@@ -405,7 +405,7 @@ const PostCard: React.FC<PostCardProps> = ({ post, onShare }) => {
                 </Animated.View>
               </TouchableOpacity>
             )}
-            keyExtractor={(item) => item.media_id}
+            keyExtractor={(item, index) => String(item?.media_id || index)}
           />
         </View>
       );

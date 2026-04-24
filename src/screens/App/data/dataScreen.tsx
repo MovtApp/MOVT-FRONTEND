@@ -39,7 +39,55 @@ import { formatTrainingTime } from "../../../utils/formatters";
 import { LinearGradient } from "expo-linear-gradient";
 import Animated, { FadeInDown } from "react-native-reanimated";
 
-const { width } = Dimensions.get("window");
+// ─── Error Boundary ────────────────────────────────────────────────────────────
+
+interface EBState {
+  hasError: boolean;
+  error: Error | null;
+}
+class DataErrorBoundary extends React.Component<{ children: React.ReactNode }, EBState> {
+  constructor(props: any) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+  static getDerivedStateFromError(error: Error) {
+    return { hasError: true, error };
+  }
+  componentDidCatch(error: Error, info: any) {
+    console.error("[DataScreen] Crash interceptado:", error, info);
+  }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <View
+          style={{
+            flex: 1,
+            backgroundColor: "#FEF2F2",
+            margin: 12,
+            borderRadius: 16,
+            padding: 20,
+            justifyContent: "center",
+            alignItems: "center",
+          }}
+        >
+          <Text style={{ fontSize: 16, fontWeight: "bold", color: "#DC2626", marginBottom: 10 }}>
+            ⚠️ Erro no Módulo de Saúde
+          </Text>
+          <Text style={{ fontSize: 12, color: "#7F1D1D", textAlign: "center", marginBottom: 10 }}>
+            {this.state.error?.message || "Erro de renderização desconhecido."}
+          </Text>
+          <Text style={{ fontSize: 10, color: "#991B1B", textAlign: "center" }}>
+            {this.state.error?.stack?.slice(0, 300)}
+          </Text>
+        </View>
+      );
+    }
+    return this.props.children;
+  }
+}
+
+const { width: screenWidth, height: screenHeight } = Dimensions.get("window");
+const width = screenWidth > 0 ? screenWidth : 360; // Fallback para largura padrão
 
 const cyclingMapStyle: MapStyleElement[] = [
   {
@@ -130,6 +178,11 @@ const cyclingMapStyle: MapStyleElement[] = [
   },
 ];
 
+const formatNumberBR = (num: number): string => {
+  if (!isFinite(num) || isNaN(num)) return "0";
+  return num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+};
+
 const DataScreen: React.FC = () => {
   type DataScreenNavigationProp = CompositeNavigationProp<
     DrawerNavigationProp<AppDrawerParamList, "HomeStack">,
@@ -137,6 +190,7 @@ const DataScreen: React.FC = () => {
   >;
   const navigation = useNavigation<DataScreenNavigationProp>();
   const { user } = useAuth();
+  const userId = user?.id;
 
   const [currentDate] = useState(new Date());
   const [selectedDay, setSelectedDay] = useState(new Date().getDate());
@@ -175,31 +229,42 @@ const DataScreen: React.FC = () => {
       try {
         const stats = await getHistoricalStats("1d");
 
+        const sNum = (val: any) => {
+          const n = typeof val === "number" ? val : parseFloat(val);
+          return isFinite(n) && !isNaN(n) ? n : 0;
+        };
+
+        const totalWater = sNum(stats?.totalWater);
+        const avgSleep = sNum(stats?.avgSleep);
+        const avgHeartRate = sNum(stats?.avgHeartRate);
+        const totalCalories = sNum(stats?.totalCalories);
+        const totalSteps = sNum(stats?.totalSteps);
+
         setForcaData({
-          water: Math.min(100, (stats.totalWater / 2000) * 100),
-          sleep: Math.min(100, (stats.avgSleep / 480) * 100),
-          steps: stats.radar.forca,
-          bpm: Math.min(100, (stats.avgHeartRate / 120) * 100),
+          water: Math.max(0, Math.min(100, (totalWater / 2000) * 100 || 0)),
+          sleep: Math.max(0, Math.min(100, (avgSleep / 480) * 100 || 0)),
+          steps: Math.max(0, Math.min(100, sNum(stats?.radar?.forca))),
+          bpm: Math.max(0, Math.min(100, (avgHeartRate / 120) * 100 || 0)),
           imc: 92,
-          calories: Math.min(100, (stats.totalCalories / 500) * 100),
+          calories: Math.max(0, Math.min(100, (totalCalories / 500) * 100 || 0)),
         });
 
         setAgilidadeData({
-          water: Math.min(100, (stats.totalWater / 1500) * 100),
-          sleep: Math.min(100, (stats.avgSleep / 420) * 100),
-          steps: Math.min(100, (stats.totalSteps / 5000) * 100),
-          bpm: stats.avgHeartRate > 0 ? 80 : 0,
+          water: Math.max(0, Math.min(100, (totalWater / 1500) * 100 || 0)),
+          sleep: Math.max(0, Math.min(100, (avgSleep / 420) * 100 || 0)),
+          steps: Math.max(0, Math.min(100, (totalSteps / 5000) * 100 || 0)),
+          bpm: avgHeartRate > 0 ? 80 : 0,
           imc: 85,
-          calories: stats.radar.agilidade,
+          calories: Math.max(0, Math.min(100, sNum(stats?.radar?.agilidade))),
         });
 
         setResistenciaData({
-          water: Math.min(100, (stats.totalWater / 1000) * 100),
-          sleep: stats.radar.resistencia,
-          steps: Math.min(100, (stats.totalSteps / 3000) * 100),
-          bpm: stats.avgHeartRate > 0 ? 60 : 0,
+          water: Math.max(0, Math.min(100, (totalWater / 1000) * 100 || 0)),
+          sleep: Math.max(0, Math.min(100, sNum(stats?.radar?.resistencia))),
+          steps: Math.max(0, Math.min(100, (totalSteps / 3000) * 100 || 0)),
+          bpm: avgHeartRate > 0 ? 60 : 0,
           imc: 70,
-          calories: Math.min(100, (stats.totalCalories / 300) * 100),
+          calories: Math.max(0, Math.min(100, (totalCalories / 300) * 100 || 0)),
         });
       } catch (error) {
         console.error("Error fetching radar data in dataScreen:", error);
@@ -207,31 +272,39 @@ const DataScreen: React.FC = () => {
     };
 
     fetchRadarData();
-  }, [getHistoricalStats, targetDate]);
+  }, [getHistoricalStats, targetDate, userId]);
 
   const healthData = {
-    calories: dailyCalories,
-    steps: stepsToday,
-    heartRate: heartRate ?? 0,
-    sleep: sleepHours,
-    water: waterConsumedMl / 250,
+    calories: isFinite(dailyCalories) && !isNaN(dailyCalories) ? dailyCalories : 0,
+    steps: isFinite(stepsToday) && !isNaN(stepsToday) ? stepsToday : 0,
+    heartRate: heartRate !== null && isFinite(heartRate) && !isNaN(heartRate) ? heartRate : 0,
+    sleep: isFinite(sleepHours) && !isNaN(sleepHours) ? sleepHours : 0,
+    water: isFinite(waterConsumedMl) && !isNaN(waterConsumedMl) ? waterConsumedMl / 250 : 0,
   };
 
   const flatListRef = useRef<FlatList>(null);
 
   const waterGoalMl = 2000;
-  const waterProgress = isFinite(waterConsumedMl / waterGoalMl)
-    ? Math.max(0, Math.min(1, waterConsumedMl / waterGoalMl))
-    : 0;
+  const rawWaterProgress = waterConsumedMl / waterGoalMl;
+  const waterProgress =
+    isFinite(rawWaterProgress) && !isNaN(rawWaterProgress)
+      ? Math.max(0, Math.min(1, rawWaterProgress))
+      : 0;
+
+  const rawStepsProgress = stepsGoal > 0 ? stepsToday / stepsGoal : 0;
   const stepsProgress =
-    stepsGoal > 0 && isFinite(stepsToday / stepsGoal) ? Math.min(1, stepsToday / stepsGoal) : 0;
+    stepsGoal > 0 && isFinite(rawStepsProgress) && !isNaN(rawStepsProgress)
+      ? Math.max(0, Math.min(1, rawStepsProgress))
+      : 0;
   const stepsProgressPercent = Math.round(stepsProgress * 100);
+
   const formattedSteps = useMemo(() => {
     if (stepsLoading) return "--";
     try {
-      return (stepsToday || 0).toLocaleString("pt-BR");
+      const safeSteps = isFinite(stepsToday) && !isNaN(stepsToday) ? stepsToday : 0;
+      return formatNumberBR(safeSteps);
     } catch (e) {
-      return (stepsToday || 0).toString();
+      return String(stepsToday || 0);
     }
   }, [stepsLoading, stepsToday]);
 
@@ -254,11 +327,6 @@ const DataScreen: React.FC = () => {
 
   const getMonthAndYear = (date: Date) => {
     try {
-      const options: Intl.DateTimeFormatOptions = { month: "long", year: "numeric" };
-      const formattedDate = date.toLocaleDateString("pt-BR", options);
-      if (!formattedDate) return "";
-      return formattedDate.charAt(0).toUpperCase() + formattedDate.slice(1);
-    } catch (e) {
       const months = [
         "Janeiro",
         "Fevereiro",
@@ -273,7 +341,10 @@ const DataScreen: React.FC = () => {
         "Novembro",
         "Dezembro",
       ];
+      if (!date || isNaN(date.getTime())) return "";
       return `${months[date.getMonth()]} de ${date.getFullYear()}`;
+    } catch (e) {
+      return "";
     }
   };
 
@@ -286,12 +357,13 @@ const DataScreen: React.FC = () => {
     return days[new Date(year, month, day).getDay()];
   };
 
-  /* Dynamic Sizing */
-  const CARD_WIDTH = (width - 40 - 20) / 2; // (Screen - PaddingHorizontal - Gap) / 2
-  const RADAR_SIZE = Math.min(CARD_WIDTH * 0.8, 140); // Max size 140, but scales down
-  const RADAR_MARGIN_TOP = CARD_WIDTH * 0.15;
+  /* Dynamic Sizing - Sanitized */
+  const SAFE_WIDTH = width > 0 ? width : 360;
+  const CARD_WIDTH = Math.max(100, (SAFE_WIDTH - 40 - 20) / 2);
+  const RADAR_SIZE = Math.max(80, Math.min(CARD_WIDTH * 0.85, 140));
+  const RADAR_MARGIN_TOP = Math.max(5, CARD_WIDTH * 0.12);
 
-  const RESULTS_CARD_INNER_SIZE = Math.floor(Math.min(202 - 30, 188 - 30) * 0.9);
+  const RESULTS_CARD_INNER_SIZE = Math.floor(Math.max(100, Math.min(202 - 30, 188 - 30) * 0.9));
 
   const monthNameAndYear = getMonthAndYear(currentDate);
   const totalDaysInMonth = getDaysInMonth(currentDate);
@@ -303,6 +375,32 @@ const DataScreen: React.FC = () => {
   const displayEndDay = isCurrentMonth ? today.getDate() : totalDaysInMonth;
 
   const daysInMonthArray = Array.from({ length: displayEndDay }, (_, i) => i + 1);
+
+  const safeCyclingRoute = useMemo(() => {
+    if (!Array.isArray(cyclingRoute)) return [];
+    return cyclingRoute.filter(
+      (c) =>
+        c &&
+        typeof c.latitude === "number" &&
+        typeof c.longitude === "number" &&
+        isFinite(c.latitude) &&
+        isFinite(c.longitude) &&
+        !isNaN(c.latitude) &&
+        !isNaN(c.longitude)
+    );
+  }, [cyclingRoute]);
+
+  const hasValidMapRegion = useMemo(() => {
+    return (
+      cyclingRegion &&
+      typeof cyclingRegion.latitude === "number" &&
+      !isNaN(cyclingRegion.latitude) &&
+      typeof cyclingRegion.longitude === "number" &&
+      !isNaN(cyclingRegion.longitude) &&
+      isFinite(cyclingRegion.latitude) &&
+      isFinite(cyclingRegion.longitude)
+    );
+  }, [cyclingRegion]);
 
   const renderDay = ({ item }: { item: number }) => {
     const isSelected = item === selectedDay;
@@ -354,353 +452,365 @@ const DataScreen: React.FC = () => {
   });
 
   return (
-    <View style={styles.container}>
-      <StatusBar style="dark" backgroundColor="#FFFFFF" />
-      <Header />
+    <DataErrorBoundary>
+      <View style={styles.container}>
+        <StatusBar style="dark" backgroundColor="#FFFFFF" />
+        <Header />
 
-      <ScrollView
-        style={styles.content}
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
-      >
-        <View style={styles.dateHeader}>
-          <Text style={styles.monthText}>{monthNameAndYear}</Text>
-        </View>
+        <ScrollView
+          style={styles.content}
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+        >
+          <View style={styles.dateHeader}>
+            <Text style={styles.monthText}>{monthNameAndYear}</Text>
+          </View>
 
-        <FlatList
-          horizontal
-          ref={flatListRef}
-          data={daysInMonthArray}
-          renderItem={renderDay}
-          keyExtractor={(item) => String(item)}
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.daysListContent}
-          style={styles.daysList}
-          initialScrollIndex={Math.max(0, selectedDay - 1)}
-          getItemLayout={getItemLayout}
-          onLayout={handleFlatListLayout}
-        />
+          <FlatList
+            horizontal
+            ref={flatListRef}
+            data={daysInMonthArray}
+            renderItem={renderDay}
+            keyExtractor={(item) => String(item)}
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.daysListContent}
+            style={styles.daysList}
+            getItemLayout={getItemLayout}
+            onLayout={handleFlatListLayout}
+          />
 
-        <Animated.View entering={FadeInDown.delay(100).duration(500)}>
-          <Text style={styles.sectionTitle}>Resumo diário</Text>
+          <Animated.View entering={FadeInDown.delay(100).duration(500)}>
+            <Text style={styles.sectionTitle}>Resumo diário</Text>
 
-          <View style={styles.gridContainer}>
-            {/* Left Column */}
-            <View style={styles.leftColumn}>
-              {/* Calories Card */}
+            <View style={styles.gridContainer}>
+              {/* Left Column */}
+              <View style={styles.leftColumn}>
+                {/* Calories Card */}
+                <TouchableOpacity
+                  activeOpacity={0.8}
+                  style={[styles.card, styles.smallCard]}
+                  onPress={() => navigation.navigate("CaloriesScreen" as never)}
+                >
+                  <LinearGradient
+                    colors={["rgba(255, 140, 0, 0.1)", "rgba(255, 140, 0, 0.05)"]}
+                    style={[StyleSheet.absoluteFill, { borderRadius: 20 }]}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                  />
+                  <View style={styles.cardHeader}>
+                    <View
+                      style={[styles.iconContainer, { backgroundColor: "rgba(255, 140, 0, 0.15)" }]}
+                    >
+                      <Flame size={18} color="#FF8C00" />
+                    </View>
+                    <ArrowRight size={16} color="#9CA3AF" />
+                  </View>
+                  <View>
+                    <Text style={styles.cardLabel}>Calorias</Text>
+                    <Text style={styles.cardValueLarge}>
+                      {Math.round(healthData.calories)}
+                      <Text style={styles.unitText}> kcal</Text>
+                    </Text>
+                  </View>
+                </TouchableOpacity>
+
+                {/* Training Time Card - Now passive display only */}
+                <View style={[styles.card, styles.smallCard]}>
+                  <LinearGradient
+                    colors={["rgba(138, 43, 226, 0.1)", "rgba(138, 43, 226, 0.05)"]}
+                    style={[StyleSheet.absoluteFill, { borderRadius: 20 }]}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                  />
+                  <View style={styles.cardHeader}>
+                    <View
+                      style={[
+                        styles.iconContainer,
+                        { backgroundColor: "rgba(138, 43, 226, 0.15)" },
+                      ]}
+                    >
+                      <Timer size={18} color="#8A2BE2" />
+                    </View>
+                    {isWalking && (
+                      <Animated.View entering={FadeInDown} style={styles.activePulse}>
+                        <View style={styles.pulseDot} />
+                      </Animated.View>
+                    )}
+                  </View>
+                  <View>
+                    <Text style={styles.cardLabel}>Tempo Ativo</Text>
+                    <Text style={styles.cardValueMedium}>{formattedTrainingTime}</Text>
+                  </View>
+                </View>
+              </View>
+
+              {/* Right Column - Results (Radar) */}
               <TouchableOpacity
                 activeOpacity={0.8}
-                style={[styles.card, styles.smallCard]}
-                onPress={() => navigation.navigate("CaloriesScreen" as never)}
+                style={[styles.card, styles.tallCard]}
+                onPress={() => navigation.navigate("ResultsScreen" as never)}
               >
                 <LinearGradient
-                  colors={["rgba(255, 140, 0, 0.1)", "rgba(255, 140, 0, 0.05)"]}
+                  colors={["rgba(187, 242, 70, 0.15)", "rgba(187, 242, 70, 0.05)"]}
+                  style={[StyleSheet.absoluteFill, { borderRadius: 20 }]}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                />
+                <View style={styles.performanceHeader}>
+                  <Text style={styles.performanceTitle}>Performance</Text>
+                  <ArrowRight size={16} color="#4B5563" />
+                </View>
+                <View style={[styles.radarContainer, { marginTop: RADAR_MARGIN_TOP }]}>
+                  <MiniRadarChart
+                    size={RADAR_SIZE}
+                    forcaData={forcaData}
+                    agilidadeData={agilidadeData}
+                    resistenciaData={resistenciaData}
+                  />
+                </View>
+
+                <View style={styles.cardFooter}>
+                  <Text style={styles.cardLabel}>Análise completa</Text>
+                </View>
+              </TouchableOpacity>
+            </View>
+
+            {/* Expectation x Reality Card - Professional Clean Version */}
+            <TouchableOpacity
+              activeOpacity={0.7}
+              style={styles.comparisonCard}
+              onPress={() => navigation.navigate("ExpectationRealityScreen" as never)}
+            >
+              <LinearGradient
+                colors={["rgba(99, 102, 241, 0.08)", "rgba(167, 139, 250, 0.03)"]}
+                style={[StyleSheet.absoluteFill, { borderRadius: 20 }]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+              />
+              <View style={styles.comparisonContent}>
+                <View style={{ flex: 1, marginLeft: 16 }}>
+                  <Text style={styles.comparisonTitle}>Expectativa x Realidade</Text>
+                  <Text style={styles.comparisonSubTitle}>
+                    Comparativo anatômico e metas físicas
+                  </Text>
+                </View>
+
+                <ArrowRight size={18} color="#94A3B8" />
+              </View>
+            </TouchableOpacity>
+
+            {/* Row 2: Steps & Heart Rate */}
+            <View style={styles.rowContainer}>
+              {/* Steps Card */}
+              <TouchableOpacity
+                activeOpacity={0.8}
+                style={[styles.card, styles.mediumCard]}
+                onPress={() => navigation.navigate("StepsScreen" as never)}
+              >
+                <LinearGradient
+                  colors={["rgba(34, 197, 94, 0.1)", "rgba(34, 197, 94, 0.02)"]}
                   style={[StyleSheet.absoluteFill, { borderRadius: 20 }]}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 1 }}
                 />
                 <View style={styles.cardHeader}>
-                  <View
-                    style={[styles.iconContainer, { backgroundColor: "rgba(255, 140, 0, 0.15)" }]}
-                  >
-                    <Flame size={18} color="#FF8C00" />
-                  </View>
-                  <ArrowRight size={16} color="#9CA3AF" />
+                  <Text style={styles.cardLabel}>Passos</Text>
+                  <Footprints size={18} color="#22C55E" />
                 </View>
-                <View>
-                  <Text style={styles.cardLabel}>Calorias</Text>
+
+                <View style={styles.stepsContent}>
+                  <View style={styles.stepsRingWrapper}>
+                    <StepProgressRing progress={stepsProgress} size={60} strokeWidth={6} />
+                    <View style={styles.stepsRingInner}>
+                      <Text style={styles.stepsPercent}>{stepsProgressPercent}%</Text>
+                    </View>
+                  </View>
+                  <View style={styles.stepsData}>
+                    <Text style={styles.cardValueMove}>{formattedSteps}</Text>
+                    <Text style={styles.cardSubText}>
+                      Meta:{" "}
+                      {(() => {
+                        try {
+                          const safeGoal =
+                            isFinite(stepsGoal) && !isNaN(stepsGoal)
+                              ? stepsGoal
+                              : DEFAULT_STEPS_GOAL;
+                          return formatNumberBR(safeGoal);
+                        } catch (e) {
+                          return String(stepsGoal || 0);
+                        }
+                      })()}
+                    </Text>
+                    {isWalking && <Text style={styles.liveTag}>• Andando</Text>}
+                  </View>
+                </View>
+              </TouchableOpacity>
+
+              {/* Heart Rate Card */}
+              <TouchableOpacity
+                activeOpacity={0.8}
+                style={[styles.card, styles.mediumCard]}
+                onPress={() => navigation.navigate("HeartbeatsScreen" as never)}
+              >
+                <LinearGradient
+                  colors={["rgba(239, 68, 68, 0.1)", "rgba(239, 68, 68, 0.02)"]}
+                  style={[StyleSheet.absoluteFill, { borderRadius: 20 }]}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                />
+                <View style={styles.cardHeader}>
+                  <Text style={styles.cardLabel}>BPM</Text>
+                  <Heart
+                    size={18}
+                    color="#EF4444"
+                    fill={healthData.heartRate > 0 ? "#EF4444" : "transparent"}
+                  />
+                </View>
+
+                <View style={styles.ecgContainer}>
+                  <ECGDisplay
+                    bpm={healthData.heartRate}
+                    width={width * 0.35}
+                    height={50}
+                    responsive={false}
+                    isConnected={isWearOsConnected && healthData.heartRate > 0}
+                    color="#EF4444"
+                  />
+                </View>
+                <View style={styles.bpmFooter}>
+                  <Text style={[styles.cardValueLarge, { color: "#EF4444" }]}>
+                    {healthData.heartRate > 0 ? healthData.heartRate : "--"}
+                  </Text>
+                  {isWearOsConnected && (
+                    <View style={styles.connectedBadge}>
+                      <View style={styles.greenDot} />
+                      <Text style={styles.connectedText}>Sync</Text>
+                    </View>
+                  )}
+                </View>
+              </TouchableOpacity>
+            </View>
+
+            {/* Row 3: Sleep & Water */}
+            <View style={styles.rowContainer}>
+              {/* Sleep Card */}
+              <TouchableOpacity
+                activeOpacity={0.8}
+                style={[styles.card, styles.halfCard]}
+                onPress={() => navigation.navigate("SleepScreen" as never)}
+              >
+                <LinearGradient
+                  colors={["rgba(99, 102, 241, 0.15)", "rgba(99, 102, 241, 0.05)"]}
+                  style={[StyleSheet.absoluteFill, { borderRadius: 20 }]}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                />
+                <View style={styles.cardHeader}>
+                  <Text style={[styles.cardLabel, { color: "#818CF8" }]}>Sono</Text>
+                  <Moon size={18} color="#818CF8" />
+                </View>
+                <View style={styles.sleepContent}>
                   <Text style={styles.cardValueLarge}>
-                    {Math.round(healthData.calories)}
-                    <Text style={styles.unitText}> kcal</Text>
+                    {sleepHours}
+                    <Text style={styles.unitText}>h</Text> {String(sleepMinutes).padStart(2, "0")}
+                    <Text style={styles.unitText}>m</Text>
                   </Text>
                 </View>
               </TouchableOpacity>
 
-              {/* Training Time Card - Now passive display only */}
-              <View style={[styles.card, styles.smallCard]}>
+              {/* Water Card */}
+              <TouchableOpacity
+                activeOpacity={0.8}
+                style={[styles.card, styles.halfCard]}
+                onPress={() => navigation.navigate("WaterScreen" as never)}
+              >
                 <LinearGradient
-                  colors={["rgba(138, 43, 226, 0.1)", "rgba(138, 43, 226, 0.05)"]}
+                  colors={["rgba(6, 182, 212, 0.15)", "rgba(6, 182, 212, 0.05)"]}
                   style={[StyleSheet.absoluteFill, { borderRadius: 20 }]}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 1 }}
                 />
                 <View style={styles.cardHeader}>
-                  <View
-                    style={[styles.iconContainer, { backgroundColor: "rgba(138, 43, 226, 0.15)" }]}
-                  >
-                    <Timer size={18} color="#8A2BE2" />
+                  <Text style={[styles.cardLabel, { color: "#22D3EE" }]}>Hidratação</Text>
+                  <Droplets size={18} color="#22D3EE" />
+                </View>
+                <View style={styles.waterContent}>
+                  <View style={styles.waterWaveContainer}>
+                    <WaterWave progress={waterProgress} height={40} width={40} />
                   </View>
-                  {isWalking && (
-                    <Animated.View entering={FadeInDown} style={styles.activePulse}>
-                      <View style={styles.pulseDot} />
-                    </Animated.View>
-                  )}
-                </View>
-                <View>
-                  <Text style={styles.cardLabel}>Tempo Ativo</Text>
-                  <Text style={styles.cardValueMedium}>{formattedTrainingTime}</Text>
-                </View>
-              </View>
-            </View>
-
-            {/* Right Column - Results (Radar) */}
-            <TouchableOpacity
-              activeOpacity={0.8}
-              style={[styles.card, styles.tallCard]}
-              onPress={() => navigation.navigate("ResultsScreen" as never)}
-            >
-              <LinearGradient
-                colors={["rgba(187, 242, 70, 0.15)", "rgba(187, 242, 70, 0.05)"]}
-                style={[StyleSheet.absoluteFill, { borderRadius: 20 }]}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-              />
-              <View style={styles.performanceHeader}>
-                <Text style={styles.performanceTitle}>Performance</Text>
-                <ArrowRight size={16} color="#4B5563" />
-              </View>
-              <View style={[styles.radarContainer, { marginTop: RADAR_MARGIN_TOP }]}>
-                <MiniRadarChart
-                  size={RADAR_SIZE}
-                  forcaData={forcaData}
-                  agilidadeData={agilidadeData}
-                  resistenciaData={resistenciaData}
-                />
-              </View>
-
-              <View style={styles.cardFooter}>
-                <Text style={styles.cardLabel}>Análise completa</Text>
-              </View>
-            </TouchableOpacity>
-          </View>
-
-          {/* Expectation x Reality Card - Professional Clean Version */}
-          <TouchableOpacity
-            activeOpacity={0.7}
-            style={styles.comparisonCard}
-            onPress={() => navigation.navigate("ExpectationRealityScreen" as never)}
-          >
-            <LinearGradient
-              colors={["rgba(99, 102, 241, 0.08)", "rgba(167, 139, 250, 0.03)"]}
-              style={[StyleSheet.absoluteFill, { borderRadius: 20 }]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-            />
-            <View style={styles.comparisonContent}>
-              <View style={{ flex: 1, marginLeft: 16 }}>
-                <Text style={styles.comparisonTitle}>Expectativa x Realidade</Text>
-                <Text style={styles.comparisonSubTitle}>Comparativo anatômico e metas físicas</Text>
-              </View>
-
-              <ArrowRight size={18} color="#94A3B8" />
-            </View>
-          </TouchableOpacity>
-
-          {/* Row 2: Steps & Heart Rate */}
-          <View style={styles.rowContainer}>
-            {/* Steps Card */}
-            <TouchableOpacity
-              activeOpacity={0.8}
-              style={[styles.card, styles.mediumCard]}
-              onPress={() => navigation.navigate("StepsScreen" as never)}
-            >
-              <LinearGradient
-                colors={["rgba(34, 197, 94, 0.1)", "rgba(34, 197, 94, 0.02)"]}
-                style={[StyleSheet.absoluteFill, { borderRadius: 20 }]}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-              />
-              <View style={styles.cardHeader}>
-                <Text style={styles.cardLabel}>Passos</Text>
-                <Footprints size={18} color="#22C55E" />
-              </View>
-
-              <View style={styles.stepsContent}>
-                <View style={styles.stepsRingWrapper}>
-                  <StepProgressRing progress={stepsProgress} size={60} strokeWidth={6} />
-                  <View style={styles.stepsRingInner}>
-                    <Text style={styles.stepsPercent}>{stepsProgressPercent}%</Text>
-                  </View>
-                </View>
-                <View style={styles.stepsData}>
-                  <Text style={styles.cardValueMove}>{formattedSteps}</Text>
-                  <Text style={styles.cardSubText}>
-                    Meta:{" "}
-                    {(() => {
-                      try {
-                        return stepsGoal.toLocaleString("pt-BR");
-                      } catch (e) {
-                        return stepsGoal.toString();
-                      }
-                    })()}
+                  <Text style={styles.cardValueMediumWater}>
+                    {waterConsumedMl}
+                    <Text style={styles.unitTextSmall}>ml</Text>
                   </Text>
-                  {isWalking && <Text style={styles.liveTag}>• Andando</Text>}
                 </View>
-              </View>
-            </TouchableOpacity>
+              </TouchableOpacity>
+            </View>
 
-            {/* Heart Rate Card */}
+            {/* Cycling Map Card */}
             <TouchableOpacity
-              activeOpacity={0.8}
-              style={[styles.card, styles.mediumCard]}
-              onPress={() => navigation.navigate("HeartbeatsScreen" as never)}
+              activeOpacity={0.9}
+              style={styles.cyclingCard}
+              onPress={() => navigation.navigate("CyclingScreen" as never)}
             >
-              <LinearGradient
-                colors={["rgba(239, 68, 68, 0.1)", "rgba(239, 68, 68, 0.02)"]}
-                style={[StyleSheet.absoluteFill, { borderRadius: 20 }]}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-              />
-              <View style={styles.cardHeader}>
-                <Text style={styles.cardLabel}>BPM</Text>
-                <Heart
-                  size={18}
-                  color="#EF4444"
-                  fill={healthData.heartRate > 0 ? "#EF4444" : "transparent"}
-                />
+              <View style={styles.cyclingHeader}>
+                <View style={styles.cyclingIconBox}>
+                  <Bike size={20} color="#111827" />
+                </View>
+                <Text style={styles.cyclingTitle}>Atividade de Ciclismo</Text>
               </View>
 
-              <View style={styles.ecgContainer}>
-                <ECGDisplay
-                  bpm={healthData.heartRate}
-                  width={width * 0.35}
-                  height={50}
-                  responsive={false}
-                  isConnected={isWearOsConnected && healthData.heartRate > 0}
-                  color="#EF4444"
-                />
-              </View>
-              <View style={styles.bpmFooter}>
-                <Text style={[styles.cardValueLarge, { color: "#EF4444" }]}>
-                  {healthData.heartRate > 0 ? healthData.heartRate : "--"}
-                </Text>
-                {isWearOsConnected && (
-                  <View style={styles.connectedBadge}>
-                    <View style={styles.greenDot} />
-                    <Text style={styles.connectedText}>Sync</Text>
+              <View style={styles.mapContainer}>
+                {hasValidMapRegion && cyclingRegion ? (
+                  <MapView
+                    provider={Platform.OS === "android" ? PROVIDER_GOOGLE : undefined}
+                    pointerEvents="none"
+                    style={styles.map}
+                    region={cyclingRegion}
+                    customMapStyle={cyclingMapStyle}
+                    scrollEnabled={false}
+                    zoomEnabled={false}
+                    rotateEnabled={false}
+                    pitchEnabled={false}
+                    toolbarEnabled={false}
+                    showsCompass={false}
+                    showsBuildings={false}
+                    showsTraffic={false}
+                    showsIndoors={false}
+                  >
+                    {safeCyclingRoute.length > 1 && (
+                      <Polyline
+                        coordinates={safeCyclingRoute}
+                        strokeColor="#BBF246"
+                        strokeWidth={4}
+                        lineCap="round"
+                        lineJoin="round"
+                      />
+                    )}
+                  </MapView>
+                ) : (
+                  <View style={styles.mapPlaceholder}>
+                    <View style={styles.radarEffect} />
+                    <Text style={styles.mapPlaceholderText}>
+                      {!isToday
+                        ? "Sem rota registrada"
+                        : locationError
+                          ? "Localização indisponível"
+                          : "Aguardando GPS..."}
+                    </Text>
                   </View>
                 )}
               </View>
             </TouchableOpacity>
-          </View>
 
-          {/* Row 3: Sleep & Water */}
-          <View style={styles.rowContainer}>
-            {/* Sleep Card */}
-            <TouchableOpacity
-              activeOpacity={0.8}
-              style={[styles.card, styles.halfCard]}
-              onPress={() => navigation.navigate("SleepScreen" as never)}
-            >
-              <LinearGradient
-                colors={["rgba(99, 102, 241, 0.15)", "rgba(99, 102, 241, 0.05)"]}
-                style={[StyleSheet.absoluteFill, { borderRadius: 20 }]}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-              />
-              <View style={styles.cardHeader}>
-                <Text style={[styles.cardLabel, { color: "#818CF8" }]}>Sono</Text>
-                <Moon size={18} color="#818CF8" />
-              </View>
-              <View style={styles.sleepContent}>
-                <Text style={styles.cardValueLarge}>
-                  {sleepHours}
-                  <Text style={styles.unitText}>h</Text> {String(sleepMinutes).padStart(2, "0")}
-                  <Text style={styles.unitText}>m</Text>
-                </Text>
-              </View>
-            </TouchableOpacity>
-
-            {/* Water Card */}
-            <TouchableOpacity
-              activeOpacity={0.8}
-              style={[styles.card, styles.halfCard]}
-              onPress={() => navigation.navigate("WaterScreen" as never)}
-            >
-              <LinearGradient
-                colors={["rgba(6, 182, 212, 0.15)", "rgba(6, 182, 212, 0.05)"]}
-                style={[StyleSheet.absoluteFill, { borderRadius: 20 }]}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-              />
-              <View style={styles.cardHeader}>
-                <Text style={[styles.cardLabel, { color: "#22D3EE" }]}>Hidratação</Text>
-                <Droplets size={18} color="#22D3EE" />
-              </View>
-              <View style={styles.waterContent}>
-                <View style={styles.waterWaveContainer}>
-                  <WaterWave progress={waterProgress} height={40} width={40} />
-                </View>
-                <Text style={styles.cardValueMediumWater}>
-                  {waterConsumedMl}
-                  <Text style={styles.unitTextSmall}>ml</Text>
-                </Text>
-              </View>
-            </TouchableOpacity>
-          </View>
-
-          {/* Cycling Map Card */}
-          <TouchableOpacity
-            activeOpacity={0.9}
-            style={styles.cyclingCard}
-            onPress={() => navigation.navigate("CyclingScreen" as never)}
-          >
-            <View style={styles.cyclingHeader}>
-              <View style={styles.cyclingIconBox}>
-                <Bike size={20} color="#111827" />
-              </View>
-              <Text style={styles.cyclingTitle}>Atividade de Ciclismo</Text>
-            </View>
-
-            <View style={styles.mapContainer}>
-              {cyclingRegion ? (
-                <MapView
-                  provider={Platform.OS === "android" ? PROVIDER_GOOGLE : undefined}
-                  pointerEvents="none"
-                  style={styles.map}
-                  region={cyclingRegion}
-                  customMapStyle={cyclingMapStyle}
-                  scrollEnabled={false}
-                  zoomEnabled={false}
-                  rotateEnabled={false}
-                  pitchEnabled={false}
-                  toolbarEnabled={false}
-                  showsCompass={false}
-                  showsBuildings={false}
-                  showsTraffic={false}
-                  showsIndoors={false}
-                >
-                  {cyclingRoute.length > 1 && (
-                    <Polyline
-                      coordinates={cyclingRoute}
-                      strokeColor="#BBF246"
-                      strokeWidth={4}
-                      lineCap="round"
-                      lineJoin="round"
-                    />
-                  )}
-                </MapView>
-              ) : (
-                <View style={styles.mapPlaceholder}>
-                  <View style={styles.radarEffect} />
-                  <Text style={styles.mapPlaceholderText}>
-                    {!isToday
-                      ? "Sem rota registrada"
-                      : locationError
-                        ? "Localização indisponível"
-                        : "Aguardando GPS..."}
-                  </Text>
-                </View>
-              )}
-            </View>
-          </TouchableOpacity>
-
-          <View style={{ height: 100 }} />
-        </Animated.View>
-      </ScrollView>
-    </View>
+            <View style={{ height: 100 }} />
+          </Animated.View>
+        </ScrollView>
+      </View>
+    </DataErrorBoundary>
   );
 };
+
+const DEFAULT_STEPS_GOAL = 10000;
 
 const styles = StyleSheet.create({
   container: {

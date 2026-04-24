@@ -171,6 +171,8 @@ export type AppDrawerParamList = {
 };
 
 export type AuthStackParamList = {
+  SplashScreen: undefined;
+  StartupScreen: undefined;
   SignInScreen: undefined;
   SignUpScreen: undefined;
   VerifyAccountScreen: undefined;

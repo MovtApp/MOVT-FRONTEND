@@ -20,9 +20,9 @@ const StepProgressRing: React.FC<StepProgressRingProps> = ({
   size = 78,
   strokeWidth = 10,
 }) => {
-  const radius = size / 2 - strokeWidth / 2 - 2; // Adjusted radius calculation
+  const radius = Math.max(1, size / 2 - strokeWidth / 2 - 2); // Adjusted radius calculation with safety
   const circumference = 2 * Math.PI * radius;
-  const clamped = Math.max(0, Math.min(1, progress));
+  const clamped = isFinite(progress) ? Math.max(0, Math.min(1, progress)) : 0;
   const animatedProgress = useSharedValue(0);
 
   useEffect(() => {

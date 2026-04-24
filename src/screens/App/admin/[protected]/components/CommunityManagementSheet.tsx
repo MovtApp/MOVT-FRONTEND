@@ -335,8 +335,12 @@ const CommunityManagementSheet = forwardRef<
 
   const filteredCommunities = communities.filter(
     (c) =>
-      c.nome.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (c.categoria || "").toLowerCase().includes(searchQuery.toLowerCase())
+      String(c?.nome || "")
+        .toLowerCase()
+        .includes((searchQuery || "").toLowerCase()) ||
+      String(c?.categoria || "")
+        .toLowerCase()
+        .includes((searchQuery || "").toLowerCase())
   );
 
   const renderBackdrop = useCallback(
@@ -475,7 +479,9 @@ const CommunityManagementSheet = forwardRef<
             ) : (
               <BottomSheetFlatList<Community>
                 data={filteredCommunities}
-                keyExtractor={(item: Community) => item.id_comunidade.toString()}
+                keyExtractor={(item: Community, index: number) =>
+                  String(item?.id_comunidade || index)
+                }
                 contentContainerStyle={{ paddingBottom: 60, paddingTop: 4 }}
                 showsVerticalScrollIndicator={false}
                 ListEmptyComponent={() => (

@@ -12,6 +12,7 @@ import {
   useWindowDimensions,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+
 import { AppStackParamList } from "../../../../@types/routes";
 import BackButton from "../../../../components/BackButton";
 import TimeSelector from "../../../../components/TimeSelector";
@@ -33,6 +34,53 @@ import {
   type TimeframeType,
   type CalorieStats,
 } from "../../../../services/caloriesService";
+
+// ─── Error Boundary ────────────────────────────────────────────────────────────
+
+interface EBState {
+  hasError: boolean;
+  error: Error | null;
+}
+class DataErrorBoundary extends React.Component<{ children: React.ReactNode }, EBState> {
+  constructor(props: any) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+  static getDerivedStateFromError(error: Error) {
+    return { hasError: true, error };
+  }
+  componentDidCatch(error: Error, info: any) {
+    console.error("[CaloriesScreen] Crash interceptado:", error, info);
+  }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <View
+          style={{
+            flex: 1,
+            backgroundColor: "#FEF2F2",
+            margin: 12,
+            borderRadius: 16,
+            padding: 20,
+            justifyContent: "center",
+            alignItems: "center",
+          }}
+        >
+          <Text style={{ fontSize: 16, fontWeight: "bold", color: "#DC2626", marginBottom: 10 }}>
+            ⚠️ Erro no Módulo de Calorias
+          </Text>
+          <Text style={{ fontSize: 12, color: "#7F1D1D", textAlign: "center", marginBottom: 10 }}>
+            {this.state.error?.message}
+          </Text>
+          <Text style={{ fontSize: 10, color: "#991B1B", textAlign: "center" }}>
+            {this.state.error?.stack?.slice(0, 300)}
+          </Text>
+        </View>
+      );
+    }
+    return this.props.children;
+  }
+}
 
 type GraphDataItem = {
   value: number;
@@ -168,14 +216,14 @@ const CaloriesScreen: React.FC = () => {
 
     // Escalas
     const scaleX = (index: number) => {
-      return (
-        (index / (displayGraphData.length - 1)) * (GRAPH_WIDTH - PADDING_HORIZONTAL * 2) +
-        PADDING_HORIZONTAL
-      );
+      const denom = Math.max(1, displayGraphData.length - 1);
+      return (index / denom) * (GRAPH_WIDTH - PADDING_HORIZONTAL * 2) + PADDING_HORIZONTAL;
     };
 
     const scaleY = (value: number) => {
-      return GRAPH_HEIGHT - (value / maxVal) * GRAPH_HEIGHT + PADDING_TOP;
+      const maxVal = Math.max(1, chartDomain[1]);
+      const safeVal = isFinite(value) && !isNaN(value) ? value : 0;
+      return GRAPH_HEIGHT - (safeVal / maxVal) * GRAPH_HEIGHT + PADDING_TOP;
     };
 
     // Gerador de linhas d3-shape
@@ -286,82 +334,86 @@ const CaloriesScreen: React.FC = () => {
 
   if (isLoading && !caloriesStats) {
     return (
-      <SafeAreaView style={styles.safeArea}>
-        <View style={styles.container}>
-          <View style={styles.header}>
-            <BackButton to={{ name: "DataScreen" }} />
-            <Text style={styles.headerTitle}>Calorias (Kcal)</Text>
-            <View style={{ width: 46 }} />
+      <DataErrorBoundary>
+        <SafeAreaView style={styles.safeArea}>
+          <View style={styles.container}>
+            <View style={styles.header}>
+              <BackButton to={{ name: "DataScreen" }} />
+              <Text style={styles.headerTitle}>Calorias (Kcal)</Text>
+              <View style={{ width: 46 }} />
+            </View>
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size="large" color="#FF7D00" />
+              <Text style={styles.loadingText}>Carregando dados...</Text>
+            </View>
           </View>
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color="#FF7D00" />
-            <Text style={styles.loadingText}>Carregando dados...</Text>
-          </View>
-        </View>
-      </SafeAreaView>
+        </SafeAreaView>
+      </DataErrorBoundary>
     );
   }
 
   return (
-    <SafeAreaView style={styles.safeArea} edges={["top"]}>
-      <ScrollView
-        style={styles.scrollView}
-        contentContainerStyle={styles.scrollContent}
-        refreshControl={<RefreshControl refreshing={isRefreshing} onRefresh={onRefresh} />}
-      >
-        <View style={styles.container}>
-          <View style={styles.header}>
-            <BackButton to={{ name: "DataScreen" }} />
-            <Text style={styles.headerTitle}>Calorias (Kcal)</Text>
-            <View style={{ width: 46 }} />
-          </View>
+    <DataErrorBoundary>
+      <SafeAreaView style={styles.safeArea} edges={["top"]}>
+        <ScrollView
+          style={styles.scrollView}
+          contentContainerStyle={styles.scrollContent}
+          refreshControl={<RefreshControl refreshing={isRefreshing} onRefresh={onRefresh} />}
+        >
+          <View style={styles.container}>
+            <View style={styles.header}>
+              <BackButton to={{ name: "DataScreen" }} />
+              <Text style={styles.headerTitle}>Calorias (Kcal)</Text>
+              <View style={{ width: 46 }} />
+            </View>
 
-          <View style={styles.calorieInfoContainer}>
-            <View style={styles.caloriesPrimaryInfo}>
-              <Image
-                source={require("../../../../assets/fire.png")}
-                style={{ width: 40, height: 40, marginTop: 6 }}
-                resizeMode="contain"
-              />
-              <Text style={styles.caloriesValue}>
-                {`${caloriesStats?.totalCalories || 0}`}
-                <Text style={styles.caloriesUnit}>kcal</Text>
+            <View style={styles.calorieInfoContainer}>
+              <View style={styles.caloriesPrimaryInfo}>
+                <Image
+                  source={require("../../../../assets/fire.png")}
+                  style={{ width: 40, height: 40, marginTop: 6 }}
+                  resizeMode="contain"
+                />
+                <Text style={styles.caloriesValue}>
+                  {`${caloriesStats?.totalCalories || 0}`}
+                  <Text style={styles.caloriesUnit}>kcal</Text>
+                </Text>
+              </View>
+              <Text style={styles.caloriesRemainingText}>
+                {`Queimar ${caloriesStats?.remainingCalories || 0} calorias restantes`}
               </Text>
             </View>
-            <Text style={styles.caloriesRemainingText}>
-              {`Queimar ${caloriesStats?.remainingCalories || 0} calorias restantes`}
-            </Text>
-          </View>
 
-          <View style={styles.timeSelectorWrapper}>
-            <TimeSelector
-              selectedTimeframe={selectedTimeframe}
-              onTimeframeChange={setSelectedTimeframe}
-              isLoading={isLoading}
-            />
-          </View>
+            <View style={styles.timeSelectorWrapper}>
+              <TimeSelector
+                selectedTimeframe={selectedTimeframe}
+                onTimeframeChange={setSelectedTimeframe}
+                isLoading={isLoading}
+              />
+            </View>
 
-          <View style={styles.graphSection}>
-            {isLoading ? (
-              <View style={styles.graphLoadingContainer}>
-                <ActivityIndicator size="small" color="#FF7D00" />
-              </View>
-            ) : (
-              <View style={[styles.graphContainer, { height: CHART_HEIGHT }]}>
-                {ChartComponent ? (
-                  ChartComponent
-                ) : (
-                  <View style={[styles.noDataContainer, { height: CHART_HEIGHT }]}>
-                    <Text style={styles.noDataText}>Nenhum dado disponível</Text>
-                  </View>
-                )}
-              </View>
-            )}
+            <View style={styles.graphSection}>
+              {isLoading ? (
+                <View style={styles.graphLoadingContainer}>
+                  <ActivityIndicator size="small" color="#FF7D00" />
+                </View>
+              ) : (
+                <View style={[styles.graphContainer, { height: CHART_HEIGHT }]}>
+                  {ChartComponent ? (
+                    ChartComponent
+                  ) : (
+                    <View style={[styles.noDataContainer, { height: CHART_HEIGHT }]}>
+                      <Text style={styles.noDataText}>Nenhum dado disponível</Text>
+                    </View>
+                  )}
+                </View>
+              )}
+            </View>
           </View>
-        </View>
-      </ScrollView>
-      <DataPillNavigator currentScreen="CaloriesScreen" />
-    </SafeAreaView>
+        </ScrollView>
+        <DataPillNavigator currentScreen="CaloriesScreen" />
+      </SafeAreaView>
+    </DataErrorBoundary>
   );
 };
 

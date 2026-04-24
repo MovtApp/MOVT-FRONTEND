@@ -32,7 +32,7 @@ const CATEGORIES = [
 
 const TrainingScreen: React.FC = () => {
   const navigation = useNavigation<NavigationProp>();
-  const { trainings, loadingTrainings } = useAppData();
+  const { trainings, loadingTrainings, fetchHomeData } = useAppData();
   const [search, setSearch] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("all");
 
@@ -49,9 +49,7 @@ const TrainingScreen: React.FC = () => {
 
     // Filter by category
     if (selectedCategory !== "all") {
-      result = result.filter(
-        (training) => (training.categoria || training.category) === selectedCategory
-      );
+      result = result.filter((training) => training.categoria === selectedCategory);
     }
 
     // Filter by search
@@ -59,10 +57,10 @@ const TrainingScreen: React.FC = () => {
       const searchTerm = normalizeText(search.trim());
       result = result.filter(
         (training) =>
-          normalizeText(training.nome || training.title).includes(searchTerm) ||
-          normalizeText(training.categoria || training.category).includes(searchTerm) ||
-          normalizeText(training.nivel || training.level).includes(searchTerm) ||
-          normalizeText(training.descricao || training.description).includes(searchTerm)
+          normalizeText(training.nome).includes(searchTerm) ||
+          normalizeText(training.categoria).includes(searchTerm) ||
+          normalizeText(training.nivel).includes(searchTerm) ||
+          normalizeText(training.descricao).includes(searchTerm)
       );
     }
 
@@ -169,7 +167,7 @@ const TrainingScreen: React.FC = () => {
       <FlatList
         data={filteredTrainings}
         renderItem={renderTrainingCard}
-        keyExtractor={(item) => item.id_treino}
+        keyExtractor={(item, index) => String(item?.id_treino || index)}
         numColumns={2}
         columnWrapperStyle={styles.row}
         contentContainerStyle={styles.listContent}

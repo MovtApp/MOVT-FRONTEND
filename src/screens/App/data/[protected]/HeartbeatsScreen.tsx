@@ -9,6 +9,7 @@ import {
   Platform,
   TouchableOpacity,
 } from "react-native";
+
 import { SafeAreaView } from "react-native-safe-area-context";
 import { AppStackParamList } from "../../../../@types/routes";
 import BackButton from "../../../../components/BackButton";
@@ -40,6 +41,53 @@ import { NativeHealthManager } from "../../../../services/nativeHealthManager";
 import { getHealthMetricData } from "../../../../services/caloriesService";
 import { bluetoothService } from "../../../../services/bluetoothService";
 
+// ─── Error Boundary ────────────────────────────────────────────────────────────
+
+interface EBState {
+  hasError: boolean;
+  error: Error | null;
+}
+class DataErrorBoundary extends React.Component<{ children: React.ReactNode }, EBState> {
+  constructor(props: any) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+  static getDerivedStateFromError(error: Error) {
+    return { hasError: true, error };
+  }
+  componentDidCatch(error: Error, info: any) {
+    console.error("[HeartbeatsScreen] Crash interceptado:", error, info);
+  }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <View
+          style={{
+            flex: 1,
+            backgroundColor: "#FEF2F2",
+            margin: 12,
+            borderRadius: 16,
+            padding: 20,
+            justifyContent: "center",
+            alignItems: "center",
+          }}
+        >
+          <Text style={{ fontSize: 16, fontWeight: "bold", color: "#DC2626", marginBottom: 10 }}>
+            ⚠️ Erro no Módulo de Batimentos
+          </Text>
+          <Text style={{ fontSize: 12, color: "#7F1D1D", textAlign: "center", marginBottom: 10 }}>
+            {this.state.error?.message || "Erro de renderização desconhecido."}
+          </Text>
+          <Text style={{ fontSize: 10, color: "#991B1B", textAlign: "center" }}>
+            {this.state.error?.stack?.slice(0, 300)}
+          </Text>
+        </View>
+      );
+    }
+    return this.props.children;
+  }
+}
+
 // Fallback seguro para ReanimatedView
 const ReanimatedView = Animated ? Animated.View : View;
 
@@ -70,7 +118,7 @@ const HeartbeatsScreen: React.FC = () => {
   const [oxygen, setOxygen] = useState<number | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [connectionStatus, setConnectionStatus] = useState<
-    "disconnected" | "connecting" | "connected" | "error"
+    "disconnected" | "connecting" | "connected" | "error" | "simulation"
   >("disconnected");
   const [connectionMessage, setConnectionMessage] = useState<string>("Buscando...");
   const [lastUpdate, setLastUpdate] = useState<string | null>(null);
@@ -132,8 +180,8 @@ const HeartbeatsScreen: React.FC = () => {
           getHealthMetricData("oxygen", "1d"),
         ]);
 
-        if (hrData && hrData.totalValue) setHeartRate(hrData.totalValue);
-        if (oxyData && oxyData.totalValue) setOxygen(oxyData.totalValue);
+        if (hrData && hrData.totalCalories) setHeartRate(hrData.totalCalories);
+        if (oxyData && oxyData.totalCalories) setOxygen(oxyData.totalCalories);
       } catch (error) {
         console.error("Erro ao buscar histórico do backend:", error);
       }
@@ -159,8 +207,13 @@ const HeartbeatsScreen: React.FC = () => {
 
         setIsLoading(false);
       } else {
-        setConnectionStatus("disconnected");
-        setConnectionMessage("Nenhum relógio conectado");
+        if (NativeHealthManager.isSimulation()) {
+          setConnectionStatus("simulation");
+          setConnectionMessage("Modo Simulação Ativo");
+        } else {
+          setConnectionStatus("disconnected");
+          setConnectionMessage("Nenhum relógio conectado");
+        }
         setIsLoading(false);
       }
     };
@@ -172,8 +225,17 @@ const HeartbeatsScreen: React.FC = () => {
     if (!isAuthorized || isUsingBluetooth) return;
 
     const cancelSubscription = NativeHealthManager.subscribeHeartRate((bpm) => {
-      setHeartRate(bpm);
-      setLastUpdate(new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }));
+      if (typeof bpm === "number" && !isNaN(bpm) && isFinite(bpm)) {
+        setHeartRate(bpm);
+        try {
+          setLastUpdate(new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }));
+        } catch (e) {
+          const d = new Date();
+          setLastUpdate(
+            `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`
+          );
+        }
+      }
     });
 
     return () => cancelSubscription();
@@ -188,10 +250,19 @@ const HeartbeatsScreen: React.FC = () => {
     const targetDevice = device.rawDevice || device;
 
     const success = await bluetoothService.connectToDevice(targetDevice, (bpm) => {
-      setHeartRate(bpm);
-      setConnectionStatus("connected");
-      setConnectionMessage(`Bluetooth: ${device.name || "Relógio"}`);
-      setLastUpdate(new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }));
+      if (typeof bpm === "number" && !isNaN(bpm) && isFinite(bpm)) {
+        setHeartRate(bpm);
+        setConnectionStatus("connected");
+        setConnectionMessage(`Bluetooth: ${device.name || "Relógio"}`);
+        try {
+          setLastUpdate(new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }));
+        } catch (e) {
+          const d = new Date();
+          setLastUpdate(
+            `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`
+          );
+        }
+      }
     });
 
     if (!success) {
@@ -215,12 +286,21 @@ const HeartbeatsScreen: React.FC = () => {
       );
       Alert.alert("Sucesso", "Seu dispositivo foi conectado profissionalmente.");
     } else {
-      setConnectionStatus("error");
-      setConnectionMessage("Falha ao autorizar");
-      Alert.alert(
-        "Erro",
-        "Não foi possível conectar. Verifique as permissões de saúde nativas (Apple Health / Google Health Connect)."
-      );
+      if (NativeHealthManager.isSimulation()) {
+        setConnectionStatus("simulation");
+        setConnectionMessage("Modo Simulação");
+        Alert.alert(
+          "Modo Simulação",
+          "O Expo Go não suporta sensores reais. Para usar de forma definitiva, você precisará gerar um build de desenvolvimento (Dev Client)."
+        );
+      } else {
+        setConnectionStatus("error");
+        setConnectionMessage("Falha ao autorizar");
+        Alert.alert(
+          "Erro",
+          "Não foi possível conectar. Verifique as permissões de saúde nativas (Apple Health / Google Health Connect)."
+        );
+      }
     }
   };
 
@@ -230,156 +310,173 @@ const HeartbeatsScreen: React.FC = () => {
         return "#10B981";
       case "connecting":
         return "#F59E0B";
+      case "simulation":
+        return "#6366F1";
       default:
         return "#EF4444";
     }
   };
 
   return (
-    <SafeAreaView style={styles.safeArea} edges={["top"]}>
-      <View style={styles.container}>
-        {/* SVG Background */}
-        <View pointerEvents="none" style={styles.background}>
-          <View
-            style={[
-              styles.svgContainer,
-              { width: svgDimensions.width, height: svgDimensions.height },
-            ]}
-          >
-            {svgContent ? (
-              <SvgXml xml={svgContent} width={svgDimensions.width} height={svgDimensions.height} />
-            ) : null}
+    <DataErrorBoundary>
+      <SafeAreaView style={styles.safeArea} edges={["top"]}>
+        <View style={styles.container}>
+          {/* SVG Background */}
+          <View pointerEvents="none" style={styles.background}>
+            <View
+              style={[
+                styles.svgContainer,
+                { width: svgDimensions.width, height: svgDimensions.height },
+              ]}
+            >
+              {svgContent ? (
+                <SvgXml
+                  xml={svgContent}
+                  width={svgDimensions.width}
+                  height={svgDimensions.height}
+                />
+              ) : null}
+            </View>
           </View>
+
+          <ScrollView
+            style={styles.scrollView}
+            contentContainerStyle={styles.scrollContent}
+            showsVerticalScrollIndicator={false}
+          >
+            {/* Header */}
+            <View style={styles.header}>
+              <BackButton to={{ name: "DataScreen" }} />
+              <Text style={styles.headerTitle}>Batimentos cardíacos</Text>
+              <View style={{ width: 46 }} />
+            </View>
+
+            {/* Connection Status Badge */}
+            <ReanimatedView
+              entering={FadeInDown.delay(100).duration(600)}
+              style={styles.statusSection}
+            >
+              <TouchableOpacity
+                style={[styles.statusBadge, { borderColor: getStatusColor() + "40" }]}
+                onPress={() => setIsDeviceModalVisible(true)}
+                activeOpacity={0.7}
+              >
+                <View style={[styles.statusDot, { backgroundColor: getStatusColor() }]} />
+                <Text style={styles.statusText}>{connectionMessage}</Text>
+                {lastUpdate && <Text style={styles.updateText}>• {lastUpdate}</Text>}
+              </TouchableOpacity>
+            </ReanimatedView>
+
+            {/* Heart Rate Display */}
+            <ReanimatedView
+              entering={FadeInDown.delay(300).duration(800)}
+              style={styles.heartDisplaySection}
+            >
+              <ReanimatedView style={[styles.heartIconWrapper, animatedHeartStyle]}>
+                <Heart size={32} color="#EF4444" fill="#EF4444" />
+              </ReanimatedView>
+
+              <View style={styles.valueContainer}>
+                <Text style={styles.bpmValue}>{heartRate ? Math.round(heartRate) : "--"}</Text>
+                <Text style={styles.bpmLabel}>BPM</Text>
+              </View>
+
+              <View style={styles.ecgWrapper}>
+                <ECGDisplay
+                  bpm={heartRate}
+                  width={SCREEN_WIDTH * 0.7}
+                  height={80}
+                  responsive={false}
+                  isConnected={connectionStatus === "connected"}
+                  color="#EF4444"
+                />
+              </View>
+            </ReanimatedView>
+
+            {/* Secondary Metrics */}
+            <View style={styles.metricsGrid}>
+              <ReanimatedView
+                entering={FadeInDown.delay(500).duration(600)}
+                style={styles.metricWrapper}
+              >
+                <LinearGradient colors={["#FFF1F2", "#FFFFFF"]} style={styles.metricCard}>
+                  <View style={styles.metricHeader}>
+                    <View style={[styles.iconBox, { backgroundColor: "#FFE4E6" }]}>
+                      <Activity size={20} color="#E11D48" />
+                    </View>
+                    <Text style={styles.metricTitle}>Pressão</Text>
+                  </View>
+                  <View style={styles.metricContent}>
+                    <Text style={styles.metricValue}>{pressure ? Math.round(pressure) : "--"}</Text>
+                    <Text style={styles.metricUnit}>mmHg</Text>
+                  </View>
+                </LinearGradient>
+              </ReanimatedView>
+
+              <ReanimatedView
+                entering={FadeInDown.delay(700).duration(600)}
+                style={styles.metricWrapper}
+              >
+                <LinearGradient colors={["#F0F9FF", "#FFFFFF"]} style={styles.metricCard}>
+                  <View style={styles.metricHeader}>
+                    <View style={[styles.iconBox, { backgroundColor: "#E0F2FE" }]}>
+                      <Wind size={20} color="#0284C7" />
+                    </View>
+                    <Text style={styles.metricTitle}>Oxigênio</Text>
+                  </View>
+                  <View style={styles.metricContent}>
+                    <Text style={styles.metricValue}>{oxygen ? Math.round(oxygen) : "--"}</Text>
+                    <Text style={styles.metricUnit}>SpO2</Text>
+                  </View>
+                </LinearGradient>
+              </ReanimatedView>
+            </View>
+
+            {/* Info Card */}
+            <ReanimatedView entering={FadeInDown.delay(900).duration(600)} style={styles.infoCard}>
+              <View style={styles.infoContent}>
+                <Text style={styles.infoTitle}>Status da Conexão</Text>
+                <Text style={styles.infoSubtitle}>
+                  {connectionStatus === "connected"
+                    ? "Seu relógio está sincronizado diretamente."
+                    : "Por favor, autorize a conexão com o Health Connect/HealthKit."}
+                </Text>
+              </View>
+
+              {connectionStatus === "simulation" && (
+                <View style={styles.simulationWarning}>
+                  <AlertTriangle size={16} color="#4338CA" />
+                  <Text style={styles.simulationWarningText}>
+                    Expo Go detectado. Sensores reais exigem Build de Desenvolvimento.
+                  </Text>
+                </View>
+              )}
+
+              {connectionStatus !== "connected" && connectionStatus !== "simulation" ? (
+                <TouchableOpacity style={styles.connectBtnAction} onPress={handleConnectDevice}>
+                  <Text style={styles.connectBtnText}>Conectar</Text>
+                  <Watch size={16} color="#FFFFFF" style={{ marginLeft: 6 }} />
+                </TouchableOpacity>
+              ) : (
+                <TouchableOpacity style={styles.syncBtn} onPress={handleConnectDevice}>
+                  <Watch size={18} color="#2563EB" />
+                </TouchableOpacity>
+              )}
+            </ReanimatedView>
+
+            <View style={{ height: 120 }} />
+          </ScrollView>
+
+          <DataPillNavigator currentScreen="HeartbeatsScreen" />
+
+          <DeviceSelectorModal
+            isVisible={isDeviceModalVisible}
+            onClose={() => setIsDeviceModalVisible(false)}
+            onDeviceSelected={handleDeviceSelected}
+          />
         </View>
-
-        <ScrollView
-          style={styles.scrollView}
-          contentContainerStyle={styles.scrollContent}
-          showsVerticalScrollIndicator={false}
-        >
-          {/* Header */}
-          <View style={styles.header}>
-            <BackButton to={{ name: "DataScreen" }} />
-            <Text style={styles.headerTitle}>Batimentos cardíacos</Text>
-            <View style={{ width: 46 }} />
-          </View>
-
-          {/* Connection Status Badge */}
-          <ReanimatedView
-            entering={FadeInDown.delay(100).duration(600)}
-            style={styles.statusSection}
-          >
-            <TouchableOpacity
-              style={[styles.statusBadge, { borderColor: getStatusColor() + "40" }]}
-              onPress={() => setIsDeviceModalVisible(true)}
-              activeOpacity={0.7}
-            >
-              <View style={[styles.statusDot, { backgroundColor: getStatusColor() }]} />
-              <Text style={styles.statusText}>{connectionMessage}</Text>
-              {lastUpdate && <Text style={styles.updateText}>• {lastUpdate}</Text>}
-            </TouchableOpacity>
-          </ReanimatedView>
-
-          {/* Heart Rate Display */}
-          <ReanimatedView
-            entering={FadeInDown.delay(300).duration(800)}
-            style={styles.heartDisplaySection}
-          >
-            <ReanimatedView style={[styles.heartIconWrapper, animatedHeartStyle]}>
-              <Heart size={32} color="#EF4444" fill="#EF4444" />
-            </ReanimatedView>
-
-            <View style={styles.valueContainer}>
-              <Text style={styles.bpmValue}>{heartRate ? Math.round(heartRate) : "--"}</Text>
-              <Text style={styles.bpmLabel}>BPM</Text>
-            </View>
-
-            <View style={styles.ecgWrapper}>
-              <ECGDisplay
-                bpm={heartRate}
-                width={SCREEN_WIDTH * 0.7}
-                height={80}
-                responsive={false}
-                isConnected={connectionStatus === "connected"}
-                color="#EF4444"
-              />
-            </View>
-          </ReanimatedView>
-
-          {/* Secondary Metrics */}
-          <View style={styles.metricsGrid}>
-            <ReanimatedView
-              entering={FadeInDown.delay(500).duration(600)}
-              style={styles.metricWrapper}
-            >
-              <LinearGradient colors={["#FFF1F2", "#FFFFFF"]} style={styles.metricCard}>
-                <View style={styles.metricHeader}>
-                  <View style={[styles.iconBox, { backgroundColor: "#FFE4E6" }]}>
-                    <Activity size={20} color="#E11D48" />
-                  </View>
-                  <Text style={styles.metricTitle}>Pressão</Text>
-                </View>
-                <View style={styles.metricContent}>
-                  <Text style={styles.metricValue}>{pressure ? Math.round(pressure) : "--"}</Text>
-                  <Text style={styles.metricUnit}>mmHg</Text>
-                </View>
-              </LinearGradient>
-            </ReanimatedView>
-
-            <ReanimatedView
-              entering={FadeInDown.delay(700).duration(600)}
-              style={styles.metricWrapper}
-            >
-              <LinearGradient colors={["#F0F9FF", "#FFFFFF"]} style={styles.metricCard}>
-                <View style={styles.metricHeader}>
-                  <View style={[styles.iconBox, { backgroundColor: "#E0F2FE" }]}>
-                    <Wind size={20} color="#0284C7" />
-                  </View>
-                  <Text style={styles.metricTitle}>Oxigênio</Text>
-                </View>
-                <View style={styles.metricContent}>
-                  <Text style={styles.metricValue}>{oxygen ? Math.round(oxygen) : "--"}</Text>
-                  <Text style={styles.metricUnit}>SpO2</Text>
-                </View>
-              </LinearGradient>
-            </ReanimatedView>
-          </View>
-
-          {/* Info Card */}
-          <ReanimatedView entering={FadeInDown.delay(900).duration(600)} style={styles.infoCard}>
-            <View style={styles.infoContent}>
-              <Text style={styles.infoTitle}>Status da Conexão</Text>
-              <Text style={styles.infoSubtitle}>
-                {connectionStatus === "connected"
-                  ? "Seu relógio está sincronizado diretamente."
-                  : "Por favor, autorize a conexão com o Health Connect/HealthKit."}
-              </Text>
-            </View>
-
-            {connectionStatus !== "connected" ? (
-              <TouchableOpacity style={styles.connectBtnAction} onPress={handleConnectDevice}>
-                <Text style={styles.connectBtnText}>Conectar</Text>
-                <Watch size={16} color="#FFFFFF" style={{ marginLeft: 6 }} />
-              </TouchableOpacity>
-            ) : (
-              <TouchableOpacity style={styles.syncBtn} onPress={handleConnectDevice}>
-                <Watch size={18} color="#2563EB" />
-              </TouchableOpacity>
-            )}
-          </ReanimatedView>
-
-          <View style={{ height: 120 }} />
-        </ScrollView>
-
-        <DataPillNavigator currentScreen="HeartbeatsScreen" />
-
-        <DeviceSelectorModal
-          isVisible={isDeviceModalVisible}
-          onClose={() => setIsDeviceModalVisible(false)}
-          onDeviceSelected={handleDeviceSelected}
-        />
-      </View>
-    </SafeAreaView>
+      </SafeAreaView>
+    </DataErrorBoundary>
   );
 };
 
@@ -574,6 +671,21 @@ const styles = StyleSheet.create({
     color: "#FFFFFF",
     fontWeight: "700",
     fontSize: 14,
+  },
+  simulationWarning: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#EEF2FF",
+    padding: 10,
+    borderRadius: 12,
+    marginTop: 10,
+    gap: 8,
+  },
+  simulationWarningText: {
+    fontSize: 11,
+    color: "#4338CA",
+    fontWeight: "600",
+    flex: 1,
   },
 });
 

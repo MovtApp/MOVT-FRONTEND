@@ -9,6 +9,7 @@ import {
   TouchableOpacity,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+
 import { getHealthMetricData } from "../../../../services/caloriesService";
 
 import BackButton from "../../../../components/BackButton";
@@ -33,6 +34,53 @@ import Animated, {
   Easing,
   FadeInDown,
 } from "react-native-reanimated";
+
+// ─── Error Boundary ────────────────────────────────────────────────────────────
+
+interface EBState {
+  hasError: boolean;
+  error: Error | null;
+}
+class DataErrorBoundary extends React.Component<{ children: React.ReactNode }, EBState> {
+  constructor(props: any) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+  static getDerivedStateFromError(error: Error) {
+    return { hasError: true, error };
+  }
+  componentDidCatch(error: Error, info: any) {
+    console.error("[SleepScreen] Crash interceptado:", error, info);
+  }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <View
+          style={{
+            flex: 1,
+            backgroundColor: "#FEF2F2",
+            margin: 12,
+            borderRadius: 16,
+            padding: 20,
+            justifyContent: "center",
+            alignItems: "center",
+          }}
+        >
+          <Text style={{ fontSize: 16, fontWeight: "bold", color: "#DC2626", marginBottom: 10 }}>
+            ⚠️ Erro no Módulo de Sono
+          </Text>
+          <Text style={{ fontSize: 12, color: "#7F1D1D", textAlign: "center", marginBottom: 10 }}>
+            {this.state.error?.message}
+          </Text>
+          <Text style={{ fontSize: 10, color: "#991B1B", textAlign: "center" }}>
+            {this.state.error?.stack?.slice(0, 300)}
+          </Text>
+        </View>
+      );
+    }
+    return this.props.children;
+  }
+}
 
 const AnimatedCircle = Animated.createAnimatedComponent(Circle);
 
@@ -61,12 +109,17 @@ const SleepProgressChart: React.FC<{
   const innerStrokeWidth = 10;
   const innerCircumference = 2 * Math.PI * innerRadius;
 
-  const totalMinutes = totalSleep.hours * 60 + totalSleep.minutes;
-  const deepMinutes = deepSleep.hours * 60 + deepSleep.minutes;
-  const maxMinutes = goalHours * 60;
+  const totalMinutes = (totalSleep?.hours || 0) * 60 + (totalSleep?.minutes || 0);
+  const deepMinutes = (deepSleep?.hours || 0) * 60 + (deepSleep?.minutes || 0);
+  const maxMinutes = Math.max(1, (goalHours || 8) * 60);
 
-  const totalProgress = Math.min(totalMinutes / maxMinutes, 1);
-  const deepProgress = Math.min(deepMinutes / totalMinutes, 0.6); // Deep sleep is a fraction of total
+  const rawTotalProgress = totalMinutes / maxMinutes;
+  const totalProgress =
+    isFinite(rawTotalProgress) && !isNaN(rawTotalProgress) ? Math.min(rawTotalProgress, 1) : 0;
+
+  const rawDeepProgress = totalMinutes > 0 ? deepMinutes / totalMinutes : 0;
+  const deepProgress =
+    isFinite(rawDeepProgress) && !isNaN(rawDeepProgress) ? Math.min(rawDeepProgress, 0.6) : 0;
 
   const totalProgressAnim = useSharedValue(0);
   const deepProgressAnim = useSharedValue(0);
@@ -250,7 +303,7 @@ export const SleepScreen: React.FC = () => {
       setIsLoading(true);
       const data = await getHealthMetricData("sleep", "1d");
       if (data && data.data) {
-        const totalHours = data.totalValue || 0;
+        const totalHours = data.totalCalories || 0;
         const hours = Math.floor(totalHours);
         const minutes = Math.round((totalHours - hours) * 60);
 
@@ -315,230 +368,236 @@ export const SleepScreen: React.FC = () => {
   );
 
   return (
-    <View style={styles.mainContainer}>
-      <SafeAreaView style={styles.safeArea} edges={["top"]}>
-        <View style={styles.header}>
-          <BackButton to={{ name: "DataScreen" }} />
-          <Text style={styles.headerTitle}>Otimização do Sono</Text>
-          <TouchableOpacity style={styles.infoBtn} onPress={handleOpenInfo}>
-            <Info size={20} color="#94A3B8" />
-          </TouchableOpacity>
-        </View>
+    <DataErrorBoundary>
+      <View style={styles.mainContainer}>
+        <SafeAreaView style={styles.safeArea} edges={["top"]}>
+          <View style={styles.header}>
+            <BackButton to={{ name: "DataScreen" }} />
+            <Text style={styles.headerTitle}>Otimização do Sono</Text>
+            <TouchableOpacity style={styles.infoBtn} onPress={handleOpenInfo}>
+              <Info size={20} color="#94A3B8" />
+            </TouchableOpacity>
+          </View>
 
-        <ScrollView
-          style={styles.scrollView}
-          contentContainerStyle={styles.scrollContent}
-          showsVerticalScrollIndicator={false}
+          <ScrollView
+            style={styles.scrollView}
+            contentContainerStyle={styles.scrollContent}
+            showsVerticalScrollIndicator={false}
+          >
+            <Animated.View
+              entering={FadeInDown.delay(100).duration(800)}
+              style={styles.chartWrapper}
+            >
+              <SleepProgressChart
+                totalSleep={sleepData.totalSleep}
+                deepSleep={sleepData.deepSleep}
+                goalHours={sleepData.goalHours}
+              />
+            </Animated.View>
+
+            <View style={styles.quickStatsRow}>
+              <View style={styles.quickStatItem}>
+                <Text style={styles.quickStatLabel}>DEITOU ÀS</Text>
+                <Text style={styles.quickStatValue}>{sleepData.startTime}</Text>
+              </View>
+              <View style={styles.divider} />
+              <View style={styles.quickStatItem}>
+                <Text style={styles.quickStatLabel}>EFICIÊNCIA</Text>
+                <Text style={styles.quickStatValue}>{sleepData.efficiency}%</Text>
+              </View>
+              <View style={styles.divider} />
+              <View style={styles.quickStatItem}>
+                <Text style={styles.quickStatLabel}>RECUPERAÇÃO</Text>
+                <Text style={styles.quickStatValue}>{sleepData.restfulness}</Text>
+              </View>
+            </View>
+
+            <View style={styles.cardsSection}>
+              <SleepInsightCard
+                title="Sono Profundo"
+                value="2h 15m"
+                icon={Brain}
+                color="#38BDF8"
+                desc="Sua mente descansou significativamente hoje."
+                onPress={() =>
+                  handleOpenCardDetails("Sono Profundo", "#38BDF8", Brain, [
+                    "Você atingiu 25% do sono total em fase profunda, o que é excelente.",
+                    "O sono profundo consolida memórias e restaura tecidos musculares.",
+                    "Evite cafeína após as 14h para manter esses índices estáveis.",
+                  ])
+                }
+              />
+              <SleepInsightCard
+                title="Pontuação de Prontidão"
+                value="88"
+                icon={Zap}
+                color="#FACC15"
+                desc="Você está pronto para atividades de alta performance."
+                onPress={() =>
+                  handleOpenCardDetails("Prontidão", "#FACC15", Zap, [
+                    "Seu sistema nervoso está bem recuperado.",
+                    "Sua variabilidade da frequência cardíaca indica boa adaptação ao estresse.",
+                    "Hoje é um dia ideal para treinos de alta intensidade.",
+                  ])
+                }
+              />
+              <SleepInsightCard
+                title="Saúde Cardiovascular"
+                value="Otimizada"
+                icon={ShieldCheck}
+                color="#2DD4BF"
+                desc="Frequência cardíaca basal estável durante a noite."
+                onPress={() =>
+                  handleOpenCardDetails("Saúde Cardio", "#2DD4BF", ShieldCheck, [
+                    "Sua frequência cardíaca de repouso atingiu o ponto mais baixo às 3h da manhã.",
+                    "Isso indica que seu corpo teve tempo suficiente para descompressão.",
+                    "Seu índice de oxigenação permaneceu estável acima de 98%.",
+                  ])
+                }
+              />
+            </View>
+
+            <SleepHeatmap weeklyData={sleepData.weeklyData} />
+
+            <View style={{ height: 120 }} />
+          </ScrollView>
+          <DataPillNavigator currentScreen="SleepScreen" />
+        </SafeAreaView>
+
+        <BottomSheet
+          ref={bottomSheetRef}
+          index={-1}
+          snapPoints={snapPoints}
+          enablePanDownToClose
+          backdropComponent={renderBackdrop}
+          backgroundStyle={bsStyles.bsBackground}
+          handleIndicatorStyle={bsStyles.bsIndicator}
         >
-          <Animated.View entering={FadeInDown.delay(100).duration(800)} style={styles.chartWrapper}>
-            <SleepProgressChart
-              totalSleep={sleepData.totalSleep}
-              deepSleep={sleepData.deepSleep}
-              goalHours={sleepData.goalHours}
-            />
-          </Animated.View>
-
-          <View style={styles.quickStatsRow}>
-            <View style={styles.quickStatItem}>
-              <Text style={styles.quickStatLabel}>DEITOU ÀS</Text>
-              <Text style={styles.quickStatValue}>{sleepData.startTime}</Text>
-            </View>
-            <View style={styles.divider} />
-            <View style={styles.quickStatItem}>
-              <Text style={styles.quickStatLabel}>EFICIÊNCIA</Text>
-              <Text style={styles.quickStatValue}>{sleepData.efficiency}%</Text>
-            </View>
-            <View style={styles.divider} />
-            <View style={styles.quickStatItem}>
-              <Text style={styles.quickStatLabel}>RECUPERAÇÃO</Text>
-              <Text style={styles.quickStatValue}>{sleepData.restfulness}</Text>
-            </View>
-          </View>
-
-          <View style={styles.cardsSection}>
-            <SleepInsightCard
-              title="Sono Profundo"
-              value="2h 15m"
-              icon={Brain}
-              color="#38BDF8"
-              desc="Sua mente descansou significativamente hoje."
-              onPress={() =>
-                handleOpenCardDetails("Sono Profundo", "#38BDF8", Brain, [
-                  "Você atingiu 25% do sono total em fase profunda, o que é excelente.",
-                  "O sono profundo consolida memórias e restaura tecidos musculares.",
-                  "Evite cafeína após as 14h para manter esses índices estáveis.",
-                ])
-              }
-            />
-            <SleepInsightCard
-              title="Pontuação de Prontidão"
-              value="88"
-              icon={Zap}
-              color="#FACC15"
-              desc="Você está pronto para atividades de alta performance."
-              onPress={() =>
-                handleOpenCardDetails("Prontidão", "#FACC15", Zap, [
-                  "Seu sistema nervoso está bem recuperado.",
-                  "Sua variabilidade da frequência cardíaca indica boa adaptação ao estresse.",
-                  "Hoje é um dia ideal para treinos de alta intensidade.",
-                ])
-              }
-            />
-            <SleepInsightCard
-              title="Saúde Cardiovascular"
-              value="Otimizada"
-              icon={ShieldCheck}
-              color="#2DD4BF"
-              desc="Frequência cardíaca basal estável durante a noite."
-              onPress={() =>
-                handleOpenCardDetails("Saúde Cardio", "#2DD4BF", ShieldCheck, [
-                  "Sua frequência cardíaca de repouso atingiu o ponto mais baixo às 3h da manhã.",
-                  "Isso indica que seu corpo teve tempo suficiente para descompressão.",
-                  "Seu índice de oxigenação permaneceu estável acima de 98%.",
-                ])
-              }
-            />
-          </View>
-
-          <SleepHeatmap weeklyData={sleepData.weeklyData} />
-
-          <View style={{ height: 120 }} />
-        </ScrollView>
-        <DataPillNavigator currentScreen="SleepScreen" />
-      </SafeAreaView>
-
-      <BottomSheet
-        ref={bottomSheetRef}
-        index={-1}
-        snapPoints={snapPoints}
-        enablePanDownToClose
-        backdropComponent={renderBackdrop}
-        backgroundStyle={bsStyles.bsBackground}
-        handleIndicatorStyle={bsStyles.bsIndicator}
-      >
-        <BottomSheetView style={bsStyles.bsContainer}>
-          <ScrollView showsVerticalScrollIndicator={false}>
-            {bottomSheetType === "info" ? (
-              <View>
-                <View style={bsStyles.bsHeader}>
-                  <View style={bsStyles.bsIconHeaderBox}>
-                    <Moon size={24} color="#818CF8" />
+          <BottomSheetView style={bsStyles.bsContainer}>
+            <ScrollView showsVerticalScrollIndicator={false}>
+              {bottomSheetType === "info" ? (
+                <View>
+                  <View style={bsStyles.bsHeader}>
+                    <View style={bsStyles.bsIconHeaderBox}>
+                      <Moon size={24} color="#818CF8" />
+                    </View>
+                    <View>
+                      <Text style={bsStyles.bsTitle}>Ciência do Sono</Text>
+                      <Text style={bsStyles.bsSubtitle}>
+                        Descubra o segredo de uma noite perfeita
+                      </Text>
+                    </View>
                   </View>
-                  <View>
-                    <Text style={bsStyles.bsTitle}>Ciência do Sono</Text>
-                    <Text style={bsStyles.bsSubtitle}>
-                      Descubra o segredo de uma noite perfeita
+
+                  <View style={bsStyles.richSection}>
+                    <Text style={bsStyles.richSectionTitle}>Ciclos do Sono</Text>
+                    <Text style={bsStyles.richText}>
+                      O sono humano não é linear. Ele é composto por ciclos de aproximadamente 90
+                      minutos que se repetem, alternando entre fases essenciais para o{" "}
+                      <Text style={{ fontWeight: "700", color: "#818CF8" }}>cérebro e o corpo</Text>
+                      .
+                    </Text>
+                  </View>
+
+                  <View style={bsStyles.richSection}>
+                    <Text style={bsStyles.richSectionTitle}>Fases da Noite</Text>
+                    <View style={bsStyles.horizontalGuide}>
+                      <View style={bsStyles.guideCard}>
+                        <View style={bsStyles.guideIconBox}>
+                          <Brain size={16} color="#38BDF8" />
+                        </View>
+                        <Text style={bsStyles.guideLabel}>Leve</Text>
+                        <Text style={bsStyles.guideDesc}>Recuperação mental.</Text>
+                      </View>
+                      <View style={bsStyles.guideCard}>
+                        <View style={bsStyles.guideIconBox}>
+                          <Zap size={16} color="#FACC15" />
+                        </View>
+                        <Text style={bsStyles.guideLabel}>Profundo</Text>
+                        <Text style={bsStyles.guideDesc}>Cura física.</Text>
+                      </View>
+                      <View style={bsStyles.guideCard}>
+                        <View style={bsStyles.guideIconBox}>
+                          <Star size={16} color="#2DD4BF" />
+                        </View>
+                        <Text style={bsStyles.guideLabel}>REM</Text>
+                        <Text style={bsStyles.guideDesc}>Memórias.</Text>
+                      </View>
+                    </View>
+                  </View>
+
+                  <View style={bsStyles.richSection}>
+                    <Text style={bsStyles.richSectionTitle}>Impacto Diário</Text>
+                    <View style={bsStyles.tagsRow}>
+                      <View style={bsStyles.tag}>
+                        <Brain size={10} color="#818CF8" />
+                        <Text style={bsStyles.tagText}>Foco</Text>
+                      </View>
+                      <View style={bsStyles.tag}>
+                        <Sun size={10} color="#FACC15" />
+                        <Text style={bsStyles.tagText}>Humor</Text>
+                      </View>
+                      <View style={bsStyles.tag}>
+                        <Zap size={10} color="#38BDF8" />
+                        <Text style={bsStyles.tagText}>Energia</Text>
+                      </View>
+                      <View style={bsStyles.tag}>
+                        <ShieldCheck size={10} color="#2DD4BF" />
+                        <Text style={bsStyles.tagText}>Imunidade</Text>
+                      </View>
+                    </View>
+                  </View>
+
+                  <View style={bsStyles.bsFooter}>
+                    <HelpCircle size={16} color="#94A3B8" />
+                    <Text style={bsStyles.bsFooterText}>
+                      Otimize sua rotina para despertar o seu melhor eu.
                     </Text>
                   </View>
                 </View>
-
-                <View style={bsStyles.richSection}>
-                  <Text style={bsStyles.richSectionTitle}>Ciclos do Sono</Text>
-                  <Text style={bsStyles.richText}>
-                    O sono humano não é linear. Ele é composto por ciclos de aproximadamente 90
-                    minutos que se repetem, alternando entre fases essenciais para o{" "}
-                    <Text style={{ fontWeight: "700", color: "#818CF8" }}>cérebro e o corpo</Text>.
-                  </Text>
-                </View>
-
-                <View style={bsStyles.richSection}>
-                  <Text style={bsStyles.richSectionTitle}>Fases da Noite</Text>
-                  <View style={bsStyles.horizontalGuide}>
-                    <View style={bsStyles.guideCard}>
-                      <View style={bsStyles.guideIconBox}>
-                        <Brain size={16} color="#38BDF8" />
+              ) : (
+                selectedTopic && (
+                  <View>
+                    <View style={bsStyles.bsHeader}>
+                      <View
+                        style={[
+                          bsStyles.bsIconContainer,
+                          { backgroundColor: selectedTopic.color + "15" },
+                        ]}
+                      >
+                        <selectedTopic.icon size={24} color={selectedTopic.color} />
                       </View>
-                      <Text style={bsStyles.guideLabel}>Leve</Text>
-                      <Text style={bsStyles.guideDesc}>Recuperação mental.</Text>
+                      <View>
+                        <Text style={bsStyles.bsTitle}>{selectedTopic.title}</Text>
+                        <Text style={bsStyles.bsSubtitle}>{selectedTopic.description}</Text>
+                      </View>
                     </View>
-                    <View style={bsStyles.guideCard}>
-                      <View style={bsStyles.guideIconBox}>
-                        <Zap size={16} color="#FACC15" />
-                      </View>
-                      <Text style={bsStyles.guideLabel}>Profundo</Text>
-                      <Text style={bsStyles.guideDesc}>Cura física.</Text>
-                    </View>
-                    <View style={bsStyles.guideCard}>
-                      <View style={bsStyles.guideIconBox}>
-                        <Star size={16} color="#2DD4BF" />
-                      </View>
-                      <Text style={bsStyles.guideLabel}>REM</Text>
-                      <Text style={bsStyles.guideDesc}>Memórias.</Text>
+
+                    <View style={bsStyles.detailsGrid}>
+                      {selectedTopic.details.map((detail, index) => (
+                        <View key={index} style={bsStyles.detailItem}>
+                          <View
+                            style={[bsStyles.detailDot, { backgroundColor: selectedTopic.color }]}
+                          />
+                          <Text style={bsStyles.detailText}>{detail}</Text>
+                        </View>
+                      ))}
                     </View>
                   </View>
-                </View>
+                )
+              )}
 
-                <View style={bsStyles.richSection}>
-                  <Text style={bsStyles.richSectionTitle}>Impacto Diário</Text>
-                  <View style={bsStyles.tagsRow}>
-                    <View style={bsStyles.tag}>
-                      <Brain size={10} color="#818CF8" />
-                      <Text style={bsStyles.tagText}>Foco</Text>
-                    </View>
-                    <View style={bsStyles.tag}>
-                      <Sun size={10} color="#FACC15" />
-                      <Text style={bsStyles.tagText}>Humor</Text>
-                    </View>
-                    <View style={bsStyles.tag}>
-                      <Zap size={10} color="#38BDF8" />
-                      <Text style={bsStyles.tagText}>Energia</Text>
-                    </View>
-                    <View style={bsStyles.tag}>
-                      <ShieldCheck size={10} color="#2DD4BF" />
-                      <Text style={bsStyles.tagText}>Imunidade</Text>
-                    </View>
-                  </View>
-                </View>
-
-                <View style={bsStyles.bsFooter}>
-                  <HelpCircle size={16} color="#94A3B8" />
-                  <Text style={bsStyles.bsFooterText}>
-                    Otimize sua rotina para despertar o seu melhor eu.
-                  </Text>
-                </View>
-              </View>
-            ) : (
-              selectedTopic && (
-                <View>
-                  <View style={bsStyles.bsHeader}>
-                    <View
-                      style={[
-                        bsStyles.bsIconContainer,
-                        { backgroundColor: selectedTopic.color + "15" },
-                      ]}
-                    >
-                      <selectedTopic.icon size={24} color={selectedTopic.color} />
-                    </View>
-                    <View>
-                      <Text style={bsStyles.bsTitle}>{selectedTopic.title}</Text>
-                      <Text style={bsStyles.bsSubtitle}>{selectedTopic.description}</Text>
-                    </View>
-                  </View>
-
-                  <View style={bsStyles.detailsGrid}>
-                    {selectedTopic.details.map((detail, index) => (
-                      <View key={index} style={bsStyles.detailItem}>
-                        <View
-                          style={[bsStyles.detailDot, { backgroundColor: selectedTopic.color }]}
-                        />
-                        <Text style={bsStyles.detailText}>{detail}</Text>
-                      </View>
-                    ))}
-                  </View>
-                </View>
-              )
-            )}
-
-            <TouchableOpacity
-              style={[bsStyles.closeBtn, { backgroundColor: selectedTopic?.color || "#818CF8" }]}
-              onPress={() => bottomSheetRef.current?.close()}
-            >
-              <Text style={bsStyles.closeBtnText}>Entendido</Text>
-            </TouchableOpacity>
-          </ScrollView>
-        </BottomSheetView>
-      </BottomSheet>
-    </View>
+              <TouchableOpacity
+                style={[bsStyles.closeBtn, { backgroundColor: selectedTopic?.color || "#818CF8" }]}
+                onPress={() => bottomSheetRef.current?.close()}
+              >
+                <Text style={bsStyles.closeBtnText}>Entendido</Text>
+              </TouchableOpacity>
+            </ScrollView>
+          </BottomSheetView>
+        </BottomSheet>
+      </View>
+    </DataErrorBoundary>
   );
 };
 

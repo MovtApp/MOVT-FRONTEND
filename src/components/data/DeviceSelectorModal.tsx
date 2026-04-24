@@ -8,6 +8,7 @@ import {
   ActivityIndicator,
   Platform,
   PermissionsAndroid,
+  Alert,
 } from "react-native";
 import BottomSheet, { BottomSheetView, BottomSheetBackdrop } from "@gorhom/bottom-sheet";
 import {
@@ -31,16 +32,24 @@ import { bluetoothService } from "../../services/bluetoothService";
 interface DeviceSelectorModalProps {
   isVisible: boolean;
   onClose: () => void;
+  onDeviceSelected?: (device: any) => void;
 }
 
 // Manager global já é tratado pelo bluetoothService
 
-const DeviceSelectorModal: React.FC<DeviceSelectorModalProps> = ({ isVisible, onClose }) => {
+const DeviceSelectorModal: React.FC<DeviceSelectorModalProps> = ({
+  isVisible,
+  onClose,
+  onDeviceSelected,
+}) => {
   const { user } = useAuth();
   const [devices, setDevices] = useState<WearOsDeviceData[]>([]);
   const [isScanning, setIsScanning] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [scanResults, setScanResults] = useState<{ name: string; model: string; id: string }[]>([]);
+  const [bluetoothState, setBluetoothState] = useState<string>("Unknown");
+  const [scanResults, setScanResults] = useState<
+    { name: string; model: string; id: string; rssi: number | null; rawDevice: any }[]
+  >([]);
   const scanningRef = useRef(false);
 
   const snapPoints = useMemo(() => ["50%", "85%"], []);
@@ -88,7 +97,7 @@ const DeviceSelectorModal: React.FC<DeviceSelectorModalProps> = ({ isVisible, on
       clearTimeout(scanTimeoutRef.current);
       scanTimeoutRef.current = null;
     }
-    if (bleManager) bleManager.stopDeviceScan();
+    bluetoothService.stopScan();
     setIsScanning(false);
     scanningRef.current = false;
   }, []);
@@ -105,32 +114,52 @@ const DeviceSelectorModal: React.FC<DeviceSelectorModalProps> = ({ isVisible, on
   const startScan = useCallback(async () => {
     const hasPermission = await bluetoothService.requestPermissions();
     if (!hasPermission) {
-      console.warn("Permissão de Bluetooth negada.");
+      Alert.alert(
+        "Permissão Necessária",
+        "O app precisa de permissões de Bluetooth e Localização para encontrar dispositivos."
+      );
+      return;
+    }
+
+    const state = await bluetoothService.getBluetoothState();
+    setBluetoothState(state);
+
+    if (state !== "PoweredOn") {
+      Alert.alert(
+        "Bluetooth Desligado",
+        "Por favor, ligue o Bluetooth do seu celular para escanear."
+      );
       return;
     }
 
     setIsScanning(true);
     setScanResults([]);
+    scanningRef.current = true;
 
+    // Scan profissional: Tenta primeiro com filtro, se não achar em 5 segundos, abre o filtro
     bluetoothService.scanDevices((device) => {
       setScanResults((prev) => {
-        if (prev.find((d) => d.id === device.id)) return prev;
+        const name = device.name || device.localName || "Dispositivo Sem Nome";
+        if (prev.find((d) => d.id === device.id)) {
+          // Atualiza RSSI se já existir
+          return prev.map((d) => (d.id === device.id ? { ...d, rssi: device.rssi } : d));
+        }
         return [
           ...prev,
           {
-            name: device.name || device.localName || "Relógio Bluetooth",
+            name: name,
             model: device.id,
             id: device.id,
+            rssi: device.rssi,
             rawDevice: device,
           },
-        ];
+        ].sort((a, b) => (b.rssi || -100) - (a.rssi || -100)); // Ordena por sinal
       });
-    });
+    }, false); // Usamos false por padrão para garantir que encontre tudo, o usuário decide o que é relógio
 
-    // Timeout de 15 segundos
-    setTimeout(() => {
+    scanTimeoutRef.current = setTimeout(() => {
       stopScanning();
-    }, 15000);
+    }, 20000);
   }, [stopScanning]);
 
   const handleRegister = async (device: any) => {
@@ -143,6 +172,9 @@ const DeviceSelectorModal: React.FC<DeviceSelectorModalProps> = ({ isVisible, on
         deviceType: "Bluetooth BLE",
       });
       await loadRegisteredDevices();
+      if (onDeviceSelected) {
+        onDeviceSelected(device);
+      }
       setScanResults([]);
       // Fecha e notifica a tela principal se necessário
     } catch (error) {
@@ -227,11 +259,18 @@ const DeviceSelectorModal: React.FC<DeviceSelectorModalProps> = ({ isVisible, on
               </View>
             )}
 
+            {scanResults.length === 0 && isScanning && (
+              <View style={styles.emptyState}>
+                <Text style={styles.emptyText}>Procurando...</Text>
+              </View>
+            )}
+
             {scanResults.map((result) => (
               <Animated.View entering={FadeInDown} key={result.id} style={styles.scanResultRow}>
                 <View style={styles.resultInfo}>
                   <Text style={styles.resultName}>{result.name}</Text>
                   <Text style={styles.resultModel}>{result.model}</Text>
+                  {result.rssi && <Text style={styles.rssiText}>Sinal: {result.rssi} dBm</Text>}
                 </View>
                 <TouchableOpacity style={styles.linkBtn} onPress={() => handleRegister(result)}>
                   <Plus size={16} color="#2563EB" />
@@ -428,6 +467,12 @@ const styles = StyleSheet.create({
   securityText: {
     fontSize: 11,
     color: "#166534",
+    fontWeight: "600",
+  },
+  rssiText: {
+    fontSize: 10,
+    color: "#94A3B8",
+    marginTop: 2,
     fontWeight: "600",
   },
 });

@@ -319,7 +319,8 @@ const PersonalDashboard: React.FC = () => {
 
     const distro = data.statusDistribution;
     const total = distro.reduce((acc, curr) => acc + (curr.count || 0), 0);
-    const confirmed = distro.find((d) => d.label?.toLowerCase() === "confirmado")?.count || 0;
+    const confirmed =
+      distro.find((d) => String(d?.label || "").toLowerCase() === "confirmado")?.count || 0;
     const rate = total > 0 ? Math.round((confirmed / total) * 100) : 0;
 
     if (rate >= 90) return { rate, status: "Excelente", color: "#10B981", bg: "#DCFCE7" };
@@ -1217,8 +1218,9 @@ const PersonalDashboard: React.FC = () => {
                   </Text>
                   <Text style={{ fontSize: 12, color: "#64748B" }}>
                     Você aprovou{" "}
-                    {data?.statusDistribution.find((d) => d.label.toLowerCase() === "confirmado")
-                      ?.count || 0}{" "}
+                    {data?.statusDistribution.find(
+                      (d) => String(d?.label || "").toLowerCase() === "confirmado"
+                    )?.count || 0}{" "}
                     sessões este mês.
                   </Text>
                 </View>

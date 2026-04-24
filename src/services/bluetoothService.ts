@@ -54,14 +54,33 @@ class BluetoothService {
     return true; // iOS handles via Info.plist automatically with ble-plx
   }
 
-  scanDevices(onDeviceFound: (device: Device) => void) {
-    if (!this.manager || !this.isAvailable) return;
-    this.manager.startDeviceScan([HEART_RATE_SERVICE_UUID], null, (error, device) => {
+  async getBluetoothState() {
+    if (!this.manager || !this.isAvailable) return "PoweredOff";
+    return await this.manager.state();
+  }
+
+  scanDevices(onDeviceFound: (device: Device) => void, filterServices: boolean = true) {
+    if (!this.manager || !this.isAvailable) {
+      console.warn("Bluetooth BLE: Gerenciador não disponível.");
+      return;
+    }
+
+    // Se filterServices for true, buscamos apenas dispositivos que anunciam o serviço de Heart Rate
+    // Caso contrário, buscamos todos (útil para dispositivos que não anunciam serviços antes de parear)
+    const services = filterServices ? [HEART_RATE_SERVICE_UUID] : null;
+
+    console.log(
+      `Iniciando scan Bluetooth (Filtro: ${filterServices ? "Heart Rate" : "Nenhum"})...`
+    );
+
+    this.manager.startDeviceScan(services, { allowDuplicates: false }, (error, device) => {
       if (error) {
+        // Se o Bluetooth estiver desligado, o erro terá o código 102
         console.error("Erro no scan Bluetooth:", error);
         return;
       }
-      if (device && device.name) {
+
+      if (device) {
         onDeviceFound(device);
       }
     });
@@ -69,6 +88,7 @@ class BluetoothService {
 
   stopScan() {
     if (!this.manager || !this.isAvailable) return;
+    console.log("Parando scan Bluetooth.");
     this.manager.stopDeviceScan();
   }
 

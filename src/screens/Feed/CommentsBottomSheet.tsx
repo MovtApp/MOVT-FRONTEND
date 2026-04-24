@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { View, Text, Image, TouchableOpacity, TextInput, StyleSheet, FlatList } from "react-native";
-import { AntDesign, Feather } from "@expo/vector-icons";
+import { AntDesign, Feather, Ionicons } from "@expo/vector-icons";
 import BottomSheet, { BottomSheetView } from "@gorhom/bottom-sheet";
 
 interface Comment {
@@ -69,7 +69,7 @@ const CommentsBottomSheet: React.FC<CommentsBottomSheetProps> = ({
           <Text style={styles.commentText}>{item.body}</Text>
           <View style={styles.commentActions}>
             <TouchableOpacity activeOpacity={0.8} onPress={() => onCommentLike(item.comment_id)}>
-              <Feather
+              <Ionicons
                 name={isLiked ? "heart" : "heart-outline"}
                 size={18}
                 color={isLiked ? "#E1306C" : "#999"}
@@ -105,7 +105,7 @@ const CommentsBottomSheet: React.FC<CommentsBottomSheetProps> = ({
         {/* Lista de comentários */}
         <FlatList
           data={comments}
-          keyExtractor={(item) => item.comment_id}
+          keyExtractor={(item, index) => String(item?.comment_id || index)}
           renderItem={renderComment}
           showsVerticalScrollIndicator={false}
           contentContainerStyle={styles.commentsList}

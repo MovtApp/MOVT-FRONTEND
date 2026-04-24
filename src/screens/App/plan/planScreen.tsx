@@ -393,7 +393,7 @@ const PlanScreen: React.FC = () => {
                 ref={flatListRef}
                 data={plans}
                 renderItem={renderCard}
-                keyExtractor={(item) => item.id}
+                keyExtractor={(item, index) => String(item?.id || index)}
                 horizontal
                 showsHorizontalScrollIndicator={false}
                 snapToInterval={CARD_ITEM_WIDTH}

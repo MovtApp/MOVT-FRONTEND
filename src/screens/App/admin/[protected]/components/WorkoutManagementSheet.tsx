@@ -391,12 +391,18 @@ const WorkoutManagementSheet = forwardRef<WorkoutManagementSheetRef, WorkoutMana
 
     const filteredWorkouts = workouts.filter(
       (w) =>
-        w.nome.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        (w.categoria || "").toLowerCase().includes(searchQuery.toLowerCase())
+        String(w?.nome || "")
+          .toLowerCase()
+          .includes((searchQuery || "").toLowerCase()) ||
+        String(w?.categoria || "")
+          .toLowerCase()
+          .includes((searchQuery || "").toLowerCase())
     );
 
     const filteredGlobalExercises = globalExercises.filter((ex) =>
-      ex.nome.toLowerCase().includes(exerciseSearchQuery.toLowerCase())
+      String(ex?.nome || "")
+        .toLowerCase()
+        .includes((exerciseSearchQuery || "").toLowerCase())
     );
 
     const renderBackdrop = useCallback(
@@ -493,7 +499,7 @@ const WorkoutManagementSheet = forwardRef<WorkoutManagementSheetRef, WorkoutMana
               ) : (
                 <BottomSheetFlatList<Training>
                   data={filteredWorkouts}
-                  keyExtractor={(item: Training) => item.id_treino.toString()}
+                  keyExtractor={(item: Training, index: number) => String(item?.id_treino || index)}
                   contentContainerStyle={{ paddingBottom: 60, paddingTop: 4 }}
                   showsVerticalScrollIndicator={false}
                   ListEmptyComponent={() => (
@@ -942,7 +948,9 @@ const WorkoutManagementSheet = forwardRef<WorkoutManagementSheetRef, WorkoutMana
 
               <FlatList
                 data={filteredGlobalExercises}
-                keyExtractor={(item: GlobalExercise) => item.id_exercicio.toString()}
+                keyExtractor={(item: GlobalExercise, index: number) =>
+                  String(item?.id_exercicio || index)
+                }
                 renderItem={({ item }: { item: GlobalExercise }) => (
                   <TouchableOpacity
                     style={styles.exerciseItem}

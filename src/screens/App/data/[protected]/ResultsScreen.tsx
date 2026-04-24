@@ -9,10 +9,12 @@ import {
   TouchableOpacity,
   Platform,
 } from "react-native";
+
 import { SafeAreaView } from "react-native-safe-area-context";
 import { AppStackParamList } from "../../../../@types/routes";
 import TimeSelector, { type TimeframeType } from "../../../../components/TimeSelector";
 import BackButton from "../../../../components/BackButton";
+import DataPillNavigator from "../../../../components/data/DataPillNavigator";
 import { Canvas, Path, vec, Circle } from "@shopify/react-native-skia";
 import {
   Info,
@@ -33,6 +35,53 @@ import { LinearGradient } from "expo-linear-gradient";
 import BottomSheet, { BottomSheetView, BottomSheetBackdrop } from "@gorhom/bottom-sheet";
 import { useAuth } from "../../../../hooks/useAuth";
 import { useHealthTracking } from "../../../../hooks/useHealthTracking";
+
+// ─── Error Boundary ────────────────────────────────────────────────────────────
+
+interface EBState {
+  hasError: boolean;
+  error: Error | null;
+}
+class DataErrorBoundary extends React.Component<{ children: React.ReactNode }, EBState> {
+  constructor(props: any) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+  static getDerivedStateFromError(error: Error) {
+    return { hasError: true, error };
+  }
+  componentDidCatch(error: Error, info: any) {
+    console.error("[ResultsScreen] Crash interceptado:", error, info);
+  }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <View
+          style={{
+            flex: 1,
+            backgroundColor: "#FEF2F2",
+            margin: 12,
+            borderRadius: 16,
+            padding: 20,
+            justifyContent: "center",
+            alignItems: "center",
+          }}
+        >
+          <Text style={{ fontSize: 16, fontWeight: "bold", color: "#DC2626", marginBottom: 10 }}>
+            ⚠️ Erro no Módulo de Resultados
+          </Text>
+          <Text style={{ fontSize: 12, color: "#7F1D1D", textAlign: "center", marginBottom: 10 }}>
+            {this.state.error?.message || "Erro de renderização desconhecido."}
+          </Text>
+          <Text style={{ fontSize: 10, color: "#991B1B", textAlign: "center" }}>
+            {this.state.error?.stack?.slice(0, 300)}
+          </Text>
+        </View>
+      );
+    }
+    return this.props.children;
+  }
+}
 
 const { width } = Dimensions.get("window");
 
@@ -113,33 +162,34 @@ const ResultsScreen: React.FC = () => {
 
       setLineData(stats.dailyScores);
 
+      const daysCount = Math.max(1, stats.dailyScores.length);
+
       // Mapeamento real para as 3 camadas do radar
-      // Mantendo as proporções originais mas alimentando com dados reais
       setForcaData({
-        water: Math.min(100, (stats.totalWater / (stats.dailyScores.length * 2000)) * 100),
+        water: Math.min(100, (stats.totalWater / (daysCount * 2000)) * 100),
         sleep: Math.min(100, (stats.avgSleep / 480) * 100),
         steps: stats.radar.forca,
         bpm: Math.min(100, (stats.avgHeartRate / 120) * 100),
-        imc: 92, // IMC é mais estático
-        calories: Math.min(100, (stats.totalCalories / (stats.dailyScores.length * 500)) * 100),
+        imc: 92,
+        calories: Math.min(100, (stats.totalCalories / (daysCount * 500)) * 100),
       });
 
       setAgilidadeData({
-        water: Math.min(100, (stats.totalWater / (stats.dailyScores.length * 1500)) * 100),
+        water: Math.min(100, (stats.totalWater / (daysCount * 1500)) * 100),
         sleep: Math.min(100, (stats.avgSleep / 420) * 100),
-        steps: Math.min(100, (stats.totalSteps / (stats.dailyScores.length * 5000)) * 100),
+        steps: Math.min(100, (stats.totalSteps / (daysCount * 5000)) * 100),
         bpm: stats.avgHeartRate > 0 ? 80 : 0,
         imc: 85,
         calories: stats.radar.agilidade,
       });
 
       setResistenciaData({
-        water: Math.min(100, (stats.totalWater / (stats.dailyScores.length * 1000)) * 100),
+        water: Math.min(100, (stats.totalWater / (daysCount * 1000)) * 100),
         sleep: stats.radar.resistencia,
-        steps: Math.min(100, (stats.totalSteps / (stats.dailyScores.length * 3000)) * 100),
+        steps: Math.min(100, (stats.totalSteps / (daysCount * 3000)) * 100),
         bpm: stats.avgHeartRate > 0 ? 60 : 0,
         imc: 70,
-        calories: Math.min(100, (stats.totalCalories / (stats.dailyScores.length * 300)) * 100),
+        calories: Math.min(100, (stats.totalCalories / (daysCount * 300)) * 100),
       });
     } catch (error) {
       console.error("Erro ao carregar dados reais:", error);
@@ -158,7 +208,9 @@ const ResultsScreen: React.FC = () => {
       ...Object.values(agilidadeData),
       ...Object.values(resistenciaData),
     ];
-    const avg = allValues.reduce((a, b) => a + b, 0) / allValues.length;
+    const validValues = allValues.filter((v) => isFinite(v) && !isNaN(v));
+    const avg =
+      validValues.length > 0 ? validValues.reduce((a, b) => a + b, 0) / validValues.length : 0;
     setCentralScore(Math.round(avg));
   }, [forcaData, agilidadeData, resistenciaData]);
 
@@ -188,8 +240,11 @@ const ResultsScreen: React.FC = () => {
     // Função para obter valores de um conjunto de dados
     const getValues = (data: RadarData) => {
       return RADAR_LABELS.map((_, i) => {
-        const key = Object.keys(data)[i] as keyof RadarData;
-        return (data[key] / MAX_VALUE) * radius;
+        const keys = Object.keys(data) as (keyof RadarData)[];
+        const key = keys[i];
+        const rawVal = data[key] || 0;
+        const val = isFinite(rawVal) && !isNaN(rawVal) ? rawVal : 0;
+        return (val / MAX_VALUE) * radius;
       });
     };
 
@@ -434,17 +489,26 @@ const ResultsScreen: React.FC = () => {
     const chartHeight = 60;
     const padding = 10;
     if (lineData.length === 0) return null;
-    const min = Math.min(...lineData);
-    const max = Math.max(...lineData);
+    const validData = lineData.filter((v) => isFinite(v) && !isNaN(v));
+    if (validData.length === 0) return null;
+    const min = Math.min(...validData);
+    const max = Math.max(...validData);
     const range = max - min || 1;
-    const points = lineData.map((val, i) => ({
-      x: padding + (i / (lineData.length - 1)) * (chartWidth - padding * 2),
-      y: chartHeight - padding - ((val - min) / range) * (chartHeight - padding * 2),
-    }));
-    const path = points.reduce(
-      (p, pt, i) => (i === 0 ? `M ${pt.x} ${pt.y}` : `${p} L ${pt.x} ${pt.y}`),
-      ""
-    );
+    const points = validData.map((val, i) => {
+      const denom = Math.max(1, validData.length - 1);
+      const safeVal = isFinite(val) && !isNaN(val) ? val : 0;
+      return {
+        x: padding + (i / denom) * (chartWidth - padding * 2),
+        y: chartHeight - padding - ((safeVal - min) / range) * (chartHeight - padding * 2),
+      };
+    });
+    const path =
+      points.length > 0
+        ? points.reduce(
+            (p, pt, i) => (i === 0 ? `M ${pt.x} ${pt.y}` : `${p} L ${pt.x} ${pt.y}`),
+            ""
+          )
+        : "";
 
     return (
       <View style={styles.lineChartHolder}>
@@ -466,206 +530,210 @@ const ResultsScreen: React.FC = () => {
   };
 
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <LinearGradient colors={["#FFFFFF", "#F8FAFC"]} style={StyleSheet.absoluteFill} />
+    <DataErrorBoundary>
+      <SafeAreaView style={styles.safeArea} edges={["top"]}>
+        <LinearGradient colors={["#FFFFFF", "#F8FAFC"]} style={StyleSheet.absoluteFill} />
 
-      <View style={styles.header}>
-        <BackButton to={{ name: "DataScreen" }} />
-        <Text style={styles.headerTitle}>Resultados</Text>
-        <TouchableOpacity style={styles.infoIcon} onPress={handleOpenInfo}>
-          <Info size={20} color="#64748B" />
-        </TouchableOpacity>
-      </View>
-
-      <ScrollView
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.scrollContent}
-        refreshControl={
-          <RefreshControl refreshing={isRefreshing} onRefresh={onRefresh} tintColor="#F97316" />
-        }
-      >
-        <View style={styles.timeSelectorBox}>
-          <TimeSelector
-            selectedTimeframe={selectedTimeframe}
-            onTimeframeChange={setSelectedTimeframe}
-          />
+        <View style={styles.header}>
+          <BackButton to={{ name: "DataScreen" }} />
+          <Text style={styles.headerTitle}>Resultados</Text>
+          <TouchableOpacity style={styles.infoIcon} onPress={handleOpenInfo}>
+            <Info size={20} color="#64748B" />
+          </TouchableOpacity>
         </View>
 
-        <View style={styles.chartSection}>
-          <RadarChart />
-        </View>
-
-        <View style={styles.premiumScoreCard}>
-          <View style={styles.scoreHeaderRow}>
-            <View>
-              <Text style={styles.premiumScoreLabel}>Health Score</Text>
-              <Text style={styles.premiumScoreDate}>Atualizado em tempo real</Text>
-            </View>
-            <View style={styles.statusPill}>
-              <Activity size={12} color="#10B981" />
-              <Text style={styles.statusPillText}>Excelente</Text>
-            </View>
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={styles.scrollContent}
+          refreshControl={
+            <RefreshControl refreshing={isRefreshing} onRefresh={onRefresh} tintColor="#F97316" />
+          }
+        >
+          <View style={styles.timeSelectorBox}>
+            <TimeSelector
+              selectedTimeframe={selectedTimeframe}
+              onTimeframeChange={setSelectedTimeframe}
+            />
           </View>
 
-          <View style={styles.scoreMainSection}>
-            <View style={styles.scoreDisplay}>
-              <Text style={styles.premiumScoreNumber}>{centralScore}</Text>
-              <View style={styles.scoreMetricInfo}>
-                <Text style={styles.scoreMax}>/100</Text>
-                <View style={styles.trendContainer}>
-                  <TrendingUp size={14} color="#10B981" />
-                  <Text style={styles.trendText}>12%</Text>
+          <View style={styles.chartSection}>
+            <RadarChart />
+          </View>
+
+          <View style={styles.premiumScoreCard}>
+            <View style={styles.scoreHeaderRow}>
+              <View>
+                <Text style={styles.premiumScoreLabel}>Health Score</Text>
+                <Text style={styles.premiumScoreDate}>Atualizado em tempo real</Text>
+              </View>
+              <View style={styles.statusPill}>
+                <Activity size={12} color="#10B981" />
+                <Text style={styles.statusPillText}>Excelente</Text>
+              </View>
+            </View>
+
+            <View style={styles.scoreMainSection}>
+              <View style={styles.scoreDisplay}>
+                <Text style={styles.premiumScoreNumber}>{centralScore}</Text>
+                <View style={styles.scoreMetricInfo}>
+                  <Text style={styles.scoreMax}>/100</Text>
+                  <View style={styles.trendContainer}>
+                    <TrendingUp size={14} color="#10B981" />
+                    <Text style={styles.trendText}>12%</Text>
+                  </View>
+                </View>
+              </View>
+
+              <View style={styles.scoreProgressWrapper}>
+                <View style={styles.progressBarBase}>
+                  <LinearGradient
+                    colors={["#F97316", "#FB923C"]}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 0 }}
+                    style={[styles.progressBarFill, { width: `${centralScore}%` }]}
+                  />
+                </View>
+                <View style={styles.progressMarkers}>
+                  <Text style={styles.markerText}>0</Text>
+                  <Text style={styles.markerText}>50</Text>
+                  <Text style={styles.markerText}>100</Text>
                 </View>
               </View>
             </View>
 
-            <View style={styles.scoreProgressWrapper}>
-              <View style={styles.progressBarBase}>
-                <LinearGradient
-                  colors={["#F97316", "#FB923C"]}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 0 }}
-                  style={[styles.progressBarFill, { width: `${centralScore}%` }]}
-                />
-              </View>
-              <View style={styles.progressMarkers}>
-                <Text style={styles.markerText}>0</Text>
-                <Text style={styles.markerText}>50</Text>
-                <Text style={styles.markerText}>100</Text>
-              </View>
+            <View style={styles.scoreFooterCard}>
+              <Trophy size={16} color="#F59E0B" />
+              <Text style={styles.scoreFooterMsg}>
+                Você superou <Text style={{ fontWeight: "700", color: "#0F172A" }}>92%</Text> dos
+                usuários no seu perfil.
+              </Text>
             </View>
           </View>
 
-          <View style={styles.scoreFooterCard}>
-            <Trophy size={16} color="#F59E0B" />
-            <Text style={styles.scoreFooterMsg}>
-              Você superou <Text style={{ fontWeight: "700", color: "#0F172A" }}>92%</Text> dos
-              usuários no seu perfil.
+          <View style={styles.historySection}>
+            <View style={styles.sectionHeader}>
+              <Activity size={18} color="#F97316" />
+              <Text style={styles.sectionTitle}>Histórico de Progresso</Text>
+            </View>
+
+            <View style={styles.lineChartCard}>
+              <LineChart />
+            </View>
+          </View>
+
+          <View style={styles.insightCard}>
+            <View style={styles.insightHeader}>
+              <ShieldCheck size={20} color="#10B981" />
+              <Text style={styles.insightTitle}>Insight de Saúde</Text>
+            </View>
+            <Text style={styles.insightText}>
+              Seus níveis de <Text style={{ fontWeight: "700", color: "#0F172A" }}>Hidratação</Text>{" "}
+              e <Text style={{ fontWeight: "700", color: "#0F172A" }}>Sono</Text> estão otimizados.
+              Mantenha a consistência nos próximos{" "}
+              {selectedTimeframe === "1m" ? "30 dias" : "período"} para consolidar seus ganhos em{" "}
+              <Text style={{ fontWeight: "700", color: "#0F172A" }}>Força</Text>.
             </Text>
           </View>
-        </View>
+        </ScrollView>
 
-        <View style={styles.historySection}>
-          <View style={styles.sectionHeader}>
-            <Activity size={18} color="#F97316" />
-            <Text style={styles.sectionTitle}>Histórico de Progresso</Text>
-          </View>
-
-          <View style={styles.lineChartCard}>
-            <LineChart />
-          </View>
-        </View>
-
-        <View style={styles.insightCard}>
-          <View style={styles.insightHeader}>
-            <ShieldCheck size={20} color="#10B981" />
-            <Text style={styles.insightTitle}>Insight de Saúde</Text>
-          </View>
-          <Text style={styles.insightText}>
-            Seus níveis de <Text style={{ fontWeight: "700", color: "#0F172A" }}>Hidratação</Text> e{" "}
-            <Text style={{ fontWeight: "700", color: "#0F172A" }}>Sono</Text> estão otimizados.
-            Mantenha a consistência nos próximos{" "}
-            {selectedTimeframe === "1m" ? "30 dias" : "período"} para consolidar seus ganhos em{" "}
-            <Text style={{ fontWeight: "700", color: "#0F172A" }}>Força</Text>.
-          </Text>
-        </View>
-      </ScrollView>
-
-      <BottomSheet
-        ref={bottomSheetRef}
-        index={-1}
-        snapPoints={snapPoints}
-        enablePanDownToClose
-        backdropComponent={renderBackdrop}
-        backgroundStyle={{ borderRadius: 32 }}
-      >
-        <BottomSheetView style={styles.bsView}>
-          <ScrollView showsVerticalScrollIndicator={false}>
-            <View style={styles.bsHeader}>
-              <View style={styles.bsIconContainer}>
-                <Zap size={24} color="#F97316" />
+        <BottomSheet
+          ref={bottomSheetRef}
+          index={-1}
+          snapPoints={snapPoints}
+          enablePanDownToClose
+          backdropComponent={renderBackdrop}
+          backgroundStyle={{ borderRadius: 32 }}
+        >
+          <BottomSheetView style={styles.bsView}>
+            <ScrollView showsVerticalScrollIndicator={false}>
+              <View style={styles.bsHeader}>
+                <View style={styles.bsIconContainer}>
+                  <Zap size={24} color="#F97316" />
+                </View>
+                <View>
+                  <Text style={styles.bsTitle}>O que é o Health Score?</Text>
+                  <Text style={styles.bsSubtitle}>Entenda como calculamos seus resultados</Text>
+                </View>
               </View>
-              <View>
-                <Text style={styles.bsTitle}>O que é o Health Score?</Text>
-                <Text style={styles.bsSubtitle}>Entenda como calculamos seus resultados</Text>
+
+              <View style={styles.bsSection}>
+                <Text style={styles.bsSectionTitle}>O Algoritmo</Text>
+                <Text style={styles.bsText}>
+                  Seu score é uma métrica ponderada que analisa a consistência dos seus hábitos. Nós
+                  cruzamos dados de{" "}
+                  <Text style={{ fontWeight: "700" }}>biometria e performance</Text> para gerar uma
+                  nota de 0 a 100.
+                </Text>
               </View>
-            </View>
 
-            <View style={styles.bsSection}>
-              <Text style={styles.bsSectionTitle}>O Algoritmo</Text>
-              <Text style={styles.bsText}>
-                Seu score é uma métrica ponderada que analisa a consistência dos seus hábitos. Nós
-                cruzamos dados de <Text style={{ fontWeight: "700" }}>biometria e performance</Text>{" "}
-                para gerar uma nota de 0 a 100.
-              </Text>
-            </View>
+              <View style={styles.bsSection}>
+                <Text style={styles.bsSectionTitle}>Dimensões do Radar</Text>
 
-            <View style={styles.bsSection}>
-              <Text style={styles.bsSectionTitle}>Dimensões do Radar</Text>
-
-              <View style={styles.metricGuideHorizontal}>
-                <View style={styles.metricCard}>
-                  <View style={styles.metricIconBox}>
-                    <Flame size={16} color="#F97316" />
+                <View style={styles.metricGuideHorizontal}>
+                  <View style={styles.metricCard}>
+                    <View style={styles.metricIconBox}>
+                      <Flame size={16} color="#F97316" />
+                    </View>
+                    <Text style={styles.metricLabelCard}>Força</Text>
+                    <Text style={styles.metricDescCard}>Calorias e esforço.</Text>
                   </View>
-                  <Text style={styles.metricLabelCard}>Força</Text>
-                  <Text style={styles.metricDescCard}>Calorias e esforço.</Text>
-                </View>
 
-                <View style={styles.metricCard}>
-                  <View style={styles.metricIconBox}>
-                    <Zap size={16} color="#0F172A" />
+                  <View style={styles.metricCard}>
+                    <View style={styles.metricIconBox}>
+                      <Zap size={16} color="#0F172A" />
+                    </View>
+                    <Text style={styles.metricLabelCard}>Agilidade</Text>
+                    <Text style={styles.metricDescCard}>Velocidade e BPM.</Text>
                   </View>
-                  <Text style={styles.metricLabelCard}>Agilidade</Text>
-                  <Text style={styles.metricDescCard}>Velocidade e BPM.</Text>
-                </View>
 
-                <View style={styles.metricCard}>
-                  <View style={styles.metricIconBox}>
-                    <ShieldCheck size={16} color="#3B82F6" />
+                  <View style={styles.metricCard}>
+                    <View style={styles.metricIconBox}>
+                      <ShieldCheck size={16} color="#3B82F6" />
+                    </View>
+                    <Text style={styles.metricLabelCard}>Resistência</Text>
+                    <Text style={styles.metricDescCard}>Tempo e foco.</Text>
                   </View>
-                  <Text style={styles.metricLabelCard}>Resistência</Text>
-                  <Text style={styles.metricDescCard}>Tempo e foco.</Text>
                 </View>
               </View>
-            </View>
 
-            <View style={styles.bsSection}>
-              <Text style={styles.bsSectionTitle}>Métricas Analisadas</Text>
-              <View style={styles.tagsContainerRow}>
-                <View style={styles.tagCompact}>
-                  <Droplets size={10} color="#3B82F6" />
-                  <Text style={styles.tagTextCompact}>Água</Text>
-                </View>
-                <View style={styles.tagCompact}>
-                  <Brain size={10} color="#8B5CF6" />
-                  <Text style={styles.tagTextCompact}>Sono</Text>
-                </View>
-                <View style={styles.tagCompact}>
-                  <Footprints size={10} color="#10B981" />
-                  <Text style={styles.tagTextCompact}>Passos</Text>
-                </View>
-                <View style={styles.tagCompact}>
-                  <Activity size={10} color="#EF4444" />
-                  <Text style={styles.tagTextCompact}>BPM</Text>
-                </View>
-                <View style={styles.tagCompact}>
-                  <User size={10} color="#6366F1" />
-                  <Text style={styles.tagTextCompact}>IMC</Text>
+              <View style={styles.bsSection}>
+                <Text style={styles.bsSectionTitle}>Métricas Analisadas</Text>
+                <View style={styles.tagsContainerRow}>
+                  <View style={styles.tagCompact}>
+                    <Droplets size={10} color="#3B82F6" />
+                    <Text style={styles.tagTextCompact}>Água</Text>
+                  </View>
+                  <View style={styles.tagCompact}>
+                    <Brain size={10} color="#8B5CF6" />
+                    <Text style={styles.tagTextCompact}>Sono</Text>
+                  </View>
+                  <View style={styles.tagCompact}>
+                    <Footprints size={10} color="#10B981" />
+                    <Text style={styles.tagTextCompact}>Passos</Text>
+                  </View>
+                  <View style={styles.tagCompact}>
+                    <Activity size={10} color="#EF4444" />
+                    <Text style={styles.tagTextCompact}>BPM</Text>
+                  </View>
+                  <View style={styles.tagCompact}>
+                    <User size={10} color="#6366F1" />
+                    <Text style={styles.tagTextCompact}>IMC</Text>
+                  </View>
                 </View>
               </View>
-            </View>
 
-            <View style={styles.bsFooter}>
-              <HelpCircle size={16} color="#94A3B8" />
-              <Text style={styles.bsFooterText}>
-                Dados sincronizados com o seu dispositivo vestível.
-              </Text>
-            </View>
-          </ScrollView>
-        </BottomSheetView>
-      </BottomSheet>
-    </SafeAreaView>
+              <View style={styles.bsFooter}>
+                <HelpCircle size={16} color="#94A3B8" />
+                <Text style={styles.bsFooterText}>
+                  Dados sincronizados com o seu dispositivo vestível.
+                </Text>
+              </View>
+            </ScrollView>
+          </BottomSheetView>
+        </BottomSheet>
+        <DataPillNavigator currentScreen="ResultsScreen" />
+      </SafeAreaView>
+    </DataErrorBoundary>
   );
 };
 

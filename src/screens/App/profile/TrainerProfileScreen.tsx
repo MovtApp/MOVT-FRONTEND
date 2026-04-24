@@ -368,9 +368,7 @@ export function TrainerProfileScreen() {
                 data={posts}
                 keyExtractor={(item: any, idx: number) => {
                   if (typeof item === "string") return item + idx;
-                  return (
-                    (item.id && String(item.id)) || `${item.imageUrl || item.image_url || idx}`
-                  );
+                  return String(item?.id || item?.imageUrl || item?.image_url || idx);
                 }}
                 numColumns={2}
                 scrollEnabled={false}

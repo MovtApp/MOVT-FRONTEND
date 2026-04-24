@@ -388,7 +388,7 @@ const ChatScreen = () => {
 
       <FlatList
         data={filteredExistingChats}
-        keyExtractor={(item) => item.id}
+        keyExtractor={(item, index) => String(item?.id || index)}
         renderItem={renderChat}
         contentContainerStyle={{ paddingBottom: 20 }}
         ListEmptyComponent={
@@ -419,7 +419,7 @@ const ChatScreen = () => {
             ) : (
               <FlatList
                 data={contacts}
-                keyExtractor={(item) => String(item.id)}
+                keyExtractor={(item, index) => String(item?.id || index)}
                 renderItem={renderContact}
                 ListEmptyComponent={
                   <View style={styles.modalEmptyContainer}>

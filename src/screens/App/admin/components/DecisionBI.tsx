@@ -31,20 +31,34 @@ const DecisionBI: React.FC<DecisionBIProps> = ({
   onOpenRevenue,
   onOpenUnits,
 }) => {
-  const planRevenue = (data?.planDistribution || [
-    { label: "Premium", count: 45, color: "#6366F1" },
-    { label: "Ouro", count: 30, color: "#F59E0B" },
-    { label: "Basic", count: 25, color: "#94A3B8" },
-  ]).map((item: any) => ({
-    ...item,
-    count: Number.isFinite(Number(item?.count)) ? Number(item.count) : 0,
+  const planRevenue: { label: string; count: number; color: string }[] = (
+    Array.isArray(data?.planDistribution) ? data.planDistribution : []
+  ).map((item: any) => ({
     label: String(item?.label || ""),
-    color: String(item?.color || "#94A3B8"),
+    count: Number.isFinite(Number(item?.count)) ? Number(item.count) : 0,
+    color: String(item?.color || "#94A3B8").startsWith("#") ? item.color : "#94A3B8",
   }));
 
+  // Caso o array sanitizado esteja vazio, usamos o fallback para evitar crash visual
+  const finalPlanRevenue =
+    planRevenue.length > 0
+      ? planRevenue
+      : [
+          { label: "Premium", count: 45, color: "#6366F1" },
+          { label: "Ouro", count: 30, color: "#F59E0B" },
+          { label: "Basic", count: 25, color: "#94A3B8" },
+        ];
+
   const churnRate = String(data?.churn?.rate || "0.0");
+  const numChurnRate = Number(churnRate) || 0;
   const churnCount = Number(data?.churn?.count || 0);
   const ltvValue = Number(data?.ltv?.value || 0);
+  const totalCount = finalPlanRevenue.reduce(
+    (acc: number, cur: any) => acc + (Number(cur.count) || 0),
+    0
+  );
+  const hasData =
+    Array.isArray(data?.planDistribution) && data.planDistribution.length > 0 && totalCount > 0;
 
   return (
     <View style={styles.container}>
@@ -61,10 +75,8 @@ const DecisionBI: React.FC<DecisionBIProps> = ({
           </View>
           <Text style={styles.cardValue}>{churnRate}%</Text>
           <View style={styles.growthBadge}>
-            <ArrowUpRight size={10} color={Number(churnRate) > 5 ? "#EF4444" : "#10B981"} />
-            <Text
-              style={[styles.growthText, { color: Number(churnRate) > 5 ? "#EF4444" : "#10B981" }]}
-            >
+            <ArrowUpRight size={10} color={numChurnRate > 5 ? "#EF4444" : "#10B981"} />
+            <Text style={[styles.growthText, { color: numChurnRate > 5 ? "#EF4444" : "#10B981" }]}>
               {churnCount} cancelamentos
             </Text>
           </View>
@@ -94,20 +106,36 @@ const DecisionBI: React.FC<DecisionBIProps> = ({
         </View>
 
         <View style={styles.pieContainer}>
-          <PolarChart data={planRevenue} labelKey={"label"} valueKey={"count"} colorKey={"color"}>
-            <Pie.Chart>{({ slice }) => <Pie.Slice {...(slice as any)} />}</Pie.Chart>
-          </PolarChart>
+          {hasData ? (
+            <>
+              <PolarChart
+                data={finalPlanRevenue}
+                labelKey="label"
+                valueKey="count"
+                colorKey="color"
+              >
+                <Pie.Chart>{({ slice }) => <Pie.Slice {...(slice as any)} />}</Pie.Chart>
+              </PolarChart>
 
-          <View style={styles.legendContainer}>
-            {planRevenue.map((item: any, i: number) => (
-              <View key={i} style={styles.legendItem}>
-                <View style={[styles.dot, { backgroundColor: item.color }]} />
-                <Text style={styles.legendText}>
-                  {item.label}: {item.count}%
-                </Text>
+              <View style={styles.legendContainer}>
+                {finalPlanRevenue.map((item: any, i: number) => (
+                  <View key={i} style={styles.legendItem}>
+                    <View style={[styles.dot, { backgroundColor: item.color }]} />
+                    <Text style={styles.legendText}>
+                      {item.label}: {item.count}%
+                    </Text>
+                  </View>
+                ))}
               </View>
-            ))}
-          </View>
+            </>
+          ) : (
+            <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
+              <Activity size={20} color="#94A3B8" />
+              <Text style={{ fontSize: 13, color: "#94A3B8", marginTop: 8 }}>
+                Sem dados de planos
+              </Text>
+            </View>
+          )}
         </View>
       </TouchableOpacity>
 
@@ -120,16 +148,28 @@ const DecisionBI: React.FC<DecisionBIProps> = ({
           </TouchableOpacity>
         </View>
 
-        {(data?.topUnits || []).slice(0, 2).map((gym: any, i: number) => (
-          <View key={i} style={styles.auditRow}>
-            <View style={styles.gymInfo}>
-              <Text style={styles.gymName}>{gym.name}</Text>
-              <Text style={styles.gymGrowth}>{gym.grow} crescimento</Text>
-            </View>
-            <Text style={styles.gymRevenue}>{formatCurrency(gym.rev)}</Text>
-          </View>
-        ))}
-        {!data?.topUnits?.length && (
+        {(Array.isArray(data?.topUnits) ? data.topUnits : [])
+          .slice(0, 2)
+          .map((gym: any, i: number) => {
+            const gymName = String(gym?.name || "Unidade");
+            const gymMembers = Number(gym?.members) || 0;
+            const gymGrow = String(gym?.grow || "0%");
+            const gymRev = Number(gym?.rev) || 0;
+            const isPos = gymGrow.startsWith("+");
+
+            return (
+              <View key={i} style={styles.auditRow}>
+                <View style={styles.gymInfo}>
+                  <Text style={styles.gymName}>{gymName}</Text>
+                  <Text style={[styles.gymGrowth, { color: isPos ? "#10B981" : "#EF4444" }]}>
+                    {gymGrow} crescimento
+                  </Text>
+                </View>
+                <Text style={styles.gymRevenue}>{formatCurrency(gymRev)}</Text>
+              </View>
+            );
+          })}
+        {(!data?.topUnits || !Array.isArray(data.topUnits) || data.topUnits.length === 0) && (
           <Text style={{ color: "#94A3B8", fontSize: 12, textAlign: "center", padding: 10 }}>
             Nenhuma unidade com dados para este período
           </Text>

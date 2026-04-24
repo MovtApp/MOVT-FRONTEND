@@ -12,6 +12,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import MapView, { Polyline, Marker, PROVIDER_GOOGLE } from "react-native-maps";
 import * as Location from "expo-location";
+
 import {
   Bike,
   Timer,
@@ -37,6 +38,53 @@ import {
   formatDuration,
   estimateCalories,
 } from "../../../../utils/workout/performance";
+
+// ─── Error Boundary ────────────────────────────────────────────────────────────
+
+interface EBState {
+  hasError: boolean;
+  error: Error | null;
+}
+class DataErrorBoundary extends React.Component<{ children: React.ReactNode }, EBState> {
+  constructor(props: any) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+  static getDerivedStateFromError(error: Error) {
+    return { hasError: true, error };
+  }
+  componentDidCatch(error: Error, info: any) {
+    console.error("[CyclingScreen] Crash interceptado:", error, info);
+  }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <View
+          style={{
+            flex: 1,
+            backgroundColor: "#FEF2F2",
+            margin: 12,
+            borderRadius: 16,
+            padding: 20,
+            justifyContent: "center",
+            alignItems: "center",
+          }}
+        >
+          <Text style={{ fontSize: 16, fontWeight: "bold", color: "#DC2626", marginBottom: 10 }}>
+            ⚠️ Erro no Módulo de Performance
+          </Text>
+          <Text style={{ fontSize: 12, color: "#7F1D1D", textAlign: "center", marginBottom: 10 }}>
+            {this.state.error?.message || "Erro de renderização desconhecido."}
+          </Text>
+          <Text style={{ fontSize: 10, color: "#991B1B", textAlign: "center" }}>
+            {this.state.error?.stack?.slice(0, 300)}
+          </Text>
+        </View>
+      );
+    }
+    return this.props.children;
+  }
+}
 
 const { width, height } = Dimensions.get("window");
 
@@ -205,293 +253,324 @@ const CyclingScreen: React.FC = () => {
 
   const handleOpenAnalysis = () => bottomSheetRef.current?.expand();
 
-  const currentSpeedKmh = (currentSpeedMs * 3.6).toFixed(1);
-  const currentPace = speedToPace(currentSpeedMs);
-  const estimatedKcal = estimateCalories(distance).toFixed(0);
+  const safeCurrentSpeedMs =
+    isFinite(currentSpeedMs) && !isNaN(currentSpeedMs) ? currentSpeedMs : 0;
+  const currentSpeedKmh = (safeCurrentSpeedMs * 3.6).toFixed(1);
+  const currentPace = speedToPace(safeCurrentSpeedMs);
+  const safeDistance = isFinite(distance) && !isNaN(distance) ? distance : 0;
+  const estimatedKcal = estimateCalories(safeDistance).toFixed(0);
+
+  const safeRoute = useMemo(() => {
+    return route.filter(
+      (p) =>
+        p &&
+        typeof p.latitude === "number" &&
+        !isNaN(p.latitude) &&
+        isFinite(p.latitude) &&
+        typeof p.longitude === "number" &&
+        !isNaN(p.longitude) &&
+        isFinite(p.longitude)
+    );
+  }, [route]);
+
+  const hasValidLocation = useMemo(() => {
+    return (
+      currentLocation?.coords &&
+      typeof currentLocation.coords.latitude === "number" &&
+      !isNaN(currentLocation.coords.latitude) &&
+      isFinite(currentLocation.coords.latitude) &&
+      typeof currentLocation.coords.longitude === "number" &&
+      !isNaN(currentLocation.coords.longitude) &&
+      isFinite(currentLocation.coords.longitude)
+    );
+  }, [currentLocation]);
 
   return (
-    <SafeAreaView style={styles.safeArea} edges={["top"]}>
-      <View style={styles.header}>
-        <BackButton to={{ name: "DataScreen" }} />
-        <Text style={styles.headerTitle}>MOVT Performance</Text>
-        <TouchableOpacity onPress={handleOpenAnalysis} style={styles.infoBtn}>
-          <TrendingUp size={22} color="#1E293B" />
-        </TouchableOpacity>
-      </View>
-
-      <View style={styles.tabsContainer}>
-        <View style={styles.tabSelector}>
-          {["Ciclismo", "Corrida"].map((tab) => (
-            <TouchableOpacity
-              key={tab}
-              onPress={() => setActiveTab(tab as any)}
-              style={[
-                styles.tab,
-                activeTab === tab && {
-                  backgroundColor: activeTab === "Ciclismo" ? "#3B82F6" : "#10B981",
-                },
-              ]}
-              disabled={isTracking}
-            >
-              <Text style={[styles.tabText, activeTab === tab && { color: "#FFF" }]}>{tab}</Text>
-            </TouchableOpacity>
-          ))}
+    <DataErrorBoundary>
+      <SafeAreaView style={styles.safeArea} edges={["top"]}>
+        <View style={styles.header}>
+          <BackButton to={{ name: "DataScreen" }} />
+          <Text style={styles.headerTitle}>MOVT Performance</Text>
+          <TouchableOpacity onPress={handleOpenAnalysis} style={styles.infoBtn}>
+            <TrendingUp size={22} color="#1E293B" />
+          </TouchableOpacity>
         </View>
-      </View>
 
-      <ScrollView
-        style={styles.scrollView}
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
-      >
-        <View style={styles.mapContainer}>
-          <MapView
-            provider={PROVIDER_GOOGLE}
-            style={styles.map}
-            region={
-              currentLocation
-                ? {
+        <View style={styles.tabsContainer}>
+          <View style={styles.tabSelector}>
+            {["Ciclismo", "Corrida"].map((tab) => (
+              <TouchableOpacity
+                key={tab}
+                onPress={() => setActiveTab(tab as any)}
+                style={[
+                  styles.tab,
+                  activeTab === tab && {
+                    backgroundColor: activeTab === "Ciclismo" ? "#3B82F6" : "#10B981",
+                  },
+                ]}
+                disabled={isTracking}
+              >
+                <Text style={[styles.tabText, activeTab === tab && { color: "#FFF" }]}>{tab}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </View>
+
+        <ScrollView
+          style={styles.scrollView}
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+        >
+          <View style={styles.mapContainer}>
+            <MapView
+              provider={PROVIDER_GOOGLE}
+              style={styles.map}
+              region={
+                hasValidLocation && currentLocation
+                  ? {
+                      latitude: currentLocation.coords.latitude,
+                      longitude: currentLocation.coords.longitude,
+                      latitudeDelta: 0.005,
+                      longitudeDelta: 0.005,
+                    }
+                  : {
+                      latitude: -23.5555,
+                      longitude: -46.6383,
+                      latitudeDelta: 0.02,
+                      longitudeDelta: 0.02,
+                    }
+              }
+            >
+              {safeRoute.length > 1 && (
+                <Polyline
+                  coordinates={safeRoute}
+                  strokeColor={activeTab === "Ciclismo" ? "#3B82F6" : "#10B981"}
+                  strokeWidth={5}
+                />
+              )}
+              {safeRoute.length > 0 && (
+                <Marker coordinate={safeRoute[0]} title="Início" pinColor="green" />
+              )}
+              {hasValidLocation && currentLocation && (
+                <Marker
+                  coordinate={{
                     latitude: currentLocation.coords.latitude,
                     longitude: currentLocation.coords.longitude,
-                    latitudeDelta: 0.005,
-                    longitudeDelta: 0.005,
-                  }
-                : undefined
-            }
-            initialRegion={{
-              latitude: -23.5555,
-              longitude: -46.6383,
-              latitudeDelta: 0.02,
-              longitudeDelta: 0.02,
-            }}
-          >
-            {route.length > 1 && (
-              <Polyline
-                coordinates={route}
-                strokeColor={activeTab === "Ciclismo" ? "#3B82F6" : "#10B981"}
-                strokeWidth={5}
-              />
+                  }}
+                >
+                  <View
+                    style={[
+                      styles.currentLocationMarker,
+                      { backgroundColor: activeTab === "Ciclismo" ? "#3B82F6" : "#10B981" },
+                    ]}
+                  />
+                </Marker>
+              )}
+            </MapView>
+
+            {isAutoPaused && (
+              <View style={styles.autoPauseOverlay}>
+                <Text style={styles.autoPauseText}>| | AUTO-PAUSA</Text>
+              </View>
             )}
-            {route.length > 0 && <Marker coordinate={route[0]} title="Início" pinColor="green" />}
-            {currentLocation && (
-              <Marker
-                coordinate={{
-                  latitude: currentLocation.coords.latitude,
-                  longitude: currentLocation.coords.longitude,
-                }}
+
+            <View style={styles.hudOverlay}>
+              <View style={styles.hudGrid}>
+                <View style={styles.hudCard}>
+                  <Navigation size={16} color="#3B82F6" />
+                  <View style={styles.hudCardValueContainer}>
+                    <Text style={styles.hudCardValue}>{distance.toFixed(2)}</Text>
+                    <Text style={styles.hudCardUnit}>km</Text>
+                  </View>
+                </View>
+                <View style={styles.hudCard}>
+                  <Timer size={16} color="#10B981" />
+                  <View style={styles.hudCardValueContainer}>
+                    <Text style={styles.hudCardValue}>{formatDuration(seconds)}</Text>
+                    <Text style={styles.hudCardUnit}>tempo</Text>
+                  </View>
+                </View>
+                <View style={styles.hudCard}>
+                  <Zap size={16} color="#EF4444" />
+                  <View style={styles.hudCardValueContainer}>
+                    <Text style={styles.hudCardValue}>
+                      {activeTab === "Ciclismo" ? currentSpeedKmh : currentPace}
+                    </Text>
+                    <Text style={styles.hudCardUnit}>
+                      {activeTab === "Ciclismo" ? "km/h" : "pace/km"}
+                    </Text>
+                  </View>
+                </View>
+                <View style={styles.hudCard}>
+                  <Flame size={16} color="#F97316" />
+                  <View style={styles.hudCardValueContainer}>
+                    <Text style={styles.hudCardValue}>{estimatedKcal}</Text>
+                    <Text style={styles.hudCardUnit}>kcal</Text>
+                  </View>
+                </View>
+              </View>
+            </View>
+          </View>
+
+          <View style={styles.controlContainer}>
+            {!isTracking ? (
+              <TouchableOpacity
+                style={[styles.mainButton, { backgroundColor: "#BBF246" }]}
+                onPress={startTracking}
+                activeOpacity={0.8}
               >
+                <Play size={24} color="#000" fill="#000" />
+                <Text style={styles.mainButtonText}>INICIAR {activeTab.toUpperCase()}</Text>
+              </TouchableOpacity>
+            ) : (
+              <View style={styles.activeControls}>
+                <TouchableOpacity style={[styles.roundButton]} onPress={togglePause}>
+                  {isPaused || isAutoPaused ? (
+                    <Play size={24} color="#000" fill="#000" />
+                  ) : (
+                    <Pause size={24} color="#000" fill="#000" />
+                  )}
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.stopButton, { backgroundColor: "#EF4444" }]}
+                  onPress={stopTracking}
+                >
+                  <Square size={24} color="#FFF" fill="#FFF" />
+                  <Text style={styles.stopButtonText}>FINALIZAR</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+          </View>
+
+          <View style={styles.insightContainer}>
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionTitle}>Tendências de Esforço</Text>
+            </View>
+
+            <TouchableOpacity
+              style={styles.mainInsightCard}
+              activeOpacity={0.85}
+              onPress={handleOpenAnalysis}
+            >
+              <LinearGradient colors={["#F8FAFC", "#F1F5F9"]} style={styles.insightGradient}>
+                <View style={styles.insightLeft}>
+                  <View style={styles.insightIconCircle}>
+                    <TrendingUp size={24} color="#3B82F6" />
+                  </View>
+                  <View>
+                    <Text style={styles.insightLabel}>Sua performance</Text>
+                    <Text style={styles.insightValue}>Acompanhe sua evolução semanal</Text>
+                  </View>
+                </View>
+                <ChevronRight size={20} color="#3B82F6" />
+              </LinearGradient>
+            </TouchableOpacity>
+
+            <View style={styles.statsRow}>
+              <View style={styles.smallStatCard}>
+                <Heart size={20} color="#EF4444" />
+                <Text style={styles.smallStatLabel}>BPM Médio</Text>
+                <Text style={styles.smallStatValue}>--</Text>
+              </View>
+              <View style={styles.smallStatCard}>
+                <Flame size={20} color="#F97316" />
+                <Text style={styles.smallStatLabel}>Calorias</Text>
+                <Text style={styles.smallStatValue}>{estimatedKcal}</Text>
+              </View>
+              <View style={styles.smallStatCard}>
+                <Droplets size={20} color="#3B82F6" />
+                <Text style={styles.smallStatLabel}>Hidratação</Text>
+                <Text style={styles.smallStatValue}>0L</Text>
+              </View>
+            </View>
+          </View>
+
+          <View style={{ height: 120 }} />
+        </ScrollView>
+
+        <DataPillNavigator currentScreen="CyclingScreen" />
+
+        <BottomSheet
+          ref={bottomSheetRef}
+          index={-1}
+          snapPoints={snapPoints}
+          enablePanDownToClose
+          backdropComponent={renderBackdrop}
+          backgroundStyle={styles.bsBackground}
+        >
+          <BottomSheetView style={styles.bsContainer}>
+            <ScrollView showsVerticalScrollIndicator={false}>
+              <View style={styles.bsHeader}>
                 <View
                   style={[
-                    styles.currentLocationMarker,
+                    styles.bsIconContainer,
                     { backgroundColor: activeTab === "Ciclismo" ? "#3B82F6" : "#10B981" },
                   ]}
-                />
-              </Marker>
-            )}
-          </MapView>
-
-          {isAutoPaused && (
-            <View style={styles.autoPauseOverlay}>
-              <Text style={styles.autoPauseText}>| | AUTO-PAUSA</Text>
-            </View>
-          )}
-
-          <View style={styles.hudOverlay}>
-            <View style={styles.hudGrid}>
-              <View style={styles.hudCard}>
-                <Navigation size={16} color="#3B82F6" />
-                <View style={styles.hudCardValueContainer}>
-                  <Text style={styles.hudCardValue}>{distance.toFixed(2)}</Text>
-                  <Text style={styles.hudCardUnit}>km</Text>
-                </View>
-              </View>
-              <View style={styles.hudCard}>
-                <Timer size={16} color="#10B981" />
-                <View style={styles.hudCardValueContainer}>
-                  <Text style={styles.hudCardValue}>{formatDuration(seconds)}</Text>
-                  <Text style={styles.hudCardUnit}>tempo</Text>
-                </View>
-              </View>
-              <View style={styles.hudCard}>
-                <Zap size={16} color="#EF4444" />
-                <View style={styles.hudCardValueContainer}>
-                  <Text style={styles.hudCardValue}>
-                    {activeTab === "Ciclismo" ? currentSpeedKmh : currentPace}
-                  </Text>
-                  <Text style={styles.hudCardUnit}>
-                    {activeTab === "Ciclismo" ? "km/h" : "pace/km"}
-                  </Text>
-                </View>
-              </View>
-              <View style={styles.hudCard}>
-                <Flame size={16} color="#F97316" />
-                <View style={styles.hudCardValueContainer}>
-                  <Text style={styles.hudCardValue}>{estimatedKcal}</Text>
-                  <Text style={styles.hudCardUnit}>kcal</Text>
-                </View>
-              </View>
-            </View>
-          </View>
-        </View>
-
-        <View style={styles.controlContainer}>
-          {!isTracking ? (
-            <TouchableOpacity
-              style={[styles.mainButton, { backgroundColor: "#BBF246" }]}
-              onPress={startTracking}
-              activeOpacity={0.8}
-            >
-              <Play size={24} color="#000" fill="#000" />
-              <Text style={styles.mainButtonText}>INICIAR {activeTab.toUpperCase()}</Text>
-            </TouchableOpacity>
-          ) : (
-            <View style={styles.activeControls}>
-              <TouchableOpacity style={[styles.roundButton]} onPress={togglePause}>
-                {isPaused || isAutoPaused ? (
-                  <Play size={24} color="#000" fill="#000" />
-                ) : (
-                  <Pause size={24} color="#000" fill="#000" />
-                )}
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.stopButton, { backgroundColor: "#EF4444" }]}
-                onPress={stopTracking}
-              >
-                <Square size={24} color="#FFF" fill="#FFF" />
-                <Text style={styles.stopButtonText}>FINALIZAR</Text>
-              </TouchableOpacity>
-            </View>
-          )}
-        </View>
-
-        <View style={styles.insightContainer}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Tendências de Esforço</Text>
-          </View>
-
-          <TouchableOpacity
-            style={styles.mainInsightCard}
-            activeOpacity={0.85}
-            onPress={handleOpenAnalysis}
-          >
-            <LinearGradient colors={["#F8FAFC", "#F1F5F9"]} style={styles.insightGradient}>
-              <View style={styles.insightLeft}>
-                <View style={styles.insightIconCircle}>
-                  <TrendingUp size={24} color="#3B82F6" />
+                >
+                  {activeTab === "Ciclismo" ? (
+                    <Bike size={24} color="#FFF" />
+                  ) : (
+                    <TrendingUp size={24} color="#FFF" />
+                  )}
                 </View>
                 <View>
-                  <Text style={styles.insightLabel}>Sua performance</Text>
-                  <Text style={styles.insightValue}>Acompanhe sua evolução semanal</Text>
+                  <Text style={styles.bsTitle}>Resumo do Treino</Text>
+                  <Text style={styles.bsSubtitle}>Histórico e análise de voltas</Text>
                 </View>
               </View>
-              <ChevronRight size={20} color="#3B82F6" />
-            </LinearGradient>
-          </TouchableOpacity>
 
-          <View style={styles.statsRow}>
-            <View style={styles.smallStatCard}>
-              <Heart size={20} color="#EF4444" />
-              <Text style={styles.smallStatLabel}>BPM Médio</Text>
-              <Text style={styles.smallStatValue}>--</Text>
-            </View>
-            <View style={styles.smallStatCard}>
-              <Flame size={20} color="#F97316" />
-              <Text style={styles.smallStatLabel}>Calorias</Text>
-              <Text style={styles.smallStatValue}>{estimatedKcal}</Text>
-            </View>
-            <View style={styles.smallStatCard}>
-              <Droplets size={20} color="#3B82F6" />
-              <Text style={styles.smallStatLabel}>Hidratação</Text>
-              <Text style={styles.smallStatValue}>0L</Text>
-            </View>
-          </View>
-        </View>
-
-        <View style={{ height: 120 }} />
-      </ScrollView>
-
-      <DataPillNavigator currentScreen="CyclingScreen" />
-
-      <BottomSheet
-        ref={bottomSheetRef}
-        index={-1}
-        snapPoints={snapPoints}
-        enablePanDownToClose
-        backdropComponent={renderBackdrop}
-        backgroundStyle={styles.bsBackground}
-      >
-        <BottomSheetView style={styles.bsContainer}>
-          <ScrollView showsVerticalScrollIndicator={false}>
-            <View style={styles.bsHeader}>
-              <View
-                style={[
-                  styles.bsIconContainer,
-                  { backgroundColor: activeTab === "Ciclismo" ? "#3B82F6" : "#10B981" },
-                ]}
-              >
-                {activeTab === "Ciclismo" ? (
-                  <Bike size={24} color="#FFF" />
-                ) : (
-                  <TrendingUp size={24} color="#FFF" />
-                )}
-              </View>
-              <View>
-                <Text style={styles.bsTitle}>Resumo do Treino</Text>
-                <Text style={styles.bsSubtitle}>Histórico e análise de voltas</Text>
-              </View>
-            </View>
-
-            <View style={styles.bsSection}>
-              <Text style={styles.bsSectionTitle}>Métricas Finais</Text>
-              <View style={styles.statsRow}>
-                <View style={styles.smallStatCard}>
-                  <Text style={styles.smallStatLabel}>Distância</Text>
-                  <Text style={styles.smallStatValue}>{distance.toFixed(2)} km</Text>
-                </View>
-                <View style={styles.smallStatCard}>
-                  <Text style={styles.smallStatLabel}>Tempo</Text>
-                  <Text style={styles.smallStatValue}>{formatDuration(seconds)}</Text>
-                </View>
-              </View>
-            </View>
-
-            {splits.length > 0 && (
               <View style={styles.bsSection}>
-                <Text style={styles.bsSectionTitle}>Voltas (Splits por KM)</Text>
-                <View style={styles.splitsTable}>
-                  <View style={styles.splitRowHeader}>
-                    <Text style={styles.splitHeaderText}>KM</Text>
-                    <Text style={styles.splitHeaderText}>TEMPO</Text>
-                    <Text style={styles.splitHeaderText}>PACE</Text>
+                <Text style={styles.bsSectionTitle}>Métricas Finais</Text>
+                <View style={styles.statsRow}>
+                  <View style={styles.smallStatCard}>
+                    <Text style={styles.smallStatLabel}>Distância</Text>
+                    <Text style={styles.smallStatValue}>{distance.toFixed(2)} km</Text>
                   </View>
-                  {splits.map((s, index) => (
-                    <View key={index} style={styles.splitRow}>
-                      <Text style={styles.splitNum}>{s.km}</Text>
-                      <Text style={styles.splitValue}>{s.time}</Text>
-                      <Text
-                        style={[
-                          styles.splitValue,
-                          { color: activeTab === "Ciclismo" ? "#3B82F6" : "#10B981" },
-                        ]}
-                      >
-                        {s.pace}
-                      </Text>
-                    </View>
-                  ))}
+                  <View style={styles.smallStatCard}>
+                    <Text style={styles.smallStatLabel}>Tempo</Text>
+                    <Text style={styles.smallStatValue}>{formatDuration(seconds)}</Text>
+                  </View>
                 </View>
               </View>
-            )}
 
-            <TouchableOpacity
-              style={styles.bsCloseBtn}
-              onPress={() => Alert.alert("Em breve", "Postando no Feed do MOVT...")}
-            >
-              <Text style={styles.bsCloseBtnText}>Postar no Feed do App</Text>
-            </TouchableOpacity>
-          </ScrollView>
-        </BottomSheetView>
-      </BottomSheet>
-    </SafeAreaView>
+              {splits.length > 0 && (
+                <View style={styles.bsSection}>
+                  <Text style={styles.bsSectionTitle}>Voltas (Splits por KM)</Text>
+                  <View style={styles.splitsTable}>
+                    <View style={styles.splitRowHeader}>
+                      <Text style={styles.splitHeaderText}>KM</Text>
+                      <Text style={styles.splitHeaderText}>TEMPO</Text>
+                      <Text style={styles.splitHeaderText}>PACE</Text>
+                    </View>
+                    {splits.map((s, index) => (
+                      <View key={index} style={styles.splitRow}>
+                        <Text style={styles.splitNum}>{s.km}</Text>
+                        <Text style={styles.splitValue}>{s.time}</Text>
+                        <Text
+                          style={[
+                            styles.splitValue,
+                            { color: activeTab === "Ciclismo" ? "#3B82F6" : "#10B981" },
+                          ]}
+                        >
+                          {s.pace}
+                        </Text>
+                      </View>
+                    ))}
+                  </View>
+                </View>
+              )}
+
+              <TouchableOpacity
+                style={styles.bsCloseBtn}
+                onPress={() => Alert.alert("Em breve", "Postando no Feed do MOVT...")}
+              >
+                <Text style={styles.bsCloseBtnText}>Postar no Feed do App</Text>
+              </TouchableOpacity>
+            </ScrollView>
+          </BottomSheetView>
+        </BottomSheet>
+      </SafeAreaView>
+    </DataErrorBoundary>
   );
 };
 

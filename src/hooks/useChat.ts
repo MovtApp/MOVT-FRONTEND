@@ -537,11 +537,11 @@ export const usePreloadChat = () => {
 
           // Preload das mensagens e perfis dos 3 chats mais recentes
           chatList.slice(0, 3).forEach(async (chat: any) => {
-            const myUUID = String(effectiveUserId).toLowerCase();
+            const myUUID = String(effectiveUserId || "").toLowerCase();
             const otherUUID =
-              String(chat.participant1_id).toLowerCase() === myUUID
-                ? chat.participant2_id
-                : chat.participant1_id;
+              String(chat?.participant1_id || "").toLowerCase() === myUUID
+                ? chat?.participant2_id
+                : chat?.participant1_id;
 
             try {
               // Preload mensagens

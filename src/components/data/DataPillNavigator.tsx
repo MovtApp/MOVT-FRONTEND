@@ -52,7 +52,7 @@ const DataPillNavigator: React.FC<DataPillNavigatorProps> = ({ currentScreen }) 
 const styles = StyleSheet.create({
   container: {
     position: "absolute",
-    bottom: Platform.OS === "android" ? 15 : 30,
+    bottom: Platform.OS === "android" ? 25 : 30,
     left: 0,
     right: 0,
     alignItems: "center",

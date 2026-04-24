@@ -25,12 +25,12 @@ const ECGDisplay: React.FC<ECGDisplayProps> = ({
 
   useEffect(() => {
     if (responsive) {
-      // Ajusta baseado no tamanho da tela
-      const calculatedWidth = Math.min(screenWidth - 40, 280);
-      const calculatedHeight = (calculatedWidth / 280) * 80;
+      // Ajusta baseado no tamanho da tela com clamp de segurança
+      const calculatedWidth = Math.max(10, Math.min(screenWidth - 40, 280));
+      const calculatedHeight = Math.max(10, (calculatedWidth / 280) * 80);
       setContainerSize({ width: calculatedWidth, height: calculatedHeight });
     } else {
-      setContainerSize({ width: width || 200, height: height || 60 });
+      setContainerSize({ width: Math.max(10, width || 200), height: Math.max(10, height || 60) });
     }
   }, [responsive, screenWidth, width, height]);
   const offsetAnim = useRef(new Animated.Value(0)).current;
@@ -45,15 +45,19 @@ const ECGDisplay: React.FC<ECGDisplayProps> = ({
     const scale = (containerSize.height - padding * 2) / 3;
     const centerY = containerSize.height / 2;
 
-    // Frequência da onda baseada em BPM
-    const beatFrequency = bpm / 60; // batidas por segundo
-    const wavelength = (containerSize.width / beatFrequency) * 1; // comprimento de onda que cabe no container
+    // Frequência da onda baseada em BPM (garante que não seja zero ou NaN)
+    const safeBpm = Math.max(1, bpm || 60);
+    const beatFrequency = safeBpm / 60; // batidas por segundo
+    const wavelength =
+      beatFrequency > 0 ? containerSize.width / beatFrequency : containerSize.width;
+    const safeWavelength =
+      isFinite(wavelength) && wavelength > 0 ? wavelength : containerSize.width;
 
     // Desenha a linha ECG
     for (let x = 0; x <= containerSize.width; x += stepSize) {
       const adjustedX = x + offset;
-      const normalizedX = adjustedX % wavelength;
-      const progress = normalizedX / wavelength;
+      const normalizedX = adjustedX % safeWavelength;
+      const progress = normalizedX / safeWavelength;
 
       let y = centerY;
 
@@ -140,7 +144,11 @@ const ECGDisplay: React.FC<ECGDisplayProps> = ({
   }, [offsetAnim]);
 
   const pathData = React.useMemo(() => {
-    return generateECGWaveform(displayOffset.current, bpm || 60);
+    try {
+      return generateECGWaveform(displayOffset.current, bpm || 60);
+    } catch (e) {
+      return "M 0 0";
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [bpm, containerSize.width, containerSize.height]);
 

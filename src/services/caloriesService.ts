@@ -39,16 +39,22 @@ export const getHealthMetricData = async (
       },
     });
 
+    const rawData = response.data?.data || [];
+    const safeData = Array.isArray(rawData) ? rawData : [];
+
     // Mapeia o campo 'value' da API genérica para o campo 'calories' usado pelas interfaces existentes
-    const formattedData = response.data.data.map((item: any) => ({
+    const formattedData = safeData.map((item: any) => ({
       ...item,
-      calories: item.value,
+      calories: Number(item?.value) || 0,
     }));
 
+    const totalVal = Number(response.data?.totalValue) || 0;
+    const dailyGoal = Number(response.data?.dailyGoal) || 10000;
+
     return {
-      totalCalories: response.data.totalValue,
-      remainingCalories: response.data.dailyGoal - response.data.totalValue,
-      dailyGoal: response.data.dailyGoal,
+      totalCalories: Math.round(totalVal),
+      remainingCalories: Math.max(0, dailyGoal - totalVal),
+      dailyGoal: dailyGoal,
       data: formattedData,
     };
   } catch (error: any) {
@@ -69,9 +75,9 @@ export const getCaloriesData = (timeframe: TimeframeType = "1d"): Promise<Calori
   getHealthMetricData("calories", timeframe);
 
 /**
- * Salva dados de calorias no backend
+ * Salva qualquer métrica de saúde no backend
  */
-export const saveCaloriesData = async (calories: number): Promise<void> => {
+export const saveHealthMetricData = async (metric: string, value: number): Promise<void> => {
   try {
     const sessionId = await AsyncStorage.getItem("userSessionId");
 
@@ -80,9 +86,9 @@ export const saveCaloriesData = async (calories: number): Promise<void> => {
     }
 
     await api.post(
-      "/dados/calories",
+      `/dados/${metric}`,
       {
-        calories,
+        value,
         timestamp: new Date().toISOString(),
       },
       {
@@ -92,9 +98,16 @@ export const saveCaloriesData = async (calories: number): Promise<void> => {
       }
     );
   } catch (error: any) {
-    console.error("❌ Erro ao salvar dados de calorias:", error);
+    console.error(`❌ Erro ao salvar dados de ${metric}:`, error);
     throw error;
   }
+};
+
+/**
+ * Salva dados de calorias no backend
+ */
+export const saveCaloriesData = async (calories: number): Promise<void> => {
+  return saveHealthMetricData("calories", calories);
 };
 
 /**
@@ -186,20 +199,28 @@ const getMockCaloriesData = (timeframe: TimeframeType): CalorieStats => {
  * Calcula o domínio dinâmico do gráfico (min e max)
  */
 export const calculateChartDomain = (data: CalorieData[]): [number, number] => {
-  if (data.length === 0) {
+  const values = (data || [])
+    .map((d) => d.calories)
+    .filter((v) => typeof v === "number" && isFinite(v) && !isNaN(v));
+
+  if (values.length === 0) {
     return [0, 2000];
   }
 
-  const values = data.map((d) => d.calories);
   const min = Math.min(...values);
   const max = Math.max(...values);
 
   // Adiciona 10% de padding acima e abaixo
-  const padding = (max - min) * 0.1;
+  const diff = max - min;
+  const padding = diff > 0 ? diff * 0.1 : 500;
+
   const minDomain = Math.floor((min - padding) / 100) * 100;
   const maxDomain = Math.ceil((max + padding) / 100) * 100;
 
-  return [Math.max(0, minDomain), maxDomain];
+  const resultMin = Math.max(0, isFinite(minDomain) ? minDomain : 0);
+  const resultMax = isFinite(maxDomain) ? maxDomain : 2000;
+
+  return [resultMin, Math.max(resultMin + 100, resultMax)];
 };
 
 /**

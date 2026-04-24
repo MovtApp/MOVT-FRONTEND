@@ -57,10 +57,11 @@ const MiniRadarChart: React.FC<MiniRadarChartProps> = ({
   const { width } = Dimensions.get("window");
   const isSmallOrIOS = width < 380 || Platform.OS === "ios";
 
-  const center = size / 2;
-  const radius = size * 0.32;
-  const axisRadius = size * 0.38;
-  const gridRadius = size * 0.38;
+  const safeSize = Math.max(1, size);
+  const center = safeSize / 2;
+  const radius = safeSize * 0.32;
+  const axisRadius = safeSize * 0.38;
+  const gridRadius = safeSize * 0.38;
   const labelRadius = axisRadius + 8;
   const levels = 5;
 
@@ -125,25 +126,38 @@ const MiniRadarChart: React.FC<MiniRadarChartProps> = ({
     }
 
     const firstControl = controlPoints[0];
+    if (!firstControl || isNaN(firstControl.before.x)) return "";
+
     pathSegments.push(`M ${firstControl.before.x} ${firstControl.before.y}`);
     for (let i = 0; i < numPoints; i++) {
       const control = controlPoints[i];
       const p1 = points[i];
+      if (isNaN(control.after.x) || isNaN(p1.x)) continue;
       pathSegments.push(`Q ${p1.x} ${p1.y} ${control.after.x} ${control.after.y}`);
     }
     return pathSegments.join(" ") + " Z";
   };
 
-  const forcaPath = createRoundedPolygonPath(getPolygonPoints(getValues(forcaData)), 16);
-  const agilidadePath = createRoundedPolygonPath(getPolygonPoints(getValues(agilidadeData)), 16);
-  const resistenciaPath = createRoundedPolygonPath(
-    getPolygonPoints(getValues(resistenciaData)),
-    16
-  );
+  const getSafePath = (data: RadarData | undefined) => {
+    if (!data) return "";
+    try {
+      const values = getValues(data);
+      if (values.some((v) => isNaN(v) || !isFinite(v))) return "";
+      const points = getPolygonPoints(values);
+      return createRoundedPolygonPath(points, 16);
+    } catch (e) {
+      console.warn("Error generating radar path:", e);
+      return "";
+    }
+  };
+
+  const forcaPath = getSafePath(forcaData);
+  const agilidadePath = getSafePath(agilidadeData);
+  const resistenciaPath = getSafePath(resistenciaData);
 
   return (
-    <View style={{ width: size, height: size, position: "relative" }}>
-      <Canvas style={{ width: size, height: size }}>
+    <View style={{ width: safeSize, height: safeSize, position: "relative" }}>
+      <Canvas style={{ width: safeSize, height: safeSize }}>
         {[...Array(levels)].map((_, i) => {
           const r = (gridRadius / levels) * (i + 1);
           const levelPoints = [0, 1, 2, 3, 4, 5].map((j) => {

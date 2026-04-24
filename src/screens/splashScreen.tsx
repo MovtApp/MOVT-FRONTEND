@@ -15,8 +15,8 @@ export function SplashScreen({ navigation }: Props) {
           // Usuário está autenticado, navegar para App
           navigation.replace("App");
         } else {
-          // Usuário não está autenticado, navegar para Auth
-          navigation.replace("Auth");
+          // Usuário não está autenticado, navegar para StartupScreen
+          navigation.replace("StartupScreen");
         }
       }
     }, 5000);

@@ -26,7 +26,8 @@
         "NSLocationAlwaysAndWhenInUseUsageDescription": "Este aplicativo precisa de acesso à localização em segundo plano para rastrear suas rotas de exercício.",
         "NSHealthShareUsageDescription": "Este aplicativo precisa de acesso aos seus dados de saúde para mostrar seu progresso fitness.",
         "NSHealthUpdateUsageDescription": "Este aplicativo precisa registrar seus dados de saúde para rastrear suas atividades.",
-        "NSBluetoothAlwaysUsageDescription": "Este aplicativo usa Bluetooth para conectar e sincronizar dados com seu relógio inteligente."
+        "NSBluetoothAlwaysUsageDescription": "Este aplicativo usa Bluetooth para conectar e sincronizar dados com seu relógio inteligente.",
+        "NSBluetoothPeripheralUsageDescription": "Este aplicativo usa Bluetooth para descobrir e parear com dispositivos de monitoramento de saúde."
       }
     },
     "android": {
@@ -48,7 +49,11 @@
         "android.permission.BLUETOOTH",
         "android.permission.BLUETOOTH_ADMIN",
         "android.permission.BLUETOOTH_CONNECT",
-        "android.permission.BLUETOOTH_SCAN"
+        "android.permission.BLUETOOTH_SCAN",
+        "android.permission.HEALTH_READ_STEPS",
+        "android.permission.HEALTH_READ_HEART_RATE",
+        "android.permission.HEALTH_WRITE_STEPS",
+        "android.permission.HEALTH_WRITE_HEART_RATE"
       ]
     },
     "runtimeVersion": "1.0.0",
@@ -75,8 +80,8 @@
         {
           "android": {
             "minSdkVersion": 26,
-            "compileSdkVersion": 35,
-            "targetSdkVersion": 35,
+            "compileSdkVersion": 34,
+            "targetSdkVersion": 34,
             "ndkVersion": "26.1.10909125",
             "extraQueryParams": {
               "stl": "c++_shared"
@@ -85,12 +90,14 @@
         }
       ]
     ],
-
     "extra": {
       "eas": {
         "projectId": "2d73320b-52df-4407-83d5-c827a5a55f27"
       }
     },
-    "owner": "movtapp"
+    "owner": "movtapp",
+    "updates": {
+      "url": "https://u.expo.dev/2d73320b-52df-4407-83d5-c827a5a55f27"
+    }
   }
 }

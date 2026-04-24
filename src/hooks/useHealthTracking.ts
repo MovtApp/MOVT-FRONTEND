@@ -11,6 +11,7 @@ import {
 import { NativeHealthManager } from "../services/nativeHealthManager";
 import { getTodayKey } from "../utils/formatters";
 import { Platform } from "react-native";
+import { getHealthMetricData } from "../services/caloriesService";
 
 const STEPS_INACTIVITY_TIMEOUT = 6000;
 const DEFAULT_STEPS_GOAL = 10000;
@@ -103,47 +104,92 @@ export const useHealthTracking = (userId: string | undefined, targetDate?: Date)
         AsyncStorage.getItem(hrKey),
       ]);
 
-      if (waterRaw) {
-        const parsed = JSON.parse(waterRaw);
-        setWaterConsumedMl(parsed.consumedMl || 0);
-      } else {
-        setWaterConsumedMl(0);
+      // Tenta buscar do backend primeiro para água (mais confiável agora)
+      try {
+        const backendWater = await getHealthMetricData("water", "1d");
+        if (backendWater && backendWater.data) {
+          const val = backendWater.totalCalories || 0;
+          setWaterConsumedMl(val);
+          // Opcional: Atualiza o cache local
+          if (waterKey) {
+            await AsyncStorage.setItem(waterKey, JSON.stringify({ consumedMl: val }));
+          }
+        } else if (waterRaw) {
+          const parsed = JSON.parse(waterRaw);
+          setWaterConsumedMl(parsed.consumedMl || 0);
+        } else {
+          setWaterConsumedMl(0);
+        }
+      } catch (err) {
+        if (waterRaw) {
+          const parsed = JSON.parse(waterRaw);
+          setWaterConsumedMl(parsed.consumedMl || 0);
+        } else {
+          setWaterConsumedMl(0);
+        }
       }
 
       if (calRaw) {
-        const parsed = JSON.parse(calRaw);
-        setDailyCalories(parsed.calories || 0);
+        try {
+          const parsed = JSON.parse(calRaw);
+          const val = Number(parsed.calories);
+          setDailyCalories(isFinite(val) ? val : 0);
+        } catch {
+          setDailyCalories(0);
+        }
       } else {
         setDailyCalories(0);
       }
 
       if (sleepRaw) {
-        const parsed = JSON.parse(sleepRaw);
-        setSleepHours(parsed.hours || 0);
-        setSleepMinutes(parsed.minutes || 0);
+        try {
+          const parsed = JSON.parse(sleepRaw);
+          const h = Number(parsed.hours);
+          const m = Number(parsed.minutes);
+          setSleepHours(isFinite(h) ? h : 0);
+          setSleepMinutes(isFinite(m) ? m : 0);
+        } catch {
+          setSleepHours(0);
+          setSleepMinutes(0);
+        }
       } else {
         setSleepHours(0);
         setSleepMinutes(0);
       }
 
       if (trainingRaw) {
-        const parsed = JSON.parse(trainingRaw);
-        setTrainingTime(parsed.duration || 0);
+        try {
+          const parsed = JSON.parse(trainingRaw);
+          const val = Number(parsed.duration);
+          setTrainingTime(isFinite(val) ? val : 0);
+        } catch {
+          setTrainingTime(0);
+        }
       } else {
         setTrainingTime(0);
       }
 
       if (!isToday) {
         if (stepsRaw) {
-          const parsed = JSON.parse(stepsRaw);
-          setStepsToday(parsed.steps || 0);
+          try {
+            const parsed = JSON.parse(stepsRaw);
+            const val = Number(parsed.steps);
+            setStepsToday(isFinite(val) ? val : 0);
+          } catch {
+            setStepsToday(0);
+          }
         } else {
           setStepsToday(0);
         }
 
         if (hrRaw) {
-          const parsed = JSON.parse(hrRaw);
-          setHeartRate(parsed.heartRate || 0);
+          try {
+            const parsed = JSON.parse(hrRaw);
+            const val = Number(parsed.heartRate);
+            setHeartRate(isFinite(val) ? val : 0);
+          } catch {
+            setHeartRate(0);
+          }
         } else {
           setHeartRate(0);
         }
@@ -198,8 +244,19 @@ export const useHealthTracking = (userId: string | undefined, targetDate?: Date)
   // Native Health Verification (Google Fit/HealthKit)
   useFocusEffect(
     useCallback(() => {
-      NativeHealthManager.authorize();
-    }, [])
+      let isSubscribed = true;
+      const authorize = async () => {
+        try {
+          await NativeHealthManager.authorize();
+        } catch (e) {
+          console.warn("Health authorization error:", e);
+        }
+      };
+      if (isToday) authorize();
+      return () => {
+        isSubscribed = false;
+      };
+    }, [isToday])
   );
 
   // Wear OS Real-time Polling
@@ -321,36 +378,45 @@ export const useHealthTracking = (userId: string | undefined, targetDate?: Date)
           const initialPosition = await Location.getCurrentPositionAsync({
             accuracy: Location.Accuracy.Balanced,
           });
-          if (!isActive) return;
-          const initialPoint = {
-            latitude: initialPosition.coords.latitude,
-            longitude: initialPosition.coords.longitude,
-          };
-          setCyclingRoute([initialPoint]);
-          setCyclingRegion({ ...initialPoint, latitudeDelta: 0.005, longitudeDelta: 0.005 });
+          const initialCoords = initialPosition.coords;
+          if (
+            initialCoords &&
+            isFinite(initialCoords.latitude) &&
+            isFinite(initialCoords.longitude)
+          ) {
+            const initialPoint = {
+              latitude: initialCoords.latitude,
+              longitude: initialCoords.longitude,
+            };
+            setCyclingRoute([initialPoint]);
+            setCyclingRegion({ ...initialPoint, latitudeDelta: 0.005, longitudeDelta: 0.005 });
+          }
           setLocationError(null);
 
           cyclingWatcherRef.current = await Location.watchPositionAsync(
             {
-              accuracy: Location.Accuracy.BestForNavigation,
-              timeInterval: 5000,
-              distanceInterval: 5,
+              accuracy: Location.Accuracy.Balanced, // Use balanced to avoid excessive battery/crashes
+              timeInterval: 10000, // 10 seconds is safer
+              distanceInterval: 10,
             },
             (update) => {
               if (!isActive) return;
-              const newPoint = {
-                latitude: update.coords.latitude,
-                longitude: update.coords.longitude,
-              };
-              setCyclingRoute((prev) => {
-                const next = [...prev, newPoint];
-                return next.length > 60 ? next.slice(next.length - 60) : next;
-              });
-              setCyclingRegion((prev) =>
-                prev
-                  ? { ...prev, ...newPoint }
-                  : { ...newPoint, latitudeDelta: 0.005, longitudeDelta: 0.005 }
-              );
+              const coords = update.coords;
+              if (coords && isFinite(coords.latitude) && isFinite(coords.longitude)) {
+                const newPoint = {
+                  latitude: coords.latitude,
+                  longitude: coords.longitude,
+                };
+                setCyclingRoute((prev) => {
+                  const next = [...prev, newPoint];
+                  return next.length > 60 ? next.slice(next.length - 60) : next;
+                });
+                setCyclingRegion((prev) =>
+                  prev
+                    ? { ...prev, ...newPoint }
+                    : { ...newPoint, latitudeDelta: 0.005, longitudeDelta: 0.005 }
+                );
+              }
             }
           );
         } catch {
@@ -451,19 +517,21 @@ export const useHealthTracking = (userId: string | undefined, targetDate?: Date)
         stats.dailyScores.unshift(Math.round(dayScore));
       }
 
+      const safeDays = Math.max(1, daysToFetch);
+
       return {
         totalWater: stats.water,
         totalCalories: stats.calories,
-        avgSleep: stats.hrCount > 0 ? stats.sleep / daysToFetch : stats.sleep, // min/day
+        avgSleep: stats.sleep / safeDays, // min/day
         totalSteps: stats.steps,
         totalTraining: stats.training,
         avgHeartRate: stats.hrCount > 0 ? stats.heartRate / stats.hrCount : 0,
         dailyScores: stats.dailyScores,
         // Radar Mapping (0-100)
         radar: {
-          forca: Math.min(100, (stats.steps / (daysToFetch * 8000)) * 100),
-          agilidade: Math.min(100, (stats.training / (daysToFetch * 30 * 60)) * 100), // 30min/dia meta
-          resistencia: Math.min(100, (stats.sleep / (daysToFetch * 420)) * 100), // 7h/dia meta
+          forca: Math.min(100, (stats.steps / (safeDays * 8000)) * 100),
+          agilidade: Math.min(100, (stats.training / (safeDays * 30 * 60)) * 100), // 30min/dia meta
+          resistencia: Math.min(100, (stats.sleep / (safeDays * 420)) * 100), // 7h/dia meta
         },
       };
     },

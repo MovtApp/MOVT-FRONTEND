@@ -5,7 +5,6 @@ import {
   StyleSheet,
   TouchableOpacity,
   ScrollView,
-  SafeAreaView,
   Animated,
   Easing,
   Dimensions,
@@ -14,6 +13,8 @@ import {
   KeyboardAvoidingView,
   Platform,
 } from "react-native";
+
+import { SafeAreaView } from "react-native-safe-area-context";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { getHealthMetricData, saveHealthMetricData } from "../../../../services/caloriesService";
 
@@ -22,6 +23,53 @@ import DataPillNavigator from "../../../../components/data/DataPillNavigator";
 import { AppStackParamList } from "../../../../@types/routes";
 import ConfettiCannon from "react-native-confetti-cannon";
 import { CirclePlus, SquarePen, RotateCcw, Plus } from "lucide-react-native";
+
+// ─── Error Boundary ────────────────────────────────────────────────────────────
+
+interface EBState {
+  hasError: boolean;
+  error: Error | null;
+}
+class DataErrorBoundary extends React.Component<{ children: React.ReactNode }, EBState> {
+  constructor(props: any) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+  static getDerivedStateFromError(error: Error) {
+    return { hasError: true, error };
+  }
+  componentDidCatch(error: Error, info: any) {
+    console.error("[WaterScreen] Crash interceptado:", error, info);
+  }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <View
+          style={{
+            flex: 1,
+            backgroundColor: "#FEF2F2",
+            margin: 12,
+            borderRadius: 16,
+            padding: 20,
+            justifyContent: "center",
+            alignItems: "center",
+          }}
+        >
+          <Text style={{ fontSize: 16, fontWeight: "bold", color: "#DC2626", marginBottom: 10 }}>
+            ⚠️ Erro no Módulo de Água
+          </Text>
+          <Text style={{ fontSize: 12, color: "#7F1D1D", textAlign: "center", marginBottom: 10 }}>
+            {this.state.error?.message}
+          </Text>
+          <Text style={{ fontSize: 10, color: "#991B1B", textAlign: "center" }}>
+            {this.state.error?.stack?.slice(0, 300)}
+          </Text>
+        </View>
+      );
+    }
+    return this.props.children;
+  }
+}
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 
@@ -78,7 +126,7 @@ const WaterScreen: React.FC = () => {
       try {
         const data = await getHealthMetricData("water", "1d");
         if (data && data.data) {
-          setConsumedMl(data.totalValue || 0);
+          setConsumedMl(data.totalCalories || 0);
           setGoalMl(data.dailyGoal || DEFAULT_GOAL_ML);
         }
       } catch (error) {
@@ -129,7 +177,9 @@ const WaterScreen: React.FC = () => {
 
   // Altura animada do card azul (cresce de baixo para cima)
   const animatedBlueHeight = useRef(new Animated.Value(0)).current;
-  const progress = Math.min(1, Math.max(0, consumedMl / goalMl));
+  const rawProgress = consumedMl / (goalMl || DEFAULT_GOAL_ML);
+  const progress =
+    isFinite(rawProgress) && !isNaN(rawProgress) ? Math.min(1, Math.max(0, rawProgress)) : 0;
   useEffect(() => {
     const target = Math.max(MIN_BLUE_HEIGHT, METRIC_AREA_HEIGHT * progress);
     Animated.timing(animatedBlueHeight, {
@@ -141,144 +191,146 @@ const WaterScreen: React.FC = () => {
   }, [progress, animatedBlueHeight]);
 
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <View style={{ flex: 1 }}>
-        <ScrollView contentContainerStyle={styles.scrollContent}>
-          <View style={styles.header}>
-            <BackButton to={{ name: "DataScreen" }} />
-            <Text style={styles.headerTitle}>Hidratação</Text>
-            <View style={{ width: 46 }} />
-          </View>
-
-          {showConfetti && (
-            <ConfettiCannon
-              key={`confetti-${consumedMl}`}
-              count={150}
-              origin={{ x: SCREEN_WIDTH / 2, y: -10 }}
-              fadeOut
-              autoStart
-              explosionSpeed={400}
-              fallSpeed={2500}
-              onAnimationEnd={() => setShowConfetti(false)}
-            />
-          )}
-
-          <View style={styles.summaryCard}>
-            <View style={styles.heroRow}>
-              <Text style={styles.dropIcon}>💧</Text>
-              <Text style={styles.summaryAmount}>
-                {consumedMl}
-                <Text style={styles.summaryUnit}> ml</Text>
-              </Text>
-            </View>
-            <Text style={styles.summarySub}>Faltam mais {remainingMl} ml para hoje.</Text>
-
-            <View style={styles.actionsRow}>
-              <TouchableOpacity
-                style={styles.actionIconButton}
-                accessibilityRole="button"
-                accessibilityLabel="Zerar consumo"
-                onPress={handleReset}
-                activeOpacity={0.85}
-              >
-                <RotateCcw size={20} color="#192126" />
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.actionIconButton}
-                accessibilityRole="button"
-                accessibilityLabel="Editar meta diária"
-                onPress={handleEditGoal}
-                activeOpacity={0.85}
-              >
-                <SquarePen size={20} color="#192126" />
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.actionIconButton}
-                accessibilityRole="button"
-                accessibilityLabel={`Adicionar ${cupMl} ml`}
-                onPress={handleAddCup}
-                activeOpacity={0.85}
-              >
-                <CirclePlus size={20} color="#192126" />
-              </TouchableOpacity>
-            </View>
-          </View>
-
-          {/* Área métrica empilhada: cinza (meta) como fundo e azul crescendo de baixo para cima */}
-          <View style={styles.metricStack}>
-            {/* Fundo cinza (meta) ocupando toda a área */}
-            <View style={styles.metricGreyBackground}>
-              <Text style={styles.metricGreyLabel}>Meta</Text>
-              <Text style={styles.metricGreyValue}>{goalMl}ml</Text>
+    <DataErrorBoundary>
+      <SafeAreaView style={styles.safeArea} edges={["top"]}>
+        <View style={{ flex: 1 }}>
+          <ScrollView contentContainerStyle={styles.scrollContent}>
+            <View style={styles.header}>
+              <BackButton to={{ name: "DataScreen" }} />
+              <Text style={styles.headerTitle}>Hidratação</Text>
+              <View style={{ width: 46 }} />
             </View>
 
-            {/* Azul dinâmico ancorado no bottom */}
-            <Animated.View style={[styles.metricBlueFill, { height: animatedBlueHeight }]}>
-              <View style={styles.metricTopRightGroup}>
-                <Text style={styles.metricBlueTopRight}>Até agora</Text>
-                <Text style={styles.metricMl}>{consumedMl} ml</Text>
+            {showConfetti && (
+              <ConfettiCannon
+                key={`confetti-${consumedMl}`}
+                count={150}
+                origin={{ x: SCREEN_WIDTH / 2, y: -10 }}
+                fadeOut
+                autoStart
+                explosionSpeed={400}
+                fallSpeed={2500}
+                onAnimationEnd={() => setShowConfetti(false)}
+              />
+            )}
+
+            <View style={styles.summaryCard}>
+              <View style={styles.heroRow}>
+                <Text style={styles.dropIcon}>💧</Text>
+                <Text style={styles.summaryAmount}>
+                  {consumedMl}
+                  <Text style={styles.summaryUnit}> ml</Text>
+                </Text>
               </View>
-              <TouchableOpacity
-                onPress={handleAddCup}
-                accessibilityRole="button"
-                accessibilityLabel={`Adicionar ${cupMl} ml`}
-                style={styles.plusButton}
-              >
-                <Plus size={20} color="#192126" />
-              </TouchableOpacity>
-            </Animated.View>
-          </View>
-        </ScrollView>
-        <DataPillNavigator currentScreen="WaterScreen" />
-      </View>
+              <Text style={styles.summarySub}>Faltam mais {remainingMl} ml para hoje.</Text>
 
-      <Modal
-        visible={showEditGoalModal}
-        transparent
-        animationType="fade"
-        onRequestClose={handleCancelEditGoal}
-      >
-        <KeyboardAvoidingView
-          behavior={Platform.OS === "ios" ? "padding" : "height"}
-          style={styles.modalOverlay}
-        >
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Editar meta</Text>
-            <Text style={styles.modalSubtitle}>Informe a meta diária em ml</Text>
-
-            <TextInput
-              style={styles.modalInput}
-              value={goalInputValue}
-              onChangeText={setGoalInputValue}
-              placeholder="Ex: 2000"
-              keyboardType="numeric"
-              autoFocus
-              selectTextOnFocus
-            />
-
-            <View style={styles.modalButtons}>
-              <TouchableOpacity
-                style={[styles.modalButton, styles.modalButtonCancel]}
-                onPress={handleCancelEditGoal}
-              >
-                <Text style={styles.modalButtonCancelText}>Cancelar</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[
-                  styles.modalButton,
-                  styles.modalButtonSave,
-                  Number(goalInputValue) <= 0 && styles.modalButtonDisabled,
-                ]}
-                onPress={handleSaveGoal}
-                disabled={Number(goalInputValue) <= 0}
-              >
-                <Text style={styles.modalButtonSaveText}>Salvar</Text>
-              </TouchableOpacity>
+              <View style={styles.actionsRow}>
+                <TouchableOpacity
+                  style={styles.actionIconButton}
+                  accessibilityRole="button"
+                  accessibilityLabel="Zerar consumo"
+                  onPress={handleReset}
+                  activeOpacity={0.85}
+                >
+                  <RotateCcw size={20} color="#192126" />
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.actionIconButton}
+                  accessibilityRole="button"
+                  accessibilityLabel="Editar meta diária"
+                  onPress={handleEditGoal}
+                  activeOpacity={0.85}
+                >
+                  <SquarePen size={20} color="#192126" />
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.actionIconButton}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Adicionar ${cupMl} ml`}
+                  onPress={handleAddCup}
+                  activeOpacity={0.85}
+                >
+                  <CirclePlus size={20} color="#192126" />
+                </TouchableOpacity>
+              </View>
             </View>
-          </View>
-        </KeyboardAvoidingView>
-      </Modal>
-    </SafeAreaView>
+
+            {/* Área métrica empilhada: cinza (meta) como fundo e azul crescendo de baixo para cima */}
+            <View style={styles.metricStack}>
+              {/* Fundo cinza (meta) ocupando toda a área */}
+              <View style={styles.metricGreyBackground}>
+                <Text style={styles.metricGreyLabel}>Meta</Text>
+                <Text style={styles.metricGreyValue}>{goalMl}ml</Text>
+              </View>
+
+              {/* Azul dinâmico ancorado no bottom */}
+              <Animated.View style={[styles.metricBlueFill, { height: animatedBlueHeight }]}>
+                <View style={styles.metricTopRightGroup}>
+                  <Text style={styles.metricBlueTopRight}>Até agora</Text>
+                  <Text style={styles.metricMl}>{consumedMl} ml</Text>
+                </View>
+                <TouchableOpacity
+                  onPress={handleAddCup}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Adicionar ${cupMl} ml`}
+                  style={styles.plusButton}
+                >
+                  <Plus size={20} color="#192126" />
+                </TouchableOpacity>
+              </Animated.View>
+            </View>
+          </ScrollView>
+          <DataPillNavigator currentScreen="WaterScreen" />
+        </View>
+
+        <Modal
+          visible={showEditGoalModal}
+          transparent
+          animationType="fade"
+          onRequestClose={handleCancelEditGoal}
+        >
+          <KeyboardAvoidingView
+            behavior={Platform.OS === "ios" ? "padding" : "height"}
+            style={styles.modalOverlay}
+          >
+            <View style={styles.modalContent}>
+              <Text style={styles.modalTitle}>Editar meta</Text>
+              <Text style={styles.modalSubtitle}>Informe a meta diária em ml</Text>
+
+              <TextInput
+                style={styles.modalInput}
+                value={goalInputValue}
+                onChangeText={setGoalInputValue}
+                placeholder="Ex: 2000"
+                keyboardType="numeric"
+                autoFocus
+                selectTextOnFocus
+              />
+
+              <View style={styles.modalButtons}>
+                <TouchableOpacity
+                  style={[styles.modalButton, styles.modalButtonCancel]}
+                  onPress={handleCancelEditGoal}
+                >
+                  <Text style={styles.modalButtonCancelText}>Cancelar</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[
+                    styles.modalButton,
+                    styles.modalButtonSave,
+                    Number(goalInputValue) <= 0 && styles.modalButtonDisabled,
+                  ]}
+                  onPress={handleSaveGoal}
+                  disabled={Number(goalInputValue) <= 0}
+                >
+                  <Text style={styles.modalButtonSaveText}>Salvar</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </KeyboardAvoidingView>
+        </Modal>
+      </SafeAreaView>
+    </DataErrorBoundary>
   );
 };
 
@@ -286,11 +338,10 @@ const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
     backgroundColor: "#fff",
-    paddingTop: Platform.OS === "android" ? 40 : 0,
   },
   scrollContent: {
     flexGrow: 1,
-    paddingBottom: 100, // padding extra na parte inferior para que o botão de + não fique escondido sob a navegação
+    paddingBottom: Platform.OS === "ios" ? 200 : 100, // Preenchimento maior no iOS para garantir que o card suba o suficiente
   },
   header: {
     flexDirection: "row",
@@ -361,6 +412,7 @@ const styles = StyleSheet.create({
     marginHorizontal: 0,
     borderRadius: 16,
     overflow: "hidden",
+    marginBottom: Platform.OS === "ios" ? 160 : 80, // Adicionado margem no Android também
   },
   metricGreyBackground: {
     ...StyleSheet.absoluteFillObject,
@@ -391,15 +443,15 @@ const styles = StyleSheet.create({
     position: "absolute",
     left: 0,
     right: 0,
-    bottom: 0,
+    bottom: Platform.OS === "ios" ? 40 : 0,
     backgroundColor: "#1976d2",
     borderTopLeftRadius: 16,
     borderTopRightRadius: 16,
-    borderBottomLeftRadius: 0,
-    borderBottomRightRadius: 0,
+    borderBottomLeftRadius: Platform.OS === "ios" ? 16 : 0,
+    borderBottomRightRadius: Platform.OS === "ios" ? 16 : 0,
     alignItems: "center",
-    justifyContent: "flex-start",
-    paddingTop: 16,
+    justifyContent: "flex-end",
+    paddingBottom: Platform.OS === "ios" ? 40 : 16,
   },
   metricTopRightGroup: {
     position: "absolute",
@@ -423,6 +475,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     borderWidth: 6,
     borderColor: "#8099DA",
+    marginBottom: Platform.OS === "ios" ? 70 : 90,
   },
   actionsCard: {
     backgroundColor: "#fff",
