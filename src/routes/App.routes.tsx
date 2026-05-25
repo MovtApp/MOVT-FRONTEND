@@ -49,9 +49,10 @@ import PostDetailScreen from "../screens/Feed/PostDetailScreen";
 import ArchivedPostsScreen from "../screens/App/profile/ArchivedPostsScreen";
 import EditProfileScreen from "../screens/App/profile/EditProfileScreen";
 import AdminDashboardScreen from "../screens/App/admin/AdminDashboardScreen";
+import PersonalDashboard from "../screens/App/personal/[protected]/PersonalDashboard";
 
 import ActiveWorkout from "../screens/App/training/[protected]/activeWorkout";
-import LanguageScreen from "../screens/App/config/LanguageScreen";
+
 import ExpectationRealityScreen from "../screens/App/biometrics/ExpectationRealityScreen";
 
 const Stack = createNativeStackNavigator<AppStackParamList>();
@@ -97,7 +98,7 @@ function AppLayout() {
         <Stack.Screen name="ExplorerScreen" component={ExplorerScreen} />
         <Stack.Screen name="ConfigScreen" component={ConfigScreen} />
         <Stack.Screen name="PlanScreen" component={PlanScreen} />
-        <Stack.Screen name="LanguageScreen" component={LanguageScreen} />
+
         <Stack.Screen name="FAQScreen" component={FAQScreen} />
         <Stack.Screen name="ServiceScreen" component={ServiceScreen} />
         <Stack.Screen name="ReviewScreen" component={ReviewScreen} />
@@ -110,6 +111,7 @@ function AppLayout() {
         <Stack.Screen name="ArchivedPostsScreen" component={ArchivedPostsScreen} />
         <Stack.Screen name="EditProfileScreen" component={EditProfileScreen} />
         <Stack.Screen name="AdminDashboard" component={AdminDashboardScreen} />
+        <Stack.Screen name="PersonalDashboard" component={PersonalDashboard} />
         <Stack.Screen name="ExpectationRealityScreen" component={ExpectationRealityScreen} />
       </Stack.Navigator>
       <BottomNavigationBar />

@@ -162,6 +162,14 @@ const PersonalDashboard: React.FC = () => {
   const [comentarioTecnico, setComentarioTecnico] = useState("");
   const [notaAluno, setNotaAluno] = useState(5);
 
+  const [renderedSheets, setRenderedSheets] = useState<Set<string>>(new Set());
+  const [sheetVersion, setSheetVersion] = useState(0);
+
+  const markSheetAsRendered = useCallback((sheetName: string) => {
+    setRenderedSheets(new Set([sheetName]));
+    setSheetVersion((v) => v + 1);
+  }, []);
+
   const fetchData = useCallback(async (tab: string = "month", status: string = "all") => {
     try {
       const response = await api.get(`/personal/dashboard-stats`, {
@@ -203,7 +211,7 @@ const PersonalDashboard: React.FC = () => {
   const openClientHistory = async (client: PersonalClient) => {
     setSelectedClient(client);
     setFetchingHistory(true);
-    historySheetRef.current?.expand();
+    markSheetAsRendered("history");
     try {
       const response = await api.get(`/personal/clients/${client.id_us}/history`);
       if (response.data.success) {
@@ -221,7 +229,7 @@ const PersonalDashboard: React.FC = () => {
     setNotaIntensidade(appt.nota_intensidade || 3);
     setComentarioTecnico(appt.comentario_tecnico || "");
     setNotaAluno(appt.nota_aluno || 5);
-    evaluationSheetRef.current?.expand();
+    markSheetAsRendered("evaluation");
   };
 
   const submitEvaluation = async () => {
@@ -245,7 +253,7 @@ const PersonalDashboard: React.FC = () => {
 
   const openFilter = () => {
     setTempStatus(filterStatus);
-    filterSheetRef.current?.expand();
+    markSheetAsRendered("filter");
   };
 
   const applyFilters = () => {
@@ -381,10 +389,10 @@ const PersonalDashboard: React.FC = () => {
         style={styles.kpiCard}
         activeOpacity={0.7}
         onPress={() => {
-          if (item.id === "appointments") appointmentsSheetRef.current?.expand();
-          if (item.id === "revenue") revenueSheetRef.current?.expand();
-          if (item.id === "clients") clientsSheetRef.current?.expand();
-          if (item.id === "pending") approvalsSheetRef.current?.expand();
+          if (item.id === "appointments") markSheetAsRendered("appointments");
+          if (item.id === "revenue") markSheetAsRendered("revenue");
+          if (item.id === "clients") markSheetAsRendered("clients");
+          if (item.id === "pending") markSheetAsRendered("approvals");
         }}
       >
         <LinearGradient
@@ -559,7 +567,7 @@ const PersonalDashboard: React.FC = () => {
             <TouchableOpacity
               style={[styles.halfCard, { flex: 1.3 }]}
               activeOpacity={0.7}
-              onPress={() => appointmentsSheetRef.current?.expand()}
+              onPress={() => markSheetAsRendered("appointments")}
             >
               <View
                 style={{
@@ -657,7 +665,7 @@ const PersonalDashboard: React.FC = () => {
             <TouchableOpacity
               style={styles.halfCard}
               activeOpacity={0.7}
-              onPress={() => performanceSheetRef.current?.expand()}
+              onPress={() => markSheetAsRendered("performance")}
             >
               <View
                 style={{
@@ -790,7 +798,7 @@ const PersonalDashboard: React.FC = () => {
             <View style={styles.statusList}>
               <TouchableOpacity
                 style={styles.statusItem}
-                onPress={() => approvalsSheetRef.current?.expand()}
+                onPress={() => markSheetAsRendered("approvals")}
               >
                 <View style={styles.statusIndicator}>
                   <View style={[styles.statusDot, { backgroundColor: "#F59E0B" }]} />
@@ -804,7 +812,7 @@ const PersonalDashboard: React.FC = () => {
 
               <TouchableOpacity
                 style={styles.statusItem}
-                onPress={() => clientsSheetRef.current?.expand()}
+                onPress={() => markSheetAsRendered("clients")}
               >
                 <View style={styles.statusIndicator}>
                   <View style={[styles.statusDot, { backgroundColor: "#10B981" }]} />
@@ -818,7 +826,7 @@ const PersonalDashboard: React.FC = () => {
 
               <TouchableOpacity
                 style={styles.statusItem}
-                onPress={() => reviewsSheetRef.current?.expand()}
+                onPress={() => markSheetAsRendered("reviews")}
               >
                 <View style={styles.statusIndicator}>
                   <View style={[styles.statusDot, { backgroundColor: "#6366F1" }]} />
@@ -832,7 +840,7 @@ const PersonalDashboard: React.FC = () => {
 
               <TouchableOpacity
                 style={styles.statusItem}
-                onPress={() => paymentsSheetRef.current?.expand()}
+                onPress={() => markSheetAsRendered("payments")}
               >
                 <View style={styles.statusIndicator}>
                   <View style={[styles.statusDot, { backgroundColor: "#192126" }]} />
@@ -849,662 +857,91 @@ const PersonalDashboard: React.FC = () => {
         </ScrollView>
 
         {/* ── SHEET: FILTRO ── */}
-        <BottomSheet
-          ref={filterSheetRef}
-          index={-1}
-          snapPoints={["40%"]}
-          enablePanDownToClose
-          backdropComponent={renderBackdrop}
-          backgroundStyle={{ borderRadius: 32 }}
-        >
-          <BottomSheetView style={styles.sheetContent}>
-            <View style={styles.sheetHeader}>
-              <Text style={styles.sheetTitle}>Filtrar por Status</Text>
-              <TouchableOpacity onPress={() => filterSheetRef.current?.close()}>
-                <X size={24} color="#64748B" />
-              </TouchableOpacity>
-            </View>
-            <View style={styles.filterSection}>
-              <Text style={styles.filterSectionTitle}>Status do Agendamento</Text>
-              <View style={styles.filterOptionsGrid}>
-                {["all", "confirmado", "pendente", "cancelado"].map((st) => (
-                  <TouchableOpacity
-                    key={st}
-                    style={[styles.filterOption, tempStatus === st && styles.filterOptionActive]}
-                    onPress={() => setTempStatus(st)}
-                  >
-                    <Text
-                      style={[
-                        styles.filterOptionText,
-                        tempStatus === st && styles.filterOptionTextActive,
-                      ]}
-                    >
-                      {st === "all"
-                        ? "Todos"
-                        : st === "confirmado"
-                          ? "Confirmado"
-                          : st === "pendente"
-                            ? "Pendente"
-                            : "Cancelado"}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
+        {renderedSheets.has("filter") && (
+          <BottomSheet
+            ref={filterSheetRef}
+            key={`filter-${sheetVersion}`}
+            index={0}
+            snapPoints={["40%"]}
+            enablePanDownToClose
+            backdropComponent={renderBackdrop}
+            backgroundStyle={{ borderRadius: 32 }}
+            onClose={() => setRenderedSheets(new Set())}
+          >
+            <BottomSheetView style={styles.sheetContent}>
+              <View style={styles.sheetHeader}>
+                <Text style={styles.sheetTitle}>Filtrar por Status</Text>
+                <TouchableOpacity onPress={() => filterSheetRef.current?.close()}>
+                  <X size={24} color="#64748B" />
+                </TouchableOpacity>
               </View>
-            </View>
-            <View style={styles.sheetFooter}>
-              <TouchableOpacity style={styles.resetBtn} onPress={() => setTempStatus("all")}>
-                <Text style={styles.resetBtnText}>Limpar</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.applyBtn} onPress={applyFilters}>
-                <LinearGradient
-                  colors={["#10B981", "#059669"]}
-                  style={StyleSheet.absoluteFill}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 0 }}
-                />
-                <Text style={styles.applyBtnText}>Aplicar</Text>
-              </TouchableOpacity>
-            </View>
-          </BottomSheetView>
-        </BottomSheet>
-
-        {/* ── SHEET: AGENDAMENTOS ── */}
-        <BottomSheet
-          ref={appointmentsSheetRef}
-          index={-1}
-          snapPoints={["85%"]}
-          enablePanDownToClose
-          backdropComponent={renderBackdrop}
-          backgroundStyle={{ borderRadius: 32 }}
-        >
-          <BottomSheetView style={styles.sheetContent}>
-            <View style={styles.sheetHeader}>
-              <Text style={styles.sheetTitle}>Todos Agendamentos</Text>
-              <TouchableOpacity onPress={() => appointmentsSheetRef.current?.close()}>
-                <X size={24} color="#64748B" />
-              </TouchableOpacity>
-            </View>
-            <ScrollView style={{ marginTop: 10 }}>
-              {data?.appointments.map((item) => (
-                <View key={item.id_agendamento} style={styles.pendingCard}>
-                  <View style={styles.pendingRow}>
-                    <Image
-                      source={
-                        item.user_avatar
-                          ? { uri: item.user_avatar }
-                          : { uri: "https://via.placeholder.com/40" }
-                      }
-                      style={styles.avatar}
-                    />
-                    <View style={{ flex: 1, marginLeft: 12 }}>
-                      <Text style={styles.clientName}>{item.user_name}</Text>
-                      <Text style={styles.clientMeta}>
-                        {item.data_agendamento} • {item.hora_inicio}
-                      </Text>
-                    </View>
-                    <View
-                      style={[
-                        styles.statusBadge,
-                        {
-                          backgroundColor:
-                            item.status === "confirmado"
-                              ? "#DCFCE7"
-                              : item.status === "pendente"
-                                ? "#FEF3C7"
-                                : "#FEE2E2",
-                        },
-                      ]}
+              <View style={styles.filterSection}>
+                <Text style={styles.filterSectionTitle}>Status do Agendamento</Text>
+                <View style={styles.filterOptionsGrid}>
+                  {["all", "confirmado", "pendente", "cancelado"].map((st) => (
+                    <TouchableOpacity
+                      key={st}
+                      style={[styles.filterOption, tempStatus === st && styles.filterOptionActive]}
+                      onPress={() => setTempStatus(st)}
                     >
                       <Text
                         style={[
-                          styles.statusBadgeText,
-                          {
-                            color:
-                              item.status === "confirmado"
-                                ? "#166534"
-                                : item.status === "pendente"
-                                  ? "#D97706"
-                                  : "#991B1B",
-                          },
+                          styles.filterOptionText,
+                          tempStatus === st && styles.filterOptionTextActive,
                         ]}
                       >
-                        {item.status.toUpperCase()}
+                        {st === "all"
+                          ? "Todos"
+                          : st === "confirmado"
+                            ? "Confirmado"
+                            : st === "pendente"
+                              ? "Pendente"
+                              : "Cancelado"}
                       </Text>
-                    </View>
-                  </View>
-                </View>
-              ))}
-              {data?.appointments.length === 0 && (
-                <Text style={styles.emptyTxt}>Nenhum agendamento encontrado.</Text>
-              )}
-            </ScrollView>
-          </BottomSheetView>
-        </BottomSheet>
-
-        {/* ── SHEET: FATURAMENTO ── */}
-        <BottomSheet
-          ref={revenueSheetRef}
-          index={-1}
-          snapPoints={["85%"]}
-          enablePanDownToClose
-          backdropComponent={renderBackdrop}
-          backgroundStyle={{ borderRadius: 32 }}
-        >
-          <BottomSheetView style={styles.sheetContent}>
-            <View style={styles.sheetHeader}>
-              <Text style={styles.sheetTitle}>Extrato de Ganhos</Text>
-              <TouchableOpacity onPress={() => revenueSheetRef.current?.close()}>
-                <X size={24} color="#64748B" />
-              </TouchableOpacity>
-            </View>
-            <ScrollView style={{ marginTop: 10 }}>
-              <View style={styles.revenueTotalCard}>
-                <Text style={styles.revenueTotalLabel}>Total no Período</Text>
-                <Text style={styles.revenueTotalValue}>
-                  {formatCurrency(data?.kpis.revenue || 0)}
-                </Text>
-              </View>
-              {data?.appointments
-                .filter((a) => a.status === "confirmado" || a.status === "concluido")
-                .map((item) => (
-                  <View key={item.id_agendamento} style={styles.revenueItem}>
-                    <View style={styles.revenueItemLeft}>
-                      <Text style={styles.revenueItemName}>{item.user_name}</Text>
-                      <Text style={styles.revenueItemMeta}>{item.data_agendamento}</Text>
-                    </View>
-                    <Text style={styles.revenueItemValue}>+ {formatCurrency(100)}</Text>
-                  </View>
-                ))}
-            </ScrollView>
-          </BottomSheetView>
-        </BottomSheet>
-
-        {/* ── SHEET: APROVAÇÕES ── */}
-        <BottomSheet
-          ref={approvalsSheetRef}
-          index={-1}
-          snapPoints={["85%"]}
-          enablePanDownToClose
-          backdropComponent={renderBackdrop}
-          backgroundStyle={{ borderRadius: 32 }}
-        >
-          <BottomSheetView style={styles.sheetContent}>
-            <View style={styles.sheetHeader}>
-              <Text style={styles.sheetTitle}>Pendentes de Aprovação</Text>
-              <TouchableOpacity onPress={() => approvalsSheetRef.current?.close()}>
-                <X size={24} color="#64748B" />
-              </TouchableOpacity>
-            </View>
-            <ScrollView style={{ marginTop: 20 }}>
-              {data?.pending.map((item) => (
-                <View key={item.id_agendamento} style={styles.pendingCard}>
-                  <View style={styles.pendingRow}>
-                    <Image
-                      source={
-                        item.user_avatar
-                          ? { uri: item.user_avatar }
-                          : { uri: "https://via.placeholder.com/40" }
-                      }
-                      style={styles.avatar}
-                    />
-                    <View style={{ flex: 1, marginLeft: 12 }}>
-                      <Text style={styles.clientName}>{item.user_name}</Text>
-                      <Text style={styles.clientMeta}>
-                        {item.data_agendamento} • {item.hora_inicio}
-                      </Text>
-                    </View>
-                  </View>
-                  <View style={{ gap: 12, marginTop: 12 }}>
-                    <TouchableOpacity
-                      style={[
-                        styles.approveBtn,
-                        { height: 52, borderRadius: 16, backgroundColor: "#10B981" },
-                      ]}
-                      onPress={() => handleUploadReceipt(item.id_agendamento)}
-                      disabled={isUploading}
-                    >
-                      {isUploading ? (
-                        <ActivityIndicator color="#fff" size="small" />
-                      ) : (
-                        <>
-                          <CreditCard size={18} color="#fff" />
-                          <Text style={[styles.approveTxt, { fontSize: 14 }]}>
-                            Confirmar com Comprovante (IA)
-                          </Text>
-                        </>
-                      )}
                     </TouchableOpacity>
-
-                    <View style={styles.actionBtns}>
-                      <TouchableOpacity
-                        style={[styles.approveBtn, { backgroundColor: "#F1F5F9", borderWidth: 0 }]}
-                        onPress={() => handleAction(item.id_agendamento, "confirmado")}
-                      >
-                        <CheckCircle size={16} color="#64748B" />
-                        <Text style={[styles.approveTxt, { color: "#64748B" }]}>
-                          Aprovar Simples
-                        </Text>
-                      </TouchableOpacity>
-
-                      <TouchableOpacity
-                        style={styles.refuseBtn}
-                        onPress={() => handleAction(item.id_agendamento, "cancelado")}
-                      >
-                        <X size={16} color="#EF4444" />
-                        <Text style={styles.refuseTxt}>Recusar</Text>
-                      </TouchableOpacity>
-                    </View>
-                  </View>
+                  ))}
                 </View>
-              ))}
-              {data?.pending.length === 0 && (
-                <Text style={styles.emptyTxt}>Nenhuma aprovação pendente.</Text>
-              )}
-            </ScrollView>
-          </BottomSheetView>
-        </BottomSheet>
-
-        {/* ── SHEET: CLIENTES ── */}
-        <BottomSheet
-          ref={clientsSheetRef}
-          index={-1}
-          snapPoints={["85%"]}
-          enablePanDownToClose
-          backdropComponent={renderBackdrop}
-          backgroundStyle={{ borderRadius: 32 }}
-        >
-          <BottomSheetView style={styles.sheetContent}>
-            <View style={styles.sheetHeader}>
-              <Text style={styles.sheetTitle}>Meus Clientes</Text>
-              <TouchableOpacity onPress={() => clientsSheetRef.current?.close()}>
-                <X size={24} color="#64748B" />
-              </TouchableOpacity>
-            </View>
-            <ScrollView style={{ marginTop: 20 }}>
-              {data?.clients.map((item) => (
-                <TouchableOpacity
-                  key={item.id_us}
-                  style={styles.pendingCard}
-                  onPress={() => openClientHistory(item)}
-                >
-                  <View style={styles.pendingRow}>
-                    <Image
-                      source={
-                        item.avatar_url
-                          ? { uri: item.avatar_url }
-                          : { uri: "https://via.placeholder.com/40" }
-                      }
-                      style={styles.avatar}
-                    />
-                    <View style={{ flex: 1, marginLeft: 12 }}>
-                      <Text style={styles.clientName}>{item.nome}</Text>
-                      <Text style={styles.clientMeta}>
-                        {item.total_appointments} agendamentos • Último:{" "}
-                        {item.last_appointment || "Nunca"}
-                      </Text>
-                    </View>
-                    <ChevronRight size={16} color="#94A3B8" />
-                  </View>
+              </View>
+              <View style={styles.sheetFooter}>
+                <TouchableOpacity style={styles.resetBtn} onPress={() => setTempStatus("all")}>
+                  <Text style={styles.resetBtnText}>Limpar</Text>
                 </TouchableOpacity>
-              ))}
-              {data?.clients.length === 0 && (
-                <Text style={styles.emptyTxt}>Nenhum cliente cadastrado.</Text>
-              )}
-            </ScrollView>
-          </BottomSheetView>
-        </BottomSheet>
-
-        {/* ── SHEET: PERFORMANCE ── */}
-        <BottomSheet
-          ref={performanceSheetRef}
-          index={-1}
-          snapPoints={["60%"]}
-          enablePanDownToClose
-          backdropComponent={renderBackdrop}
-          backgroundStyle={{ borderRadius: 32 }}
-        >
-          <BottomSheetView style={styles.sheetContent}>
-            <View style={styles.sheetHeader}>
-              <Text style={styles.sheetTitle}>Insights de Performance</Text>
-              <TouchableOpacity onPress={() => performanceSheetRef.current?.close()}>
-                <X size={24} color="#64748B" />
-              </TouchableOpacity>
-            </View>
-
-            <View style={{ alignItems: "center", marginVertical: 20 }}>
-              <View
-                style={[
-                  styles.revenueTotalCard,
-                  { width: "100%", backgroundColor: performanceData.color },
-                ]}
-              >
-                <Text style={[styles.revenueTotalLabel, { color: "rgba(255,255,255,0.7)" }]}>
-                  Sua taxa de aprovação é
-                </Text>
-                <Text style={styles.revenueTotalValue}>{performanceData.rate}%</Text>
-                <View
-                  style={{
-                    marginTop: 10,
-                    paddingHorizontal: 16,
-                    paddingVertical: 6,
-                    borderRadius: 20,
-                    backgroundColor: "rgba(255,255,255,0.2)",
-                  }}
-                >
-                  <Text style={{ color: "#fff", fontWeight: "800", fontSize: 12 }}>
-                    Status: {performanceData.status}
-                  </Text>
-                </View>
+                <TouchableOpacity style={styles.applyBtn} onPress={applyFilters}>
+                  <LinearGradient
+                    colors={["#10B981", "#059669"]}
+                    style={StyleSheet.absoluteFill}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 0 }}
+                  />
+                  <Text style={styles.applyBtnText}>Aplicar</Text>
+                </TouchableOpacity>
               </View>
-            </View>
+            </BottomSheetView>
+          </BottomSheet>
+        )}
 
-            <View style={{ gap: 16 }}>
-              <View style={{ flexDirection: "row", gap: 12, alignItems: "center" }}>
-                <View
-                  style={{
-                    width: 40,
-                    height: 40,
-                    borderRadius: 12,
-                    backgroundColor: "#F1F5F9",
-                    alignItems: "center",
-                    justifyContent: "center",
-                  }}
-                >
-                  <Target size={20} color="#6366F1" />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={{ fontSize: 14, fontWeight: "700", color: "#1E293B" }}>
-                    Foco no Cliente
-                  </Text>
-                  <Text style={{ fontSize: 12, color: "#64748B" }}>
-                    Você aprovou{" "}
-                    {data?.statusDistribution.find(
-                      (d) => String(d?.label || "").toLowerCase() === "confirmado"
-                    )?.count || 0}{" "}
-                    sessões este mês.
-                  </Text>
-                </View>
+        {/* ── SHEET: AGENDAMENTOS ── */}
+        {renderedSheets.has("appointments") && (
+          <BottomSheet
+            ref={appointmentsSheetRef}
+            key={`appointments-${sheetVersion}`}
+            index={0}
+            snapPoints={["85%"]}
+            enablePanDownToClose
+            backdropComponent={renderBackdrop}
+            backgroundStyle={{ borderRadius: 32 }}
+            onClose={() => setRenderedSheets(new Set())}
+          >
+            <BottomSheetView style={styles.sheetContent}>
+              <View style={styles.sheetHeader}>
+                <Text style={styles.sheetTitle}>Todos Agendamentos</Text>
+                <TouchableOpacity onPress={() => appointmentsSheetRef.current?.close()}>
+                  <X size={24} color="#64748B" />
+                </TouchableOpacity>
               </View>
-
-              <View style={{ flexDirection: "row", gap: 12, alignItems: "center" }}>
-                <View
-                  style={{
-                    width: 40,
-                    height: 40,
-                    borderRadius: 12,
-                    backgroundColor: "#F1F5F9",
-                    alignItems: "center",
-                    justifyContent: "center",
-                  }}
-                >
-                  <Clock size={20} color="#F59E0B" />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={{ fontSize: 14, fontWeight: "700", color: "#1E293B" }}>
-                    Tempo de Resposta
-                  </Text>
-                  <Text style={{ fontSize: 12, color: "#64748B" }}>
-                    Mantenha suas notificações ativas para responder rápido.
-                  </Text>
-                </View>
-              </View>
-
-              <View
-                style={{ backgroundColor: "#F8FAFC", padding: 16, borderRadius: 20, marginTop: 10 }}
-              >
-                <Text
-                  style={{ fontSize: 13, fontWeight: "800", color: "#1E293B", marginBottom: 6 }}
-                >
-                  Dica Pro:
-                </Text>
-                <Text style={{ fontSize: 12, color: "#64748B", lineHeight: 18 }}>
-                  Personais que aprovam agendamentos em menos de 1 hora aumentam sua retenção em até
-                  40%.
-                </Text>
-              </View>
-            </View>
-          </BottomSheetView>
-        </BottomSheet>
-
-        {/* ── SHEET: HISTÓRICO DO CLIENTE ── */}
-        <BottomSheet
-          ref={historySheetRef}
-          index={-1}
-          snapPoints={["85%"]}
-          enablePanDownToClose
-          backdropComponent={renderBackdrop}
-          backgroundStyle={{ borderRadius: 32 }}
-        >
-          <BottomSheetView style={styles.sheetContent}>
-            <View style={styles.sheetHeader}>
-              <View>
-                <Text style={styles.headerTitle}>{selectedClient?.nome || "Histórico"}</Text>
-                <Text style={styles.cardSubtitle}>Histórico de Treinos</Text>
-              </View>
-              <TouchableOpacity onPress={() => historySheetRef.current?.close()}>
-                <X size={24} color="#64748B" />
-              </TouchableOpacity>
-            </View>
-            {fetchingHistory ? (
-              <ActivityIndicator color="#10B981" style={{ marginTop: 40 }} />
-            ) : (
-              <ScrollView style={{ marginTop: 20 }}>
-                {clientHistory.map((appt) => (
-                  <View key={appt.id_agendamento} style={styles.pendingCard}>
-                    <View
-                      style={{
-                        flexDirection: "row",
-                        justifyContent: "space-between",
-                        alignItems: "center",
-                      }}
-                    >
-                      <View>
-                        <Text style={styles.clientName}>
-                          {appt.data_agendamento} • {appt.hora_inicio}
-                        </Text>
-                        <View style={{ flexDirection: "row", alignItems: "center", marginTop: 4 }}>
-                          <View
-                            style={[
-                              styles.statusDot,
-                              {
-                                backgroundColor:
-                                  appt.status === "concluido" ? "#10B981" : "#94A3B8",
-                                width: 6,
-                                height: 6,
-                              },
-                            ]}
-                          />
-                          <Text style={{ fontSize: 10, marginLeft: 4, color: "#64748B" }}>
-                            {appt.status.toUpperCase()}
-                          </Text>
-                        </View>
-                      </View>
-                      {appt.status === "concluido" || appt.status === "confirmado" ? (
-                        <TouchableOpacity
-                          style={[
-                            styles.approveBtn,
-                            { paddingHorizontal: 12, height: 32, flex: 0 },
-                          ]}
-                          onPress={() => openEvaluation(appt)}
-                        >
-                          <Text style={{ color: "#fff", fontSize: 12, fontWeight: "700" }}>
-                            {appt.nota_aluno ? "Ver Avaliação" : "Avaliar"}
-                          </Text>
-                        </TouchableOpacity>
-                      ) : null}
-                    </View>
-                    {appt.comentario_tecnico && (
-                      <View
-                        style={{
-                          marginTop: 10,
-                          padding: 10,
-                          backgroundColor: "#F8FAFC",
-                          borderRadius: 12,
-                        }}
-                      >
-                        <Text style={{ fontSize: 11, fontWeight: "700", color: "#1E293B" }}>
-                          Feedback Técnico:
-                        </Text>
-                        <Text style={{ fontSize: 11, color: "#64748B", marginTop: 2 }}>
-                          {appt.comentario_tecnico}
-                        </Text>
-                      </View>
-                    )}
-                  </View>
-                ))}
-                {clientHistory.length === 0 && (
-                  <Text style={styles.emptyTxt}>Nenhum registro encontrado.</Text>
-                )}
-              </ScrollView>
-            )}
-          </BottomSheetView>
-        </BottomSheet>
-
-        {/* ── SHEET: AVALIAÇÃO DE TREINO ── */}
-        <BottomSheet
-          ref={evaluationSheetRef}
-          index={-1}
-          snapPoints={["75%"]}
-          enablePanDownToClose
-          backdropComponent={renderBackdrop}
-          backgroundStyle={{ borderRadius: 32 }}
-        >
-          <BottomSheetView style={styles.sheetContent}>
-            <View style={styles.sheetHeader}>
-              <Text style={styles.sheetTitle}>Avaliação do Treino</Text>
-              <TouchableOpacity onPress={() => evaluationSheetRef.current?.close()}>
-                <X size={24} color="#64748B" />
-              </TouchableOpacity>
-            </View>
-
-            <ScrollView style={{ marginTop: 10 }}>
-              <View style={styles.filterSection}>
-                <Text style={styles.filterSectionTitle}>Intensidade do Treino (1-5)</Text>
-                <View style={{ flexDirection: "row", gap: 10, marginTop: 4 }}>
-                  {[1, 2, 3, 4, 5].map((num) => (
-                    <TouchableOpacity
-                      key={num}
-                      onPress={() => setNotaIntensidade(num)}
-                      style={{
-                        width: 44,
-                        height: 44,
-                        borderRadius: 22,
-                        backgroundColor: notaIntensidade === num ? "#10B981" : "#F1F5F9",
-                        alignItems: "center",
-                        justifyContent: "center",
-                      }}
-                    >
-                      <Text
-                        style={{
-                          color: notaIntensidade === num ? "#fff" : "#64748B",
-                          fontWeight: "800",
-                        }}
-                      >
-                        {num}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-              </View>
-
-              <View style={[styles.filterSection, { marginTop: 10 }]}>
-                <Text style={styles.filterSectionTitle}>Feedback para o Aluno</Text>
-                <View
-                  style={{
-                    backgroundColor: "#F8FAFC",
-                    borderRadius: 16,
-                    padding: 16,
-                    marginTop: 4,
-                    borderWidth: 1,
-                    borderColor: "#E2E8F0",
-                  }}
-                >
-                  <TouchableOpacity
-                    onPress={() => {
-                      Alert.prompt(
-                        "Feedback",
-                        "O que o aluno pode melhorar?",
-                        (text) => setComentarioTecnico(text),
-                        "plain-text",
-                        comentarioTecnico
-                      );
-                    }}
-                  >
-                    <Text
-                      style={{ fontSize: 14, color: comentarioTecnico ? "#1E293B" : "#94A3B8" }}
-                    >
-                      {comentarioTecnico || "Toque aqui para escrever o feedback técnico..."}
-                    </Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
-
-              <View style={[styles.filterSection, { marginTop: 10 }]}>
-                <Text style={styles.filterSectionTitle}>Nota do Aluno (Performance)</Text>
-                <View style={{ flexDirection: "row", gap: 10, marginTop: 4 }}>
-                  {[1, 2, 3, 4, 5].map((num) => (
-                    <TouchableOpacity
-                      key={num}
-                      onPress={() => setNotaAluno(num)}
-                      style={{
-                        width: 44,
-                        height: 44,
-                        borderRadius: 22,
-                        backgroundColor: notaAluno === num ? "#10B981" : "#F1F5F9",
-                        alignItems: "center",
-                        justifyContent: "center",
-                      }}
-                    >
-                      <Text
-                        style={{ color: notaAluno === num ? "#fff" : "#64748B", fontWeight: "800" }}
-                      >
-                        {num}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-              </View>
-
-              <TouchableOpacity
-                style={[
-                  styles.applyBtn,
-                  { marginTop: 20, height: 55, alignSelf: "stretch", flex: 0 },
-                ]}
-                onPress={submitEvaluation}
-              >
-                <LinearGradient
-                  colors={["#10B981", "#059669"]}
-                  style={StyleSheet.absoluteFill}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 0 }}
-                />
-                <Text style={styles.applyBtnText}>Salvar Avaliação</Text>
-              </TouchableOpacity>
-            </ScrollView>
-          </BottomSheetView>
-        </BottomSheet>
-
-        {/* ── SHEET: AVALIAÇÕES DO PERSONAL ── */}
-        <BottomSheet
-          ref={reviewsSheetRef}
-          index={-1}
-          snapPoints={["85%"]}
-          enablePanDownToClose
-          backdropComponent={renderBackdrop}
-          backgroundStyle={{ borderRadius: 32 }}
-        >
-          <BottomSheetView style={styles.sheetContent}>
-            <View style={styles.sheetHeader}>
-              <Text style={styles.sheetTitle}>Avaliações</Text>
-              <TouchableOpacity onPress={() => reviewsSheetRef.current?.close()}>
-                <X size={24} color="#64748B" />
-              </TouchableOpacity>
-            </View>
-            <ScrollView style={{ marginTop: 20 }}>
-              {data?.reviews?.map((item) => {
-                const isPositive = (item.ratingProfessional + item.ratingTraining) / 2 >= 4;
-                return (
-                  <View key={item.id} style={styles.pendingCard}>
+              <ScrollView style={{ marginTop: 10 }}>
+                {data?.appointments.map((item) => (
+                  <View key={item.id_agendamento} style={styles.pendingCard}>
                     <View style={styles.pendingRow}>
                       <Image
                         source={
@@ -1517,132 +954,762 @@ const PersonalDashboard: React.FC = () => {
                       <View style={{ flex: 1, marginLeft: 12 }}>
                         <Text style={styles.clientName}>{item.user_name}</Text>
                         <Text style={styles.clientMeta}>
-                          {new Date(item.created_at).toLocaleDateString("pt-BR")}
+                          {item.data_agendamento} • {item.hora_inicio}
                         </Text>
                       </View>
                       <View
                         style={[
                           styles.statusBadge,
-                          { backgroundColor: isPositive ? "#DCFCE7" : "#FEF3C7" },
+                          {
+                            backgroundColor:
+                              item.status === "confirmado"
+                                ? "#DCFCE7"
+                                : item.status === "pendente"
+                                  ? "#FEF3C7"
+                                  : "#FEE2E2",
+                          },
                         ]}
                       >
                         <Text
                           style={[
                             styles.statusBadgeText,
-                            { color: isPositive ? "#166534" : "#D97706" },
+                            {
+                              color:
+                                item.status === "confirmado"
+                                  ? "#166534"
+                                  : item.status === "pendente"
+                                    ? "#D97706"
+                                    : "#991B1B",
+                            },
                           ]}
                         >
-                          ★ {((item.ratingProfessional + item.ratingTraining) / 2).toFixed(1)}
+                          {item.status.toUpperCase()}
                         </Text>
                       </View>
                     </View>
+                  </View>
+                ))}
+                {data?.appointments.length === 0 && (
+                  <Text style={styles.emptyTxt}>Nenhum agendamento encontrado.</Text>
+                )}
+              </ScrollView>
+            </BottomSheetView>
+          </BottomSheet>
+        )}
 
-                    <View
-                      style={{
-                        marginTop: 10,
-                        padding: 10,
-                        backgroundColor: "#F8FAFC",
-                        borderRadius: 12,
-                        borderWidth: 1,
-                        borderColor: "#F1F5F9",
-                      }}
-                    >
+        {/* ── SHEET: FATURAMENTO ── */}
+        {renderedSheets.has("revenue") && (
+          <BottomSheet
+            ref={revenueSheetRef}
+            key={`revenue-${sheetVersion}`}
+            index={0}
+            snapPoints={["85%"]}
+            enablePanDownToClose
+            backdropComponent={renderBackdrop}
+            backgroundStyle={{ borderRadius: 32 }}
+            onClose={() => setRenderedSheets(new Set())}
+          >
+            <BottomSheetView style={styles.sheetContent}>
+              <View style={styles.sheetHeader}>
+                <Text style={styles.sheetTitle}>Extrato de Ganhos</Text>
+                <TouchableOpacity onPress={() => revenueSheetRef.current?.close()}>
+                  <X size={24} color="#64748B" />
+                </TouchableOpacity>
+              </View>
+              <ScrollView style={{ marginTop: 10 }}>
+                <View style={styles.revenueTotalCard}>
+                  <Text style={styles.revenueTotalLabel}>Total no Período</Text>
+                  <Text style={styles.revenueTotalValue}>
+                    {formatCurrency(data?.kpis.revenue || 0)}
+                  </Text>
+                </View>
+                {data?.appointments
+                  .filter((a) => a.status === "confirmado" || a.status === "concluido")
+                  .map((item) => (
+                    <View key={item.id_agendamento} style={styles.revenueItem}>
+                      <View style={styles.revenueItemLeft}>
+                        <Text style={styles.revenueItemName}>{item.user_name}</Text>
+                        <Text style={styles.revenueItemMeta}>{item.data_agendamento}</Text>
+                      </View>
+                      <Text style={styles.revenueItemValue}>+ {formatCurrency(100)}</Text>
+                    </View>
+                  ))}
+              </ScrollView>
+            </BottomSheetView>
+          </BottomSheet>
+        )}
+
+        {/* ── SHEET: APROVAÇÕES ── */}
+        {renderedSheets.has("approvals") && (
+          <BottomSheet
+            ref={approvalsSheetRef}
+            key={`approvals-${sheetVersion}`}
+            index={0}
+            snapPoints={["85%"]}
+            enablePanDownToClose
+            backdropComponent={renderBackdrop}
+            backgroundStyle={{ borderRadius: 32 }}
+            onClose={() => setRenderedSheets(new Set())}
+          >
+            <BottomSheetView style={styles.sheetContent}>
+              <View style={styles.sheetHeader}>
+                <Text style={styles.sheetTitle}>Pendentes de Aprovação</Text>
+                <TouchableOpacity onPress={() => approvalsSheetRef.current?.close()}>
+                  <X size={24} color="#64748B" />
+                </TouchableOpacity>
+              </View>
+              <ScrollView style={{ marginTop: 20 }}>
+                {data?.pending.map((item) => (
+                  <View key={item.id_agendamento} style={styles.pendingCard}>
+                    <View style={styles.pendingRow}>
+                      <Image
+                        source={
+                          item.user_avatar
+                            ? { uri: item.user_avatar }
+                            : { uri: "https://via.placeholder.com/40" }
+                        }
+                        style={styles.avatar}
+                      />
+                      <View style={{ flex: 1, marginLeft: 12 }}>
+                        <Text style={styles.clientName}>{item.user_name}</Text>
+                        <Text style={styles.clientMeta}>
+                          {item.data_agendamento} • {item.hora_inicio}
+                        </Text>
+                      </View>
+                    </View>
+                    <View style={{ gap: 12, marginTop: 12 }}>
+                      <TouchableOpacity
+                        style={[
+                          styles.approveBtn,
+                          { height: 52, borderRadius: 16, backgroundColor: "#10B981" },
+                        ]}
+                        onPress={() => handleUploadReceipt(item.id_agendamento)}
+                        disabled={isUploading}
+                      >
+                        {isUploading ? (
+                          <ActivityIndicator color="#fff" size="small" />
+                        ) : (
+                          <>
+                            <CreditCard size={18} color="#fff" />
+                            <Text style={[styles.approveTxt, { fontSize: 14 }]}>
+                              Confirmar com Comprovante (IA)
+                            </Text>
+                          </>
+                        )}
+                      </TouchableOpacity>
+
+                      <View style={styles.actionBtns}>
+                        <TouchableOpacity
+                          style={[
+                            styles.approveBtn,
+                            { backgroundColor: "#F1F5F9", borderWidth: 0 },
+                          ]}
+                          onPress={() => handleAction(item.id_agendamento, "confirmado")}
+                        >
+                          <CheckCircle size={16} color="#64748B" />
+                          <Text style={[styles.approveTxt, { color: "#64748B" }]}>
+                            Aprovar Simples
+                          </Text>
+                        </TouchableOpacity>
+
+                        <TouchableOpacity
+                          style={styles.refuseBtn}
+                          onPress={() => handleAction(item.id_agendamento, "cancelado")}
+                        >
+                          <X size={16} color="#EF4444" />
+                          <Text style={styles.refuseTxt}>Recusar</Text>
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+                  </View>
+                ))}
+                {data?.pending.length === 0 && (
+                  <Text style={styles.emptyTxt}>Nenhuma aprovação pendente.</Text>
+                )}
+              </ScrollView>
+            </BottomSheetView>
+          </BottomSheet>
+        )}
+
+        {/* ── SHEET: CLIENTES ── */}
+        {renderedSheets.has("clients") && (
+          <BottomSheet
+            ref={clientsSheetRef}
+            key={`clients-${sheetVersion}`}
+            index={0}
+            snapPoints={["85%"]}
+            enablePanDownToClose
+            backdropComponent={renderBackdrop}
+            backgroundStyle={{ borderRadius: 32 }}
+            onClose={() => setRenderedSheets(new Set())}
+          >
+            <BottomSheetView style={styles.sheetContent}>
+              <View style={styles.sheetHeader}>
+                <Text style={styles.sheetTitle}>Meus Clientes</Text>
+                <TouchableOpacity onPress={() => clientsSheetRef.current?.close()}>
+                  <X size={24} color="#64748B" />
+                </TouchableOpacity>
+              </View>
+              <ScrollView style={{ marginTop: 20 }}>
+                {data?.clients.map((item) => (
+                  <TouchableOpacity
+                    key={item.id_us}
+                    style={styles.pendingCard}
+                    onPress={() => openClientHistory(item)}
+                  >
+                    <View style={styles.pendingRow}>
+                      <Image
+                        source={
+                          item.avatar_url
+                            ? { uri: item.avatar_url }
+                            : { uri: "https://via.placeholder.com/40" }
+                        }
+                        style={styles.avatar}
+                      />
+                      <View style={{ flex: 1, marginLeft: 12 }}>
+                        <Text style={styles.clientName}>{item.nome}</Text>
+                        <Text style={styles.clientMeta}>
+                          {item.total_appointments} agendamentos • Último:{" "}
+                          {item.last_appointment || "Nunca"}
+                        </Text>
+                      </View>
+                      <ChevronRight size={16} color="#94A3B8" />
+                    </View>
+                  </TouchableOpacity>
+                ))}
+                {data?.clients.length === 0 && (
+                  <Text style={styles.emptyTxt}>Nenhum cliente cadastrado.</Text>
+                )}
+              </ScrollView>
+            </BottomSheetView>
+          </BottomSheet>
+        )}
+
+        {/* ── SHEET: PERFORMANCE ── */}
+        {renderedSheets.has("performance") && (
+          <BottomSheet
+            ref={performanceSheetRef}
+            key={`performance-${sheetVersion}`}
+            index={0}
+            snapPoints={["60%"]}
+            enablePanDownToClose
+            backdropComponent={renderBackdrop}
+            backgroundStyle={{ borderRadius: 32 }}
+            onClose={() => setRenderedSheets(new Set())}
+          >
+            <BottomSheetView style={styles.sheetContent}>
+              <View style={styles.sheetHeader}>
+                <Text style={styles.sheetTitle}>Insights de Performance</Text>
+                <TouchableOpacity onPress={() => performanceSheetRef.current?.close()}>
+                  <X size={24} color="#64748B" />
+                </TouchableOpacity>
+              </View>
+
+              <View style={{ alignItems: "center", marginVertical: 20 }}>
+                <View
+                  style={[
+                    styles.revenueTotalCard,
+                    { width: "100%", backgroundColor: performanceData.color },
+                  ]}
+                >
+                  <Text style={[styles.revenueTotalLabel, { color: "rgba(255,255,255,0.7)" }]}>
+                    Sua taxa de aprovação é
+                  </Text>
+                  <Text style={styles.revenueTotalValue}>{performanceData.rate}%</Text>
+                  <View
+                    style={{
+                      marginTop: 10,
+                      paddingHorizontal: 16,
+                      paddingVertical: 6,
+                      borderRadius: 20,
+                      backgroundColor: "rgba(255,255,255,0.2)",
+                    }}
+                  >
+                    <Text style={{ color: "#fff", fontWeight: "800", fontSize: 12 }}>
+                      Status: {performanceData.status}
+                    </Text>
+                  </View>
+                </View>
+              </View>
+
+              <View style={{ gap: 16 }}>
+                <View style={{ flexDirection: "row", gap: 12, alignItems: "center" }}>
+                  <View
+                    style={{
+                      width: 40,
+                      height: 40,
+                      borderRadius: 12,
+                      backgroundColor: "#F1F5F9",
+                      alignItems: "center",
+                      justifyContent: "center",
+                    }}
+                  >
+                    <Target size={20} color="#6366F1" />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ fontSize: 14, fontWeight: "700", color: "#1E293B" }}>
+                      Foco no Cliente
+                    </Text>
+                    <Text style={{ fontSize: 12, color: "#64748B" }}>
+                      Você aprovou{" "}
+                      {data?.statusDistribution.find(
+                        (d) => String(d?.label || "").toLowerCase() === "confirmado"
+                      )?.count || 0}{" "}
+                      sessões este mês.
+                    </Text>
+                  </View>
+                </View>
+
+                <View style={{ flexDirection: "row", gap: 12, alignItems: "center" }}>
+                  <View
+                    style={{
+                      width: 40,
+                      height: 40,
+                      borderRadius: 12,
+                      backgroundColor: "#F1F5F9",
+                      alignItems: "center",
+                      justifyContent: "center",
+                    }}
+                  >
+                    <Clock size={20} color="#F59E0B" />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ fontSize: 14, fontWeight: "700", color: "#1E293B" }}>
+                      Tempo de Resposta
+                    </Text>
+                    <Text style={{ fontSize: 12, color: "#64748B" }}>
+                      Mantenha suas notificações ativas para responder rápido.
+                    </Text>
+                  </View>
+                </View>
+
+                <View
+                  style={{
+                    backgroundColor: "#F8FAFC",
+                    padding: 16,
+                    borderRadius: 20,
+                    marginTop: 10,
+                  }}
+                >
+                  <Text
+                    style={{ fontSize: 13, fontWeight: "800", color: "#1E293B", marginBottom: 6 }}
+                  >
+                    Dica Pro:
+                  </Text>
+                  <Text style={{ fontSize: 12, color: "#64748B", lineHeight: 18 }}>
+                    Personais que aprovam agendamentos em menos de 1 hora aumentam sua retenção em
+                    até 40%.
+                  </Text>
+                </View>
+              </View>
+            </BottomSheetView>
+          </BottomSheet>
+        )}
+
+        {/* ── SHEET: HISTÓRICO DO CLIENTE ── */}
+        {renderedSheets.has("history") && (
+          <BottomSheet
+            ref={historySheetRef}
+            key={`history-${sheetVersion}`}
+            index={0}
+            snapPoints={["85%"]}
+            enablePanDownToClose
+            backdropComponent={renderBackdrop}
+            backgroundStyle={{ borderRadius: 32 }}
+            onClose={() => setRenderedSheets(new Set())}
+          >
+            <BottomSheetView style={styles.sheetContent}>
+              <View style={styles.sheetHeader}>
+                <View>
+                  <Text style={styles.headerTitle}>{selectedClient?.nome || "Histórico"}</Text>
+                  <Text style={styles.cardSubtitle}>Histórico de Treinos</Text>
+                </View>
+                <TouchableOpacity onPress={() => historySheetRef.current?.close()}>
+                  <X size={24} color="#64748B" />
+                </TouchableOpacity>
+              </View>
+              {fetchingHistory ? (
+                <ActivityIndicator color="#10B981" style={{ marginTop: 40 }} />
+              ) : (
+                <ScrollView style={{ marginTop: 20 }}>
+                  {clientHistory.map((appt) => (
+                    <View key={appt.id_agendamento} style={styles.pendingCard}>
                       <View
                         style={{
                           flexDirection: "row",
                           justifyContent: "space-between",
-                          marginBottom: 8,
+                          alignItems: "center",
                         }}
                       >
-                        <Text style={{ fontSize: 11, fontWeight: "700", color: "#64748B" }}>
-                          Profissional:{" "}
-                          <Text style={{ color: "#1E293B" }}>{item.ratingProfessional}</Text>/5
-                        </Text>
-                        <Text style={{ fontSize: 11, fontWeight: "700", color: "#64748B" }}>
-                          Treino: <Text style={{ color: "#1E293B" }}>{item.ratingTraining}</Text>/5
-                        </Text>
+                        <View>
+                          <Text style={styles.clientName}>
+                            {appt.data_agendamento} • {appt.hora_inicio}
+                          </Text>
+                          <View
+                            style={{ flexDirection: "row", alignItems: "center", marginTop: 4 }}
+                          >
+                            <View
+                              style={[
+                                styles.statusDot,
+                                {
+                                  backgroundColor:
+                                    appt.status === "concluido" ? "#10B981" : "#94A3B8",
+                                  width: 6,
+                                  height: 6,
+                                },
+                              ]}
+                            />
+                            <Text style={{ fontSize: 10, marginLeft: 4, color: "#64748B" }}>
+                              {appt.status.toUpperCase()}
+                            </Text>
+                          </View>
+                        </View>
+                        {appt.status === "concluido" || appt.status === "confirmado" ? (
+                          <TouchableOpacity
+                            style={[
+                              styles.approveBtn,
+                              { paddingHorizontal: 12, height: 32, flex: 0 },
+                            ]}
+                            onPress={() => openEvaluation(appt)}
+                          >
+                            <Text style={{ color: "#fff", fontSize: 12, fontWeight: "700" }}>
+                              {appt.nota_aluno ? "Ver Avaliação" : "Avaliar"}
+                            </Text>
+                          </TouchableOpacity>
+                        ) : null}
                       </View>
-                      {item.comment ? (
-                        <Text
-                          style={{ fontSize: 12, color: "#1E293B", lineHeight: 18, marginTop: 4 }}
+                      {appt.comentario_tecnico && (
+                        <View
+                          style={{
+                            marginTop: 10,
+                            padding: 10,
+                            backgroundColor: "#F8FAFC",
+                            borderRadius: 12,
+                          }}
                         >
-                          &quot;{item.comment}&quot;
-                        </Text>
-                      ) : (
+                          <Text style={{ fontSize: 11, fontWeight: "700", color: "#1E293B" }}>
+                            Feedback Técnico:
+                          </Text>
+                          <Text style={{ fontSize: 11, color: "#64748B", marginTop: 2 }}>
+                            {appt.comentario_tecnico}
+                          </Text>
+                        </View>
+                      )}
+                    </View>
+                  ))}
+                  {clientHistory.length === 0 && (
+                    <Text style={styles.emptyTxt}>Nenhum registro encontrado.</Text>
+                  )}
+                </ScrollView>
+              )}
+            </BottomSheetView>
+          </BottomSheet>
+        )}
+
+        {/* ── SHEET: AVALIAÇÃO DE TREINO ── */}
+        {renderedSheets.has("evaluation") && (
+          <BottomSheet
+            ref={evaluationSheetRef}
+            key={`evaluation-${sheetVersion}`}
+            index={0}
+            snapPoints={["75%"]}
+            enablePanDownToClose
+            backdropComponent={renderBackdrop}
+            backgroundStyle={{ borderRadius: 32 }}
+            onClose={() => setRenderedSheets(new Set())}
+          >
+            <BottomSheetView style={styles.sheetContent}>
+              <View style={styles.sheetHeader}>
+                <Text style={styles.sheetTitle}>Avaliação do Treino</Text>
+                <TouchableOpacity onPress={() => evaluationSheetRef.current?.close()}>
+                  <X size={24} color="#64748B" />
+                </TouchableOpacity>
+              </View>
+
+              <ScrollView style={{ marginTop: 10 }}>
+                <View style={styles.filterSection}>
+                  <Text style={styles.filterSectionTitle}>Intensidade do Treino (1-5)</Text>
+                  <View style={{ flexDirection: "row", gap: 10, marginTop: 4 }}>
+                    {[1, 2, 3, 4, 5].map((num) => (
+                      <TouchableOpacity
+                        key={num}
+                        onPress={() => setNotaIntensidade(num)}
+                        style={{
+                          width: 44,
+                          height: 44,
+                          borderRadius: 22,
+                          backgroundColor: notaIntensidade === num ? "#10B981" : "#F1F5F9",
+                          alignItems: "center",
+                          justifyContent: "center",
+                        }}
+                      >
                         <Text
                           style={{
-                            fontSize: 12,
-                            color: "#94A3B8",
-                            fontStyle: "italic",
+                            color: notaIntensidade === num ? "#fff" : "#64748B",
+                            fontWeight: "800",
+                          }}
+                        >
+                          {num}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                </View>
+
+                <View style={[styles.filterSection, { marginTop: 10 }]}>
+                  <Text style={styles.filterSectionTitle}>Feedback para o Aluno</Text>
+                  <View
+                    style={{
+                      backgroundColor: "#F8FAFC",
+                      borderRadius: 16,
+                      padding: 16,
+                      marginTop: 4,
+                      borderWidth: 1,
+                      borderColor: "#E2E8F0",
+                    }}
+                  >
+                    <TouchableOpacity
+                      onPress={() => {
+                        Alert.prompt(
+                          "Feedback",
+                          "O que o aluno pode melhorar?",
+                          (text) => setComentarioTecnico(text),
+                          "plain-text",
+                          comentarioTecnico
+                        );
+                      }}
+                    >
+                      <Text
+                        style={{ fontSize: 14, color: comentarioTecnico ? "#1E293B" : "#94A3B8" }}
+                      >
+                        {comentarioTecnico || "Toque aqui para escrever o feedback técnico..."}
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+
+                <View style={[styles.filterSection, { marginTop: 10 }]}>
+                  <Text style={styles.filterSectionTitle}>Nota do Aluno (Performance)</Text>
+                  <View style={{ flexDirection: "row", gap: 10, marginTop: 4 }}>
+                    {[1, 2, 3, 4, 5].map((num) => (
+                      <TouchableOpacity
+                        key={num}
+                        onPress={() => setNotaAluno(num)}
+                        style={{
+                          width: 44,
+                          height: 44,
+                          borderRadius: 22,
+                          backgroundColor: notaAluno === num ? "#10B981" : "#F1F5F9",
+                          alignItems: "center",
+                          justifyContent: "center",
+                        }}
+                      >
+                        <Text
+                          style={{
+                            color: notaAluno === num ? "#fff" : "#64748B",
+                            fontWeight: "800",
+                          }}
+                        >
+                          {num}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                </View>
+
+                <TouchableOpacity
+                  style={[
+                    styles.applyBtn,
+                    { marginTop: 20, height: 55, alignSelf: "stretch", flex: 0 },
+                  ]}
+                  onPress={submitEvaluation}
+                >
+                  <LinearGradient
+                    colors={["#10B981", "#059669"]}
+                    style={StyleSheet.absoluteFill}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 0 }}
+                  />
+                  <Text style={styles.applyBtnText}>Salvar Avaliação</Text>
+                </TouchableOpacity>
+              </ScrollView>
+            </BottomSheetView>
+          </BottomSheet>
+        )}
+
+        {/* ── SHEET: AVALIAÇÕES DO PERSONAL ── */}
+        {renderedSheets.has("reviews") && (
+          <BottomSheet
+            ref={reviewsSheetRef}
+            key={`reviews-${sheetVersion}`}
+            index={0}
+            snapPoints={["85%"]}
+            enablePanDownToClose
+            backdropComponent={renderBackdrop}
+            backgroundStyle={{ borderRadius: 32 }}
+            onClose={() => setRenderedSheets(new Set())}
+          >
+            <BottomSheetView style={styles.sheetContent}>
+              <View style={styles.sheetHeader}>
+                <Text style={styles.sheetTitle}>Avaliações</Text>
+                <TouchableOpacity onPress={() => reviewsSheetRef.current?.close()}>
+                  <X size={24} color="#64748B" />
+                </TouchableOpacity>
+              </View>
+              <ScrollView style={{ marginTop: 20 }}>
+                {data?.reviews?.map((item) => {
+                  const isPositive = (item.ratingProfessional + item.ratingTraining) / 2 >= 4;
+                  return (
+                    <View key={item.id} style={styles.pendingCard}>
+                      <View style={styles.pendingRow}>
+                        <Image
+                          source={
+                            item.user_avatar
+                              ? { uri: item.user_avatar }
+                              : { uri: "https://via.placeholder.com/40" }
+                          }
+                          style={styles.avatar}
+                        />
+                        <View style={{ flex: 1, marginLeft: 12 }}>
+                          <Text style={styles.clientName}>{item.user_name}</Text>
+                          <Text style={styles.clientMeta}>
+                            {new Date(item.created_at).toLocaleDateString("pt-BR")}
+                          </Text>
+                        </View>
+                        <View
+                          style={[
+                            styles.statusBadge,
+                            { backgroundColor: isPositive ? "#DCFCE7" : "#FEF3C7" },
+                          ]}
+                        >
+                          <Text
+                            style={[
+                              styles.statusBadgeText,
+                              { color: isPositive ? "#166534" : "#D97706" },
+                            ]}
+                          >
+                            ★ {((item.ratingProfessional + item.ratingTraining) / 2).toFixed(1)}
+                          </Text>
+                        </View>
+                      </View>
+
+                      <View
+                        style={{
+                          marginTop: 10,
+                          padding: 10,
+                          backgroundColor: "#F8FAFC",
+                          borderRadius: 12,
+                          borderWidth: 1,
+                          borderColor: "#F1F5F9",
+                        }}
+                      >
+                        <View
+                          style={{
+                            flexDirection: "row",
+                            justifyContent: "space-between",
+                            marginBottom: 8,
+                          }}
+                        >
+                          <Text style={{ fontSize: 11, fontWeight: "700", color: "#64748B" }}>
+                            Profissional:{" "}
+                            <Text style={{ color: "#1E293B" }}>{item.ratingProfessional}</Text>/5
+                          </Text>
+                          <Text style={{ fontSize: 11, fontWeight: "700", color: "#64748B" }}>
+                            Treino: <Text style={{ color: "#1E293B" }}>{item.ratingTraining}</Text>
+                            /5
+                          </Text>
+                        </View>
+                        {item.comment ? (
+                          <Text
+                            style={{ fontSize: 12, color: "#1E293B", lineHeight: 18, marginTop: 4 }}
+                          >
+                            &quot;{item.comment}&quot;
+                          </Text>
+                        ) : (
+                          <Text
+                            style={{
+                              fontSize: 12,
+                              color: "#94A3B8",
+                              fontStyle: "italic",
+                              marginTop: 4,
+                            }}
+                          >
+                            Sem comentário
+                          </Text>
+                        )}
+                      </View>
+                    </View>
+                  );
+                })}
+                {(!data?.reviews || data.reviews.length === 0) && (
+                  <Text style={styles.emptyTxt}>Nenhuma avaliação encontrada.</Text>
+                )}
+              </ScrollView>
+            </BottomSheetView>
+          </BottomSheet>
+        )}
+
+        {/* ── SHEET: COMPROVANTES ── */}
+        {renderedSheets.has("payments") && (
+          <BottomSheet
+            ref={paymentsSheetRef}
+            key={`payments-${sheetVersion}`}
+            index={0}
+            snapPoints={["85%"]}
+            enablePanDownToClose
+            backdropComponent={renderBackdrop}
+            backgroundStyle={{ borderRadius: 32 }}
+            onClose={() => setRenderedSheets(new Set())}
+          >
+            <BottomSheetView style={styles.sheetContent}>
+              <View style={styles.sheetHeader}>
+                <Text style={styles.sheetTitle}>Comprovantes Enviados</Text>
+                <TouchableOpacity onPress={() => paymentsSheetRef.current?.close()}>
+                  <X size={24} color="#64748B" />
+                </TouchableOpacity>
+              </View>
+              <ScrollView style={{ marginTop: 20 }}>
+                {data?.receiptHistory?.map((item) => (
+                  <View key={item.id_agendamento} style={styles.pendingCard}>
+                    <View style={styles.pendingRow}>
+                      <Image
+                        source={
+                          item.user_avatar
+                            ? { uri: item.user_avatar }
+                            : { uri: "https://via.placeholder.com/40" }
+                        }
+                        style={styles.avatar}
+                      />
+                      <View style={{ flex: 1, marginLeft: 12 }}>
+                        <Text style={styles.clientName}>{item.user_name}</Text>
+                        <Text style={styles.clientMeta}>
+                          {new Date(item.data_agendamento).toLocaleDateString("pt-BR")} •{" "}
+                          {item.hora_inicio}
+                        </Text>
+                        <Text
+                          style={{
+                            fontSize: 13,
+                            fontWeight: "800",
+                            color: "#10B981",
                             marginTop: 4,
                           }}
                         >
-                          Sem comentário
+                          + {formatCurrency(item.valor_recebido)}
                         </Text>
-                      )}
+                      </View>
+                      <View style={{ padding: 8, backgroundColor: "#DCFCE7", borderRadius: 10 }}>
+                        <CheckCircle size={18} color="#10B981" />
+                      </View>
                     </View>
                   </View>
-                );
-              })}
-              {(!data?.reviews || data.reviews.length === 0) && (
-                <Text style={styles.emptyTxt}>Nenhuma avaliação encontrada.</Text>
-              )}
-            </ScrollView>
-          </BottomSheetView>
-        </BottomSheet>
-
-        {/* ── SHEET: COMPROVANTES ── */}
-        <BottomSheet
-          ref={paymentsSheetRef}
-          index={-1}
-          snapPoints={["85%"]}
-          enablePanDownToClose
-          backdropComponent={renderBackdrop}
-          backgroundStyle={{ borderRadius: 32 }}
-        >
-          <BottomSheetView style={styles.sheetContent}>
-            <View style={styles.sheetHeader}>
-              <Text style={styles.sheetTitle}>Comprovantes Enviados</Text>
-              <TouchableOpacity onPress={() => paymentsSheetRef.current?.close()}>
-                <X size={24} color="#64748B" />
-              </TouchableOpacity>
-            </View>
-            <ScrollView style={{ marginTop: 20 }}>
-              {data?.receiptHistory?.map((item) => (
-                <View key={item.id_agendamento} style={styles.pendingCard}>
-                  <View style={styles.pendingRow}>
-                    <Image
-                      source={
-                        item.user_avatar
-                          ? { uri: item.user_avatar }
-                          : { uri: "https://via.placeholder.com/40" }
-                      }
-                      style={styles.avatar}
-                    />
-                    <View style={{ flex: 1, marginLeft: 12 }}>
-                      <Text style={styles.clientName}>{item.user_name}</Text>
-                      <Text style={styles.clientMeta}>
-                        {new Date(item.data_agendamento).toLocaleDateString("pt-BR")} •{" "}
-                        {item.hora_inicio}
-                      </Text>
-                      <Text
-                        style={{ fontSize: 13, fontWeight: "800", color: "#10B981", marginTop: 4 }}
-                      >
-                        + {formatCurrency(item.valor_recebido)}
-                      </Text>
-                    </View>
-                    <View style={{ padding: 8, backgroundColor: "#DCFCE7", borderRadius: 10 }}>
-                      <CheckCircle size={18} color="#10B981" />
-                    </View>
-                  </View>
-                </View>
-              ))}
-              {(!data?.receiptHistory || data.receiptHistory.length === 0) && (
-                <Text style={styles.emptyTxt}>Nenhum comprovante enviado ainda.</Text>
-              )}
-            </ScrollView>
-          </BottomSheetView>
-        </BottomSheet>
+                ))}
+                {(!data?.receiptHistory || data.receiptHistory.length === 0) && (
+                  <Text style={styles.emptyTxt}>Nenhum comprovante enviado ainda.</Text>
+                )}
+              </ScrollView>
+            </BottomSheetView>
+          </BottomSheet>
+        )}
       </SafeAreaView>
     </GestureHandlerRootView>
   );

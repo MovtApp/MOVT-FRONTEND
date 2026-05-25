@@ -320,12 +320,19 @@ const ChatScreen = () => {
               {pName}
             </Text>
             <Text style={styles.chatTime}>
-              {item.last_timestamp
-                ? new Date(item.last_timestamp).toLocaleTimeString([], {
+              {(() => {
+                try {
+                  if (!item.last_timestamp) return "Agora";
+                  const date = new Date(item.last_timestamp);
+                  if (isNaN(date.getTime())) return "Agora";
+                  return date.toLocaleTimeString([], {
                     hour: "2-digit",
                     minute: "2-digit",
-                  })
-                : "Agora"}
+                  });
+                } catch (e) {
+                  return "Agora";
+                }
+              })()}
             </Text>
           </View>
           <View style={styles.chatFooter}>

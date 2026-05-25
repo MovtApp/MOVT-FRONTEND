@@ -57,7 +57,7 @@ const HomeScreen: React.FC = () => {
 
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [isSearching, setIsSearching] = useState(false);
-  const searchTimeout = useRef<NodeJS.Timeout | null>(null);
+  const searchTimeout = useRef<any>(null);
 
   const [selectedSpecialty, setSelectedSpecialty] = useState<string | null>(null);
   const {
@@ -352,7 +352,10 @@ const HomeScreen: React.FC = () => {
           title="Melhor treino de superiores"
           imageUrl="https://img.freepik.com/free-photo/view-woman-helping-man-exercise-gym_52683-98092.jpg?t=st=1758297406~exp=1758301006~hmac=66860a69d0b54e22b28d0831392e01278764d6b6d47e956a9576e041c9e016c2&w=1480"
           onPress={() => {
-            Alert.alert("Destaque", "Este treino está em destaque para você!");
+            Alert.alert(
+              "Destaque",
+              "Este treino está em destaque para você!\n\nFuncionalidade disponível em breve."
+            );
           }}
         />
         <TheBestForYou
@@ -372,9 +375,11 @@ const HomeScreen: React.FC = () => {
                 }))
               : undefined
           }
-          onPress={(item) => {
-            const training = trainings.find((t: any) => String(t.id_treino) === item.id);
-            if (training) handleTrainingPress(training);
+          onPress={() => {
+            Alert.alert(
+              "Desafio",
+              "Este desafio está em destaque para você!\n\nFuncionalidade disponível em breve."
+            );
           }}
         />
         <HeatingScreen

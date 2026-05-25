@@ -83,11 +83,21 @@ export function Appointment() {
       }
       const response = await listAppointments(role, user.sessionId);
       // Verificar se a resposta tem a estrutura esperada
-      const appointments = response?.data || response || []; // lidar com o formato {count, data} ou array direto
+      const rawAppointments = response?.data || response || [];
+
+      // Filtro de Unicidade: Garante que agendamentos duplicados do backend não quebrem a UI
+      const appointments = Array.isArray(rawAppointments)
+        ? rawAppointments.filter(
+            (apt: any, index: number, self: any[]) =>
+              index === self.findIndex((t) => t.id_agendamento === apt.id_agendamento)
+          )
+        : [];
+
       // Separar agendamentos por status e tipo
       const upcomingAppointments: AppointmentData[] = [];
       const completedAppointments: AppointmentData[] = [];
-      if (Array.isArray(appointments)) {
+
+      if (appointments.length > 0) {
         appointments.forEach((apt: any) => {
           // Safe date parsing to avoid timezone issues
           // Assuming data_agendamento is "YYYY-MM-DD" or ISO string

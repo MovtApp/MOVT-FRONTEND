@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useEffect, useRef, useState } from "react";
 import * as Location from "expo-location";
-import { Linking, Platform } from "react-native";
+import { AppState, AppStateStatus, Linking, Platform } from "react-native";
+import { NativeHealthManager } from "../services/nativeHealthManager";
 
 type Coordinates = { latitude: number; longitude: number };
 
@@ -25,6 +26,34 @@ export const LocationProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     };
   }, []);
 
+  /**
+   * Aguarda o app voltar ao foreground após abrir um diálogo externo (como o HC).
+   * Isso evita o crash de UninitializedPropertyAccessException causado por transições
+   * de Activity enquanto o delegate nativo do HC ainda não está pronto.
+   */
+  const waitForForeground = (): Promise<void> => {
+    return new Promise((resolve) => {
+      // Se já está em foreground, resolve imediatamente com um pequeno buffer
+      if (AppState.currentState === "active") {
+        setTimeout(resolve, 500);
+        return;
+      }
+      // Caso contrário, espera o app voltar ao foco
+      const sub = AppState.addEventListener("change", (state: AppStateStatus) => {
+        if (state === "active") {
+          sub.remove();
+          // Buffer extra após o retorno para garantir estabilidade da Activity
+          setTimeout(resolve, 1000);
+        }
+      });
+      // Timeout de segurança de 10s para não travar o app
+      setTimeout(() => {
+        sub.remove();
+        resolve();
+      }, 10000);
+    });
+  };
+
   const initializeLocation = async () => {
     try {
       // Verifica permissão atual primeiro
@@ -41,13 +70,20 @@ export const LocationProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         } else {
           // Usuário marcou "não perguntar novamente"
           if (Platform.OS === "android" || Platform.OS === "ios") {
-            // Abre configurações para o usuário habilitar manualmente
             try {
               await Linking.openSettings();
             } catch {}
           }
         }
       }
+
+      // Aguarda o app voltar ao foreground após o diálogo de localização fechar
+      // e a Activity estar 100% estabilizada.
+      await waitForForeground();
+
+      // REMOVIDO: NativeHealthManager.authorize() automático.
+      // As permissões de saúde devem ser solicitadas separadamente
+      // para evitar conflitos com diálogos de localização e crashes no boot.
 
       if (status !== "granted") return;
 
@@ -60,12 +96,12 @@ export const LocationProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         });
       }
 
-      // Inicia watcher para manter atualizado em tempo real com alta precisão
+      // Inicia watcher para manter atualizado em tempo real
       watcherRef.current = await Location.watchPositionAsync(
         {
           accuracy: Location.Accuracy.Highest,
-          timeInterval: 1000, // Atualiza a cada 1 segundo
-          distanceInterval: 1, // Atualiza a cada 1 metro de deslocamento
+          timeInterval: 1000,
+          distanceInterval: 1,
         },
         (loc) => {
           if (loc?.coords?.latitude && loc?.coords?.longitude) {
@@ -77,7 +113,6 @@ export const LocationProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         }
       );
     } catch {
-      // Erro não é usado, removemos a variável
       // noop
     }
   };

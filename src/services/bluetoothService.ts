@@ -1,8 +1,9 @@
 import { BleManager, Device, Service, Characteristic } from "react-native-ble-plx";
-import { Platform, PermissionsAndroid } from "react-native";
+import { Platform, PermissionsAndroid, Linking } from "react-native";
+import { Buffer } from "buffer";
 
-const HEART_RATE_SERVICE_UUID = "0000180d-0000-1000-8000-00805f9b34fb";
-const HEART_RATE_CHARACTERISTIC_UUID = "00002a37-0000-1000-8000-00805f9b34fb";
+export const HEART_RATE_SERVICE_UUID = "0000180d-0000-1000-8000-00805f9b34fb";
+export const HEART_RATE_CHARACTERISTIC_UUID = "00002a37-0000-1000-8000-00805f9b34fb";
 
 class BluetoothService {
   private manager: BleManager | null = null;
@@ -59,6 +60,24 @@ class BluetoothService {
     return await this.manager.state();
   }
 
+  async getConnectedDevices() {
+    if (!this.manager || !this.isAvailable) return [];
+    try {
+      // Busca dispositivos já conectados que exponham serviços comuns
+      // Incluindo Generic Access e Generic Attribute para maior compatibilidade
+      const commonServices = [
+        HEART_RATE_SERVICE_UUID,
+        "0000180f-0000-1000-8000-00805f9b34fb", // Battery Service
+        "0000180a-0000-1000-8000-00805f9b34fb", // Device Information
+        "00001800-0000-1000-8000-00805f9b34fb", // Generic Access
+        "00001801-0000-1000-8000-00805f9b34fb", // Generic Attribute
+      ];
+      return await this.manager.connectedDevices(commonServices);
+    } catch (e) {
+      return [];
+    }
+  }
+
   scanDevices(onDeviceFound: (device: Device) => void, filterServices: boolean = true) {
     if (!this.manager || !this.isAvailable) {
       console.warn("Bluetooth BLE: Gerenciador não disponível.");
@@ -92,6 +111,16 @@ class BluetoothService {
     this.manager.stopDeviceScan();
   }
 
+  openBluetoothSettings() {
+    if (Platform.OS === "android") {
+      Linking.sendIntent("android.settings.BLUETOOTH_SETTINGS").catch(() => {
+        Linking.openSettings(); // Fallback se o intent falhar
+      });
+    } else {
+      Linking.openURL("App-Prefs:root=Bluetooth"); // iOS shortcut
+    }
+  }
+
   async connectToDevice(device: Device, onHeartRateUpdate: (bpm: number) => void) {
     if (!this.manager || !this.isAvailable) return false;
     try {
@@ -109,8 +138,12 @@ class BluetoothService {
             return;
           }
           if (characteristic?.value) {
-            const bpm = this.decodeHeartRate(characteristic.value);
-            onHeartRateUpdate(bpm);
+            try {
+              const bpm = this.decodeHeartRate(characteristic.value);
+              if (bpm > 0) onHeartRateUpdate(bpm);
+            } catch (e) {
+              console.warn("[Bluetooth] Falha ao decodificar pacote:", e);
+            }
           }
         }
       );
@@ -123,19 +156,21 @@ class BluetoothService {
   }
 
   private decodeHeartRate(base64Value: string): number {
-    // Decodifica o valor Base64 para bytes
-    const buffer = Buffer.from(base64Value, "base64");
-    const flags = buffer[0];
+    try {
+      const buffer = Buffer.from(base64Value, "base64");
+      if (buffer.length < 2) return 0;
 
-    // De acordo com a especificação Bluetooth GATT:
-    // Se o bit 0 da flag for 0, o BPM é 1 byte (UINT8).
-    // Se o bit 0 da flag for 1, o BPM é 2 bytes (UINT16).
-    const isUint16 = (flags & 0x01) !== 0;
+      const flags = buffer[0];
+      const isUint16 = (flags & 0x01) !== 0;
 
-    if (isUint16) {
-      return buffer.readUInt16LE(1);
-    } else {
-      return buffer[1];
+      if (isUint16) {
+        if (buffer.length < 3) return 0;
+        return buffer.readUInt16LE(1);
+      } else {
+        return buffer[1];
+      }
+    } catch (e) {
+      return 0;
     }
   }
 

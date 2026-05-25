@@ -1,86 +1,145 @@
 import { Platform } from "react-native";
-import {
-  ensureHealthConnectPermissions,
-  fetchHealthConnectSteps,
-  fetchHealthConnectHeartRate,
-  fetchHealthConnectCalories,
-  fetchHealthConnectOxygen,
-} from "./healthConnectService";
+import { unifiedHealthService } from "./unifiedHealthService";
 import {
   ensureHealthKitPermissions,
   fetchHealthKitSteps,
   fetchHealthKitHeartRate,
   fetchHealthKitCalories,
 } from "./appleHealthKitService";
-
-export interface NativeHealthData {
-  steps: number;
-  heartRate: number;
-}
-
-let isSimulationState = false;
+import { saveHealthMetricData } from "./caloriesService";
 
 export const NativeHealthManager = {
-  isSimulation: (): boolean => isSimulationState,
-
   authorize: async (): Promise<boolean> => {
-    let success = false;
     try {
       if (Platform.OS === "android") {
-        success = await ensureHealthConnectPermissions();
+        return await unifiedHealthService.requestAllPermissions();
       } else if (Platform.OS === "ios") {
-        success = await ensureHealthKitPermissions();
+        return await ensureHealthKitPermissions();
       }
-    } catch (error) {
-      console.log("ℹ️ Saúde Nativa: Módulos indisponíveis (Expo Go). Ativando Modo Simulação.");
-      success = false;
-    }
-
-    if (!success) {
-      isSimulationState = true;
-      console.log("🛠️ [MODO SIMULAÇÃO] Ativado para testes de interface.");
+      return false;
+    } catch (e) {
+      console.warn("Authorization failed:", e);
       return false;
     }
-
-    isSimulationState = false;
-    return success;
   },
 
   fetchSteps: async (): Promise<number> => {
-    if (isSimulationState) return 0;
-    if (Platform.OS === "android") {
-      return fetchHealthConnectSteps();
-    } else if (Platform.OS === "ios") {
-      return fetchHealthKitSteps();
+    let steps = 0;
+    try {
+      if (Platform.OS === "android") {
+        steps = await unifiedHealthService.getSteps();
+      } else if (Platform.OS === "ios") {
+        steps = await fetchHealthKitSteps();
+      }
+    } catch (e) {
+      console.warn("[NHM] fetchSteps falhou:", e);
     }
-    return 0;
+
+    if (steps > 0) {
+      try {
+        await saveHealthMetricData("steps", steps);
+      } catch (e) {
+        console.warn("Erro ao sincronizar passos com o backend:", e);
+      }
+    }
+    return steps;
   },
 
   fetchHeartRate: async (): Promise<number> => {
-    if (isSimulationState) return 0;
-    if (Platform.OS === "android") {
-      return fetchHealthConnectHeartRate();
-    } else if (Platform.OS === "ios") {
-      return fetchHealthKitHeartRate();
+    let bpm = 0;
+    try {
+      if (Platform.OS === "android") {
+        bpm = await unifiedHealthService.getHeartRate();
+      } else if (Platform.OS === "ios") {
+        bpm = await fetchHealthKitHeartRate();
+      }
+    } catch (e) {
+      console.warn("[NHM] fetchHeartRate falhou:", e);
     }
-    return 0;
+    return bpm;
   },
 
   fetchCalories: async (): Promise<number> => {
-    if (isSimulationState) return 0;
-    if (Platform.OS === "android") {
-      return fetchHealthConnectCalories();
-    } else if (Platform.OS === "ios") {
-      return fetchHealthKitCalories();
+    let calories = 0;
+    try {
+      if (Platform.OS === "android") {
+        calories = await unifiedHealthService.getCalories();
+      } else if (Platform.OS === "ios") {
+        calories = await fetchHealthKitCalories();
+      }
+    } catch (e) {
+      console.warn("[NHM] fetchCalories falhou:", e);
     }
-    return 0;
+
+    if (calories > 0) {
+      try {
+        await saveHealthMetricData("calories", calories);
+      } catch (e) {
+        console.warn("Erro ao sincronizar calorias com o backend:", e);
+      }
+    }
+    return calories;
+  },
+
+  fetchOxygen: async (): Promise<number> => {
+    let oxygen = 0;
+    try {
+      if (Platform.OS === "android") {
+        oxygen = await unifiedHealthService.getOxygen();
+      }
+    } catch (e) {
+      console.warn("[NHM] fetchOxygen falhou:", e);
+    }
+
+    const rounded = Math.round(oxygen * 100) / 100;
+    if (rounded > 0) {
+      try {
+        await saveHealthMetricData("oxygen", rounded);
+      } catch (e) {
+        console.warn("Erro ao sincronizar oxigênio com o backend:", e);
+      }
+    }
+    return rounded;
+  },
+
+  fetchSleep: async (): Promise<number> => {
+    let hours = 0;
+    try {
+      if (Platform.OS === "android") {
+        hours = await unifiedHealthService.getSleep();
+      }
+    } catch (e) {
+      console.warn("[NHM] fetchSleep falhou:", e);
+    }
+
+    if (hours > 0) {
+      try {
+        await saveHealthMetricData("sleep", hours);
+        console.log(`[NHM] ✅ Sono salvo no backend: ${hours.toFixed(2)}h`);
+      } catch (e) {
+        console.warn("Erro ao sincronizar sono com o backend:", e);
+      }
+    }
+    return hours;
+  },
+
+  fetchDetailedSleep: async (): Promise<any> => {
+    try {
+      if (Platform.OS === "android") {
+        return await unifiedHealthService.getDetailedSleep();
+      }
+      return null;
+    } catch (e) {
+      console.warn("[NHM] fetchDetailedSleep falhou:", e);
+      return null;
+    }
   },
 
   subscribeSteps: (callback: (steps: number) => void): (() => void) => {
     const interval = setInterval(async () => {
       const steps = await NativeHealthManager.fetchSteps();
       callback(steps);
-    }, 5000);
+    }, 10000);
     return () => clearInterval(interval);
   },
 
@@ -88,20 +147,11 @@ export const NativeHealthManager = {
     const interval = setInterval(async () => {
       const bpm = await NativeHealthManager.fetchHeartRate();
       if (bpm > 0) callback(bpm);
-    }, 3000);
+    }, 5000);
     return () => clearInterval(interval);
   },
 
-  fetchPressure: async (): Promise<number | null> => {
-    if (isSimulationState) return 0;
-    return null;
-  },
-
-  fetchOxygen: async (): Promise<number | null> => {
-    if (isSimulationState) return 0;
-    if (Platform.OS === "android") {
-      return fetchHealthConnectOxygen();
-    }
-    return null;
+  isSimulation: () => {
+    return false;
   },
 };

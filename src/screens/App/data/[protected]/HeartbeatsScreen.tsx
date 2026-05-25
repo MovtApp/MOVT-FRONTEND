@@ -11,6 +11,7 @@ import {
 } from "react-native";
 
 import { SafeAreaView } from "react-native-safe-area-context";
+import { useRoute } from "@react-navigation/native";
 import { AppStackParamList } from "../../../../@types/routes";
 import BackButton from "../../../../components/BackButton";
 import DataPillNavigator from "../../../../components/data/DataPillNavigator";
@@ -111,6 +112,25 @@ const calculateSvgDimensions = (screenWidth: number, screenHeight: number) => {
 
 const HeartbeatsScreen: React.FC = () => {
   const { user } = useAuth();
+  const route = useRoute<any>();
+  const routeDate = (() => {
+    try {
+      const d = route.params?.date ? new Date(route.params.date) : new Date();
+      return isNaN(d.getTime()) ? new Date() : d;
+    } catch (e) {
+      return new Date();
+    }
+  })();
+  const dateStr = `${routeDate.getFullYear()}-${String(routeDate.getMonth() + 1).padStart(2, "0")}-${String(routeDate.getDate()).padStart(2, "0")}`;
+
+  const isToday = useMemo(() => {
+    const today = new Date();
+    return (
+      routeDate.getDate() === today.getDate() &&
+      routeDate.getMonth() === today.getMonth() &&
+      routeDate.getFullYear() === today.getFullYear()
+    );
+  }, [routeDate]);
 
   // Estados
   const [heartRate, setHeartRate] = useState<number | null>(null);
@@ -176,8 +196,8 @@ const HeartbeatsScreen: React.FC = () => {
       // Primeiro, tenta buscar histórico do nosso backend
       try {
         const [hrData, oxyData] = await Promise.all([
-          getHealthMetricData("heartrate", "1d"),
-          getHealthMetricData("oxygen", "1d"),
+          getHealthMetricData("heartrate", "1d", dateStr),
+          getHealthMetricData("oxygen", "1d", dateStr),
         ]);
 
         if (hrData && hrData.totalCalories) setHeartRate(hrData.totalCalories);
@@ -192,37 +212,17 @@ const HeartbeatsScreen: React.FC = () => {
         return;
       }
 
-      // Depois tenta autorização nativa
-      const success = await NativeHealthManager.authorize();
-      setIsAuthorized(success);
+      // REMOVIDO: NativeHealthManager.authorize() automático.
+      // O usuário deve clicar no botão 'Conectar' para autorizar manualmente.
 
-      if (success) {
-        setConnectionStatus("connected");
-        setConnectionMessage(
-          "Relógio Pareado (" + (Platform.OS === "ios" ? "Apple" : "Google Health") + ")"
-        );
-
-        const bpm = await NativeHealthManager.fetchHeartRate();
-        if (bpm) setHeartRate(bpm);
-
-        setIsLoading(false);
-      } else {
-        if (NativeHealthManager.isSimulation()) {
-          setConnectionStatus("simulation");
-          setConnectionMessage("Modo Simulação Ativo");
-        } else {
-          setConnectionStatus("disconnected");
-          setConnectionMessage("Nenhum relógio conectado");
-        }
-        setIsLoading(false);
-      }
+      setIsLoading(false);
     };
     checkNativeConnection();
-  }, [user?.id, isUsingBluetooth]);
+  }, [user?.id, isUsingBluetooth, dateStr]);
 
-  // Handle subscription to heart rate if authorized
+  // Handle subscription to heart rate if authorized and isToday
   useEffect(() => {
-    if (!isAuthorized || isUsingBluetooth) return;
+    if (!isAuthorized || isUsingBluetooth || !isToday) return;
 
     const cancelSubscription = NativeHealthManager.subscribeHeartRate((bpm) => {
       if (typeof bpm === "number" && !isNaN(bpm) && isFinite(bpm)) {
@@ -239,7 +239,7 @@ const HeartbeatsScreen: React.FC = () => {
     });
 
     return () => cancelSubscription();
-  }, [isAuthorized, isUsingBluetooth]);
+  }, [isAuthorized, isUsingBluetooth, isToday]);
 
   const handleDeviceSelected = async (device: any) => {
     setIsUsingBluetooth(true);
@@ -248,6 +248,7 @@ const HeartbeatsScreen: React.FC = () => {
 
     // Se o device vier do scanner real, ele terá a propriedade 'rawDevice' ou será o próprio objeto
     const targetDevice = device.rawDevice || device;
+    console.log(`[BT CONNECT] Tentando conectar ao dispositivo: ${device.name} (ID: ${device.id})`);
 
     const success = await bluetoothService.connectToDevice(targetDevice, (bpm) => {
       if (typeof bpm === "number" && !isNaN(bpm) && isFinite(bpm)) {
@@ -274,34 +275,41 @@ const HeartbeatsScreen: React.FC = () => {
   };
 
   const handleConnectDevice = async () => {
-    setConnectionStatus("connecting");
-    setConnectionMessage("Autorizando conexão...");
-    const success = await NativeHealthManager.authorize();
-
-    if (success) {
-      setIsAuthorized(true);
-      setConnectionStatus("connected");
-      setConnectionMessage(
-        "Relógio Conectado via " + (Platform.OS === "ios" ? "HealthKit" : "Health Connect")
-      );
-      Alert.alert("Sucesso", "Seu dispositivo foi conectado profissionalmente.");
-    } else {
-      if (NativeHealthManager.isSimulation()) {
-        setConnectionStatus("simulation");
-        setConnectionMessage("Modo Simulação");
-        Alert.alert(
-          "Modo Simulação",
-          "O Expo Go não suporta sensores reais. Para usar de forma definitiva, você precisará gerar um build de desenvolvimento (Dev Client)."
-        );
-      } else {
-        setConnectionStatus("error");
-        setConnectionMessage("Falha ao autorizar");
-        Alert.alert(
-          "Erro",
-          "Não foi possível conectar. Verifique as permissões de saúde nativas (Apple Health / Google Health Connect)."
-        );
-      }
-    }
+    Alert.alert("Como deseja conectar?", "Escolha o método de conexão para o seu relógio.", [
+      {
+        text: "Google Health Connect",
+        onPress: async () => {
+          setConnectionStatus("connecting");
+          setConnectionMessage("Autorizando conexão...");
+          try {
+            const success = await NativeHealthManager.authorize();
+            if (success) {
+              setIsAuthorized(true);
+              setConnectionStatus("connected");
+              setConnectionMessage("Relógio Conectado via Health Connect");
+              Alert.alert("Sucesso", "Conectado ao Google Health com sucesso.");
+            } else {
+              setConnectionStatus("error");
+              setConnectionMessage("Falha na autorização");
+            }
+          } catch (err) {
+            setConnectionStatus("error");
+            console.error(err);
+          }
+        },
+      },
+      {
+        text: "Bluetooth Direto",
+        onPress: () => {
+          setIsDeviceModalVisible(true);
+        },
+      },
+      {
+        text: "Cancelar",
+        style: "cancel",
+        onPress: () => setConnectionStatus("disconnected"),
+      },
+    ]);
   };
 
   const getStatusColor = () => {
@@ -358,12 +366,15 @@ const HeartbeatsScreen: React.FC = () => {
             >
               <TouchableOpacity
                 style={[styles.statusBadge, { borderColor: getStatusColor() + "40" }]}
-                onPress={() => setIsDeviceModalVisible(true)}
-                activeOpacity={0.7}
+                onPress={isToday ? () => setIsDeviceModalVisible(true) : undefined}
+                activeOpacity={isToday ? 0.7 : 1}
+                disabled={!isToday}
               >
                 <View style={[styles.statusDot, { backgroundColor: getStatusColor() }]} />
-                <Text style={styles.statusText}>{connectionMessage}</Text>
-                {lastUpdate && <Text style={styles.updateText}>• {lastUpdate}</Text>}
+                <Text style={styles.statusText}>
+                  {isToday ? connectionMessage : "Histórico Registrado"}
+                </Text>
+                {lastUpdate && isToday && <Text style={styles.updateText}>• {lastUpdate}</Text>}
               </TouchableOpacity>
             </ReanimatedView>
 
@@ -435,15 +446,19 @@ const HeartbeatsScreen: React.FC = () => {
             {/* Info Card */}
             <ReanimatedView entering={FadeInDown.delay(900).duration(600)} style={styles.infoCard}>
               <View style={styles.infoContent}>
-                <Text style={styles.infoTitle}>Status da Conexão</Text>
+                <Text style={styles.infoTitle}>
+                  {isToday ? "Status da Conexão" : "Registro Histórico"}
+                </Text>
                 <Text style={styles.infoSubtitle}>
-                  {connectionStatus === "connected"
-                    ? "Seu relógio está sincronizado diretamente."
-                    : "Por favor, autorize a conexão com o Health Connect/HealthKit."}
+                  {isToday
+                    ? connectionStatus === "connected"
+                      ? "Seu relógio está sincronizado diretamente."
+                      : "Por favor, autorize a conexão com o Health Connect/HealthKit."
+                    : "Os batimentos e oxigênio mostrados acima correspondem a este dia do histórico."}
                 </Text>
               </View>
 
-              {connectionStatus === "simulation" && (
+              {connectionStatus === "simulation" && isToday && (
                 <View style={styles.simulationWarning}>
                   <AlertTriangle size={16} color="#4338CA" />
                   <Text style={styles.simulationWarningText}>
@@ -452,22 +467,37 @@ const HeartbeatsScreen: React.FC = () => {
                 </View>
               )}
 
-              {connectionStatus !== "connected" && connectionStatus !== "simulation" ? (
-                <TouchableOpacity style={styles.connectBtnAction} onPress={handleConnectDevice}>
-                  <Text style={styles.connectBtnText}>Conectar</Text>
-                  <Watch size={16} color="#FFFFFF" style={{ marginLeft: 6 }} />
-                </TouchableOpacity>
+              {isToday ? (
+                connectionStatus !== "connected" && connectionStatus !== "simulation" ? (
+                  <TouchableOpacity style={styles.connectBtnAction} onPress={handleConnectDevice}>
+                    <Text style={styles.connectBtnText}>Conectar</Text>
+                    <Watch size={16} color="#FFFFFF" style={{ marginLeft: 6 }} />
+                  </TouchableOpacity>
+                ) : (
+                  <TouchableOpacity style={styles.syncBtn} onPress={handleConnectDevice}>
+                    <Watch size={18} color="#2563EB" />
+                  </TouchableOpacity>
+                )
               ) : (
-                <TouchableOpacity style={styles.syncBtn} onPress={handleConnectDevice}>
-                  <Watch size={18} color="#2563EB" />
-                </TouchableOpacity>
+                <View
+                  style={{
+                    paddingVertical: 8,
+                    paddingHorizontal: 12,
+                    backgroundColor: "#F1F5F9",
+                    borderRadius: 8,
+                  }}
+                >
+                  <Text style={{ color: "#475569", fontSize: 12, fontWeight: "bold" }}>
+                    Apenas Leitura
+                  </Text>
+                </View>
               )}
             </ReanimatedView>
 
             <View style={{ height: 120 }} />
           </ScrollView>
 
-          <DataPillNavigator currentScreen="HeartbeatsScreen" />
+          {!isDeviceModalVisible && <DataPillNavigator currentScreen="HeartbeatsScreen" />}
 
           <DeviceSelectorModal
             isVisible={isDeviceModalVisible}

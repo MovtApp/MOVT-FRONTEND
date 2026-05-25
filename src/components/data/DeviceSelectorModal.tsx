@@ -10,6 +10,7 @@ import {
   PermissionsAndroid,
   Alert,
 } from "react-native";
+import { Buffer } from "buffer";
 import BottomSheet, { BottomSheetView, BottomSheetBackdrop } from "@gorhom/bottom-sheet";
 import {
   Watch,
@@ -19,6 +20,8 @@ import {
   Plus,
   ShieldCheck,
   Smartphone,
+  Headphones,
+  Monitor,
 } from "lucide-react-native";
 import {
   getAllWearOsDevices,
@@ -27,7 +30,7 @@ import {
 } from "../../services/wearOsHealthService";
 import { useAuth } from "../../contexts/AuthContext";
 import Animated, { FadeInDown } from "react-native-reanimated";
-import { bluetoothService } from "../../services/bluetoothService";
+import { bluetoothService, HEART_RATE_SERVICE_UUID } from "../../services/bluetoothService";
 
 interface DeviceSelectorModalProps {
   isVisible: boolean;
@@ -48,7 +51,15 @@ const DeviceSelectorModal: React.FC<DeviceSelectorModalProps> = ({
   const [isLoading, setIsLoading] = useState(false);
   const [bluetoothState, setBluetoothState] = useState<string>("Unknown");
   const [scanResults, setScanResults] = useState<
-    { name: string; model: string; id: string; rssi: number | null; rawDevice: any }[]
+    {
+      name: string;
+      model: string;
+      id: string;
+      rssi: number | null;
+      rawDevice: any;
+      isLikelyWearable?: boolean;
+      deviceType?: "watch" | "audio" | "tv" | "other";
+    }[]
   >([]);
   const scanningRef = useRef(false);
 
@@ -90,7 +101,7 @@ const DeviceSelectorModal: React.FC<DeviceSelectorModalProps> = ({
     }
   }, [user?.id]);
 
-  const scanTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const scanTimeoutRef = useRef<any>(null);
 
   const stopScanning = useCallback(() => {
     if (scanTimeoutRef.current) {
@@ -136,26 +147,108 @@ const DeviceSelectorModal: React.FC<DeviceSelectorModalProps> = ({
     setScanResults([]);
     scanningRef.current = true;
 
+    // Busca dispositivos já conectados ao sistema (útil para fones já pareados)
+    bluetoothService
+      .getConnectedDevices()
+      .then((connectedDevices) => {
+        connectedDevices.forEach((device) => {
+          const name = device.name || device.localName || "Dispositivo Conectado";
+          console.log(`[BT CONNECTED] Encontrado: ${name} | ID: ${device.id}`);
+
+          // Detecção de tipo para os já conectados
+          let type: "watch" | "audio" | "tv" | "other" = "other";
+          const lowerName = name.toLowerCase();
+          if (/watch|band|fit|heart|relogio/i.test(lowerName)) type = "watch";
+          else if (/fone|ear|buds|audio|fon-|moto|phone/i.test(lowerName)) type = "audio";
+
+          setScanResults((prev) => {
+            if (prev.find((d) => d.id === device.id)) return prev;
+            return [
+              ...prev,
+              {
+                name: name,
+                model: device.id,
+                id: device.id,
+                rssi: -35, // Sinal forte presumido para conectados
+                rawDevice: device,
+                deviceType: type,
+                isLikelyWearable: type === "watch",
+              },
+            ];
+          });
+        });
+      })
+      .catch((err) => console.warn("[BT] Erro ao buscar conectados:", err));
+
     // Scan profissional: Tenta primeiro com filtro, se não achar em 5 segundos, abre o filtro
     bluetoothService.scanDevices((device) => {
+      // DUMP COMPLETO EM LINHA ÚNICA
+      console.log(
+        `[BT DUMP] ID: ${device.id} | Name: ${device.name || "null"} | RSSI: ${device.rssi} | Services: ${JSON.stringify(device.serviceUUIDs)}`
+      );
+
+      const name = device.name || device.localName;
+
+      // Filtro solicitado: Apenas exige que tenha NOME real
+      if (!name || name.trim() === "" || name === "null") {
+        return;
+      }
+
+      const rssi = device.rssi || -100;
+      const displayName = name;
+
+      // Detecção de Tipo
+      let type: "watch" | "audio" | "tv" | "other" = "other";
+      const lowerName = displayName.toLowerCase();
+
+      const isWatch =
+        /watch|band|fit|pulse|heart|relogio|mi\s|amazfit|galaxy|huawei|garmin/i.test(lowerName) ||
+        device.serviceUUIDs?.includes(HEART_RATE_SERVICE_UUID);
+
+      const isAudio = /fone|ear|buds|pods|audio|wh-|wf-|sound|speaker|headset|headphone|fon-/i.test(
+        lowerName
+      );
+
+      const isTV = /tv|uhd|led|oled|smart|vizio|sharp|sony|roku|firestick/i.test(lowerName);
+
+      if (isWatch) type = "watch";
+      else if (isAudio) type = "audio";
+      else if (isTV) type = "tv";
+
+      console.log(`[BT SCAN] Encontrado: ${displayName} | Tipo: ${type} | RSSI: ${rssi}dBm`);
+
+      const isLikelyOther =
+        type === "tv" || (type === "other" && /Samsung|LG|Monitor|Soundbar/i.test(displayName));
+
       setScanResults((prev) => {
-        const name = device.name || device.localName || "Dispositivo Sem Nome";
-        if (prev.find((d) => d.id === device.id)) {
-          // Atualiza RSSI se já existir
-          return prev.map((d) => (d.id === device.id ? { ...d, rssi: device.rssi } : d));
+        const existing = prev.find((d) => d.id === device.id);
+        if (existing) {
+          return prev.map((d) =>
+            d.id === device.id
+              ? { ...d, rssi: device.rssi, name: displayName, deviceType: type }
+              : d
+          );
         }
-        return [
-          ...prev,
-          {
-            name: name,
-            model: device.id,
-            id: device.id,
-            rssi: device.rssi,
-            rawDevice: device,
-          },
-        ].sort((a, b) => (b.rssi || -100) - (a.rssi || -100)); // Ordena por sinal
+
+        const newDevice = {
+          name: displayName,
+          model: device.id,
+          id: device.id,
+          rssi: device.rssi,
+          rawDevice: device,
+          deviceType: type,
+          isLikelyWearable:
+            type === "watch" || (!isLikelyOther && type !== "audio" && (device.rssi || -100) > -65),
+        };
+
+        return [...prev, newDevice].sort((a: any, b: any) => {
+          // Prioriza wearables prováveis e depois por sinal
+          if (a.isLikelyWearable && !b.isLikelyWearable) return -1;
+          if (!a.isLikelyWearable && b.isLikelyWearable) return 1;
+          return (b.rssi || -100) - (a.rssi || -100);
+        });
       });
-    }, false); // Usamos false por padrão para garantir que encontre tudo, o usuário decide o que é relógio
+    }, false);
 
     scanTimeoutRef.current = setTimeout(() => {
       stopScanning();
@@ -166,19 +259,37 @@ const DeviceSelectorModal: React.FC<DeviceSelectorModalProps> = ({
     if (!user?.id) return;
     setIsLoading(true);
     try {
+      // 1. Registra no banco (o service já trata o limite de 14 caracteres)
       await registerWearOsDevice(parseInt(user.id, 10), {
         deviceName: device.name,
-        deviceModel: device.model,
+        deviceModel: device.id,
         deviceType: "Bluetooth BLE",
       });
+
+      // 2. Tenta conexão real via Bluetooth para iniciar monitoramento
+      console.log(`[BT] Tentando conectar ao dispositivo: ${device.id}`);
+      // Passamos um callback vazio por enquanto, pois o monitoramento global será feito pelo Health Manager
+      const connected = await bluetoothService.connectToDevice(device.rawDevice, (bpm) => {
+        console.log(`[BT LIVE] Batimento recebido de ${device.name}: ${bpm} BPM`);
+      });
+
+      if (connected) {
+        Alert.alert("Sucesso", `${device.name} vinculado e conectado com sucesso!`);
+      } else {
+        Alert.alert(
+          "Vínculo salvo",
+          `${device.name} foi salvo nos seus dispositivos, mas não conseguimos estabelecer uma conexão Bluetooth agora. \n\nCertifique-se de que o dispositivo está ligado e próximo.`
+        );
+      }
+
       await loadRegisteredDevices();
       if (onDeviceSelected) {
         onDeviceSelected(device);
       }
       setScanResults([]);
-      // Fecha e notifica a tela principal se necessário
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error registering device:", error);
+      Alert.alert("Erro de Registro", `Não foi possível vincular o dispositivo: ${error.message}`);
     } finally {
       setIsLoading(false);
     }
@@ -265,12 +376,38 @@ const DeviceSelectorModal: React.FC<DeviceSelectorModalProps> = ({
               </View>
             )}
 
-            {scanResults.map((result) => (
+            {scanResults.map((result: any) => (
               <Animated.View entering={FadeInDown} key={result.id} style={styles.scanResultRow}>
+                <View style={styles.deviceIcon}>
+                  {result.deviceType === "watch" ? (
+                    <Watch size={20} color="#2563EB" />
+                  ) : result.deviceType === "audio" ? (
+                    <Headphones size={20} color="#8B5CF6" />
+                  ) : result.deviceType === "tv" ? (
+                    <Monitor size={20} color="#F59E0B" />
+                  ) : (
+                    <Bluetooth size={20} color="#64748B" />
+                  )}
+                </View>
                 <View style={styles.resultInfo}>
-                  <Text style={styles.resultName}>{result.name}</Text>
-                  <Text style={styles.resultModel}>{result.model}</Text>
-                  {result.rssi && <Text style={styles.rssiText}>Sinal: {result.rssi} dBm</Text>}
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                    <Text style={styles.resultName}>{result.name}</Text>
+                    {result.deviceType === "watch" && (
+                      <View style={styles.wearableBadge}>
+                        <Text style={styles.wearableBadgeText}>Relógio</Text>
+                      </View>
+                    )}
+                    {result.deviceType === "audio" && (
+                      <View style={[styles.wearableBadge, { backgroundColor: "#F3E8FF" }]}>
+                        <Text style={[styles.wearableBadgeText, { color: "#6B21A8" }]}>Áudio</Text>
+                      </View>
+                    )}
+                    {result.deviceType === "tv" && (
+                      <View style={[styles.wearableBadge, { backgroundColor: "#FEF3C7" }]}>
+                        <Text style={[styles.wearableBadgeText, { color: "#92400E" }]}>TV</Text>
+                      </View>
+                    )}
+                  </View>
                 </View>
                 <TouchableOpacity style={styles.linkBtn} onPress={() => handleRegister(result)}>
                   <Plus size={16} color="#2563EB" />
@@ -294,6 +431,26 @@ const DeviceSelectorModal: React.FC<DeviceSelectorModalProps> = ({
               Seus dados de saúde são criptografados e protegidos.
             </Text>
           </View>
+
+          {/* Seção de Ajuda */}
+          <TouchableOpacity
+            style={styles.helpButton}
+            onPress={() =>
+              Alert.alert(
+                "Ajuda na Conexão",
+                "1. Verifique se o dispositivo está ligado e em modo de pareamento.\n\n2. Se o dispositivo já estiver conectado ao Bluetooth do seu celular, DESCONECTE-O nas configurações do Android para que ele apareça aqui.\n\n3. Verifique se as permissões de localização estão ativas.",
+                [
+                  { text: "Cancelar", style: "cancel" },
+                  {
+                    text: "Abrir Bluetooth",
+                    onPress: () => bluetoothService.openBluetoothSettings(),
+                  },
+                ]
+              )
+            }
+          >
+            <Text style={styles.helpButtonText}>Meu dispositivo não aparece?</Text>
+          </TouchableOpacity>
         </ScrollView>
       </BottomSheetView>
     </BottomSheet>
@@ -439,7 +596,18 @@ const styles = StyleSheet.create({
   resultModel: {
     fontSize: 12,
     color: "#64748B",
-    marginTop: 2,
+    flex: 1,
+  },
+  helpButton: {
+    paddingVertical: 12,
+    alignItems: "center",
+    marginTop: 8,
+  },
+  helpButtonText: {
+    color: "#2563EB",
+    fontSize: 13,
+    fontWeight: "600",
+    textDecorationLine: "underline",
   },
   linkBtn: {
     flexDirection: "row",
@@ -474,6 +642,18 @@ const styles = StyleSheet.create({
     color: "#94A3B8",
     marginTop: 2,
     fontWeight: "600",
+  },
+  wearableBadge: {
+    backgroundColor: "#DCFCE7",
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  wearableBadgeText: {
+    color: "#166534",
+    fontSize: 9,
+    fontWeight: "800",
+    textTransform: "uppercase",
   },
 });
 

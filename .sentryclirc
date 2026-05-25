@@ -1,0 +1,5 @@
+[defaults]
+url = https://sentry.io/
+
+[auth]
+token = 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

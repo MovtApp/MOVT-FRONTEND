@@ -21,8 +21,34 @@ import {
 } from "@expo-google-fonts/rubik";
 import FlashMessage from "react-native-flash-message";
 import "react-native-reanimated";
+import GlobalErrorBoundary from "./src/components/GlobalErrorBoundary";
+import * as Sentry from "@sentry/react-native";
+import { preInitializeHC } from "@services/healthConnectService";
+
+Sentry.init({
+  dsn: "https://63a1a4145497ba9b5cf511732a408323@o4511396537106432.ingest.us.sentry.io/4511396541825024",
+  debug: __DEV__,
+  tracesSampleRate: 1.0,
+  enableNative: true,
+  attachScreenshot: true,
+  enableAutoSessionTracking: true,
+});
 
 function AppContent() {
+  React.useEffect(() => {
+    // Inicialização atrasada e super protegida para Health Connect
+    const timer = setTimeout(() => {
+      try {
+        preInitializeHC().catch((err) => {
+          console.warn("[App] Falha silenciosa no HC:", err);
+          Sentry.captureException(err);
+        });
+      } catch (err) {
+        console.warn("[App] Erro crítico capturado ao iniciar HC:", err);
+      }
+    }, 2500);
+    return () => clearTimeout(timer);
+  }, []);
   const [fontsLoaded] = useFonts({
     Rubik_400Regular,
     Rubik_500Medium,
@@ -67,24 +93,28 @@ function AppContent() {
   );
 }
 
-export default function App() {
+function App() {
   return (
-    <SafeAreaProvider>
-      <GestureHandlerRootView
-        style={{
-          flex: 1,
-        }}
-      >
-        <StatusBar barStyle={"dark-content"} />
-        <BottomSheetModalProvider>
-          <AuthProvider>
-            <AppDataProvider>
-              <AppContent />
-            </AppDataProvider>
-          </AuthProvider>
-        </BottomSheetModalProvider>
-        <FlashMessage position="top" />
-      </GestureHandlerRootView>
-    </SafeAreaProvider>
+    <GlobalErrorBoundary>
+      <SafeAreaProvider>
+        <GestureHandlerRootView
+          style={{
+            flex: 1,
+          }}
+        >
+          <StatusBar barStyle={"dark-content"} />
+          <BottomSheetModalProvider>
+            <AuthProvider>
+              <AppDataProvider>
+                <AppContent />
+              </AppDataProvider>
+            </AuthProvider>
+          </BottomSheetModalProvider>
+          <FlashMessage position="top" />
+        </GestureHandlerRootView>
+      </SafeAreaProvider>
+    </GlobalErrorBoundary>
   );
 }
+
+export default Sentry.wrap(App);

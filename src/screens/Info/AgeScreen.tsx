@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from "react";
 import { View, StyleSheet, TouchableOpacity, Text, ScrollView, Dimensions } from "react-native";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import BackButton from "@components/BackButton";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useNavigation } from "@react-navigation/native";
@@ -28,8 +29,13 @@ const AgeScreen = () => {
     }
   }, [selectedAge, ages]);
 
-  const handleAge = () => {
-    navigation.navigate("Info", { screen: "HeightScreen" });
+  const handleAge = async () => {
+    try {
+      await AsyncStorage.setItem("@MOVT:onboarding:age", String(selectedAge));
+      navigation.navigate("Info", { screen: "HeightScreen" });
+    } catch (e) {
+      console.error("Erro ao salvar idade:", e);
+    }
   };
 
   const handleScroll = (event: any) => {

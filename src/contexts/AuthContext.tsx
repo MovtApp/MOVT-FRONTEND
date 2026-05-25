@@ -18,6 +18,7 @@ interface User {
   banner?: string | null;
   documentId?: string | null;
   documentType?: "CPF" | "CNPJ" | null;
+  isPendingSync?: boolean; // Flag para evitar chamadas de API antes da sincronização final
   role?: string;
 }
 
@@ -60,6 +61,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 supabaseUserId: response.data.user.supabase_uid || parsedUserDetails.supabaseUserId,
                 sessionId: storedSessionId,
               };
+
+              console.log("👤 [AuthContext] Usuário atualizado do Backend:", {
+                id: refreshedUser.id,
+                email: refreshedUser.email,
+                role: refreshedUser.role,
+                supabase_uid: refreshedUser.supabaseUserId,
+              });
 
               setUser(refreshedUser);
 
@@ -118,6 +126,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   async function signIn(sessionId: string, userDetails: Omit<User, "sessionId">) {
     try {
+      console.log(
+        "🔑 [AuthContext] Iniciando signIn para:",
+        userDetails.email,
+        "UID:",
+        userDetails.supabaseUserId
+      );
       // Salva o sessionId e os detalhes do usuário no AsyncStorage
       await AsyncStorage.setItem("userSessionId", sessionId);
       await AsyncStorage.setItem("@Auth:user", JSON.stringify(userDetails));

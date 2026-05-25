@@ -25,9 +25,7 @@ import * as WebBrowser from "expo-web-browser";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useAuth } from "../../../contexts/AuthContext";
 import { useAppData } from "../../../contexts/AppDataContext";
-import StripePlansSheet, {
-  StripePlansSheetRef,
-} from "../admin/[protected]/components/StripePlansSheet";
+
 import {
   Settings,
   Zap,
@@ -144,8 +142,6 @@ const PlanScreen: React.FC = () => {
 
   const { user } = useAuth();
   const insets = useSafeAreaInsets();
-  const isAdmin = user?.id === "15" || String(user?.id_us) === "15";
-  const adminSheetRef = useRef<StripePlansSheetRef>(null);
   const flatListRef = useRef<FlatList>(null);
   const featuresOpacity = useRef(new Animated.Value(1)).current;
 
@@ -543,19 +539,6 @@ const PlanScreen: React.FC = () => {
           </View>
         )}
       </ScrollView>
-
-      {/* ─── ADMIN FAB ────────────────────────────────────── */}
-      {isAdmin && (
-        <TouchableOpacity
-          style={styles.adminFab}
-          onPress={() => adminSheetRef.current?.open()}
-          activeOpacity={0.8}
-        >
-          <Settings size={26} color="#000" />
-        </TouchableOpacity>
-      )}
-
-      {isAdmin && <StripePlansSheet ref={adminSheetRef} />}
     </View>
   );
 };
@@ -860,24 +843,6 @@ const styles = StyleSheet.create({
     fontSize: 11,
     lineHeight: 16,
     paddingHorizontal: 20,
-  },
-
-  // ── ADMIN FAB ──────────────────────────────────────────
-  adminFab: {
-    position: "absolute",
-    bottom: 24,
-    right: 24,
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: "#BBF246",
-    justifyContent: "center",
-    alignItems: "center",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.25,
-    shadowRadius: 8,
-    elevation: 8,
   },
 });
 

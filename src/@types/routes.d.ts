@@ -78,7 +78,7 @@ export type AppStackParamList = {
   ConfigScreen: undefined;
   FAQScreen: undefined;
   PlanScreen: undefined;
-  LanguageScreen: undefined;
+
   ServiceScreen: undefined;
   ReviewScreen: undefined;
   TermsScreen: undefined;
@@ -104,6 +104,7 @@ export type AppStackParamList = {
   ArchivedPostsScreen: undefined;
   EditProfileScreen: undefined;
   AdminDashboard: undefined;
+  PersonalDashboard: undefined;
   ExpectationRealityScreen: undefined;
 };
 

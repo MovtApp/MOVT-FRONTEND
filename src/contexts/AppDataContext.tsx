@@ -151,14 +151,14 @@ export const AppDataProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
   const fetchHomeData = useCallback(
     async (specialty: string | null = null, force = false) => {
-      if (!user?.sessionId) return;
+      if (!user?.sessionId || user?.isPendingSync) return;
 
       // Se não for forçado e o cache for recente, não busca
       if (!force && !shouldFetch(`home-${specialty || "all"}`)) return;
 
       try {
-        setLoadingTrainings(true);
-        setLoadingDailyPlans(true);
+        if (trainings.length === 0) setLoadingTrainings(true);
+        if (dailyPlans.length === 0) setLoadingDailyPlans(true);
 
         const [trResp, dailyResp] = await Promise.all([
           api.get("/treinos", { params: { specialty } }),
@@ -209,16 +209,16 @@ export const AppDataProvider: React.FC<{ children: React.ReactNode }> = ({ child
         setLoadingDailyPlans(false);
       }
     },
-    [user?.sessionId, saveCache]
+    [user?.sessionId, saveCache, trainings.length, dailyPlans.length]
   );
 
   const fetchCommunities = useCallback(
     async (category: string = "Todas", force = false) => {
-      if (!user?.sessionId) return;
+      if (!user?.sessionId || user?.isPendingSync) return;
       if (!force && !shouldFetch(`communities-${category}`)) return;
 
       try {
-        setLoadingCommunities(true);
+        if (communities.length === 0) setLoadingCommunities(true);
         const { listCommunities } = await import("../services/communityService");
         const data = await listCommunities(user.sessionId, category);
         let formattedData: Community[] = [];
@@ -235,12 +235,12 @@ export const AppDataProvider: React.FC<{ children: React.ReactNode }> = ({ child
         setLoadingCommunities(false);
       }
     },
-    [user?.sessionId, saveCache]
+    [user?.sessionId, saveCache, communities.length]
   );
 
   const fetchDietMeals = useCallback(
     async (category: string = "all", force = false) => {
-      if (!user?.sessionId) return;
+      if (!user?.sessionId || user?.isPendingSync) return;
       if (!force && !shouldFetch(`diets-${category}`)) return;
 
       try {
@@ -298,7 +298,7 @@ export const AppDataProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
   const fetchFeedData = useCallback(
     async (force = false) => {
-      if (!user?.sessionId) return;
+      if (!user?.sessionId || user?.isPendingSync) return;
       if (!force && !shouldFetch("feed-data")) return;
 
       try {
@@ -349,12 +349,7 @@ export const AppDataProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
   const fetchAdminDashboardData = useCallback(
     async (force = false, tab = "month", status = "all") => {
-      const isAdmin =
-        user?.id === "15" ||
-        String(user?.id_us) === "15" ||
-        String(user?.id) === "15" ||
-        user?.role === "admin" ||
-        (user as any)?.tipo === "admin";
+      const isAdmin = user?.role === "admin" || (user as any)?.tipo === "admin";
       if (!user?.sessionId || !isAdmin) return;
       if (!force && !shouldFetch(`admin-dashboard-${tab}-${status}`)) return;
 
@@ -362,7 +357,7 @@ export const AppDataProvider: React.FC<{ children: React.ReactNode }> = ({ child
         setLoadingAdminDashboard(true);
 
         const [statsResp, usersResp, trainersResp, gymsResp] = await Promise.all([
-          api.get(`/admin/dashboard-stats`, { params: { tab, status } }),
+          api.get(`/admin/dashboard-stats`, { params: { tab, period: tab, status } }),
           api.get("/admin/all-users"),
           api.get("/admin/trainers"),
           api.get("/admin/gyms"),
@@ -395,12 +390,7 @@ export const AppDataProvider: React.FC<{ children: React.ReactNode }> = ({ child
   );
 
   const refreshAll = useCallback(async () => {
-    const isAdmin =
-      user?.id === "15" ||
-      String(user?.id_us) === "15" ||
-      String(user?.id) === "15" ||
-      user?.role === "admin" ||
-      (user as any)?.tipo === "admin";
+    const isAdmin = user?.role === "admin" || (user as any)?.tipo === "admin";
     const tasks = [
       fetchHomeData(null, true),
       fetchCommunities("Todas", true),
@@ -424,57 +414,60 @@ export const AppDataProvider: React.FC<{ children: React.ReactNode }> = ({ child
     user?.sessionId,
   ]);
 
+  // 1. Carrega o cache offline IMEDIATAMENTE ao inicializar o app (Pre-boot Cache)
   useEffect(() => {
-    const initAppData = async () => {
-      // 1. Carrega o que tiver no disco imediatamente para cada domínio
-      const [
-        cTrainings,
-        cDaily,
-        cComm,
-        cDiets,
-        cStripe,
-        cFPosts,
-        cFDiets,
-        cAdminData,
-        cAdminUsers,
-        cAdminTrainers,
-        cAdminGyms,
-      ] = await Promise.all([
-        loadCache("trainings-all"),
-        loadCache("dailyPlans"),
-        loadCache("communities-Todas"),
-        loadCache("diets-all"),
-        loadCache("stripe-plans"),
-        loadCache("feedPosts"),
-        loadCache("feedDiets"),
-        loadCache("adminDashboardData"),
-        loadCache("adminUsers"),
-        loadCache("adminTrainers"),
-        loadCache("adminGyms"),
-      ]);
+    const initOfflineCache = async () => {
+      try {
+        const [
+          cTrainings,
+          cDaily,
+          cComm,
+          cDiets,
+          cStripe,
+          cFPosts,
+          cFDiets,
+          cAdminData,
+          cAdminUsers,
+          cAdminTrainers,
+          cAdminGyms,
+        ] = await Promise.all([
+          loadCache("trainings-all"),
+          loadCache("dailyPlans"),
+          loadCache("communities-Todas"),
+          loadCache("diets-all"),
+          loadCache("stripe-plans"),
+          loadCache("feedPosts"),
+          loadCache("feedDiets"),
+          loadCache("adminDashboardData"),
+          loadCache("adminUsers"),
+          loadCache("adminTrainers"),
+          loadCache("adminGyms"),
+        ]);
 
-      if (cTrainings) setTrainings(cTrainings.data);
-      if (cDaily) setDailyPlans(cDaily.data);
-      if (cComm) setCommunities(cComm.data);
-      if (cDiets) setDietMeals(cDiets.data);
-      if (cStripe) setStripePlans(cStripe.data);
-      if (cFPosts) setFeedPosts(cFPosts.data);
-      if (cFDiets) setFeedDiets(cFDiets.data);
-      if (cAdminData) setAdminDashboardData(cAdminData.data);
-      if (cAdminUsers) setAdminUsers(cAdminUsers.data);
-      if (cAdminTrainers) setAdminTrainers(cAdminTrainers.data);
-      if (cAdminGyms) setAdminGyms(cAdminGyms.data);
-
-      // 2. Se houver sessão, dispara o fetch em background para atualizar
-      if (user?.sessionId) {
-        refreshAll();
+        if (cTrainings) setTrainings(cTrainings.data);
+        if (cDaily) setDailyPlans(cDaily.data);
+        if (cComm) setCommunities(cComm.data);
+        if (cDiets) setDietMeals(cDiets.data);
+        if (cStripe) setStripePlans(cStripe.data);
+        if (cFPosts) setFeedPosts(cFPosts.data);
+        if (cFDiets) setFeedDiets(cFDiets.data);
+        if (cAdminData) setAdminDashboardData(cAdminData.data);
+        if (cAdminUsers) setAdminUsers(cAdminUsers.data);
+        if (cAdminTrainers) setAdminTrainers(cAdminTrainers.data);
+        if (cAdminGyms) setAdminGyms(cAdminGyms.data);
+      } catch (err) {
+        console.warn("Erro ao inicializar o cache do AppDataContext:", err);
       }
     };
+    initOfflineCache();
+  }, [loadCache]);
 
-    if (user?.sessionId) {
-      initAppData();
+  // 2. Dispara a atualização silenciosa em background assim que a sessão estiver disponível
+  useEffect(() => {
+    if (user?.sessionId && !user?.isPendingSync) {
+      refreshAll();
     }
-  }, [user?.sessionId]);
+  }, [user?.sessionId, user?.isPendingSync, refreshAll]);
 
   return (
     <AppDataContext.Provider

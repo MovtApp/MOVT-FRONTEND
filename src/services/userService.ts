@@ -221,4 +221,22 @@ export const userService = {
     const response = await api.put("/user/notifications/read-all", {}, headers);
     return response.data;
   },
+
+  completeRegistration: async (data: {
+    nome: string;
+    email: string;
+    senha?: string;
+    genero?: string;
+    idade?: number;
+    altura?: number;
+    peso?: number;
+    objetivo?: string;
+    nivel?: string;
+  }) => {
+    // Para login social, usamos o endpoint de complete-onboarding
+    // Se houver senha, poderíamos usar o /register, mas para unificar o fluxo Info,
+    // usamos o update de perfil.
+    const response = await api.post("/user/complete-onboarding", data);
+    return response.data;
+  },
 };

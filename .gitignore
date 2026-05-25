@@ -145,5 +145,7 @@ babel.config.js
 *.config.mjs
 
 # Expo Prebuild
-/android
+# /android é versionado porque contém código nativo customizado (MOVTForegroundService,
+# MOVTServiceModule, edições em MainActivity) que nenhum config plugin recria.
+# Artefatos de build e segredos são ignorados pelo android/.gitignore aninhado.
 /ios

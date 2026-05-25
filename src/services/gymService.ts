@@ -72,12 +72,13 @@ export async function getNearbyGyms(
   specialty?: string | null
 ) {
   try {
-    const response = await api.get("/academias/nearby", {
+    const response = await api.get("/academias/v2/nearby", {
       params: {
         lat: latitude,
         lng: longitude,
         raio: radius,
         specialty: specialty || undefined,
+        useGoogle: "false",
       },
       headers: { Authorization: `Bearer ${sessionId}` },
     });

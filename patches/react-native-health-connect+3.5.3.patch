@@ -1,0 +1,74 @@
+diff --git a/node_modules/react-native-health-connect/android/src/main/java/dev/matinzd/healthconnect/HealthConnectManager.kt b/node_modules/react-native-health-connect/android/src/main/java/dev/matinzd/healthconnect/HealthConnectManager.kt
+index 40539fe..fb7c8f5 100644
+--- a/node_modules/react-native-health-connect/android/src/main/java/dev/matinzd/healthconnect/HealthConnectManager.kt
++++ b/node_modules/react-native-health-connect/android/src/main/java/dev/matinzd/healthconnect/HealthConnectManager.kt
+@@ -69,8 +69,12 @@ class HealthConnectManager(private val applicationContext: ReactApplicationConte
+   ) {
+     throwUnlessClientIsAvailable(promise) {
+       coroutineScope.launch {
+-        val granted = HealthConnectPermissionDelegate.launchPermissionsDialog(PermissionUtils.parsePermissions(reactPermissions))
+-        promise.resolve(PermissionUtils.mapPermissionResult(granted))
++        try {
++          val granted = HealthConnectPermissionDelegate.launchPermissionsDialog(PermissionUtils.parsePermissions(reactPermissions))
++          promise.resolve(PermissionUtils.mapPermissionResult(granted))
++        } catch (e: Exception) {
++          promise.rejectWithException(e)
++        }
+       }
+     }
+   }
+@@ -80,12 +84,16 @@ class HealthConnectManager(private val applicationContext: ReactApplicationConte
+   ) {
+     throwUnlessClientIsAvailable(promise) {
+       coroutineScope.launch {
+-        val exerciseRoute = HealthConnectPermissionDelegate.launchExerciseRouteAccessRequestDialog(recordId)
+-        if (exerciseRoute != null) {
+-          promise.resolve(ReactExerciseSessionRecord.parseExerciseRoute(exerciseRoute))
+-        }
+-        else{
+-          promise.rejectWithException(ExerciseRouteAccessDenied())
++        try {
++          val exerciseRoute = HealthConnectPermissionDelegate.launchExerciseRouteAccessRequestDialog(recordId)
++          if (exerciseRoute != null) {
++            promise.resolve(ReactExerciseSessionRecord.parseExerciseRoute(exerciseRoute))
++          }
++          else{
++            promise.rejectWithException(ExerciseRouteAccessDenied())
++          }
++        } catch (e: Exception) {
++          promise.rejectWithException(e)
+         }
+       }
+     }
+diff --git a/node_modules/react-native-health-connect/android/src/main/java/dev/matinzd/healthconnect/permissions/HealthConnectPermissionDelegate.kt b/node_modules/react-native-health-connect/android/src/main/java/dev/matinzd/healthconnect/permissions/HealthConnectPermissionDelegate.kt
+index 5ec3641..b245da0 100644
+--- a/node_modules/react-native-health-connect/android/src/main/java/dev/matinzd/healthconnect/permissions/HealthConnectPermissionDelegate.kt
++++ b/node_modules/react-native-health-connect/android/src/main/java/dev/matinzd/healthconnect/permissions/HealthConnectPermissionDelegate.kt
+@@ -42,11 +42,27 @@ object HealthConnectPermissionDelegate {
+   }
+ 
+   suspend fun launchPermissionsDialog(permissions: Set<String>): Set<String> {
++    // Guarda contra UninitializedPropertyAccessException quando o launcher ainda
++    // não foi registrado (ex.: recriação da Activity / corrida de ciclo de vida).
++    // Lançamos IllegalStateException (recuperável) para que o módulo rejeite a
++    // promise em vez de derrubar o app com crash fatal.
++    if (!::requestPermission.isInitialized) {
++      throw IllegalStateException(
++        "HealthConnect permission delegate not initialized. " +
++          "Ensure HealthConnectPermissionDelegate.setPermissionDelegate(activity) is called in Activity.onCreate()."
++      )
++    }
+     requestPermission.launch(permissions)
+     return permissionsChannel.receive()
+   }
+ 
+   suspend fun launchExerciseRouteAccessRequestDialog(recordId: String): ExerciseRoute? {
++    if (!::requestRoutePermission.isInitialized) {
++      throw IllegalStateException(
++        "HealthConnect route permission delegate not initialized. " +
++          "Ensure HealthConnectPermissionDelegate.setPermissionDelegate(activity) is called in Activity.onCreate()."
++      )
++    }
+     requestRoutePermission.launch(recordId)
+     return exerciseRouteChannel.receive()
+   }

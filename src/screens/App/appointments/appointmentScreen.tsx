@@ -43,6 +43,13 @@ export function AppointmentScreen() {
 
   const trainerId = (route.params as any)?.trainerId;
 
+  useEffect(() => {
+    if (!trainerId) {
+      Alert.alert("Erro", "ID do treinador não encontrado.");
+      navigation.goBack();
+    }
+  }, [trainerId]);
+
   const getLocalDateString = (date?: Date) => {
     const d = date || new Date();
     const year = d.getFullYear();
@@ -75,6 +82,7 @@ export function AppointmentScreen() {
   const [error, setError] = useState<string | null>(null);
 
   const fetchAvailability = useCallback(async () => {
+    if (!trainerId || !user?.sessionId) return;
     try {
       setLoading(true);
       setError(null);
@@ -99,13 +107,13 @@ export function AppointmentScreen() {
         error?.response?.data?.error ||
         "Não foi possível carregar a disponibilidade. Tente novamente.";
       setError(errorMsg);
-      Alert.alert("Erro", errorMsg);
     } finally {
       setLoading(false);
     }
   }, [trainerId, selectedDate, user?.sessionId]);
 
   const fetchWeeklyAvailability = useCallback(async () => {
+    if (!trainerId || !user?.sessionId) return;
     try {
       const resp = await getAvailability(trainerId, undefined, user?.sessionId);
       if (resp && resp.availability) {
@@ -117,8 +125,8 @@ export function AppointmentScreen() {
   }, [trainerId, user?.sessionId]);
 
   const fetchUserAppointments = useCallback(async () => {
+    if (!trainerId || !user?.sessionId) return;
     try {
-      if (!user?.sessionId) return;
       const resp = await api.get(`/appointments?role=client`);
       if (resp.data && Array.isArray(resp.data.data)) {
         // Filtrar apenas agendamentos com este trainer
@@ -135,12 +143,19 @@ export function AppointmentScreen() {
   }, [trainerId, user?.sessionId]);
 
   useEffect(() => {
-    if (trainerId) {
+    if (trainerId && user?.sessionId) {
       fetchWeeklyAvailability();
       fetchAvailability();
       fetchUserAppointments();
     }
-  }, [trainerId, selectedDate, fetchAvailability, fetchWeeklyAvailability, fetchUserAppointments]);
+  }, [
+    trainerId,
+    user?.sessionId,
+    selectedDate,
+    fetchAvailability,
+    fetchWeeklyAvailability,
+    fetchUserAppointments,
+  ]);
 
   // Obter dias da semana
   const weekDays = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];

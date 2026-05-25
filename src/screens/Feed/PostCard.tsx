@@ -148,7 +148,7 @@ const PostCard: React.FC<PostCardProps> = ({ post, onShare }) => {
 
   // Refs para detecção de toques (Double Tap)
   const lastTapRef = useRef(0);
-  const doubleTapDebounceRef = useRef<NodeJS.Timeout | null>(null);
+  const doubleTapDebounceRef = useRef<any>(null);
 
   // Estados para Gestão do Post
   const [showPostActions, setShowPostActions] = useState(false);

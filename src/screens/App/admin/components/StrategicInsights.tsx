@@ -30,9 +30,9 @@ const StrategicInsights: React.FC<StrategicInsightsProps> = ({ strategicData, fo
   } = strategicData || {};
 
   // Mock data for projections if empty
-  const projectionData =
+  const projectionData: { label: string; total: number }[] =
     projectedRevenue.length > 0
-      ? projectedRevenue.map((d: any) => ({ ...d, total: Number(d.total) }))
+      ? projectedRevenue.map((d: any) => ({ label: String(d.label), total: Number(d.total) }))
       : [
           { label: "M1", total: mrr * 1.1 },
           { label: "M2", total: mrr * 1.25 },
@@ -89,9 +89,10 @@ const StrategicInsights: React.FC<StrategicInsightsProps> = ({ strategicData, fo
             yKeys={["total"]}
             padding={{ top: 10, bottom: 10, left: 10, right: 10 }}
           >
-            {({ points }) => (
+            {({ points, chartBounds }) => (
               <Bar
                 points={points.total}
+                chartBounds={chartBounds}
                 color="#6366F1"
                 roundedCorners={{ topLeft: 8, topRight: 8 }}
                 animate={{ type: "timing", duration: 1000 }}

@@ -51,6 +51,7 @@ const HIDDEN_SCREENS = [
   "EditProfileScreen",
   "ActiveWorkout",
   "AdminDashboard",
+  "PersonalDashboard",
 ];
 // ============================================================================
 

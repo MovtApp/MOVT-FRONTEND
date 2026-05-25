@@ -5,21 +5,27 @@ import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { RootStackParamList } from "../../@types/routes";
 import { useNavigation } from "@react-navigation/native";
 import SelectInput from "../../components/SelectInput";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 const GenderScreen = () => {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
 
   const [gender, setGender] = useState<string | null>(null);
 
-  const handleAge = () => {
-    navigation.navigate("Info", { screen: "AgeScreen" });
+  const handleAge = async () => {
+    try {
+      await AsyncStorage.setItem("@MOVT:onboarding:gender", gender || "Não informado");
+      navigation.navigate("Info", { screen: "AgeScreen" });
+    } catch (e) {
+      console.error("Erro ao salvar gênero:", e);
+    }
   };
 
   const genderOptions = [
     { label: "Masculino", value: "masculino" },
     { label: "Feminino", value: "feminino" },
     { label: "Outro", value: "outro" },
-    { label: "Prefiro não responder", value: null },
+    { label: "Prefiro não responder", value: "não informado" },
   ];
 
   return (
@@ -41,7 +47,7 @@ const GenderScreen = () => {
       </View>
 
       <TouchableOpacity style={styles.verifyButton} onPress={handleAge}>
-        <Text style={styles.verifyButtonText}>Verificar</Text>
+        <Text style={styles.verifyButtonText}>Avançar</Text>
       </TouchableOpacity>
     </View>
   );

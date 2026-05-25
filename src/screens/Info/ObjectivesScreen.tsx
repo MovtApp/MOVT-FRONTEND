@@ -1,39 +1,124 @@
-import { View, StyleSheet, TouchableOpacity, Text } from "react-native";
+import { View, StyleSheet, TouchableOpacity, Text, Alert } from "react-native";
+import React, { useState, useEffect } from "react";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import BackButton from "@components/BackButton";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import { useNavigation } from "@react-navigation/native";
+import { useNavigation, useRoute } from "@react-navigation/native";
 import { SelectButton } from "@components/SelectButton";
 import { RootStackParamList } from "@typings/routes";
 
 const ObjectivesScreen = () => {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  const route = useRoute<any>();
+  const isEditing = route.params?.isEditing;
 
-  const handleHeight = () => {
-    navigation.navigate("Info", { screen: "LevelScreen" });
+  const [selectedObjectives, setSelectedObjectives] = useState<string[]>(["Manter peso"]);
+
+  const objectives = [
+    "Perder peso",
+    "Ganhar peso",
+    "Ganho de massa muscular",
+    "Definir corpo",
+    "Condicionamento físico",
+  ];
+
+  useEffect(() => {
+    const loadSavedObjective = async () => {
+      try {
+        const saved = await AsyncStorage.getItem("@MOVT:onboarding:objective");
+        if (saved) {
+          let savedList: string[] = [];
+          if (saved.startsWith("[") && saved.endsWith("]")) {
+            try {
+              const parsed = JSON.parse(saved);
+              if (Array.isArray(parsed)) {
+                savedList = parsed;
+              } else {
+                savedList = [saved];
+              }
+            } catch {
+              savedList = [saved];
+            }
+          } else {
+            savedList = saved
+              .split(",")
+              .map((s) => s.trim())
+              .filter(Boolean);
+          }
+
+          // Filtra o que é padrão
+          const standard = savedList.filter((item) => objectives.includes(item));
+
+          if (standard.length > 0) {
+            setSelectedObjectives(standard);
+          } else {
+            setSelectedObjectives(["Manter peso"]);
+          }
+        }
+      } catch (e) {
+        console.error("Erro ao carregar objetivo:", e);
+      }
+    };
+
+    loadSavedObjective();
+  }, []);
+
+  const handleSelectObjective = (obj: string) => {
+    setSelectedObjectives((prev) => {
+      if (prev.includes(obj)) {
+        const next = prev.filter((item) => item !== obj);
+        return next;
+      } else {
+        return [...prev, obj];
+      }
+    });
+  };
+
+  const handleAdvance = async () => {
+    try {
+      if (selectedObjectives.length === 0) {
+        Alert.alert("Aviso", "Por favor, selecione pelo menos um objetivo.");
+        return;
+      }
+
+      const joinedString = selectedObjectives.join(", ");
+      await AsyncStorage.setItem("@MOVT:onboarding:objective", joinedString);
+
+      if (isEditing) {
+        Alert.alert("Sucesso", "Objetivos atualizados com sucesso!");
+        navigation.goBack();
+      } else {
+        navigation.navigate("Info", { screen: "LevelScreen" });
+      }
+    } catch (e) {
+      console.error("Erro ao salvar objetivos:", e);
+    }
   };
 
   return (
     <View style={styles.container}>
       <View style={styles.topSection}>
-        <BackButton />
-        <Text style={styles.title}>Objetivos</Text>
+        <BackButton autoTopInset />
+        <Text style={styles.title}>{isEditing ? "Editar Objetivos" : "Objetivos"}</Text>
         <Text style={styles.question}>Qual é seu objetivo?</Text>
         <Text style={styles.instruction}>
-          Escolha o objetivo que melhor representa sua meta: perder peso, ganhar massa muscular ou
-          manter o peso atual.
+          {isEditing
+            ? "Selecione um ou mais objetivos que melhor representam suas metas atuais."
+            : "Escolha um ou mais objetivos que melhor representam suas metas."}
         </Text>
 
-        <SelectButton text="Perder peso" />
-        <SelectButton text="Ganhar peso" />
-        <SelectButton text="Ganho de massa muscular" />
-        <SelectButton text="Definir corpo" />
-        <SelectButton text="Condicionamento físico" />
-
-        <Text style={styles.subtitle}>Outros</Text>
+        {objectives.map((obj) => (
+          <SelectButton
+            key={obj}
+            text={obj}
+            onPress={() => handleSelectObjective(obj)}
+            style={selectedObjectives.includes(obj) ? { backgroundColor: "#BBF246" } : {}}
+          />
+        ))}
       </View>
 
-      <TouchableOpacity style={styles.advanceButton} onPress={handleHeight}>
-        <Text style={styles.advanceButtonText}>Avançar</Text>
+      <TouchableOpacity style={styles.advanceButton} onPress={handleAdvance}>
+        <Text style={styles.advanceButtonText}>{isEditing ? "Salvar Alterações" : "Avançar"}</Text>
       </TouchableOpacity>
     </View>
   );
@@ -60,7 +145,7 @@ const styles = StyleSheet.create({
   subtitle: {
     fontFamily: "Rubik_500Medium",
     fontSize: 16,
-    marginTop: 30,
+    marginTop: 20,
     color: "#111",
     marginBottom: 8,
     textAlign: "center",

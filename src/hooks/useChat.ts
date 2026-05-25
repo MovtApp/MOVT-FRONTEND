@@ -58,6 +58,7 @@ export const useChats = (userId: string) => {
   const [chats, setChats] = useState<Chat[]>(globalChatCache.list);
   const { user } = useAuth();
   const sessionId = user?.sessionId;
+  const realtimeDebounceRef = useRef<any>(null);
 
   const fetchChats = useCallback(async () => {
     if (!sessionId) return;
@@ -95,23 +96,33 @@ export const useChats = (userId: string) => {
   useEffect(() => {
     fetchChats();
 
-    // Opcional: Escutar mudanças na tabela chats para atualizar a lista em tempo real
+    // Coalesce rajadas de eventos realtime em um único refetch (mitiga ANR e
+    // evita tempestades de requisições quando várias mudanças chegam juntas).
+    const scheduleRefetch = () => {
+      if (realtimeDebounceRef.current) clearTimeout(realtimeDebounceRef.current);
+      realtimeDebounceRef.current = setTimeout(() => fetchChats(), 400);
+    };
+
+    // Escutar mudanças na tabela chats para atualizar a lista em tempo real.
+    // Nome de canal único por sessão evita colisão de tópico entre re-montagens.
     const subscription = supabase
-      .channel("public:chats")
+      .channel(`public:chats:${sessionId ?? "anon"}`)
       .on("postgres_changes", { event: "INSERT", schema: "public", table: "chats" }, () => {
-        console.log("Novo chat detectado!");
-        fetchChats();
+        scheduleRefetch();
       })
       .on("postgres_changes", { event: "UPDATE", schema: "public", table: "chats" }, () => {
-        console.log("Chat atualizado!");
-        fetchChats();
+        scheduleRefetch();
       })
       .subscribe();
 
     return () => {
-      subscription.unsubscribe();
+      if (realtimeDebounceRef.current) clearTimeout(realtimeDebounceRef.current);
+      // removeChannel (e não unsubscribe) remove o canal do registro interno do
+      // Supabase. Sem isso, ao reexecutar o efeito o cliente reutiliza um canal
+      // já inscrito e o .on() lança "cannot add postgres_changes after subscribe()".
+      supabase.removeChannel(subscription);
     };
-  }, [fetchChats]);
+  }, [fetchChats, sessionId]);
 
   const deleteChat = async (chatId: string) => {
     if (!sessionId) return;
@@ -154,7 +165,7 @@ export const useMessages = (chatId: string, userId: string) => {
   const { user } = useAuth();
   const sessionId = user?.sessionId;
   const isFetchingRef = useRef(false);
-  const refreshTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const refreshTimerRef = useRef<any>(null);
 
   const fetchMessages = useCallback(
     async (isSilent = false) => {
@@ -210,7 +221,10 @@ export const useMessages = (chatId: string, userId: string) => {
                 _id: msg.id,
                 text: text,
                 image: image,
-                createdAt: new Date(msg.created_at),
+                createdAt: (() => {
+                  const d = new Date(msg.created_at);
+                  return isNaN(d.getTime()) ? new Date() : d;
+                })(),
                 user: {
                   _id: msg.sender_id,
                   name: String(msg.sender_id) === String(userId) ? "Eu" : "Participante",
@@ -576,7 +590,10 @@ export const usePreloadChat = () => {
                     _id: msg.id,
                     text: text,
                     image: image,
-                    createdAt: new Date(msg.created_at),
+                    createdAt: (() => {
+                      const d = new Date(msg.created_at);
+                      return isNaN(d.getTime()) ? new Date() : d;
+                    })(),
                     user: {
                       _id: msg.sender_id,
                       name:

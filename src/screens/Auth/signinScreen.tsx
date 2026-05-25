@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { View, Text, TouchableOpacity, StyleSheet, Alert, Platform } from "react-native";
 import BackButton from "@/components/BackButton";
 import SocialButton from "@/components/SocialButton";
@@ -10,11 +10,12 @@ import { Eye, EyeOff } from "lucide-react-native";
 import { useAuth } from "@contexts/AuthContext";
 import { supabase } from "../../services/supabaseClient";
 import * as WebBrowser from "expo-web-browser";
-// import * as Google from "expo-auth-session/providers/google";
-// import * as AuthSession from "expo-auth-session";
+import * as Google from "expo-auth-session/providers/google";
+import * as AuthSession from "expo-auth-session";
 // import { LoginManager, AccessToken } from 'react-native-fbsdk-next'; // Para Facebook (Removido)
 
 import { api } from "../../services/api";
+import { API_CONFIG } from "../../config/api";
 
 // URL da sua Edge Function que receberá os tokens dos provedores
 const SOCIAL_SIGN_IN_EDGE_FUNCTION_URL = `${
@@ -22,8 +23,9 @@ const SOCIAL_SIGN_IN_EDGE_FUNCTION_URL = `${
 }/functions/v1/auth/social-sign-in`;
 
 // Variáveis de ambiente (usa EXPO_PUBLIC_* e faz fallback)
-// const GOOGLE_WEB_CLIENT_ID =
-//   process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID || process.env.GOOGLE_WEB_CLIENT_ID;
+const GOOGLE_WEB_CLIENT_ID = process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID;
+const GOOGLE_ANDROID_CLIENT_ID = process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID;
+const GOOGLE_IOS_CLIENT_ID = process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID;
 
 export const SignInScreen = () => {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
@@ -140,11 +142,12 @@ export const SignInScreen = () => {
 
   WebBrowser.maybeCompleteAuthSession();
 
-  /*
   const handleSignInWithSocialToken = useCallback(
     async (provider: "google", token: string) => {
       setLoading(true);
+      setError(null);
       try {
+        console.log(`Iniciando autenticação social com ${provider}...`);
         const response = await fetch(SOCIAL_SIGN_IN_EDGE_FUNCTION_URL, {
           method: "POST",
           headers: {
@@ -203,6 +206,7 @@ export const SignInScreen = () => {
         }
       } catch (error: any) {
         console.error("Erro na autenticação social:", error.message);
+        setError(error.message);
         Alert.alert("Erro de Login", error.message);
       } finally {
         setLoading(false);
@@ -210,24 +214,136 @@ export const SignInScreen = () => {
     },
     [navigation, signIn]
   );
-  */
-  /* 
-   Google Sign-In no Expo Go:
-   O Google bloqueia redirecionamentos para IPs locais (exp://192.168...), causando erro 400.
-   O Proxy da Expo também apresenta instabilidade para esquemas customizados.
-   
-   SOLUÇÃO: Esta funcionalidade funcionará AUTOMATICAMENTE no build de produção (.apk/.aab)
-   devido aos Client IDs nativos que já configuramos corretamente no .env e no Google Cloud.
-  */
+
   const signInWithGoogle = async () => {
-    Alert.alert(
-      "Aviso de Desenvolvimento",
-      "O Login com Google tem restrições de segurança no Expo Go.\n\nFique tranquilo: A configuração nativa já está pronta! \n\nIsso funcionará perfeitamente quando você gerar o APK/Build do app.",
-      [
-        { text: "Testar com E-mail/Senha", style: "default" },
-        { text: "Entendi", style: "cancel" },
-      ]
-    );
+    setLoading(true);
+    try {
+      const redirectUri = AuthSession.makeRedirectUri({
+        scheme: "movt",
+        path: "auth",
+      });
+
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider: "google",
+        options: {
+          redirectTo: redirectUri,
+          skipBrowserRedirect: true,
+          queryParams: {
+            access_type: "offline",
+            prompt: "consent",
+          },
+          scopes: "openid profile email",
+        },
+      });
+
+      if (error) throw error;
+
+      const res = await WebBrowser.openAuthSessionAsync(data.url, redirectUri);
+
+      console.log("Resultado do WebBrowser:", res.type);
+
+      if (res.type === "success" && res.url) {
+        console.log("URL de retorno recebida:", res.url);
+
+        // Parsing robusto para pegar tokens tanto de hash (#) quanto de query (?)
+        const urlObj = new URL(res.url.replace("#", "?"));
+        const access_token = (urlObj.searchParams as any).get("access_token");
+        const refresh_token = (urlObj.searchParams as any).get("refresh_token");
+        const id_token = (urlObj.searchParams as any).get("id_token");
+        const provider_token = (urlObj.searchParams as any).get("provider_token");
+
+        if (access_token && refresh_token) {
+          console.log("Tokens extraídos com sucesso. Definindo sessão Supabase...");
+          const {
+            data: { user: supabaseUser },
+            error: userError,
+          } = await supabase.auth.setSession({
+            access_token,
+            refresh_token,
+          });
+
+          if (userError || !supabaseUser) throw userError || new Error("Usuário não encontrado.");
+
+          console.log("Sessão Supabase definida. Iniciando Sincronização Direta Vercel...");
+
+          try {
+            // Sincronização DIRETA com o backend da Vercel (Bypass Edge Function)
+            const syncResponse = await api.post("/auth/social-sync", {
+              email: supabaseUser.email,
+              nome: supabaseUser.user_metadata?.full_name,
+              supabase_uid: supabaseUser.id,
+              photo: supabaseUser.user_metadata?.avatar_url,
+            });
+
+            if (syncResponse.status === 200 || syncResponse.status === 201) {
+              const backendData = syncResponse.data;
+              console.log("✅ Sincronização Direta com Vercel concluída.");
+
+              await signIn(backendData.sessionId, {
+                id: backendData.user.id_us || backendData.user.id,
+                id_us: backendData.user.id_us || backendData.user.id,
+                name: backendData.user.nome,
+                email: backendData.user.email,
+                username: backendData.user.username,
+                isVerified: true,
+                role: backendData.user.role,
+                supabaseUserId: supabaseUser.id,
+                photo: backendData.user.avatar_url,
+                isPendingSync: backendData.isNewUser, // Só bloqueia se for usuário novo
+              });
+
+              if (backendData.isNewUser) {
+                console.log("Novo usuário social. Redirecionando para Onboarding...");
+                navigation.reset({
+                  index: 0,
+                  routes: [{ name: "Info" as never }],
+                });
+              } else {
+                console.log("Usuário social recorrente. Indo para Home...");
+                navigation.reset({
+                  index: 0,
+                  routes: [{ name: "App" as never }],
+                });
+              }
+            } else {
+              throw new Error(`Erro na sincronização: Status ${syncResponse.status}`);
+            }
+          } catch (syncError: any) {
+            console.error(
+              "Falha na Sincronização Direta:",
+              syncError.response?.data || syncError.message
+            );
+
+            // Fallback de segurança (mantém o usuário logado localmente mas pendente)
+            await signIn(access_token, {
+              id: supabaseUser.id,
+              name: supabaseUser.user_metadata?.full_name || "Usuário Google",
+              email: supabaseUser.email || "",
+              username: "google_user",
+              isVerified: true,
+              role: "client_pf", // Fallback role
+              supabaseUserId: supabaseUser.id,
+              isPendingSync: true,
+            });
+
+            navigation.reset({
+              index: 0,
+              routes: [{ name: "Info" as never }],
+            });
+          }
+        } else {
+          console.error("Tokens não encontrados na URL de retorno.");
+          Alert.alert("Erro", "Não foi possível extrair os dados de login.");
+        }
+      } else if (res.type === "cancel") {
+        console.log("Login cancelado pelo usuário no navegador.");
+      }
+    } catch (error: any) {
+      console.error("Erro detalhado no login Google:", error);
+      Alert.alert("Erro", "Falha ao autenticar com Google.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (

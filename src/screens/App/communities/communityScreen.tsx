@@ -13,7 +13,7 @@ import {
   NativeScrollEvent,
   Animated,
 } from "react-native";
-import { Users, Settings, Search, MapPin, Star, TrendingUp } from "lucide-react-native";
+import { Users, Search, MapPin, Star, TrendingUp } from "lucide-react-native";
 import { useNavigation, useRoute, RouteProp, useIsFocused } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { LinearGradient } from "expo-linear-gradient";
@@ -25,9 +25,6 @@ import Communities from "@components/Communities";
 import { FooterVersion } from "@components/FooterVersion";
 import { useAppData } from "@contexts/AppDataContext";
 import { AppStackParamList, Community } from "../../../@types/routes";
-import CommunityManagementSheet, {
-  CommunityManagementSheetRef,
-} from "../admin/[protected]/components/CommunityManagementSheet";
 
 const { width } = Dimensions.get("window");
 const ITEM_WIDTH = 270;
@@ -49,10 +46,7 @@ const CommunityScreen: React.FC = () => {
   const [selectedCategory, setSelectedCategory] = useState(route.params?.category || "Todas");
   const scrollX = useRef(new Animated.Value(0)).current;
 
-  // Ref e estado para uso do Admin
-  const adminSheetRef = useRef<CommunityManagementSheetRef>(null);
   const isFocused = useIsFocused();
-  const isAdmin = user?.id === "15" || String(user?.id_us) === "15";
 
   useEffect(() => {
     if (route.params?.category) {
@@ -250,20 +244,6 @@ const CommunityScreen: React.FC = () => {
           <FooterVersion />
         </View>
       </ScrollView>
-
-      {isAdmin && (
-        <TouchableOpacity
-          style={styles.adminFab}
-          onPress={() => adminSheetRef.current?.open()}
-          activeOpacity={0.8}
-        >
-          <Settings size={28} color="#000" />
-        </TouchableOpacity>
-      )}
-
-      {isAdmin && (
-        <CommunityManagementSheet ref={adminSheetRef} onClose={() => fetchCommunities()} />
-      )}
     </View>
   );
 };
@@ -430,23 +410,6 @@ const styles = StyleSheet.create({
   paginationDotActive: {
     backgroundColor: "#BBF246",
     width: 18,
-  },
-  adminFab: {
-    position: "absolute",
-    bottom: 30,
-    right: 25,
-    width: 64,
-    height: 64,
-    borderRadius: 22,
-    backgroundColor: "#BBF246",
-    justifyContent: "center",
-    alignItems: "center",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.25,
-    shadowRadius: 15,
-    elevation: 10,
-    zIndex: 99,
   },
 });
 

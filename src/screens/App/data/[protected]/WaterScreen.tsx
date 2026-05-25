@@ -24,6 +24,8 @@ import { AppStackParamList } from "../../../../@types/routes";
 import ConfettiCannon from "react-native-confetti-cannon";
 import { CirclePlus, SquarePen, RotateCcw, Plus } from "lucide-react-native";
 
+import { useRoute } from "@react-navigation/native";
+
 // ─── Error Boundary ────────────────────────────────────────────────────────────
 
 interface EBState {
@@ -101,6 +103,27 @@ const DATA_SCREENS: (keyof AppStackParamList)[] = [
 ];
 
 const WaterScreen: React.FC = () => {
+  // ... [Inside WaterScreen component]
+  const route = useRoute<any>();
+  const routeDate = (() => {
+    try {
+      const d = route.params?.date ? new Date(route.params.date) : new Date();
+      return isNaN(d.getTime()) ? new Date() : d;
+    } catch (e) {
+      return new Date();
+    }
+  })();
+  const dateStr = `${routeDate.getFullYear()}-${String(routeDate.getMonth() + 1).padStart(2, "0")}-${String(routeDate.getDate()).padStart(2, "0")}`;
+
+  const isToday = useMemo(() => {
+    const today = new Date();
+    return (
+      routeDate.getDate() === today.getDate() &&
+      routeDate.getMonth() === today.getMonth() &&
+      routeDate.getFullYear() === today.getFullYear()
+    );
+  }, [routeDate]);
+
   const [consumedMl, setConsumedMl] = useState<number>(0);
   const [goalMl, setGoalMl] = useState<number>(DEFAULT_GOAL_ML);
   const cupMl = DEFAULT_CUP_ML;
@@ -124,7 +147,7 @@ const WaterScreen: React.FC = () => {
   useEffect(() => {
     const load = async () => {
       try {
-        const data = await getHealthMetricData("water", "1d");
+        const data = await getHealthMetricData("water", "1d", dateStr);
         if (data && data.data) {
           setConsumedMl(data.totalCalories || 0);
           setGoalMl(data.dailyGoal || DEFAULT_GOAL_ML);
@@ -135,11 +158,11 @@ const WaterScreen: React.FC = () => {
       }
     };
     load();
-  }, []);
+  }, [dateStr]);
 
   const persist = async (nextConsumed: number) => {
     try {
-      await saveHealthMetricData("water", nextConsumed);
+      await saveHealthMetricData("water", nextConsumed, routeDate);
     } catch (error) {
       console.error("Erro ao salvar dados de água:", error);
     }
@@ -222,37 +245,45 @@ const WaterScreen: React.FC = () => {
                   <Text style={styles.summaryUnit}> ml</Text>
                 </Text>
               </View>
-              <Text style={styles.summarySub}>Faltam mais {remainingMl} ml para hoje.</Text>
+              <Text style={styles.summarySub}>
+                {isToday
+                  ? `Faltam mais ${remainingMl} ml para hoje.`
+                  : remainingMl === 0
+                    ? "Meta de hidratação atingida! 🎉"
+                    : `Faltaram ${remainingMl} ml para atingir a meta.`}
+              </Text>
 
-              <View style={styles.actionsRow}>
-                <TouchableOpacity
-                  style={styles.actionIconButton}
-                  accessibilityRole="button"
-                  accessibilityLabel="Zerar consumo"
-                  onPress={handleReset}
-                  activeOpacity={0.85}
-                >
-                  <RotateCcw size={20} color="#192126" />
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={styles.actionIconButton}
-                  accessibilityRole="button"
-                  accessibilityLabel="Editar meta diária"
-                  onPress={handleEditGoal}
-                  activeOpacity={0.85}
-                >
-                  <SquarePen size={20} color="#192126" />
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={styles.actionIconButton}
-                  accessibilityRole="button"
-                  accessibilityLabel={`Adicionar ${cupMl} ml`}
-                  onPress={handleAddCup}
-                  activeOpacity={0.85}
-                >
-                  <CirclePlus size={20} color="#192126" />
-                </TouchableOpacity>
-              </View>
+              {isToday && (
+                <View style={styles.actionsRow}>
+                  <TouchableOpacity
+                    style={styles.actionIconButton}
+                    accessibilityRole="button"
+                    accessibilityLabel="Zerar consumo"
+                    onPress={handleReset}
+                    activeOpacity={0.85}
+                  >
+                    <RotateCcw size={20} color="#192126" />
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={styles.actionIconButton}
+                    accessibilityRole="button"
+                    accessibilityLabel="Editar meta diária"
+                    onPress={handleEditGoal}
+                    activeOpacity={0.85}
+                  >
+                    <SquarePen size={20} color="#192126" />
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={styles.actionIconButton}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Adicionar ${cupMl} ml`}
+                    onPress={handleAddCup}
+                    activeOpacity={0.85}
+                  >
+                    <CirclePlus size={20} color="#192126" />
+                  </TouchableOpacity>
+                </View>
+              )}
             </View>
 
             {/* Área métrica empilhada: cinza (meta) como fundo e azul crescendo de baixo para cima */}
@@ -269,14 +300,16 @@ const WaterScreen: React.FC = () => {
                   <Text style={styles.metricBlueTopRight}>Até agora</Text>
                   <Text style={styles.metricMl}>{consumedMl} ml</Text>
                 </View>
-                <TouchableOpacity
-                  onPress={handleAddCup}
-                  accessibilityRole="button"
-                  accessibilityLabel={`Adicionar ${cupMl} ml`}
-                  style={styles.plusButton}
-                >
-                  <Plus size={20} color="#192126" />
-                </TouchableOpacity>
+                {isToday && (
+                  <TouchableOpacity
+                    onPress={handleAddCup}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Adicionar ${cupMl} ml`}
+                    style={styles.plusButton}
+                  >
+                    <Plus size={20} color="#192126" />
+                  </TouchableOpacity>
+                )}
               </Animated.View>
             </View>
           </ScrollView>

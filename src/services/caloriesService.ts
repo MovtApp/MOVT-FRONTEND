@@ -21,7 +21,8 @@ export type TimeframeType = "1d" | "1s" | "1m" | "1a" | "Tudo";
  */
 export const getHealthMetricData = async (
   metric: string,
-  timeframe: TimeframeType = "1d"
+  timeframe: TimeframeType = "1d",
+  date?: string
 ): Promise<CalorieStats> => {
   try {
     const sessionId = await AsyncStorage.getItem("userSessionId");
@@ -36,6 +37,7 @@ export const getHealthMetricData = async (
       },
       params: {
         timeframe,
+        date, // Passa a data específica se fornecida
       },
     });
 
@@ -71,13 +73,19 @@ export const getHealthMetricData = async (
 /**
  * Busca dados de calorias do backend com base no timeframe selecionado
  */
-export const getCaloriesData = (timeframe: TimeframeType = "1d"): Promise<CalorieStats> =>
-  getHealthMetricData("calories", timeframe);
+export const getCaloriesData = (
+  timeframe: TimeframeType = "1d",
+  date?: string
+): Promise<CalorieStats> => getHealthMetricData("calories", timeframe, date);
 
 /**
  * Salva qualquer métrica de saúde no backend
  */
-export const saveHealthMetricData = async (metric: string, value: number): Promise<void> => {
+export const saveHealthMetricData = async (
+  metric: string,
+  value: number,
+  targetDate?: Date
+): Promise<void> => {
   try {
     const sessionId = await AsyncStorage.getItem("userSessionId");
 
@@ -85,11 +93,21 @@ export const saveHealthMetricData = async (metric: string, value: number): Promi
       throw new Error("Sessão não encontrada. Faça login novamente.");
     }
 
+    const now = targetDate || new Date();
+    if (isNaN(now.getTime())) return; // Proteção contra data inválida
+
+    // Gera a data local no formato YYYY-MM-DD de forma robusta
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, "0");
+    const day = String(now.getDate()).padStart(2, "0");
+    const localDateStr = `${year}-${month}-${day}`;
+
     await api.post(
       `/dados/${metric}`,
       {
         value,
-        timestamp: new Date().toISOString(),
+        timestamp: now.toISOString(),
+        date: localDateStr, // Garante que o backend usa a data local, não UTC
       },
       {
         headers: {
@@ -106,8 +124,8 @@ export const saveHealthMetricData = async (metric: string, value: number): Promi
 /**
  * Salva dados de calorias no backend
  */
-export const saveCaloriesData = async (calories: number): Promise<void> => {
-  return saveHealthMetricData("calories", calories);
+export const saveCaloriesData = async (calories: number, targetDate?: Date): Promise<void> => {
+  return saveHealthMetricData("calories", calories, targetDate);
 };
 
 /**
@@ -227,40 +245,45 @@ export const calculateChartDomain = (data: CalorieData[]): [number, number] => {
  * Formata a data com base no timeframe
  */
 export const formatDateLabel = (date: string, timeframe: TimeframeType): string => {
-  const d = new Date(date);
+  try {
+    const d = new Date(date);
+    if (isNaN(d.getTime())) return "";
 
-  switch (timeframe) {
-    case "1d":
-      return d.getHours().toString().padStart(2, "0") + "h";
+    switch (timeframe) {
+      case "1d":
+        return d.getHours().toString().padStart(2, "0") + "h";
 
-    case "1s":
-      const days = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
-      return days[d.getDay()];
+      case "1s":
+        const days = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
+        return days[d.getDay()] || "";
 
-    case "1m":
-      return d.getDate().toString();
+      case "1m":
+        return d.getDate().toString();
 
-    case "1a":
-      const months = [
-        "Jan",
-        "Fev",
-        "Mar",
-        "Abr",
-        "Mai",
-        "Jun",
-        "Jul",
-        "Ago",
-        "Set",
-        "Out",
-        "Nov",
-        "Dez",
-      ];
-      return months[d.getMonth()];
+      case "1a":
+        const months = [
+          "Jan",
+          "Fev",
+          "Mar",
+          "Abr",
+          "Mai",
+          "Jun",
+          "Jul",
+          "Ago",
+          "Set",
+          "Out",
+          "Nov",
+          "Dez",
+        ];
+        return months[d.getMonth()] || "";
 
-    case "Tudo":
-      return `${d.getDate()}/${d.getMonth() + 1}`;
+      case "Tudo":
+        return `${d.getDate()}/${d.getMonth() + 1}`;
 
-    default:
-      return date;
+      default:
+        return "";
+    }
+  } catch (e) {
+    return "";
   }
 };

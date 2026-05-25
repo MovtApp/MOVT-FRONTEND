@@ -152,7 +152,7 @@ const DietCard: React.FC<DietCardProps> = ({ diet, onShare }) => {
   const [heartAnim] = useState(new Animated.Value(0));
 
   const lastTapRef = useRef(0);
-  const doubleTapDebounceRef = useRef<NodeJS.Timeout | null>(null);
+  const doubleTapDebounceRef = useRef<any>(null);
 
   useEffect(() => {
     if (diet.isLiked !== undefined) {

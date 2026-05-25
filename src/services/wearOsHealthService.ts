@@ -488,10 +488,10 @@ export const registerWearOsDevice = async (
       .insert([
         {
           id_us: userId,
-          nome: deviceInfo.deviceName,
+          nome: deviceInfo.deviceName.substring(0, 50), // Garante limite razoável para nome
           tipo: deviceInfo.deviceType || "Wear OS",
           status: "ativo",
-          modelo: deviceInfo.deviceModel,
+          modelo: deviceInfo.deviceModel.substring(0, 14), // FIX 22001: Trunca para caber no varchar(14)
           versao_watchos: deviceInfo.deviceVersion,
           token_acesso: deviceInfo.tokenAcesso,
           createdat: new Date().toISOString(),

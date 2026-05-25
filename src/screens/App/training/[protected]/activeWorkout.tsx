@@ -65,7 +65,7 @@ const ActiveWorkout: React.FC = () => {
 
   // Timer logic
   useEffect(() => {
-    let interval: NodeJS.Timeout | null = null;
+    let interval: any = null;
     if (isActive) {
       interval = setInterval(() => {
         setSeconds((prev) => prev + 1);

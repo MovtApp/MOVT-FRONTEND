@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from "react";
 import { View, StyleSheet, TouchableOpacity, Text, ScrollView, Dimensions } from "react-native";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import BackButton from "@components/BackButton";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useNavigation } from "@react-navigation/native";
@@ -28,8 +29,13 @@ const WeightScreen = () => {
     }
   }, [selectedAge, ages]);
 
-  const handleAge = () => {
-    navigation.navigate("Info", { screen: "HeightScreen" });
+  const handleWeight = async () => {
+    try {
+      await AsyncStorage.setItem("@MOVT:onboarding:weight", String(selectedAge));
+      navigation.navigate("Info", { screen: "ObjectivesScreen" });
+    } catch (e) {
+      console.error("Erro ao salvar peso:", e);
+    }
   };
 
   const handleScroll = (event: any) => {
@@ -80,7 +86,7 @@ const WeightScreen = () => {
         </View>
       </View>
 
-      <TouchableOpacity style={styles.advanceButton} onPress={handleAge}>
+      <TouchableOpacity style={styles.advanceButton} onPress={handleWeight}>
         <Text style={styles.advanceButtonText}>Avançar</Text>
       </TouchableOpacity>
     </View>

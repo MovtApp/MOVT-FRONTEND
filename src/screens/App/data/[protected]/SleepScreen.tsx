@@ -9,8 +9,10 @@ import {
   TouchableOpacity,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { useRoute } from "@react-navigation/native";
 
 import { getHealthMetricData } from "../../../../services/caloriesService";
+import { NativeHealthManager } from "../../../../services/nativeHealthManager";
 
 import BackButton from "../../../../components/BackButton";
 import DataPillNavigator from "../../../../components/data/DataPillNavigator";
@@ -283,6 +285,26 @@ const SleepHeatmap: React.FC<{ weeklyData: SleepDay[] }> = ({ weeklyData }) => {
 };
 
 export const SleepScreen: React.FC = () => {
+  const route = useRoute<any>();
+  const routeDate = (() => {
+    try {
+      const d = route.params?.date ? new Date(route.params.date) : new Date();
+      return isNaN(d.getTime()) ? new Date() : d;
+    } catch (e) {
+      return new Date();
+    }
+  })();
+  const dateStr = `${routeDate.getFullYear()}-${String(routeDate.getMonth() + 1).padStart(2, "0")}-${String(routeDate.getDate()).padStart(2, "0")}`;
+
+  const isToday = useMemo(() => {
+    const today = new Date();
+    return (
+      routeDate.getDate() === today.getDate() &&
+      routeDate.getMonth() === today.getMonth() &&
+      routeDate.getFullYear() === today.getFullYear()
+    );
+  }, [routeDate]);
+
   const [sleepData, setSleepData] = useState({
     totalSleep: { hours: 0, minutes: 0 },
     deepSleep: { hours: 0, minutes: 0 },
@@ -290,31 +312,92 @@ export const SleepScreen: React.FC = () => {
     efficiency: 0,
     startTime: "--:--",
     restfulness: "Calculando...",
-    weeklyData: [],
+    weeklyData: [] as SleepDay[],
   });
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     fetchSleepData();
-  }, []);
+  }, [dateStr, isToday]);
 
   const fetchSleepData = async () => {
     try {
       setIsLoading(true);
-      const data = await getHealthMetricData("sleep", "1d");
-      if (data && data.data) {
-        const totalHours = data.totalCalories || 0;
+
+      let detailedSleep = null;
+      let hcFallbackHours = 0;
+
+      // Tenta buscar os dados detalhados reais (Fases do sono, horas, etc) apenas se for hoje
+      if (isToday) {
+        try {
+          // REMOVIDO: NativeHealthManager.authorize() automático.
+          // A autorização deve ser disparada por ação do usuário ou fluxo global estável.
+
+          detailedSleep = await NativeHealthManager.fetchDetailedSleep();
+
+          // Mantém a sincronia com o backend
+          hcFallbackHours = await NativeHealthManager.fetchSleep();
+        } catch (err) {
+          console.warn("Erro ao sincronizar sono nativo:", err);
+        }
+      }
+
+      const data = await getHealthMetricData("sleep", "1d", dateStr);
+
+      if (detailedSleep) {
+        // Usa os dados REAIS do Health Connect se disponíveis
+        const totalHours = detailedSleep.totalHours || 0;
+        const deepHoursTotal = detailedSleep.deepHours || 0;
+
+        const formatTimeStr = (isoString: string | null) => {
+          if (!isoString) return "--:--";
+          const d = new Date(isoString);
+          return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+        };
+
+        const efficiency =
+          totalHours > 0
+            ? Math.min(
+                100,
+                Math.round(((totalHours - (detailedSleep.awakeHours || 0)) / totalHours) * 100)
+              )
+            : 0;
+
+        setSleepData({
+          totalSleep: {
+            hours: Math.floor(totalHours),
+            minutes: Math.round((totalHours % 1) * 60),
+          },
+          deepSleep: {
+            hours: Math.floor(deepHoursTotal),
+            minutes: Math.round((deepHoursTotal % 1) * 60),
+          },
+          goalHours: data?.dailyGoal || 8,
+          efficiency: efficiency > 0 ? efficiency : totalHours > 0 ? 85 : 0,
+          startTime: formatTimeStr(detailedSleep.startTime),
+          restfulness:
+            deepHoursTotal >= 1.5 ? "Excelente" : deepHoursTotal >= 1 ? "Bom" : "Razoável",
+          weeklyData:
+            data?.data?.map((d: any) => ({
+              date: d.date,
+              duration: d.value,
+              quality: d.value >= 7 ? "deep" : "light",
+            })) || [],
+        });
+      } else if (data && data.data) {
+        // Fallback: Se o device não tiver dados detalhados, recai pro backend
+        const totalHours = Math.max(hcFallbackHours, data.totalCalories || 0);
         const hours = Math.floor(totalHours);
         const minutes = Math.round((totalHours - hours) * 60);
 
         setSleepData({
           totalSleep: { hours, minutes },
-          deepSleep: { hours: Math.floor(hours * 0.3), minutes: Math.round(minutes * 0.3) }, // Estimativa
+          deepSleep: { hours: Math.floor(hours * 0.3), minutes: Math.round(minutes * 0.3) }, // Estimativa fallback
           goalHours: data.dailyGoal || 8,
-          efficiency: totalHours > 0 ? 85 + Math.random() * 10 : 0,
-          startTime: "23:00", // Placeholder format
+          efficiency: totalHours > 0 ? 85 : 0, // Fallback seco, sem random
+          startTime: "--:--",
           restfulness: totalHours >= 7 ? "Excelente" : totalHours > 5 ? "Bom" : "Razoável",
-          weeklyData: data.data.map((d: any, i: number) => ({
+          weeklyData: data.data.map((d: any) => ({
             date: d.date,
             duration: d.value,
             quality: d.value >= 7 ? "deep" : "light",
@@ -340,9 +423,11 @@ export const SleepScreen: React.FC = () => {
   const bottomSheetRef = useRef<BottomSheet>(null);
   const snapPoints = useMemo(() => ["60%", "90%"], []);
 
+  const [sheetIndex, setSheetIndex] = useState(-1);
+
   const handleOpenInfo = useCallback(() => {
     setBottomSheetType("info");
-    bottomSheetRef.current?.expand();
+    setSheetIndex(0);
   }, []);
 
   const handleOpenCardDetails = useCallback(
@@ -355,7 +440,7 @@ export const SleepScreen: React.FC = () => {
         color,
         details,
       });
-      bottomSheetRef.current?.expand();
+      setSheetIndex(0);
     },
     []
   );
@@ -374,9 +459,7 @@ export const SleepScreen: React.FC = () => {
           <View style={styles.header}>
             <BackButton to={{ name: "DataScreen" }} />
             <Text style={styles.headerTitle}>Otimização do Sono</Text>
-            <TouchableOpacity style={styles.infoBtn} onPress={handleOpenInfo}>
-              <Info size={20} color="#94A3B8" />
-            </TouchableOpacity>
+            <View style={{ width: 46 }} />
           </View>
 
           <ScrollView
@@ -463,139 +546,6 @@ export const SleepScreen: React.FC = () => {
           </ScrollView>
           <DataPillNavigator currentScreen="SleepScreen" />
         </SafeAreaView>
-
-        <BottomSheet
-          ref={bottomSheetRef}
-          index={-1}
-          snapPoints={snapPoints}
-          enablePanDownToClose
-          backdropComponent={renderBackdrop}
-          backgroundStyle={bsStyles.bsBackground}
-          handleIndicatorStyle={bsStyles.bsIndicator}
-        >
-          <BottomSheetView style={bsStyles.bsContainer}>
-            <ScrollView showsVerticalScrollIndicator={false}>
-              {bottomSheetType === "info" ? (
-                <View>
-                  <View style={bsStyles.bsHeader}>
-                    <View style={bsStyles.bsIconHeaderBox}>
-                      <Moon size={24} color="#818CF8" />
-                    </View>
-                    <View>
-                      <Text style={bsStyles.bsTitle}>Ciência do Sono</Text>
-                      <Text style={bsStyles.bsSubtitle}>
-                        Descubra o segredo de uma noite perfeita
-                      </Text>
-                    </View>
-                  </View>
-
-                  <View style={bsStyles.richSection}>
-                    <Text style={bsStyles.richSectionTitle}>Ciclos do Sono</Text>
-                    <Text style={bsStyles.richText}>
-                      O sono humano não é linear. Ele é composto por ciclos de aproximadamente 90
-                      minutos que se repetem, alternando entre fases essenciais para o{" "}
-                      <Text style={{ fontWeight: "700", color: "#818CF8" }}>cérebro e o corpo</Text>
-                      .
-                    </Text>
-                  </View>
-
-                  <View style={bsStyles.richSection}>
-                    <Text style={bsStyles.richSectionTitle}>Fases da Noite</Text>
-                    <View style={bsStyles.horizontalGuide}>
-                      <View style={bsStyles.guideCard}>
-                        <View style={bsStyles.guideIconBox}>
-                          <Brain size={16} color="#38BDF8" />
-                        </View>
-                        <Text style={bsStyles.guideLabel}>Leve</Text>
-                        <Text style={bsStyles.guideDesc}>Recuperação mental.</Text>
-                      </View>
-                      <View style={bsStyles.guideCard}>
-                        <View style={bsStyles.guideIconBox}>
-                          <Zap size={16} color="#FACC15" />
-                        </View>
-                        <Text style={bsStyles.guideLabel}>Profundo</Text>
-                        <Text style={bsStyles.guideDesc}>Cura física.</Text>
-                      </View>
-                      <View style={bsStyles.guideCard}>
-                        <View style={bsStyles.guideIconBox}>
-                          <Star size={16} color="#2DD4BF" />
-                        </View>
-                        <Text style={bsStyles.guideLabel}>REM</Text>
-                        <Text style={bsStyles.guideDesc}>Memórias.</Text>
-                      </View>
-                    </View>
-                  </View>
-
-                  <View style={bsStyles.richSection}>
-                    <Text style={bsStyles.richSectionTitle}>Impacto Diário</Text>
-                    <View style={bsStyles.tagsRow}>
-                      <View style={bsStyles.tag}>
-                        <Brain size={10} color="#818CF8" />
-                        <Text style={bsStyles.tagText}>Foco</Text>
-                      </View>
-                      <View style={bsStyles.tag}>
-                        <Sun size={10} color="#FACC15" />
-                        <Text style={bsStyles.tagText}>Humor</Text>
-                      </View>
-                      <View style={bsStyles.tag}>
-                        <Zap size={10} color="#38BDF8" />
-                        <Text style={bsStyles.tagText}>Energia</Text>
-                      </View>
-                      <View style={bsStyles.tag}>
-                        <ShieldCheck size={10} color="#2DD4BF" />
-                        <Text style={bsStyles.tagText}>Imunidade</Text>
-                      </View>
-                    </View>
-                  </View>
-
-                  <View style={bsStyles.bsFooter}>
-                    <HelpCircle size={16} color="#94A3B8" />
-                    <Text style={bsStyles.bsFooterText}>
-                      Otimize sua rotina para despertar o seu melhor eu.
-                    </Text>
-                  </View>
-                </View>
-              ) : (
-                selectedTopic && (
-                  <View>
-                    <View style={bsStyles.bsHeader}>
-                      <View
-                        style={[
-                          bsStyles.bsIconContainer,
-                          { backgroundColor: selectedTopic.color + "15" },
-                        ]}
-                      >
-                        <selectedTopic.icon size={24} color={selectedTopic.color} />
-                      </View>
-                      <View>
-                        <Text style={bsStyles.bsTitle}>{selectedTopic.title}</Text>
-                        <Text style={bsStyles.bsSubtitle}>{selectedTopic.description}</Text>
-                      </View>
-                    </View>
-
-                    <View style={bsStyles.detailsGrid}>
-                      {selectedTopic.details.map((detail, index) => (
-                        <View key={index} style={bsStyles.detailItem}>
-                          <View
-                            style={[bsStyles.detailDot, { backgroundColor: selectedTopic.color }]}
-                          />
-                          <Text style={bsStyles.detailText}>{detail}</Text>
-                        </View>
-                      ))}
-                    </View>
-                  </View>
-                )
-              )}
-
-              <TouchableOpacity
-                style={[bsStyles.closeBtn, { backgroundColor: selectedTopic?.color || "#818CF8" }]}
-                onPress={() => bottomSheetRef.current?.close()}
-              >
-                <Text style={bsStyles.closeBtnText}>Entendido</Text>
-              </TouchableOpacity>
-            </ScrollView>
-          </BottomSheetView>
-        </BottomSheet>
       </View>
     </DataErrorBoundary>
   );

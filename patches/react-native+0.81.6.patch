@@ -1,0 +1,30 @@
+diff --git a/node_modules/react-native/ReactCommon/react/renderer/core/graphicsConversions.h b/node_modules/react-native/ReactCommon/react/renderer/core/graphicsConversions.h
+index bb59351..a2f640e 100644
+--- a/node_modules/react-native/ReactCommon/react/renderer/core/graphicsConversions.h
++++ b/node_modules/react-native/ReactCommon/react/renderer/core/graphicsConversions.h
+@@ -77,7 +77,7 @@ inline folly::dynamic toDynamic(const YGValue& dimension) {
+     case YGUnitPoint:
+       return dimension.value;
+     case YGUnitPercent:
+-      return std::format("{}%", dimension.value);
++      return std::to_string(dimension.value) + "%";
+   }
+ 
+   return nullptr;
+diff --git a/node_modules/react-native/scripts/codegen/generate-specs-cli-executor.js b/node_modules/react-native/scripts/codegen/generate-specs-cli-executor.js
+index a50afb5..30b76f1 100644
+--- a/node_modules/react-native/scripts/codegen/generate-specs-cli-executor.js
++++ b/node_modules/react-native/scripts/codegen/generate-specs-cli-executor.js
+@@ -104,7 +104,11 @@ function generateSpecFromInMemorySchema(
+     files
+       .filter(f => f.endsWith('.h') || f.endsWith('.cpp'))
+       .forEach(f => {
+-        fs.renameSync(`${outputDirectory}/${f}`, `${jniOutputDirectory}/${f}`);
++        const srcPath = path.join(outputDirectory, f);
++        const destPath = path.join(jniOutputDirectory, f);
++        if (fs.existsSync(srcPath)) {
++          fs.renameSync(srcPath, destPath);
++        }
+       });
+   }
+ }

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import {
   View,
   Text,
@@ -10,11 +10,22 @@ import {
   Alert,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { useRoute } from "@react-navigation/native";
 import { AppStackParamList } from "../../../../@types/routes";
 import BackButton from "../../../../components/BackButton";
 import DataPillNavigator from "../../../../components/data/DataPillNavigator";
 import { Flame, MapPin, Clock, Footprints, Target, Edit2 } from "lucide-react-native";
-import Svg, { Circle, Defs, LinearGradient, Stop, G } from "react-native-svg";
+import Svg, {
+  Circle,
+  Defs,
+  LinearGradient,
+  Stop,
+  G,
+  Path,
+  Rect,
+  Line as SvgLine,
+  Text as SvgText,
+} from "react-native-svg";
 import { LinearGradient as ExpoLinearGradient } from "expo-linear-gradient";
 import Animated, {
   useSharedValue,
@@ -78,103 +89,91 @@ const ReanimatedView = typeof Animated !== "undefined" && Animated?.View ? Anima
 
 const AnimatedCircle = Animated.createAnimatedComponent(Circle);
 
-const StepsProgressChart: React.FC<{
-  progress: number;
+const StepsCircularProgress: React.FC<{
   steps: number;
   goal: number;
+  isToday: boolean;
   onEditGoal?: () => void;
-}> = ({ progress, steps, goal, onEditGoal }) => {
-  const { width } = useWindowDimensions();
-  const size = Math.min(Math.max(width * 0.85, 280), 340);
-  const center = size / 2;
+}> = ({ steps, goal, isToday, onEditGoal }) => {
+  const { width: windowWidth } = useWindowDimensions();
+  const size = windowWidth * 0.75;
   const strokeWidth = 24;
-  const radius = center - strokeWidth;
+  const radius = (size - strokeWidth) / 2;
   const circumference = 2 * Math.PI * radius;
 
-  const clampedProgress = Math.max(0.01, Math.min(1, progress));
-  const progressAnim = useSharedValue(0);
+  const rawProgress = goal > 0 ? steps / goal : 0;
+  const progress =
+    isFinite(rawProgress) && !isNaN(rawProgress) ? Math.min(1.5, Math.max(0, rawProgress)) : 0;
+
+  const animatedProgress = useSharedValue(0);
 
   useEffect(() => {
-    progressAnim.value = withTiming(clampedProgress, {
+    animatedProgress.value = withTiming(progress, {
       duration: 1500,
-      easing: Easing.bezier(0.4, 0, 0.2, 1),
+      easing: Easing.out(Easing.exp),
     });
-  }, [clampedProgress, progressAnim]);
+  }, [progress]);
 
   const animatedProps = useAnimatedProps(() => ({
-    strokeDashoffset: circumference * (1 - progressAnim.value),
+    strokeDashoffset: circumference * (1 - Math.min(1, animatedProgress.value)),
   }));
 
   return (
     <View style={chartStyles.container}>
       <Svg width={size} height={size} style={chartStyles.svg}>
         <Defs>
-          <LinearGradient id="stepsGrad" x1="0%" y1="0%" x2="100%" y2="0%">
-            <Stop offset="0%" stopColor="#2563EB" />
-            <Stop offset="100%" stopColor="#60A5FA" />
-          </LinearGradient>
-          <LinearGradient id="bgGrad" x1="0%" y1="0%" x2="0%" y2="100%">
-            <Stop offset="0%" stopColor="#F3F4F6" />
-            <Stop offset="100%" stopColor="#FFFFFF" />
+          <LinearGradient id="stepsGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+            <Stop offset="0%" stopColor="#3B82F6" />
+            <Stop offset="100%" stopColor="#2563EB" />
           </LinearGradient>
         </Defs>
 
-        <G rotation="-90" origin={`${center}, ${center}`}>
-          {/* Background Track with soft shadow internal effect */}
-          <Circle
-            cx={center}
-            cy={center}
-            r={radius}
-            stroke="#F1F5F9"
-            strokeWidth={strokeWidth}
-            fill="none"
-          />
+        {/* Background Track */}
+        <Circle
+          cx={size / 2}
+          cy={size / 2}
+          r={radius}
+          stroke="#F1F5F9"
+          strokeWidth={strokeWidth}
+          fill="none"
+        />
 
-          {/* Main Progress Ring */}
-          <AnimatedCircle
-            cx={center}
-            cy={center}
-            r={radius}
-            stroke="url(#stepsGrad)"
-            strokeWidth={strokeWidth}
-            fill="none"
-            strokeDasharray={circumference}
-            animatedProps={animatedProps}
-            strokeLinecap="round"
-          />
-        </G>
+        {/* Progress Fill */}
+        <AnimatedCircle
+          cx={size / 2}
+          cy={size / 2}
+          r={radius}
+          stroke="url(#stepsGradient)"
+          strokeWidth={strokeWidth}
+          fill="none"
+          strokeDasharray={circumference}
+          animatedProps={animatedProps}
+          strokeLinecap="round"
+          rotation="-90"
+          origin={`${size / 2}, ${size / 2}`}
+        />
       </Svg>
 
       <View style={chartStyles.contentOverlay}>
         <View style={chartStyles.iconCircle}>
           <Footprints size={24} color="#2563EB" />
         </View>
-        <Text style={chartStyles.stepsValue}>
-          {(() => {
-            try {
-              return (steps || 0).toLocaleString("pt-BR");
-            } catch (e) {
-              return String(steps || 0);
-            }
-          })()}
-        </Text>
-        <Text style={chartStyles.stepsLabel}>passos</Text>
+        <Text style={chartStyles.stepsValue}>{steps.toLocaleString("pt-BR")}</Text>
+        <Text style={chartStyles.stepsLabel}>PASSOS</Text>
 
-        <TouchableOpacity style={chartStyles.goalBadge} onPress={onEditGoal} activeOpacity={0.7}>
-          <Target size={12} color="#2563EB" style={{ marginRight: 4 }} />
-          <Text style={chartStyles.goalText}>
-            Meta:{" "}
-            {(() => {
-              try {
-                return (goal || 10000).toLocaleString("pt-BR");
-              } catch (e) {
-                return String(goal || 10000);
-              }
-            })()}
-          </Text>
-          <View style={chartStyles.editIconWrapper}>
-            <Edit2 size={10} color="#2563EB" />
-          </View>
+        <TouchableOpacity
+          style={chartStyles.goalBadge}
+          activeOpacity={isToday ? 0.7 : 1}
+          onPress={isToday ? onEditGoal : undefined}
+          disabled={!isToday}
+        >
+          <Target size={14} color="#2563EB" style={{ marginRight: 6 }} />
+          <Text style={chartStyles.goalText}>Meta: {goal.toLocaleString("pt-BR")}</Text>
+          {isToday && (
+            <View style={chartStyles.editIconWrapper}>
+              <Edit2 size={12} color="#2563EB" />
+            </View>
+          )}
         </TouchableOpacity>
       </View>
     </View>
@@ -182,23 +181,52 @@ const StepsProgressChart: React.FC<{
 };
 
 const StepsScreen: React.FC = () => {
+  const route = useRoute<any>();
+  const routeDate = (() => {
+    try {
+      const d = route.params?.date ? new Date(route.params.date) : new Date();
+      return isNaN(d.getTime()) ? new Date() : d;
+    } catch (e) {
+      return new Date();
+    }
+  })();
+  const dateStr = `${routeDate.getFullYear()}-${String(routeDate.getMonth() + 1).padStart(2, "0")}-${String(routeDate.getDate()).padStart(2, "0")}`;
+
+  const isToday = useMemo(() => {
+    const today = new Date();
+    return (
+      routeDate.getDate() === today.getDate() &&
+      routeDate.getMonth() === today.getMonth() &&
+      routeDate.getFullYear() === today.getFullYear()
+    );
+  }, [routeDate]);
+
   const [stepsData, setStepsData] = useState({
     steps: 0,
     goal: 10000,
     calories: 0,
     kilometers: 0,
     minutes: 0,
+    rawData: [] as any[],
   });
   const [isLoading, setIsLoading] = useState(true);
-
-  useEffect(() => {
-    fetchStepsData();
-  }, []);
 
   const fetchStepsData = async () => {
     try {
       setIsLoading(true);
-      const data = await getHealthMetricData("steps", "1d");
+
+      // Sincronização em tempo real com o dispositivo apenas se for hoje
+      if (isToday) {
+        try {
+          const { NativeHealthManager } = require("../../../../services/nativeHealthManager");
+          console.log("[StepsScreen] Sincronizando passos com o sistema...");
+          await NativeHealthManager.fetchSteps();
+        } catch (err) {
+          console.warn("Erro ao sincronizar passos nativos:", err);
+        }
+      }
+
+      const data = await getHealthMetricData("steps", "1d", dateStr);
       if (data && data.data) {
         setStepsData({
           steps: data.totalCalories || 0,
@@ -206,6 +234,7 @@ const StepsScreen: React.FC = () => {
           calories: Math.round((data.totalCalories || 0) * 0.04), // Estimativa de calorias por passo
           kilometers: parseFloat(((data.totalCalories || 0) * 0.000762).toFixed(2)),
           minutes: Math.round((data.totalCalories || 0) / 100),
+          rawData: data.data || [],
         });
       }
     } catch (error) {
@@ -215,7 +244,12 @@ const StepsScreen: React.FC = () => {
     }
   };
 
+  useEffect(() => {
+    fetchStepsData();
+  }, [dateStr, isToday]);
+
   const handleEditGoal = () => {
+    if (!isToday) return;
     if (Platform.OS === "ios" || Platform.OS === "android") {
       Alert.prompt(
         "Editar Meta",
@@ -261,10 +295,10 @@ const StepsScreen: React.FC = () => {
 
             {/* Main Chart Area */}
             <ReanimatedView entering={FadeInDown.duration(800)} style={styles.chartSection}>
-              <StepsProgressChart
-                progress={progress}
+              <StepsCircularProgress
                 steps={stepsData.steps}
                 goal={stepsData.goal}
+                isToday={isToday}
                 onEditGoal={handleEditGoal}
               />
             </ReanimatedView>

@@ -7,11 +7,10 @@ import {
   TouchableOpacity,
   ScrollView,
   Dimensions,
-  SafeAreaView,
   Platform,
   Alert,
 } from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useSafeAreaInsets, SafeAreaView } from "react-native-safe-area-context";
 import { useNavigation } from "@react-navigation/native";
 import {
   Flame,
@@ -83,13 +82,14 @@ const ExpectationRealityScreen: React.FC = () => {
     null
   );
   const snapPoints = useMemo(() => ["60%", "85%"], []);
+  const [sheetIndex, setSheetIndex] = useState(-1);
 
   const openExplanation = (type: keyof typeof EXPLANATIONS) => {
     setActiveExplanation(type);
     if (type === "protocol") {
-      bottomSheetRef.current?.snapToIndex(1);
+      setSheetIndex(1);
     } else {
-      bottomSheetRef.current?.snapToIndex(0);
+      setSheetIndex(0);
     }
   };
 
@@ -100,7 +100,7 @@ const ExpectationRealityScreen: React.FC = () => {
     []
   );
 
-  const health = useHealthTracking(user?.id);
+  const health = useHealthTracking();
   const [biometrics, setBiometrics] = useState({
     weight: 82.5,
     height: 1.75,
@@ -180,13 +180,16 @@ const ExpectationRealityScreen: React.FC = () => {
   const currentStats = stats[viewMode];
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={["bottom"]}>
       <View style={[styles.header, { marginTop: headerMarginTop }]}>
         <BackButton onPress={() => navigation.goBack()} />
         <View style={styles.toggleContainer}>
           <TouchableOpacity
             style={[styles.toggleBtn, viewMode === "expectation" && styles.toggleBtnActive]}
-            onPress={() => setViewMode("expectation")}
+            onPress={() => {
+              console.log("Button pressed: Expectation");
+              setViewMode("expectation");
+            }}
           >
             <Text
               style={[styles.toggleText, viewMode === "expectation" && styles.toggleTextActive]}
@@ -196,16 +199,17 @@ const ExpectationRealityScreen: React.FC = () => {
           </TouchableOpacity>
           <TouchableOpacity
             style={[styles.toggleBtn, viewMode === "reality" && styles.toggleBtnActive]}
-            onPress={() => setViewMode("reality")}
+            onPress={() => {
+              console.log("Button pressed: Reality");
+              setViewMode("reality");
+            }}
           >
             <Text style={[styles.toggleText, viewMode === "reality" && styles.toggleTextActive]}>
               Realidade
             </Text>
           </TouchableOpacity>
         </View>
-        <TouchableOpacity onPress={() => openExplanation("protocol")} style={styles.infoBtn}>
-          <Info size={20} color="#64748B" />
-        </TouchableOpacity>
+        <View style={{ width: 40 }} />
       </View>
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
@@ -339,132 +343,6 @@ const ExpectationRealityScreen: React.FC = () => {
           <ChevronRight size={16} color="#94A3B8" />
         </TouchableOpacity>
       </ScrollView>
-
-      <BottomSheet
-        ref={bottomSheetRef}
-        index={-1}
-        snapPoints={snapPoints}
-        enablePanDownToClose
-        backdropComponent={renderBackdrop}
-        backgroundStyle={{ borderRadius: 32, backgroundColor: "#FFFFFF" }}
-      >
-        <BottomSheetView style={styles.sheetContent}>
-          <ScrollView showsVerticalScrollIndicator={false}>
-            {activeExplanation === "protocol" ? (
-              <View style={styles.bsView}>
-                <View style={styles.bsHeader}>
-                  <View style={styles.bsIconContainer}>
-                    <Zap size={24} color="#BBF246" />
-                  </View>
-                  <View>
-                    <Text style={styles.bsTitle}>Health Anatomy</Text>
-                    <Text style={styles.bsSubtitle}>Entenda a análise de biometria MOVT</Text>
-                  </View>
-                </View>
-
-                <View style={styles.bsSection}>
-                  <Text style={styles.bsSectionTitle}>O Algoritmo de Precisão</Text>
-                  <Text style={styles.bsText}>
-                    Cruzamos seus{" "}
-                    <Text style={{ fontWeight: "700", color: "#0F172A" }}>Objetivos Genéticos</Text>{" "}
-                    com a sua realidade metabólica diária. Este processo garante que cada ajuste no
-                    seu treino seja baseado em dados biológicos reais.
-                  </Text>
-                </View>
-
-                <View style={styles.bsSection}>
-                  <Text style={styles.bsSectionTitle}>Dimensões da Experiência</Text>
-                  <View style={styles.metricGuideHorizontal}>
-                    <View style={styles.metricCardBS}>
-                      <View style={styles.metricIconBoxBS}>
-                        <Target size={16} color="#BBF246" />
-                      </View>
-                      <Text style={styles.metricLabelCard}>Expectativa</Text>
-                      <Text style={styles.metricDescCard}>Meta de performance ideal.</Text>
-                    </View>
-                    <View style={styles.metricCardBS}>
-                      <View style={styles.metricIconBoxBS}>
-                        <Activity size={16} color="#0F172A" />
-                      </View>
-                      <Text style={styles.metricLabelCard}>Realidade</Text>
-                      <Text style={styles.metricDescCard}>Status biométrico atual.</Text>
-                    </View>
-                    <View style={styles.metricCardBS}>
-                      <View style={styles.metricIconBoxBS}>
-                        <ShieldCheck size={16} color="#3B82F6" />
-                      </View>
-                      <Text style={styles.metricLabelCard}>Segurança</Text>
-                      <Text style={styles.metricDescCard}>Proteção de articulações.</Text>
-                    </View>
-                  </View>
-                </View>
-
-                <View style={styles.bsSection}>
-                  <Text style={styles.bsSectionTitle}>Protocolo de Coleta (Guia MOVT)</Text>
-                  <View style={styles.tagsContainerRow}>
-                    <View style={styles.tagCompact}>
-                      <Flame size={10} color="#FF8C00" />
-                      <Text style={styles.tagTextCompact}>Jejum 4h</Text>
-                    </View>
-                    <View style={styles.tagCompact}>
-                      <Zap size={10} color="#10B981" />
-                      <Text style={styles.tagTextCompact}>Sem Treino 24h</Text>
-                    </View>
-                    <View style={styles.tagCompact}>
-                      <Droplets size={10} color="#3B82F6" />
-                      <Text style={styles.tagTextCompact}>Hidratação</Text>
-                    </View>
-                    <View style={styles.tagCompact}>
-                      <Activity size={10} color="#EF4444" />
-                      <Text style={styles.tagTextCompact}>Bexiga Vazia</Text>
-                    </View>
-                    <View style={styles.tagCompact}>
-                      <Moon size={10} color="#8B5CF6" />
-                      <Text style={styles.tagTextCompact}>Repouso</Text>
-                    </View>
-                  </View>
-                </View>
-
-                <View style={styles.bsFooter}>
-                  <HelpCircle size={16} color="#94A3B8" />
-                  <Text style={styles.bsFooterText}>
-                    Dados sincronizados com o protocolo de avaliação ISAK/BIA.
-                  </Text>
-                </View>
-
-                <TouchableOpacity
-                  style={styles.closeSheetBtn}
-                  onPress={() => bottomSheetRef.current?.close()}
-                >
-                  <Text style={styles.closeSheetBtnText}>Pronto, entendi!</Text>
-                </TouchableOpacity>
-              </View>
-            ) : (
-              activeExplanation && (
-                <View style={styles.explanationContainer}>
-                  <View style={styles.explanationIconBox}>
-                    {EXPLANATIONS[activeExplanation].icon}
-                  </View>
-                  <Text style={styles.explanationTitle}>
-                    {EXPLANATIONS[activeExplanation].title}
-                  </Text>
-                  <View style={styles.explanationBubble}>
-                    <Text style={styles.explanationText}>
-                      {EXPLANATIONS[activeExplanation].text}
-                    </Text>
-                  </View>
-                  <TouchableOpacity
-                    style={styles.closeSheetBtn}
-                    onPress={() => bottomSheetRef.current?.close()}
-                  >
-                    <Text style={styles.closeSheetBtnText}>Legal, entendi!</Text>
-                  </TouchableOpacity>
-                </View>
-              )
-            )}
-          </ScrollView>
-        </BottomSheetView>
-      </BottomSheet>
     </SafeAreaView>
   );
 };
@@ -522,7 +400,7 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   toggleText: { fontSize: 13, fontWeight: "700", color: "#64748B" },
-  toggleTextActive: { color: "#1E293B" },
+  toggleTextActive: { color: "#1E293B", fontWeight: "900" },
   infoBtn: { width: 40, height: 40, alignItems: "center", justifyContent: "center" },
   scrollContent: { paddingBottom: 40, alignItems: "center" },
   physiologistCard: {

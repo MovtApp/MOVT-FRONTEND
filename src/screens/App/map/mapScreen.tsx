@@ -1,6 +1,14 @@
 import React, { useRef, useState, useEffect } from "react";
-import { Text, View, TouchableOpacity, StyleSheet, Platform } from "react-native";
-import MapView, { Marker } from "@components/MapComponent";
+import {
+  Text,
+  View,
+  TouchableOpacity,
+  StyleSheet,
+  Platform,
+  ActivityIndicator,
+} from "react-native";
+import MapView, { Marker, PROVIDER_GOOGLE } from "@components/MapComponent";
+
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import TrainingSelector from "@components/TrainingSelector";
 import { DetailsBottomSheet, PersonalTrainer } from "@components/DetailsBottomSheet";
@@ -74,7 +82,7 @@ const OptimizedGymMarker = ({
 };
 
 const MapScreen: React.FC = () => {
-  const { location, refreshLocation } = useLocationContext();
+  const { location, refreshLocation, permissionStatus } = useLocationContext();
   const { user } = useAuth();
   const [isSheetOpen, setIsSheetOpen] = useState(false);
   const [sheetIndex, setSheetIndex] = useState(1);
@@ -306,14 +314,16 @@ const MapScreen: React.FC = () => {
     <View style={{ flex: 1 }}>
       {shouldShowLoading ? (
         <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
-          <Text>Carregando localização...</Text>
-          <TouchableOpacity onPress={handleRetryLocation} style={{ marginTop: 10 }}>
-            <Text style={{ color: "#007AFF" }}>Tentar novamente</Text>
+          <ActivityIndicator size="large" color="#B1F232" />
+          <Text style={{ marginTop: 10, color: "#666" }}>Obtendo sua localização...</Text>
+          <TouchableOpacity onPress={handleRetryLocation} style={{ marginTop: 20, padding: 10 }}>
+            <Text style={{ color: "#007AFF" }}>Tentar manualmente</Text>
           </TouchableOpacity>
         </View>
       ) : (
         <MapView
           ref={mapRef}
+          provider={PROVIDER_GOOGLE}
           style={{ flex: 1 }}
           initialRegion={{
             latitude: location?.latitude || defaultLocation.latitude,
@@ -326,10 +336,12 @@ const MapScreen: React.FC = () => {
           toolbarEnabled={false}
           zoomControlEnabled={false}
           mapType={mapType}
-          loadingEnabled={true} // Mostra indicador de carregamento do mapa enquanto renderiza
+          loadingEnabled={true}
           loadingBackgroundColor="#FFFFFF"
-          loadingIndicatorColor="#666666"
+          loadingIndicatorColor="#B1F232"
           showsMyLocationButton={false}
+          showsPointsOfInterest={false}
+          showsCompass={false}
         >
           {/* Markers das academias */}
           {gyms.map((gym) => (
@@ -447,9 +459,9 @@ const MapScreen: React.FC = () => {
         <View
           style={[
             gymCardStyles.container,
-            Platform.OS === "android" && {
-              bottom: 20 + (insets.bottom > 0 ? insets.bottom : 20) + 40,
-            }, // Ajuste seguro para Android
+            {
+              bottom: (insets.bottom || 20) + 90, // 60 (BottomNav height) + 10 (BottomNav margin) + 20 (spacing)
+            },
           ]}
         >
           <GymCard gym={selectedGym} onDetailsPress={handleOpenGymDetails} />

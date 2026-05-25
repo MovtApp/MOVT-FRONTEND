@@ -98,6 +98,8 @@ const DietCommentItem: React.FC<DietCommentItemProps> = ({
     );
   };
 
+  if (!item) return null;
+
   const content = (
     <View style={styles.commentItem}>
       <Image
@@ -613,7 +615,7 @@ const DietDetailsScreen: React.FC<DietDetailsScreenProps> = ({ route, navigation
                     renderItem={({ item }) => (
                       <DietCommentItem
                         item={item}
-                        currentUserId={user?.id || user?.id_us!}
+                        currentUserId={user?.id || (user as any)?.id_us || 0}
                         dietAuthorId={meal.id_us}
                         onDelete={handleDeleteComment}
                       />

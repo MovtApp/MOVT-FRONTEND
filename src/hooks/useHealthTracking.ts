@@ -1,99 +1,84 @@
-import { useState, useRef, useEffect, useCallback } from "react";
-import { useFocusEffect } from "@react-navigation/native";
+import { useState, useEffect, useCallback, useRef } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import * as Location from "expo-location";
-import { LatLng, Region } from "@components/MapComponent";
+import { useFocusEffect } from "@react-navigation/native";
+import { api } from "../services/api";
+import { useAuth } from "./useAuth";
 import {
-  getLatestWearOsHealthDataFromAllDevices,
+  getLatestWearOsHealthData,
   pollWearOsHealthData,
   checkWearOsDeviceRegistered,
 } from "../services/wearOsHealthService";
+import { isHealthConnectReady } from "../services/healthConnectService";
 import { NativeHealthManager } from "../services/nativeHealthManager";
 import { getTodayKey } from "../utils/formatters";
 import { Platform } from "react-native";
-import { getHealthMetricData } from "../services/caloriesService";
+import * as Location from "expo-location";
 
-const STEPS_INACTIVITY_TIMEOUT = 6000;
-const DEFAULT_STEPS_GOAL = 10000;
+// Module-level caches to survive across mounts and renders
+const healthDataCache: Record<
+  string,
+  {
+    stepsToday: number;
+    dailyCalories: number;
+    sleepHours: number;
+    sleepMinutes: number;
+    waterConsumedMl: number;
+    heartRate: number;
+    oxygen: number;
+  }
+> = {};
 
-export const useHealthTracking = (userId: string | undefined, targetDate?: Date) => {
+const statsCache: Record<string, any> = {};
+
+export const useHealthTracking = (targetDate?: Date) => {
+  const { user } = useAuth();
+  const userId = user?.id ? Number(user.id) : null;
+
   const isToday = !targetDate || targetDate.toDateString() === new Date().toDateString();
-  // Wear OS State
-  const [heartRate, setHeartRate] = useState<number | null>(null);
-  const [isWearOsConnected, setIsWearOsConnected] = useState(false);
-  const [hasWearOsDevice, setHasWearOsDevice] = useState<boolean | null>(null);
+  const dateKey = targetDate ? targetDate.toDateString() : new Date().toDateString();
 
-  // Steps State
-  const [stepsToday, setStepsToday] = useState<number>(0);
-  const [stepsLoading, setStepsLoading] = useState<boolean>(false);
-  const [isWalking, setIsWalking] = useState<boolean>(false);
-  const lastStepCountRef = useRef<number>(0);
-  const stepsInactivityTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const stepsGoal = DEFAULT_STEPS_GOAL;
+  const cached = healthDataCache[dateKey] || null;
 
-  // Training Time State
-  const [trainingTime, setTrainingTime] = useState<number>(0);
-  const trainingIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  // Metrics state initialized from cache if available to prevent any flashing
+  const [steps, setSteps] = useState(0);
+  const [stepsToday, setStepsToday] = useState(cached ? cached.stepsToday : 0);
+  const [dailyCalories, setDailyCalories] = useState(cached ? cached.dailyCalories : 0);
+  const [sleepHours, setSleepHours] = useState(cached ? cached.sleepHours : 0);
+  const [sleepMinutes, setSleepMinutes] = useState(cached ? cached.sleepMinutes : 0);
+  const [waterIntake, setWaterIntake] = useState(cached ? cached.waterConsumedMl : 0);
+  const [heartRate, setHeartRate] = useState(cached ? cached.heartRate : 0);
+  const [oxygen, setOxygen] = useState(cached ? cached.oxygen : 0);
+  const [trainingActive, setTrainingActive] = useState(false);
+  const [lastUpdate, setLastUpdate] = useState(new Date());
 
-  // Cycling State
-  const [cyclingRoute, setCyclingRoute] = useState<LatLng[]>([]);
-  const [cyclingRegion, setCyclingRegion] = useState<Region | null>(null);
-  const [locationError, setLocationError] = useState<string | null>(null);
-  const cyclingWatcherRef = useRef<Location.LocationSubscription | null>(null);
+  // Loading states are false if cached data exists, preventing spinners
+  const [stepsLoading, setStepsLoading] = useState(!cached);
+  const [caloriesLoading, setCaloriesLoading] = useState(!cached);
+  const [sleepLoading, setSleepLoading] = useState(!cached);
+  const [waterLoading, setWaterLoading] = useState(!cached);
+  const [hrLoading, setHRLoading] = useState(!cached);
 
-  // Calories & Sleep & Water (Fetched from storage)
-  const [dailyCalories, setDailyCalories] = useState<number>(0);
-  const [sleepHours, setSleepHours] = useState<number>(0);
-  const [sleepMinutes, setSleepMinutes] = useState<number>(0);
-  const [waterConsumedMl, setWaterConsumedMl] = useState<number>(0);
+  // Refs
+  const lastStepCountRef = useRef(0);
+  const pollingIntervalRef = useRef<any>(null);
 
-  const scheduleWalkingTimeout = useCallback(() => {
-    if (stepsInactivityTimeoutRef.current) {
-      clearTimeout(stepsInactivityTimeoutRef.current);
-    }
-    stepsInactivityTimeoutRef.current = setTimeout(() => {
-      setIsWalking(false);
-      stepsInactivityTimeoutRef.current = null;
-    }, STEPS_INACTIVITY_TIMEOUT);
-  }, []);
+  // keys
+  const waterKey = `@MOVT:water_intake:${dateKey}`;
+  const calKey = `@MOVT:daily_calories:${dateKey}`;
+  const sleepKey = `@MOVT:sleep_data:${dateKey}`;
+  const stepsKey = `@MOVT:steps_data:${dateKey}`;
+  const trainingKey = `@MOVT:training_active:${dateKey}`;
+  const hrKey = `@MOVT:heart_rate:${dateKey}`;
 
-  // Calculation for calories
-  const calculateAndSaveCalories = useCallback(async () => {
-    if (!isToday) return; // Never recalculate for past days
+  // Initial Data Load
+  const loadInitialData = useCallback(async () => {
     try {
-      let calories = 0;
-      calories += stepsToday * 0.05;
-      if (heartRate && heartRate > 60) {
-        const excessBpm = heartRate - 60;
-        calories += excessBpm * 0.15;
-      }
-      if (trainingTime > 0) {
-        const minutesOfTraining = trainingTime / 60;
-        calories += minutesOfTraining * 5;
-      }
-      const roundedCalories = Math.round(calories * 100) / 100;
-      setDailyCalories(roundedCalories);
-
-      const key = getTodayKey("calories", targetDate, userId);
-      await AsyncStorage.setItem(key, JSON.stringify({ calories: roundedCalories }));
-    } catch (error) {
-      console.error("Erro ao calcular/salvar calorias:", error);
-    }
-  }, [stepsToday, heartRate, trainingTime, isToday, targetDate]);
-
-  useEffect(() => {
-    calculateAndSaveCalories();
-  }, [stepsToday, heartRate, trainingTime, calculateAndSaveCalories]);
-
-  // Load static daily data
-  const loadDailyData = useCallback(async () => {
-    try {
-      const waterKey = getTodayKey("water", targetDate, userId);
-      const calKey = getTodayKey("calories", targetDate, userId);
-      const sleepKey = getTodayKey("sleep", targetDate, userId);
-      const stepsKey = getTodayKey("steps", targetDate, userId);
-      const trainingKey = getTodayKey("training", targetDate, userId);
-      const hrKey = getTodayKey("heartRate", targetDate, userId);
+      const hasCached = !!healthDataCache[dateKey];
+      setStepsLoading(!hasCached);
+      setCaloriesLoading(!hasCached);
+      setSleepLoading(!hasCached);
+      setWaterLoading(!hasCached);
+      setHRLoading(!hasCached);
 
       const [waterRaw, calRaw, sleepRaw, stepsRaw, trainingRaw, hrRaw] = await Promise.all([
         AsyncStorage.getItem(waterKey),
@@ -104,444 +89,289 @@ export const useHealthTracking = (userId: string | undefined, targetDate?: Date)
         AsyncStorage.getItem(hrKey),
       ]);
 
-      // Tenta buscar do backend primeiro para água (mais confiável agora)
-      try {
-        const backendWater = await getHealthMetricData("water", "1d");
-        if (backendWater && backendWater.data) {
-          const val = backendWater.totalCalories || 0;
-          setWaterConsumedMl(val);
-          // Opcional: Atualiza o cache local
-          if (waterKey) {
-            await AsyncStorage.setItem(waterKey, JSON.stringify({ consumedMl: val }));
+      let finalSteps = cached ? cached.stepsToday : 0;
+      let finalCalories = cached ? cached.dailyCalories : 0;
+      let finalSleepHours = cached ? cached.sleepHours : 0;
+      let finalSleepMinutes = cached ? cached.sleepMinutes : 0;
+      let finalWater = cached ? cached.waterConsumedMl : 0;
+      let finalHR = cached ? cached.heartRate : 0;
+      let finalOxygen = cached ? cached.oxygen : 0;
+
+      if (!cached) {
+        if (waterRaw) finalWater = parseInt(waterRaw, 10);
+        if (calRaw) finalCalories = parseInt(calRaw, 10);
+        if (sleepRaw) {
+          const s = parseFloat(sleepRaw);
+          finalSleepHours = Math.floor(s);
+          finalSleepMinutes = Math.round((s % 1) * 60);
+        }
+        if (stepsRaw) finalSteps = parseInt(stepsRaw, 10);
+        if (hrRaw) finalHR = parseInt(hrRaw, 10);
+      }
+
+      // Para HOJE: sincroniza HC primeiro para garantir que os passos reais apareçam
+      if (isToday) {
+        try {
+          // Garante autorização automática silenciosa
+          await NativeHealthManager.authorize();
+
+          const hcSteps = await NativeHealthManager.fetchSteps();
+          const hcSleep = await NativeHealthManager.fetchSleep();
+          const hcCalories = await NativeHealthManager.fetchCalories();
+          const hcHR = await NativeHealthManager.fetchHeartRate();
+          const hcOxygen = await NativeHealthManager.fetchOxygen();
+
+          console.log("[HealthConnect] Dados sincronizados no foco.");
+
+          if (hcSteps > 0) finalSteps = hcSteps;
+          if (hcSleep > 0) {
+            finalSleepHours = Math.floor(hcSleep);
+            finalSleepMinutes = Math.round((hcSleep % 1) * 60);
           }
-        } else if (waterRaw) {
-          const parsed = JSON.parse(waterRaw);
-          setWaterConsumedMl(parsed.consumedMl || 0);
-        } else {
-          setWaterConsumedMl(0);
+          if (hcCalories > 0) finalCalories = hcCalories;
+          if (hcHR > 0) finalHR = hcHR;
+          if (hcOxygen > 0) finalOxygen = hcOxygen;
+        } catch (hcErr) {
+          console.warn("[useHealthTracking] Falha na sincronização inicial HC:", hcErr);
+        }
+      }
+
+      // Tenta buscar do backend para todas as métricas (Garante reset diário e histórico)
+      try {
+        const dateStr = targetDate
+          ? `${targetDate.getFullYear()}-${String(targetDate.getMonth() + 1).padStart(2, "0")}-${String(targetDate.getDate()).padStart(2, "0")}`
+          : `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, "0")}-${String(new Date().getDate()).padStart(2, "0")}`;
+
+        console.log(`[HISTORY] Buscando dados consolidados para: ${dateStr}`);
+        const response = await api.get("/health/daily-summary", { params: { date: dateStr } });
+
+        if (response.data && response.data.success) {
+          const remote = response.data.data;
+          if (remote.steps !== undefined) finalSteps = remote.steps;
+          if (remote.calories !== undefined) finalCalories = remote.calories;
+          if (remote.sleep_hours !== undefined) {
+            finalSleepHours = Math.floor(remote.sleep_hours);
+            finalSleepMinutes = Math.round((remote.sleep_hours % 1) * 60);
+          }
+          if (remote.water_intake !== undefined) finalWater = remote.water_intake;
         }
       } catch (err) {
-        if (waterRaw) {
-          const parsed = JSON.parse(waterRaw);
-          setWaterConsumedMl(parsed.consumedMl || 0);
-        } else {
-          setWaterConsumedMl(0);
-        }
+        console.log("[HISTORY] Sem dados no backend para esta data, usando cache local.");
       }
 
-      if (calRaw) {
-        try {
-          const parsed = JSON.parse(calRaw);
-          const val = Number(parsed.calories);
-          setDailyCalories(isFinite(val) ? val : 0);
-        } catch {
-          setDailyCalories(0);
-        }
-      } else {
-        setDailyCalories(0);
-      }
+      // Batch state updates to avoid multi-render layouts shifts
+      setStepsToday(finalSteps);
+      setDailyCalories(finalCalories);
+      setSleepHours(finalSleepHours);
+      setSleepMinutes(finalSleepMinutes);
+      setWaterIntake(finalWater);
+      setHeartRate(finalHR);
+      setOxygen(finalOxygen);
+      setTrainingActive(trainingRaw === "true");
 
-      if (sleepRaw) {
-        try {
-          const parsed = JSON.parse(sleepRaw);
-          const h = Number(parsed.hours);
-          const m = Number(parsed.minutes);
-          setSleepHours(isFinite(h) ? h : 0);
-          setSleepMinutes(isFinite(m) ? m : 0);
-        } catch {
-          setSleepHours(0);
-          setSleepMinutes(0);
-        }
-      } else {
-        setSleepHours(0);
-        setSleepMinutes(0);
-      }
-
-      if (trainingRaw) {
-        try {
-          const parsed = JSON.parse(trainingRaw);
-          const val = Number(parsed.duration);
-          setTrainingTime(isFinite(val) ? val : 0);
-        } catch {
-          setTrainingTime(0);
-        }
-      } else {
-        setTrainingTime(0);
-      }
-
-      if (!isToday) {
-        if (stepsRaw) {
-          try {
-            const parsed = JSON.parse(stepsRaw);
-            const val = Number(parsed.steps);
-            setStepsToday(isFinite(val) ? val : 0);
-          } catch {
-            setStepsToday(0);
-          }
-        } else {
-          setStepsToday(0);
-        }
-
-        if (hrRaw) {
-          try {
-            const parsed = JSON.parse(hrRaw);
-            const val = Number(parsed.heartRate);
-            setHeartRate(isFinite(val) ? val : 0);
-          } catch {
-            setHeartRate(0);
-          }
-        } else {
-          setHeartRate(0);
-        }
-      }
-    } catch (e) {
-      console.error("Error loading daily health data:", e);
+      // Save to static memory cache
+      healthDataCache[dateKey] = {
+        stepsToday: finalSteps,
+        dailyCalories: finalCalories,
+        sleepHours: finalSleepHours,
+        sleepMinutes: finalSleepMinutes,
+        waterConsumedMl: finalWater,
+        heartRate: finalHR,
+        oxygen: finalOxygen,
+      };
+    } catch (error) {
+      console.error("Error loading health data:", error);
+    } finally {
+      setStepsLoading(false);
+      setCaloriesLoading(false);
+      setSleepLoading(false);
+      setWaterLoading(false);
+      setHRLoading(false);
     }
-  }, [targetDate, isToday]);
+  }, [
+    isToday,
+    waterKey,
+    calKey,
+    sleepKey,
+    stepsKey,
+    trainingKey,
+    hrKey,
+    targetDate,
+    dateKey,
+    cached,
+  ]);
 
+  // Sincronização Autônoma Periódica (Foco Ativo)
   useFocusEffect(
     useCallback(() => {
-      loadDailyData();
-    }, [loadDailyData])
+      // Executa a carga/sincronização inicial de imediato
+      loadInitialData();
+
+      // Configura intervalo de sincronização silenciosa se for a data de hoje
+      let intervalId: any = null;
+      if (isToday) {
+        console.log("[NHM] 🔄 Sincronização automática de saúde ativada (a cada 30s)");
+        intervalId = setInterval(() => {
+          loadInitialData();
+        }, 30000);
+      }
+
+      return () => {
+        if (intervalId) {
+          clearInterval(intervalId);
+          console.log("[NHM] ⏸️ Sincronização automática de saúde pausada");
+        }
+      };
+    }, [loadInitialData, isToday])
   );
 
-  // Training Timer Logic with Auto-Save
+  // Wear OS Polling (Background)
   useEffect(() => {
-    if (isWalking && isToday) {
-      if (!trainingIntervalRef.current) {
-        trainingIntervalRef.current = setInterval(async () => {
-          setTrainingTime((prev) => {
-            const next = prev + 1;
-            // Salva a cada 30 segundos de movimento contínuo ou ao final
-            if (next % 30 === 0) {
-              const key = getTodayKey("training", targetDate, userId);
-              AsyncStorage.setItem(key, JSON.stringify({ duration: next }));
+    if (!isToday || !userId) return;
+
+    let isMounted = true;
+    const fetchLatest = async () => {
+      try {
+        const isRegistered = await checkWearOsDeviceRegistered(userId);
+        if (isRegistered) {
+          const data = await getLatestWearOsHealthData(userId);
+          if (isMounted && data) {
+            if (data.heartRate) {
+              setHeartRate(data.heartRate);
+              if (healthDataCache[dateKey]) healthDataCache[dateKey].heartRate = data.heartRate;
             }
-            return next;
-          });
-        }, 1000);
-      }
-    } else {
-      if (trainingIntervalRef.current) {
-        // Salva o valor final ao parar
-        const saveFinal = async () => {
-          const key = getTodayKey("training", targetDate, userId);
-          await AsyncStorage.setItem(key, JSON.stringify({ duration: trainingTime }));
-        };
-        saveFinal();
-        clearInterval(trainingIntervalRef.current);
-        trainingIntervalRef.current = null;
-      }
-    }
-    return () => {
-      if (trainingIntervalRef.current) {
-        clearInterval(trainingIntervalRef.current);
-        trainingIntervalRef.current = null;
+            if (data.oxygen) {
+              setOxygen(data.oxygen);
+              if (healthDataCache[dateKey]) healthDataCache[dateKey].oxygen = data.oxygen;
+            }
+            setLastUpdate(new Date());
+          }
+        }
+      } catch (error) {
+        console.warn("Wear OS initial fetch error:", error);
       }
     };
-  }, [isWalking, isToday, trainingTime, targetDate, userId]);
 
-  // Native Health Verification (Google Fit/HealthKit)
-  useFocusEffect(
-    useCallback(() => {
-      let isSubscribed = true;
-      const authorize = async () => {
-        try {
-          await NativeHealthManager.authorize();
-        } catch (e) {
-          console.warn("Health authorization error:", e);
+    // Inicia polling real via service
+    const stopPolling = pollWearOsHealthData(userId, 30000, (data) => {
+      if (isMounted && data) {
+        if (data.heartRate) {
+          setHeartRate(data.heartRate);
+          if (healthDataCache[dateKey]) healthDataCache[dateKey].heartRate = data.heartRate;
         }
-      };
-      if (isToday) authorize();
-      return () => {
-        isSubscribed = false;
-      };
-    }, [isToday])
-  );
-
-  // Wear OS Real-time Polling
-  useFocusEffect(
-    useCallback(() => {
-      if (Platform.OS === "ios") {
-        // No iOS, podemos tentar buscar dados do HealthKit se não houver WearOS
-        if (!heartRate) {
-          NativeHealthManager.fetchHeartRate().then((rate) => {
-            if (rate > 0) setHeartRate(rate);
-          });
+        if (data.oxygen) {
+          setOxygen(data.oxygen);
+          if (healthDataCache[dateKey]) healthDataCache[dateKey].oxygen = data.oxygen;
         }
+        setLastUpdate(new Date());
       }
+    });
 
-      if (!userId || hasWearOsDevice !== true || !isToday) {
-        setIsWearOsConnected(false);
-        return;
-      }
-      const uId = parseInt(userId, 10);
-      if (isNaN(uId)) return;
+    fetchLatest();
 
-      let isMounted = true;
-      let unsubscribe: (() => void) | undefined;
+    return () => {
+      isMounted = false;
+      stopPolling();
+    };
+  }, [isToday, userId, dateKey]);
 
-      const loadWearOsData = async () => {
-        try {
-          const data = await getLatestWearOsHealthDataFromAllDevices(uId);
-          if (isMounted) {
-            if (data && data.heartRate) {
-              setHeartRate(data.heartRate);
-              setIsWearOsConnected(true);
-            } else {
-              setIsWearOsConnected(false);
-            }
-          }
-          unsubscribe = pollWearOsHealthData(uId, 5000, (newData) => {
-            if (isMounted && newData.heartRate) {
-              setHeartRate(newData.heartRate);
-              setIsWearOsConnected(true);
-            }
-          });
-        } catch (error) {
-          if (isMounted) setIsWearOsConnected(false);
-        }
-      };
-      loadWearOsData();
-      return () => {
-        isMounted = false;
-        if (unsubscribe) unsubscribe();
-      };
-    }, [userId, hasWearOsDevice])
-  );
+  const [isWearOsConnected, setIsWearOsConnected] = useState(false);
+  const [isWalking, setIsWalking] = useState(false);
+  const [stepsGoal] = useState(10000); // Meta padrão
+  const [trainingTime] = useState(0); // Placeholder
+  const [cyclingRoute, setCyclingRoute] = useState<any[]>([]);
+  const [cyclingRegion, setCyclingRegion] = useState<any>(null);
+  const [locationError, setLocationError] = useState<string | null>(null);
 
-  // Steps Tracking
-  useFocusEffect(
-    useCallback(() => {
-      if (!isToday) return;
-
-      let isMounted = true;
-      let unsubscribeSteps: (() => void) | null = null;
-      const start = async () => {
-        setStepsLoading(true);
-        let authorized = false;
-        try {
-          authorized = await NativeHealthManager.authorize();
-        } catch (err) {
-          console.warn("Plataforma de saúde não disponível ou permissão negada:", err);
-        }
-
-        if (!authorized) {
-          if (isMounted) setStepsLoading(false);
+  // Fetch current GPS location for the dashboard Map
+  useEffect(() => {
+    let isMounted = true;
+    const fetchLocation = async () => {
+      try {
+        const { status } = await Location.requestForegroundPermissionsAsync();
+        if (status !== "granted") {
+          if (isMounted) setLocationError("Permissão de localização negada");
           return;
         }
-        try {
-          const initialSteps = await NativeHealthManager.fetchSteps();
-          if (isMounted) {
-            lastStepCountRef.current = initialSteps;
-            setStepsToday(initialSteps);
-          }
-        } finally {
-          if (isMounted) setStepsLoading(false);
-        }
-        unsubscribeSteps = NativeHealthManager.subscribeSteps((value) => {
-          if (!isMounted) return;
-          const numericValue = Number(value);
-          if (!Number.isFinite(numericValue)) return;
-          if (numericValue > lastStepCountRef.current) {
-            setIsWalking(true);
-            scheduleWalkingTimeout();
-          }
-          lastStepCountRef.current = numericValue;
-          setStepsToday(numericValue);
-        });
-      };
-      start();
-      return () => {
-        isMounted = false;
-        if (unsubscribeSteps) unsubscribeSteps();
-        if (stepsInactivityTimeoutRef.current) clearTimeout(stepsInactivityTimeoutRef.current);
-        setIsWalking(false);
-      };
-    }, [scheduleWalkingTimeout])
-  );
 
-  // Cycling Tracking
-  useFocusEffect(
-    useCallback(() => {
-      if (!isToday) return;
-
-      let isActive = true;
-      const startCyclingTracking = async () => {
-        try {
-          if (cyclingWatcherRef.current) cyclingWatcherRef.current.remove();
-          const { status } = await Location.requestForegroundPermissionsAsync();
-          if (!isActive || status !== Location.PermissionStatus.GRANTED) {
-            setLocationError("Permissão de localização negada.");
-            return;
-          }
-          const initialPosition = await Location.getCurrentPositionAsync({
+        // Get last known location first (lightning fast!)
+        let loc = await Location.getLastKnownPositionAsync({});
+        if (!loc) {
+          // Fallback to current location (takes ~1-2 seconds)
+          loc = await Location.getCurrentPositionAsync({
             accuracy: Location.Accuracy.Balanced,
           });
-          const initialCoords = initialPosition.coords;
-          if (
-            initialCoords &&
-            isFinite(initialCoords.latitude) &&
-            isFinite(initialCoords.longitude)
-          ) {
-            const initialPoint = {
-              latitude: initialCoords.latitude,
-              longitude: initialCoords.longitude,
-            };
-            setCyclingRoute([initialPoint]);
-            setCyclingRegion({ ...initialPoint, latitudeDelta: 0.005, longitudeDelta: 0.005 });
-          }
-          setLocationError(null);
-
-          cyclingWatcherRef.current = await Location.watchPositionAsync(
-            {
-              accuracy: Location.Accuracy.Balanced, // Use balanced to avoid excessive battery/crashes
-              timeInterval: 10000, // 10 seconds is safer
-              distanceInterval: 10,
-            },
-            (update) => {
-              if (!isActive) return;
-              const coords = update.coords;
-              if (coords && isFinite(coords.latitude) && isFinite(coords.longitude)) {
-                const newPoint = {
-                  latitude: coords.latitude,
-                  longitude: coords.longitude,
-                };
-                setCyclingRoute((prev) => {
-                  const next = [...prev, newPoint];
-                  return next.length > 60 ? next.slice(next.length - 60) : next;
-                });
-                setCyclingRegion((prev) =>
-                  prev
-                    ? { ...prev, ...newPoint }
-                    : { ...newPoint, latitudeDelta: 0.005, longitudeDelta: 0.005 }
-                );
-              }
-            }
-          );
-        } catch {
-          if (isActive) setLocationError("Não foi possível iniciar o rastreamento de ciclismo.");
         }
-      };
-      startCyclingTracking();
-      return () => {
-        isActive = false;
-        if (cyclingWatcherRef.current) cyclingWatcherRef.current.remove();
-        setCyclingRoute([]);
-        setCyclingRegion(null);
-      };
-    }, [])
-  );
+
+        if (isMounted && loc) {
+          setCyclingRegion({
+            latitude: loc.coords.latitude,
+            longitude: loc.coords.longitude,
+            latitudeDelta: 0.012,
+            longitudeDelta: 0.012,
+          });
+        }
+      } catch (err: any) {
+        console.warn("Erro ao obter localização no painel:", err);
+        if (isMounted) setLocationError(err.message || "Erro de GPS");
+      }
+    };
+
+    fetchLocation();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  // Wear OS Connectivity Check
+  useEffect(() => {
+    if (userId) {
+      checkWearOsDeviceRegistered(userId).then((device) => setIsWearOsConnected(!!device));
+    }
+  }, [userId]);
+
+  const addWater = async (amount: number) => {
+    const newAmount = waterIntake + amount;
+    setWaterIntake(newAmount);
+    await AsyncStorage.setItem(waterKey, newAmount.toString());
+
+    if (healthDataCache[dateKey]) {
+      healthDataCache[dateKey].waterConsumedMl = newAmount;
+    }
+
+    try {
+      const dateStr = targetDate
+        ? `${targetDate.getFullYear()}-${String(targetDate.getMonth() + 1).padStart(2, "0")}-${String(targetDate.getDate()).padStart(2, "0")}`
+        : `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, "0")}-${String(new Date().getDate()).padStart(2, "0")}`;
+
+      await api.post("/health/water", { amount: newAmount, date: dateStr });
+    } catch (e) {
+      console.warn("Falha ao salvar água no servidor:", e);
+    }
+  };
 
   const getHistoricalStats = useCallback(
-    async (timeframe: string) => {
-      let daysToFetch = 1;
-      if (timeframe === "1s") daysToFetch = 7;
-      else if (timeframe === "1m") daysToFetch = 30;
-      else if (timeframe === "1a") daysToFetch = 365;
-      else if (timeframe === "Tudo") daysToFetch = 1095; // 3 anos
-
-      const end = targetDate || new Date();
-      const prefixes = ["water", "calories", "sleep", "steps", "training", "heartRate"];
-      const allKeys: string[] = [];
-      const dateList: Date[] = [];
-
-      for (let i = 0; i < daysToFetch; i++) {
-        const d = new Date(end);
-        d.setDate(d.getDate() - i);
-        dateList.push(d);
-
-        const yyyy = d.getFullYear();
-        const mm = String(d.getMonth() + 1).padStart(2, "0");
-        const dd = String(d.getDate()).padStart(2, "0");
-        const dateStr = `${yyyy}-${mm}-${dd}`;
-        const userPrefix = userId ? `user_${userId}:` : "";
-
-        prefixes.forEach((p) => allKeys.push(`${userPrefix}${p}:${dateStr}`));
+    async (period: string) => {
+      const cacheKey = `${period}:${userId}:${dateKey}`;
+      if (statsCache[cacheKey]) {
+        return statsCache[cacheKey];
       }
-
-      const results = await AsyncStorage.multiGet(allKeys);
-      const dataMap: { [key: string]: any } = {};
-      results.forEach(([key, val]) => {
-        if (val) dataMap[key] = JSON.parse(val);
-      });
-
-      // Agregação
-      const stats = {
-        water: 0,
-        calories: 0,
-        sleep: 0,
-        steps: 0,
-        training: 0,
-        heartRate: 0,
-        hrCount: 0,
-        daysWithData: 0,
-        dailyScores: [] as number[],
-      };
-
-      for (let i = 0; i < daysToFetch; i++) {
-        const d = dateList[i];
-        const yyyy = d.getFullYear();
-        const mm = String(d.getMonth() + 1).padStart(2, "0");
-        const dd = String(d.getDate()).padStart(2, "0");
-        const dateStr = `${yyyy}-${mm}-${dd}`;
-        const userPrefix = userId ? `user_${userId}:` : "";
-
-        const dayWater = dataMap[`${userPrefix}water:${dateStr}`]?.consumedMl || 0;
-        const dayCal = dataMap[`${userPrefix}calories:${dateStr}`]?.calories || 0;
-        const daySleep =
-          (dataMap[`${userPrefix}sleep:${dateStr}`]?.hours || 0) * 60 +
-          (dataMap[`${userPrefix}sleep:${dateStr}`]?.minutes || 0);
-        const daySteps = dataMap[`${userPrefix}steps:${dateStr}`]?.steps || 0;
-        const dayTrain = dataMap[`${userPrefix}training:${dateStr}`]?.duration || 0;
-        const dayHR = dataMap[`${userPrefix}heartRate:${dateStr}`]?.heartRate || 0;
-
-        stats.water += dayWater;
-        stats.calories += dayCal;
-        stats.sleep += daySleep;
-        stats.steps += daySteps;
-        stats.training += dayTrain;
-        if (dayHR > 0) {
-          stats.heartRate += dayHR;
-          stats.hrCount++;
-        }
-
-        // Pontuação diária simples para o gráfico de linha (0-100)
-        let dayScore = 0;
-        if (daySteps > 0 || dayWater > 0 || daySleep > 0) {
-          dayScore = Math.min(
-            100,
-            (daySteps / 10000) * 40 + (dayWater / 2000) * 30 + (daySleep / 480) * 30
-          );
-        }
-        stats.dailyScores.unshift(Math.round(dayScore));
+      try {
+        const response = await api.get("/health/stats", { params: { period, userId } });
+        statsCache[cacheKey] = response.data;
+        return response.data;
+      } catch (error) {
+        console.error("Error fetching historical stats:", error);
+        return { dailyScores: [], radar: { forca: 0, agilidade: 0, resistencia: 0 } };
       }
-
-      const safeDays = Math.max(1, daysToFetch);
-
-      return {
-        totalWater: stats.water,
-        totalCalories: stats.calories,
-        avgSleep: stats.sleep / safeDays, // min/day
-        totalSteps: stats.steps,
-        totalTraining: stats.training,
-        avgHeartRate: stats.hrCount > 0 ? stats.heartRate / stats.hrCount : 0,
-        dailyScores: stats.dailyScores,
-        // Radar Mapping (0-100)
-        radar: {
-          forca: Math.min(100, (stats.steps / (safeDays * 8000)) * 100),
-          agilidade: Math.min(100, (stats.training / (safeDays * 30 * 60)) * 100), // 30min/dia meta
-          resistencia: Math.min(100, (stats.sleep / (safeDays * 420)) * 100), // 7h/dia meta
-        },
-      };
     },
-    [targetDate]
+    [userId, dateKey]
   );
 
   return {
     heartRate,
     isWearOsConnected,
-    hasWearOsDevice,
     stepsToday,
     stepsLoading,
     isWalking,
@@ -553,9 +383,14 @@ export const useHealthTracking = (userId: string | undefined, targetDate?: Date)
     dailyCalories,
     sleepHours,
     sleepMinutes,
-    waterConsumedMl,
-    loadDailyData,
+    waterConsumedMl: waterIntake,
     getHistoricalStats,
     isToday,
+    oxygen,
+    trainingActive,
+    lastUpdate,
+    addWater,
+    refresh: loadInitialData,
+    authorize: NativeHealthManager.authorize,
   };
 };

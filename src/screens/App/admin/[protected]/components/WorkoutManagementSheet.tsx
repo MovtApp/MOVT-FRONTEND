@@ -415,8 +415,8 @@ const WorkoutManagementSheet = forwardRef<WorkoutManagementSheetRef, WorkoutMana
     return (
       <BottomSheet
         ref={bottomSheetRef}
-        index={-1}
-        snapPoints={["92%"]}
+        index={0}
+        snapPoints={["85%"]}
         enablePanDownToClose
         enableDynamicSizing={false}
         backdropComponent={renderBackdrop}

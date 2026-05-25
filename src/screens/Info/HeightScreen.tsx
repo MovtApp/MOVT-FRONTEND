@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from "react";
 import { View, StyleSheet, TouchableOpacity, Text, ScrollView, Dimensions } from "react-native";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import BackButton from "@components/BackButton";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useNavigation } from "@react-navigation/native";
@@ -28,8 +29,13 @@ const HeightScreen = () => {
     }
   }, [selectedHeight, heights]);
 
-  const handleHeight = () => {
-    navigation.navigate("Info", { screen: "ObjectivesScreen" });
+  const handleHeight = async () => {
+    try {
+      await AsyncStorage.setItem("@MOVT:onboarding:height", String(selectedHeight));
+      navigation.navigate("Info", { screen: "WeightScreen" });
+    } catch (e) {
+      console.error("Erro ao salvar altura:", e);
+    }
   };
 
   const handleScroll = (event: any) => {

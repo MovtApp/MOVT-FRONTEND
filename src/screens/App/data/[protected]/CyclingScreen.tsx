@@ -10,8 +10,10 @@ import {
   Alert,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { useRoute } from "@react-navigation/native";
 import MapView, { Polyline, Marker, PROVIDER_GOOGLE } from "react-native-maps";
 import * as Location from "expo-location";
+import { startMOVTService, stopMOVTService } from "../../../../services/movtService";
 
 import {
   Bike,
@@ -103,6 +105,26 @@ const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: numbe
 };
 
 const CyclingScreen: React.FC = () => {
+  const navRoute = useRoute<any>();
+  const routeDate = (() => {
+    try {
+      const d = navRoute.params?.date ? new Date(navRoute.params.date) : new Date();
+      return isNaN(d.getTime()) ? new Date() : d;
+    } catch (e) {
+      return new Date();
+    }
+  })();
+  const dateStr = `${routeDate.getFullYear()}-${String(routeDate.getMonth() + 1).padStart(2, "0")}-${String(routeDate.getDate()).padStart(2, "0")}`;
+
+  const isToday = useMemo(() => {
+    const today = new Date();
+    return (
+      routeDate.getDate() === today.getDate() &&
+      routeDate.getMonth() === today.getMonth() &&
+      routeDate.getFullYear() === today.getFullYear()
+    );
+  }, [routeDate]);
+
   const [activeTab, setActiveTab] = useState<"Ciclismo" | "Corrida" | "Maratona">("Ciclismo");
   const bottomSheetRef = useRef<BottomSheet>(null);
   const snapPoints = useMemo(() => ["50%", "85%"], []);
@@ -119,7 +141,7 @@ const CyclingScreen: React.FC = () => {
   const [splits, setSplits] = useState<{ km: number; time: string; pace: string }[]>([]);
 
   const lastSplitDist = useRef(0);
-  const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const timerRef = useRef<any>(null);
   const locationSubscriber = useRef<Location.LocationSubscription | null>(null);
 
   const startTracking = async () => {
@@ -137,6 +159,11 @@ const CyclingScreen: React.FC = () => {
     setRoute([]);
     setSplits([]);
     lastSplitDist.current = 0;
+
+    startMOVTService(
+      "MOVT - Treino em Andamento",
+      `Acompanhando sua atividade de ${activeTab.toLowerCase()} em tempo real...`
+    );
 
     timerRef.current = setInterval(() => {
       setSeconds((prev) => prev + 1);
@@ -231,6 +258,7 @@ const CyclingScreen: React.FC = () => {
           setIsTracking(false);
           if (timerRef.current) clearInterval(timerRef.current);
           if (locationSubscriber.current) locationSubscriber.current.remove();
+          stopMOVTService();
           handleOpenAnalysis();
         },
       },
@@ -241,8 +269,11 @@ const CyclingScreen: React.FC = () => {
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
       if (locationSubscriber.current) locationSubscriber.current.remove();
+      stopMOVTService();
     };
   }, []);
+
+  const [sheetIndex, setSheetIndex] = useState(-1);
 
   const renderBackdrop = useCallback(
     (props: any) => (
@@ -251,7 +282,7 @@ const CyclingScreen: React.FC = () => {
     []
   );
 
-  const handleOpenAnalysis = () => bottomSheetRef.current?.expand();
+  const handleOpenAnalysis = () => setSheetIndex(0);
 
   const safeCurrentSpeedMs =
     isFinite(currentSpeedMs) && !isNaN(currentSpeedMs) ? currentSpeedMs : 0;
@@ -262,7 +293,7 @@ const CyclingScreen: React.FC = () => {
 
   const safeRoute = useMemo(() => {
     return route.filter(
-      (p) =>
+      (p: { latitude: number; longitude: number }) =>
         p &&
         typeof p.latitude === "number" &&
         !isNaN(p.latitude) &&
@@ -413,31 +444,51 @@ const CyclingScreen: React.FC = () => {
           </View>
 
           <View style={styles.controlContainer}>
-            {!isTracking ? (
-              <TouchableOpacity
-                style={[styles.mainButton, { backgroundColor: "#BBF246" }]}
-                onPress={startTracking}
-                activeOpacity={0.8}
-              >
-                <Play size={24} color="#000" fill="#000" />
-                <Text style={styles.mainButtonText}>INICIAR {activeTab.toUpperCase()}</Text>
-              </TouchableOpacity>
-            ) : (
-              <View style={styles.activeControls}>
-                <TouchableOpacity style={[styles.roundButton]} onPress={togglePause}>
-                  {isPaused || isAutoPaused ? (
-                    <Play size={24} color="#000" fill="#000" />
-                  ) : (
-                    <Pause size={24} color="#000" fill="#000" />
-                  )}
-                </TouchableOpacity>
+            {isToday ? (
+              !isTracking ? (
                 <TouchableOpacity
-                  style={[styles.stopButton, { backgroundColor: "#EF4444" }]}
-                  onPress={stopTracking}
+                  style={[styles.mainButton, { backgroundColor: "#BBF246" }]}
+                  onPress={startTracking}
+                  activeOpacity={0.8}
                 >
-                  <Square size={24} color="#FFF" fill="#FFF" />
-                  <Text style={styles.stopButtonText}>FINALIZAR</Text>
+                  <Play size={24} color="#000" fill="#000" />
+                  <Text style={styles.mainButtonText}>INICIAR {activeTab.toUpperCase()}</Text>
                 </TouchableOpacity>
+              ) : (
+                <View style={styles.activeControls}>
+                  <TouchableOpacity style={[styles.roundButton]} onPress={togglePause}>
+                    {isPaused || isAutoPaused ? (
+                      <Play size={24} color="#000" fill="#000" />
+                    ) : (
+                      <Pause size={24} color="#000" fill="#000" />
+                    )}
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.stopButton, { backgroundColor: "#EF4444" }]}
+                    onPress={stopTracking}
+                  >
+                    <Square size={24} color="#FFF" fill="#FFF" />
+                    <Text style={styles.stopButtonText}>FINALIZAR</Text>
+                  </TouchableOpacity>
+                </View>
+              )
+            ) : (
+              <View
+                style={{
+                  padding: 18,
+                  alignItems: "center",
+                  backgroundColor: "#F8FAFC",
+                  borderRadius: 16,
+                  width: "100%",
+                  borderWidth: 1,
+                  borderColor: "#E2E8F0",
+                }}
+              >
+                <Text
+                  style={{ color: "#64748B", fontSize: 14, fontWeight: "600", textAlign: "center" }}
+                >
+                  Rastreamento indisponível para dias passados
+                </Text>
               </View>
             )}
           </View>
@@ -489,86 +540,6 @@ const CyclingScreen: React.FC = () => {
         </ScrollView>
 
         <DataPillNavigator currentScreen="CyclingScreen" />
-
-        <BottomSheet
-          ref={bottomSheetRef}
-          index={-1}
-          snapPoints={snapPoints}
-          enablePanDownToClose
-          backdropComponent={renderBackdrop}
-          backgroundStyle={styles.bsBackground}
-        >
-          <BottomSheetView style={styles.bsContainer}>
-            <ScrollView showsVerticalScrollIndicator={false}>
-              <View style={styles.bsHeader}>
-                <View
-                  style={[
-                    styles.bsIconContainer,
-                    { backgroundColor: activeTab === "Ciclismo" ? "#3B82F6" : "#10B981" },
-                  ]}
-                >
-                  {activeTab === "Ciclismo" ? (
-                    <Bike size={24} color="#FFF" />
-                  ) : (
-                    <TrendingUp size={24} color="#FFF" />
-                  )}
-                </View>
-                <View>
-                  <Text style={styles.bsTitle}>Resumo do Treino</Text>
-                  <Text style={styles.bsSubtitle}>Histórico e análise de voltas</Text>
-                </View>
-              </View>
-
-              <View style={styles.bsSection}>
-                <Text style={styles.bsSectionTitle}>Métricas Finais</Text>
-                <View style={styles.statsRow}>
-                  <View style={styles.smallStatCard}>
-                    <Text style={styles.smallStatLabel}>Distância</Text>
-                    <Text style={styles.smallStatValue}>{distance.toFixed(2)} km</Text>
-                  </View>
-                  <View style={styles.smallStatCard}>
-                    <Text style={styles.smallStatLabel}>Tempo</Text>
-                    <Text style={styles.smallStatValue}>{formatDuration(seconds)}</Text>
-                  </View>
-                </View>
-              </View>
-
-              {splits.length > 0 && (
-                <View style={styles.bsSection}>
-                  <Text style={styles.bsSectionTitle}>Voltas (Splits por KM)</Text>
-                  <View style={styles.splitsTable}>
-                    <View style={styles.splitRowHeader}>
-                      <Text style={styles.splitHeaderText}>KM</Text>
-                      <Text style={styles.splitHeaderText}>TEMPO</Text>
-                      <Text style={styles.splitHeaderText}>PACE</Text>
-                    </View>
-                    {splits.map((s, index) => (
-                      <View key={index} style={styles.splitRow}>
-                        <Text style={styles.splitNum}>{s.km}</Text>
-                        <Text style={styles.splitValue}>{s.time}</Text>
-                        <Text
-                          style={[
-                            styles.splitValue,
-                            { color: activeTab === "Ciclismo" ? "#3B82F6" : "#10B981" },
-                          ]}
-                        >
-                          {s.pace}
-                        </Text>
-                      </View>
-                    ))}
-                  </View>
-                </View>
-              )}
-
-              <TouchableOpacity
-                style={styles.bsCloseBtn}
-                onPress={() => Alert.alert("Em breve", "Postando no Feed do MOVT...")}
-              >
-                <Text style={styles.bsCloseBtnText}>Postar no Feed do App</Text>
-              </TouchableOpacity>
-            </ScrollView>
-          </BottomSheetView>
-        </BottomSheet>
       </SafeAreaView>
     </DataErrorBoundary>
   );

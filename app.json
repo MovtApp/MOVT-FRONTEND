@@ -3,7 +3,7 @@
     "name": "MOVT",
     "slug": "movt",
     "scheme": "movt",
-    "version": "1.0.0",
+    "version": "1.0.2",
     "orientation": "portrait",
     "icon": "./src/assets/iconBuild.png",
     "splash": {
@@ -33,10 +33,11 @@
     "android": {
       "config": {
         "googleMaps": {
-          "apiKey": "AIzaSyCDr92TX5erQLKKXVQQ9aOLER2XTpxD7CY"
+          "apiKey": "AIzaSyDTRVXtY25ARGfBPaFIqva84QeAgziJ9Ds"
         }
       },
       "package": "com.dsvmTechnology.movtapp",
+      "versionCode": 21,
       "edgeToEdgeEnabled": true,
       "permissions": [
         "android.permission.ACCESS_COARSE_LOCATION",
@@ -50,10 +51,16 @@
         "android.permission.BLUETOOTH_ADMIN",
         "android.permission.BLUETOOTH_CONNECT",
         "android.permission.BLUETOOTH_SCAN",
-        "android.permission.HEALTH_READ_STEPS",
-        "android.permission.HEALTH_READ_HEART_RATE",
-        "android.permission.HEALTH_WRITE_STEPS",
-        "android.permission.HEALTH_WRITE_HEART_RATE"
+        "android.permission.health.READ_STEPS",
+        "android.permission.health.READ_HEART_RATE",
+        "android.permission.health.READ_TOTAL_CALORIES_BURNED",
+        "android.permission.health.READ_OXYGEN_SATURATION",
+        "android.permission.health.READ_SLEEP_SESSION",
+        "android.permission.health.WRITE_STEPS",
+        "android.permission.health.WRITE_HEART_RATE",
+        "android.permission.health.WRITE_TOTAL_CALORIES_BURNED",
+        "android.permission.FOREGROUND_SERVICE_LOCATION",
+        "android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE"
       ]
     },
     "runtimeVersion": "1.0.0",
@@ -63,41 +70,44 @@
     "plugins": [
       "expo-localization",
       "expo-web-browser",
+      "expo-sensors",
       [
         "react-native-ble-plx",
         {
           "isBackgroundEnabled": true,
-          "modes": [
-            "peripheral",
-            "central"
-          ],
+          "modes": ["peripheral", "central"],
           "bluetoothAlwaysPermission": "Este aplicativo usa Bluetooth para conectar e sincronizar dados com seu relógio inteligente."
         }
       ],
+      "./plugins/withNdkVersion.js",
+      "./plugins/withHealthConnectManifest.js",
       "react-native-health-connect",
+      "react-native-health",
+      [
+        "@sentry/react-native/expo",
+        {
+          "organization": "movt-app-pw",
+          "project": "react-native"
+        }
+      ],
       [
         "expo-build-properties",
         {
           "android": {
             "minSdkVersion": 26,
-            "compileSdkVersion": 34,
-            "targetSdkVersion": 34,
-            "ndkVersion": "26.1.10909125",
-            "extraQueryParams": {
-              "stl": "c++_shared"
-            }
+            "compileSdkVersion": 35,
+            "targetSdkVersion": 35
           }
         }
       ]
     ],
     "extra": {
       "eas": {
-        "projectId": "2d73320b-52df-4407-83d5-c827a5a55f27"
+        "projectId": "6edbc095-2229-4734-8443-27ec0ca14ee1",
+        "versionSource": "local"
       }
     },
-    "owner": "movtapp",
-    "updates": {
-      "url": "https://u.expo.dev/2d73320b-52df-4407-83d5-c827a5a55f27"
-    }
+    "updates": {},
+    "owner": "jvlima22"
   }
 }

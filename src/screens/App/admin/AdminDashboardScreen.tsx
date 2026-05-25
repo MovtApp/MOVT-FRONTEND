@@ -301,6 +301,18 @@ const AdminDashboardScreen: React.FC = () => {
   const adminCommSheetRef = React.useRef<CommunityManagementSheetRef>(null);
   const adminWorkoutSheetRef = React.useRef<WorkoutManagementSheetRef>(null);
 
+  // Estado para montagem preguiçosa (Lazy Mount) de TODOS os bottom sheets do dashboard
+  const [openSheets, setOpenSheets] = React.useState<Record<string, boolean>>({});
+
+  // Helper para abrir sheets garantindo a montagem e abertura automática via index={0}
+  const openSheet = React.useCallback((sheetId: string, ref: React.RefObject<any>) => {
+    setOpenSheets((prev) => ({ ...prev, [sheetId]: true }));
+  }, []);
+
+  const closeSheet = React.useCallback((sheetId: string, ref: React.RefObject<any>) => {
+    ref.current?.close?.();
+  }, []);
+
   // Novos Refs para BI Estratégico
   const churnDetailSheetRef = React.useRef<BottomSheet>(null);
   const ltvDetailSheetRef = React.useRef<BottomSheet>(null);
@@ -578,34 +590,34 @@ const AdminDashboardScreen: React.FC = () => {
 
   const openFilter = () => {
     markSheetAsRendered("filter");
-    filterSheetRef.current?.expand();
+    openSheet("filter", filterSheetRef);
   };
 
   const fetchAdminUsers = async () => {
     markSheetAsRendered("users");
-    usersSheetRef.current?.expand();
+    openSheet("users", usersSheetRef);
   };
 
   const fetchActivePlansList = async () => {
     markSheetAsRendered("activePlans");
-    activePlansSheetRef.current?.expand();
+    openSheet("activePlans", activePlansSheetRef);
   };
 
   const fetchAdminTrainers = async (silent: boolean = false) => {
     markSheetAsRendered("trainers");
-    if (!silent) trainersSheetRef.current?.expand();
+    if (!silent) openSheet("trainers", trainersSheetRef);
   };
 
   const fetchAdminGyms = async () => {
     markSheetAsRendered("gyms");
-    gymsSheetRef.current?.expand();
+    openSheet("gyms", gymsSheetRef);
   };
 
   const fetchAdminExpiring = async () => {
     try {
       markSheetAsRendered("expiring");
       setLoadingSheet(true);
-      expiringSheetRef.current?.expand();
+      openSheet("expiring", expiringSheetRef);
 
       // Busca paralela para garantir que temos dados mesmo que um endpoint venha vazio
       const [expResp, usersResp] = await Promise.all([
@@ -633,7 +645,7 @@ const AdminDashboardScreen: React.FC = () => {
       if (shouldExpand) {
         markSheetAsRendered("plans");
         setLoadingSheet(true);
-        plansSheetRef.current?.expand();
+        openSheet("plans", plansSheetRef);
       }
       const response = await api.get("/plans");
       setAdminPlans(response.data || []);
@@ -668,7 +680,7 @@ const AdminDashboardScreen: React.FC = () => {
         features: [],
       });
     }
-    editPlanSheetRef.current?.expand();
+    openSheet("editPlan", editPlanSheetRef);
   };
 
   const addFeature = () => {
@@ -864,12 +876,12 @@ const AdminDashboardScreen: React.FC = () => {
 
   const openUserDetail = (u: any) => {
     setSelectedUserDetail(u);
-    userDetailSheetRef.current?.expand();
+    openSheet("userDetail", userDetailSheetRef);
   };
 
   const openGymDetails = async (gym: any) => {
     setSelectedGym(gym);
-    gymDetailSheetRef.current?.expand();
+    openSheet("gymDetail", gymDetailSheetRef);
     fetchGymTrainers(gym.id_academia);
   };
 
@@ -1063,7 +1075,7 @@ const AdminDashboardScreen: React.FC = () => {
   const openClientHistory = async (client: PersonalClient) => {
     setSelectedClient(client);
     setFetchingHistory(true);
-    historySheetRef.current?.expand();
+    openSheet("history", historySheetRef);
     try {
       const response = await api.get(`/admin/clients/${client.id_us}/history`);
       if (response.data.success) {
@@ -1081,7 +1093,7 @@ const AdminDashboardScreen: React.FC = () => {
     setNotaIntensidade(appt.nota_intensidade || 3);
     setComentarioTecnico(appt.comentario_tecnico || "");
     setNotaAluno(appt.nota_aluno || 5);
-    evaluationSheetRef.current?.expand();
+    openSheet("evaluation", evaluationSheetRef);
   };
 
   const submitEvaluation = async () => {
@@ -1581,10 +1593,10 @@ const AdminDashboardScreen: React.FC = () => {
               <DecisionBI
                 data={data}
                 formatCurrency={formatCurrency}
-                onOpenChurn={() => churnDetailSheetRef.current?.expand()}
-                onOpenLTV={() => ltvDetailSheetRef.current?.expand()}
-                onOpenRevenue={() => revenueMixSheetRef.current?.expand()}
-                onOpenUnits={() => unitAuditSheetRef.current?.expand()}
+                onOpenChurn={() => openSheet("churnDetail", churnDetailSheetRef)}
+                onOpenLTV={() => openSheet("ltvDetail", ltvDetailSheetRef)}
+                onOpenRevenue={() => openSheet("revenueMix", revenueMixSheetRef)}
+                onOpenUnits={() => openSheet("unitAudit", unitAuditSheetRef)}
               />
             </DashboardErrorBoundary>
 
@@ -1644,7 +1656,7 @@ const AdminDashboardScreen: React.FC = () => {
 
                 <TouchableOpacity
                   style={styles.statusItem}
-                  onPress={() => adminCommSheetRef.current?.open()}
+                  onPress={() => openSheet("comunidades", adminCommSheetRef)}
                 >
                   <View style={styles.statusIndicator}>
                     <View style={[styles.statusDot, { backgroundColor: "#EC4899" }]} />
@@ -1658,7 +1670,7 @@ const AdminDashboardScreen: React.FC = () => {
 
                 <TouchableOpacity
                   style={styles.statusItem}
-                  onPress={() => adminWorkoutSheetRef.current?.open()}
+                  onPress={() => openSheet("treinos", adminWorkoutSheetRef)}
                 >
                   <View style={styles.statusIndicator}>
                     <View style={[styles.statusDot, { backgroundColor: "#BBF246" }]} />
@@ -1676,84 +1688,212 @@ const AdminDashboardScreen: React.FC = () => {
           </ScrollView>
 
           {/* ── SHEET: FILTRO ── */}
-          <BottomSheet
-            ref={filterSheetRef}
-            index={-1}
-            snapPoints={[SCREEN_HEIGHT * 0.4]}
-            enablePanDownToClose
-            backdropComponent={renderBackdrop}
-            backgroundStyle={{ borderRadius: 32 }}
-          >
-            <BottomSheetView style={styles.sheetContent}>
-              <View style={styles.sheetHeader}>
-                <Text style={styles.sheetTitle}>Filtrar por Status</Text>
-                <TouchableOpacity onPress={() => filterSheetRef.current?.close()}>
-                  <X size={24} color="#64748B" />
-                </TouchableOpacity>
-              </View>
-              <View style={styles.filterSection}>
-                <Text style={styles.filterSectionTitle}>Status do Agendamento</Text>
-                <View style={styles.filterOptionsGrid}>
-                  {["all", "confirmado", "pendente", "cancelado"].map((st) => (
-                    <TouchableOpacity
-                      key={st}
-                      style={[styles.filterOption, tempStatus === st && styles.filterOptionActive]}
-                      onPress={() => setTempStatus(st)}
-                    >
-                      <Text
-                        style={[
-                          styles.filterOptionText,
-                          tempStatus === st && styles.filterOptionTextActive,
-                        ]}
-                      >
-                        {st === "all"
-                          ? "Todos"
-                          : st === "confirmado"
-                            ? "Confirmado"
-                            : st === "pendente"
-                              ? "Pendente"
-                              : "Cancelado"}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
+          {openSheets["filter"] && (
+            <BottomSheet
+              ref={filterSheetRef}
+              onClose={() => setOpenSheets((prev) => ({ ...prev, filter: false }))}
+              index={0}
+              snapPoints={[SCREEN_HEIGHT * 0.4]}
+              enablePanDownToClose
+              backdropComponent={renderBackdrop}
+              backgroundStyle={{ borderRadius: 32 }}
+            >
+              <BottomSheetView style={styles.sheetContent}>
+                <View style={styles.sheetHeader}>
+                  <Text style={styles.sheetTitle}>Filtrar por Status</Text>
+                  <TouchableOpacity onPress={() => filterSheetRef.current?.close()}>
+                    <X size={24} color="#64748B" />
+                  </TouchableOpacity>
                 </View>
-              </View>
-              <View style={styles.sheetFooter}>
-                <TouchableOpacity style={styles.resetBtn} onPress={() => setTempStatus("all")}>
-                  <Text style={styles.resetBtnText}>Limpar</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.applyBtn} onPress={applyFilters}>
-                  <LinearGradient
-                    colors={["#10B981", "#059669"]}
-                    style={StyleSheet.absoluteFill}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 0 }}
-                  />
-                  <Text style={styles.applyBtnText}>Aplicar</Text>
-                </TouchableOpacity>
-              </View>
-            </BottomSheetView>
-          </BottomSheet>
+                <View style={styles.filterSection}>
+                  <Text style={styles.filterSectionTitle}>Status do Agendamento</Text>
+                  <View style={styles.filterOptionsGrid}>
+                    {["all", "confirmado", "pendente", "cancelado"].map((st) => (
+                      <TouchableOpacity
+                        key={st}
+                        style={[
+                          styles.filterOption,
+                          tempStatus === st && styles.filterOptionActive,
+                        ]}
+                        onPress={() => setTempStatus(st)}
+                      >
+                        <Text
+                          style={[
+                            styles.filterOptionText,
+                            tempStatus === st && styles.filterOptionTextActive,
+                          ]}
+                        >
+                          {st === "all"
+                            ? "Todos"
+                            : st === "confirmado"
+                              ? "Confirmado"
+                              : st === "pendente"
+                                ? "Pendente"
+                                : "Cancelado"}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                </View>
+                <View style={styles.sheetFooter}>
+                  <TouchableOpacity style={styles.resetBtn} onPress={() => setTempStatus("all")}>
+                    <Text style={styles.resetBtnText}>Limpar</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={styles.applyBtn} onPress={applyFilters}>
+                    <LinearGradient
+                      colors={["#10B981", "#059669"]}
+                      style={StyleSheet.absoluteFill}
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 1, y: 0 }}
+                    />
+                    <Text style={styles.applyBtnText}>Aplicar</Text>
+                  </TouchableOpacity>
+                </View>
+              </BottomSheetView>
+            </BottomSheet>
+          )}
 
           {/* ── SHEET: AGENDAMENTOS ── */}
-          <BottomSheet
-            ref={appointmentsSheetRef}
-            index={-1}
-            snapPoints={[SCREEN_HEIGHT * 0.85]}
-            enablePanDownToClose
-            backdropComponent={renderBackdrop}
-            backgroundStyle={{ borderRadius: 32 }}
-          >
-            <BottomSheetView style={styles.sheetContent}>
-              <View style={styles.sheetHeader}>
-                <Text style={styles.sheetTitle}>Todos Agendamentos</Text>
-                <TouchableOpacity onPress={() => appointmentsSheetRef.current?.close()}>
-                  <X size={24} color="#64748B" />
-                </TouchableOpacity>
-              </View>
-              <ScrollView style={{ marginTop: 10 }}>
-                {renderedSheets["appointments"] &&
-                  data?.appointments?.map((item: PendingAppointment) => (
+          {openSheets["appointments"] && (
+            <BottomSheet
+              ref={appointmentsSheetRef}
+              onClose={() => setOpenSheets((prev) => ({ ...prev, appointments: false }))}
+              index={0}
+              snapPoints={[SCREEN_HEIGHT * 0.85]}
+              enablePanDownToClose
+              backdropComponent={renderBackdrop}
+              backgroundStyle={{ borderRadius: 32 }}
+            >
+              <BottomSheetView style={styles.sheetContent}>
+                <View style={styles.sheetHeader}>
+                  <Text style={styles.sheetTitle}>Todos Agendamentos</Text>
+                  <TouchableOpacity onPress={() => appointmentsSheetRef.current?.close()}>
+                    <X size={24} color="#64748B" />
+                  </TouchableOpacity>
+                </View>
+                <ScrollView style={{ marginTop: 10 }}>
+                  {renderedSheets["appointments"] &&
+                    data?.appointments?.map((item: PendingAppointment) => (
+                      <View key={item.id_agendamento} style={styles.pendingCard}>
+                        <View style={styles.pendingRow}>
+                          <Image
+                            source={
+                              item.user_avatar
+                                ? { uri: item.user_avatar }
+                                : { uri: "https://via.placeholder.com/40" }
+                            }
+                            style={styles.avatar}
+                          />
+                          <View style={{ flex: 1, marginLeft: 12 }}>
+                            <Text style={styles.clientName}>{item.user_name}</Text>
+                            <Text style={styles.clientMeta}>
+                              {item.data_agendamento} • {item.hora_inicio}
+                            </Text>
+                          </View>
+                          <View
+                            style={[
+                              styles.statusBadge,
+                              {
+                                backgroundColor:
+                                  item.status === "confirmado"
+                                    ? "#DCFCE7"
+                                    : item.status === "pendente"
+                                      ? "#FEF3C7"
+                                      : "#FEE2E2",
+                              },
+                            ]}
+                          >
+                            <Text
+                              style={[
+                                styles.statusBadgeText,
+                                {
+                                  color:
+                                    item.status === "confirmado"
+                                      ? "#166534"
+                                      : item.status === "pendente"
+                                        ? "#D97706"
+                                        : "#991B1B",
+                                },
+                              ]}
+                            >
+                              {item.status.toUpperCase()}
+                            </Text>
+                          </View>
+                        </View>
+                      </View>
+                    ))}
+                  {data?.appointments?.length === 0 && (
+                    <Text style={styles.emptyTxt}>Nenhum agendamento encontrado.</Text>
+                  )}
+                </ScrollView>
+              </BottomSheetView>
+            </BottomSheet>
+          )}
+
+          {/* ── SHEET: FATURAMENTO ── */}
+          {openSheets["revenue"] && (
+            <BottomSheet
+              ref={revenueSheetRef}
+              onClose={() => setOpenSheets((prev) => ({ ...prev, revenue: false }))}
+              index={0}
+              snapPoints={[SCREEN_HEIGHT * 0.85]}
+              enablePanDownToClose
+              backdropComponent={renderBackdrop}
+              backgroundStyle={{ borderRadius: 32 }}
+            >
+              <BottomSheetView style={styles.sheetContent}>
+                <View style={styles.sheetHeader}>
+                  <Text style={styles.sheetTitle}>Extrato de Ganhos</Text>
+                  <TouchableOpacity onPress={() => revenueSheetRef.current?.close()}>
+                    <X size={24} color="#64748B" />
+                  </TouchableOpacity>
+                </View>
+                <ScrollView style={{ marginTop: 10 }}>
+                  <View style={styles.revenueTotalCard}>
+                    <Text style={styles.revenueTotalLabel}>Total no Período</Text>
+                    <Text style={styles.revenueTotalValue}>
+                      {formatCurrency(data?.kpis.revenue || 0)}
+                    </Text>
+                  </View>
+                  {data?.appointments
+                    ?.filter(
+                      (a: PendingAppointment) =>
+                        a.status === "confirmado" || a.status === "concluido"
+                    )
+                    .map((item: PendingAppointment) => (
+                      <View key={item.id_agendamento} style={styles.revenueItem}>
+                        <View style={styles.revenueItemLeft}>
+                          <Text style={styles.revenueItemName}>{item.user_name}</Text>
+                          <Text style={styles.revenueItemMeta}>{item.data_agendamento}</Text>
+                        </View>
+                        <Text style={styles.revenueItemValue}>+ {formatCurrency(100)}</Text>
+                      </View>
+                    ))}
+                </ScrollView>
+              </BottomSheetView>
+            </BottomSheet>
+          )}
+
+          {/* ── SHEET: APROVAÇÕES ── */}
+          {openSheets["approvals"] && (
+            <BottomSheet
+              ref={approvalsSheetRef}
+              onClose={() => setOpenSheets((prev) => ({ ...prev, approvals: false }))}
+              index={0}
+              snapPoints={[SCREEN_HEIGHT * 0.85]}
+              enablePanDownToClose
+              backdropComponent={renderBackdrop}
+              backgroundStyle={{ borderRadius: 32 }}
+            >
+              <BottomSheetView style={styles.sheetContent}>
+                <View style={styles.sheetHeader}>
+                  <Text style={styles.sheetTitle}>Pendentes de Aprovação</Text>
+                  <TouchableOpacity onPress={() => approvalsSheetRef.current?.close()}>
+                    <X size={24} color="#64748B" />
+                  </TouchableOpacity>
+                </View>
+                <ScrollView style={{ marginTop: 20 }}>
+                  {data?.pending?.map((item: PendingAppointment) => (
                     <View key={item.id_agendamento} style={styles.pendingCard}>
                       <View style={styles.pendingRow}>
                         <Image
@@ -1770,587 +1910,619 @@ const AdminDashboardScreen: React.FC = () => {
                             {item.data_agendamento} • {item.hora_inicio}
                           </Text>
                         </View>
-                        <View
-                          style={[
-                            styles.statusBadge,
-                            {
-                              backgroundColor:
-                                item.status === "confirmado"
-                                  ? "#DCFCE7"
-                                  : item.status === "pendente"
-                                    ? "#FEF3C7"
-                                    : "#FEE2E2",
-                            },
-                          ]}
-                        >
-                          <Text
-                            style={[
-                              styles.statusBadgeText,
-                              {
-                                color:
-                                  item.status === "confirmado"
-                                    ? "#166534"
-                                    : item.status === "pendente"
-                                      ? "#D97706"
-                                      : "#991B1B",
-                              },
-                            ]}
-                          >
-                            {item.status.toUpperCase()}
-                          </Text>
-                        </View>
                       </View>
-                    </View>
-                  ))}
-                {data?.appointments?.length === 0 && (
-                  <Text style={styles.emptyTxt}>Nenhum agendamento encontrado.</Text>
-                )}
-              </ScrollView>
-            </BottomSheetView>
-          </BottomSheet>
-
-          {/* ── SHEET: FATURAMENTO ── */}
-          <BottomSheet
-            ref={revenueSheetRef}
-            index={-1}
-            snapPoints={[SCREEN_HEIGHT * 0.85]}
-            enablePanDownToClose
-            backdropComponent={renderBackdrop}
-            backgroundStyle={{ borderRadius: 32 }}
-          >
-            <BottomSheetView style={styles.sheetContent}>
-              <View style={styles.sheetHeader}>
-                <Text style={styles.sheetTitle}>Extrato de Ganhos</Text>
-                <TouchableOpacity onPress={() => revenueSheetRef.current?.close()}>
-                  <X size={24} color="#64748B" />
-                </TouchableOpacity>
-              </View>
-              <ScrollView style={{ marginTop: 10 }}>
-                <View style={styles.revenueTotalCard}>
-                  <Text style={styles.revenueTotalLabel}>Total no Período</Text>
-                  <Text style={styles.revenueTotalValue}>
-                    {formatCurrency(data?.kpis.revenue || 0)}
-                  </Text>
-                </View>
-                {data?.appointments
-                  ?.filter(
-                    (a: PendingAppointment) => a.status === "confirmado" || a.status === "concluido"
-                  )
-                  .map((item: PendingAppointment) => (
-                    <View key={item.id_agendamento} style={styles.revenueItem}>
-                      <View style={styles.revenueItemLeft}>
-                        <Text style={styles.revenueItemName}>{item.user_name}</Text>
-                        <Text style={styles.revenueItemMeta}>{item.data_agendamento}</Text>
-                      </View>
-                      <Text style={styles.revenueItemValue}>+ {formatCurrency(100)}</Text>
-                    </View>
-                  ))}
-              </ScrollView>
-            </BottomSheetView>
-          </BottomSheet>
-
-          {/* ── SHEET: APROVAÇÕES ── */}
-          <BottomSheet
-            ref={approvalsSheetRef}
-            index={-1}
-            snapPoints={[SCREEN_HEIGHT * 0.85]}
-            enablePanDownToClose
-            backdropComponent={renderBackdrop}
-            backgroundStyle={{ borderRadius: 32 }}
-          >
-            <BottomSheetView style={styles.sheetContent}>
-              <View style={styles.sheetHeader}>
-                <Text style={styles.sheetTitle}>Pendentes de Aprovação</Text>
-                <TouchableOpacity onPress={() => approvalsSheetRef.current?.close()}>
-                  <X size={24} color="#64748B" />
-                </TouchableOpacity>
-              </View>
-              <ScrollView style={{ marginTop: 20 }}>
-                {data?.pending?.map((item: PendingAppointment) => (
-                  <View key={item.id_agendamento} style={styles.pendingCard}>
-                    <View style={styles.pendingRow}>
-                      <Image
-                        source={
-                          item.user_avatar
-                            ? { uri: item.user_avatar }
-                            : { uri: "https://via.placeholder.com/40" }
-                        }
-                        style={styles.avatar}
-                      />
-                      <View style={{ flex: 1, marginLeft: 12 }}>
-                        <Text style={styles.clientName}>{item.user_name}</Text>
-                        <Text style={styles.clientMeta}>
-                          {item.data_agendamento} • {item.hora_inicio}
-                        </Text>
-                      </View>
-                    </View>
-                    <View style={{ gap: 12, marginTop: 12 }}>
-                      <TouchableOpacity
-                        style={[
-                          styles.approveBtn,
-                          { height: 52, borderRadius: 16, backgroundColor: "#10B981" },
-                        ]}
-                        onPress={() => handleUploadReceipt(item.id_agendamento)}
-                        disabled={isUploading}
-                      >
-                        {isUploading ? (
-                          <ActivityIndicator color="#fff" size="small" />
-                        ) : (
-                          <>
-                            <CreditCard size={18} color="#fff" />
-                            <Text style={[styles.approveTxt, { fontSize: 14 }]}>
-                              Confirmar com Comprovante (IA)
-                            </Text>
-                          </>
-                        )}
-                      </TouchableOpacity>
-
-                      <View style={styles.actionBtns}>
+                      <View style={{ gap: 12, marginTop: 12 }}>
                         <TouchableOpacity
                           style={[
                             styles.approveBtn,
-                            { backgroundColor: "#F1F5F9", borderWidth: 0 },
+                            { height: 52, borderRadius: 16, backgroundColor: "#10B981" },
                           ]}
-                          onPress={() => handleAction(item.id_agendamento, "confirmado")}
+                          onPress={() => handleUploadReceipt(item.id_agendamento)}
+                          disabled={isUploading}
                         >
-                          <CheckCircle size={16} color="#64748B" />
-                          <Text style={[styles.approveTxt, { color: "#64748B" }]}>
-                            Aprovar Simples
-                          </Text>
+                          {isUploading ? (
+                            <ActivityIndicator color="#fff" size="small" />
+                          ) : (
+                            <>
+                              <CreditCard size={18} color="#fff" />
+                              <Text style={[styles.approveTxt, { fontSize: 14 }]}>
+                                Confirmar com Comprovante (IA)
+                              </Text>
+                            </>
+                          )}
                         </TouchableOpacity>
 
-                        <TouchableOpacity
-                          style={styles.refuseBtn}
-                          onPress={() => handleAction(item.id_agendamento, "cancelado")}
-                        >
-                          <X size={16} color="#EF4444" />
-                          <Text style={styles.refuseTxt}>Recusar</Text>
-                        </TouchableOpacity>
-                      </View>
-                    </View>
-                  </View>
-                ))}
-                {data?.pending?.length === 0 && (
-                  <Text style={styles.emptyTxt}>Nenhuma aprovação pendente.</Text>
-                )}
-              </ScrollView>
-            </BottomSheetView>
-          </BottomSheet>
-
-          {/* ── SHEET: CLIENTES ── */}
-          <BottomSheet
-            ref={clientsSheetRef}
-            index={-1}
-            snapPoints={[SCREEN_HEIGHT * 0.85]}
-            enablePanDownToClose
-            backdropComponent={renderBackdrop}
-            backgroundStyle={{ borderRadius: 32 }}
-          >
-            <BottomSheetView style={styles.sheetContent}>
-              <View style={styles.sheetHeader}>
-                <Text style={styles.sheetTitle}>Meus Clientes</Text>
-                <TouchableOpacity onPress={() => clientsSheetRef.current?.close()}>
-                  <X size={24} color="#64748B" />
-                </TouchableOpacity>
-              </View>
-              <ScrollView style={{ marginTop: 20 }}>
-                {renderedSheets["clients"] &&
-                  data?.clients?.map((item: PersonalClient) => (
-                    <TouchableOpacity
-                      key={item?.id_us || Math.random()}
-                      style={styles.pendingCard}
-                      onPress={() => openClientHistory(item)}
-                    >
-                      <View style={styles.pendingRow}>
-                        <Image
-                          source={
-                            item?.avatar_url
-                              ? { uri: item.avatar_url }
-                              : { uri: "https://via.placeholder.com/40" }
-                          }
-                          style={styles.avatar}
-                        />
-                        <View style={{ flex: 1, marginLeft: 12 }}>
-                          <Text style={styles.clientName}>{item?.nome}</Text>
-                          <Text style={styles.clientMeta}>
-                            {item?.total_appointments} agendamentos • Último:{" "}
-                            {item?.last_appointment || "Nunca"}
-                          </Text>
-                        </View>
-                        <ChevronRight size={16} color="#94A3B8" />
-                      </View>
-                    </TouchableOpacity>
-                  ))}
-                {data?.clients?.length === 0 && (
-                  <Text style={styles.emptyTxt}>Nenhum cliente cadastrado.</Text>
-                )}
-              </ScrollView>
-            </BottomSheetView>
-          </BottomSheet>
-
-          {/* ── SHEET: PERFORMANCE ── */}
-          <BottomSheet
-            ref={performanceSheetRef}
-            index={-1}
-            snapPoints={[SCREEN_HEIGHT * 0.6]}
-            enablePanDownToClose
-            backdropComponent={renderBackdrop}
-            backgroundStyle={{ borderRadius: 32 }}
-          >
-            <BottomSheetView style={styles.sheetContent}>
-              <View style={styles.sheetHeader}>
-                <Text style={styles.sheetTitle}>Insights de Performance</Text>
-                <TouchableOpacity onPress={() => performanceSheetRef.current?.close()}>
-                  <X size={24} color="#64748B" />
-                </TouchableOpacity>
-              </View>
-
-              <View style={{ alignItems: "center", marginVertical: 20 }}>
-                <View
-                  style={[
-                    styles.revenueTotalCard,
-                    { width: "100%", backgroundColor: performanceData.color },
-                  ]}
-                >
-                  <Text style={[styles.revenueTotalLabel, { color: "rgba(255,255,255,0.7)" }]}>
-                    Sua taxa de aprovação é
-                  </Text>
-                  <Text style={styles.revenueTotalValue}>{performanceData.rate}%</Text>
-                  <View
-                    style={{
-                      marginTop: 10,
-                      paddingHorizontal: 16,
-                      paddingVertical: 6,
-                      borderRadius: 20,
-                      backgroundColor: "rgba(255,255,255,0.2)",
-                    }}
-                  >
-                    <Text style={{ color: "#fff", fontWeight: "800", fontSize: 12 }}>
-                      Status: {performanceData.status}
-                    </Text>
-                  </View>
-                </View>
-              </View>
-
-              <View style={{ gap: 16 }}>
-                <View style={{ flexDirection: "row", gap: 12, alignItems: "center" }}>
-                  <View
-                    style={{
-                      width: 40,
-                      height: 40,
-                      borderRadius: 12,
-                      backgroundColor: "#F1F5F9",
-                      alignItems: "center",
-                      justifyContent: "center",
-                    }}
-                  >
-                    <Target size={20} color="#6366F1" />
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={{ fontSize: 14, fontWeight: "700", color: "#1E293B" }}>
-                      Foco no Cliente
-                    </Text>
-                    <Text style={{ fontSize: 12, color: "#64748B" }}>
-                      Você aprovou{" "}
-                      {data?.statusDistribution?.find(
-                        (d: any) => String(d?.label || "").toLowerCase() === "confirmado"
-                      )?.count || 0}{" "}
-                      sessões este mês.
-                    </Text>
-                  </View>
-                </View>
-
-                <View style={{ flexDirection: "row", gap: 12, alignItems: "center" }}>
-                  <View
-                    style={{
-                      width: 40,
-                      height: 40,
-                      borderRadius: 12,
-                      backgroundColor: "#F1F5F9",
-                      alignItems: "center",
-                      justifyContent: "center",
-                    }}
-                  >
-                    <Clock size={20} color="#F59E0B" />
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={{ fontSize: 14, fontWeight: "700", color: "#1E293B" }}>
-                      Tempo de Resposta
-                    </Text>
-                    <Text style={{ fontSize: 12, color: "#64748B" }}>
-                      Mantenha suas notificações ativas para responder rápido.
-                    </Text>
-                  </View>
-                </View>
-
-                <View
-                  style={{
-                    backgroundColor: "#F8FAFC",
-                    padding: 16,
-                    borderRadius: 20,
-                    marginTop: 10,
-                  }}
-                >
-                  <Text
-                    style={{ fontSize: 13, fontWeight: "800", color: "#1E293B", marginBottom: 6 }}
-                  >
-                    Dica Pro:
-                  </Text>
-                  <Text style={{ fontSize: 12, color: "#64748B", lineHeight: 18 }}>
-                    Personais que aprovam agendamentos em menos de 1 hora aumentam sua retenção em
-                    até 40%.
-                  </Text>
-                </View>
-              </View>
-            </BottomSheetView>
-          </BottomSheet>
-
-          {/* ── SHEET: HISTÓRICO DO CLIENTE ── */}
-          <BottomSheet
-            ref={historySheetRef}
-            index={-1}
-            snapPoints={["85%"]}
-            enablePanDownToClose
-            backdropComponent={renderBackdrop}
-            backgroundStyle={{ borderRadius: 32 }}
-          >
-            <BottomSheetView style={styles.sheetContent}>
-              <View style={styles.sheetHeader}>
-                <View>
-                  <Text style={styles.headerTitle}>{selectedClient?.nome || "Histórico"}</Text>
-                  <Text style={styles.cardSubtitle}>Histórico de Treinos</Text>
-                </View>
-                <TouchableOpacity onPress={() => historySheetRef.current?.close()}>
-                  <X size={24} color="#64748B" />
-                </TouchableOpacity>
-              </View>
-              {fetchingHistory ? (
-                <ActivityIndicator color="#10B981" style={{ marginTop: 40 }} />
-              ) : (
-                <ScrollView style={{ marginTop: 20 }}>
-                  {clientHistory.map((appt) => (
-                    <View key={appt?.id_agendamento || Math.random()} style={styles.pendingCard}>
-                      <View
-                        style={{
-                          flexDirection: "row",
-                          justifyContent: "space-between",
-                          alignItems: "center",
-                        }}
-                      >
-                        <View>
-                          <Text style={styles.clientName}>
-                            {appt?.data_agendamento} • {appt?.hora_inicio}
-                          </Text>
-                          <View
-                            style={{ flexDirection: "row", alignItems: "center", marginTop: 4 }}
-                          >
-                            <View
-                              style={[
-                                {
-                                  backgroundColor:
-                                    appt?.status === "concluido" ? "#10B981" : "#94A3B8",
-                                  width: 6,
-                                  height: 6,
-                                },
-                              ]}
-                            />
-                            <Text style={{ fontSize: 10, marginLeft: 4, color: "#64748B" }}>
-                              {String(appt?.status || "").toUpperCase()}
-                            </Text>
-                          </View>
-                        </View>
-                        {appt?.status === "concluido" || appt?.status === "confirmado" ? (
+                        <View style={styles.actionBtns}>
                           <TouchableOpacity
                             style={[
                               styles.approveBtn,
-                              { paddingHorizontal: 12, height: 32, flex: 0 },
+                              { backgroundColor: "#F1F5F9", borderWidth: 0 },
                             ]}
-                            onPress={() => openEvaluation(appt)}
+                            onPress={() => handleAction(item.id_agendamento, "confirmado")}
                           >
-                            <Text style={{ color: "#fff", fontSize: 12, fontWeight: "700" }}>
-                              {appt.nota_aluno ? "Ver Avaliação" : "Avaliar"}
+                            <CheckCircle size={16} color="#64748B" />
+                            <Text style={[styles.approveTxt, { color: "#64748B" }]}>
+                              Aprovar Simples
                             </Text>
                           </TouchableOpacity>
-                        ) : null}
+
+                          <TouchableOpacity
+                            style={styles.refuseBtn}
+                            onPress={() => handleAction(item.id_agendamento, "cancelado")}
+                          >
+                            <X size={16} color="#EF4444" />
+                            <Text style={styles.refuseTxt}>Recusar</Text>
+                          </TouchableOpacity>
+                        </View>
                       </View>
-                      {appt?.comentario_tecnico && (
+                    </View>
+                  ))}
+                  {data?.pending?.length === 0 && (
+                    <Text style={styles.emptyTxt}>Nenhuma aprovação pendente.</Text>
+                  )}
+                </ScrollView>
+              </BottomSheetView>
+            </BottomSheet>
+          )}
+
+          {/* ── SHEET: CLIENTES ── */}
+          {openSheets["clients"] && (
+            <BottomSheet
+              ref={clientsSheetRef}
+              onClose={() => setOpenSheets((prev) => ({ ...prev, clients: false }))}
+              index={0}
+              snapPoints={[SCREEN_HEIGHT * 0.85]}
+              enablePanDownToClose
+              backdropComponent={renderBackdrop}
+              backgroundStyle={{ borderRadius: 32 }}
+            >
+              <BottomSheetView style={styles.sheetContent}>
+                <View style={styles.sheetHeader}>
+                  <Text style={styles.sheetTitle}>Meus Clientes</Text>
+                  <TouchableOpacity onPress={() => clientsSheetRef.current?.close()}>
+                    <X size={24} color="#64748B" />
+                  </TouchableOpacity>
+                </View>
+                <ScrollView style={{ marginTop: 20 }}>
+                  {renderedSheets["clients"] &&
+                    data?.clients?.map((item: PersonalClient) => (
+                      <TouchableOpacity
+                        key={item?.id_us || Math.random()}
+                        style={styles.pendingCard}
+                        onPress={() => openClientHistory(item)}
+                      >
+                        <View style={styles.pendingRow}>
+                          <Image
+                            source={
+                              item?.avatar_url
+                                ? { uri: item.avatar_url }
+                                : { uri: "https://via.placeholder.com/40" }
+                            }
+                            style={styles.avatar}
+                          />
+                          <View style={{ flex: 1, marginLeft: 12 }}>
+                            <Text style={styles.clientName}>{item?.nome}</Text>
+                            <Text style={styles.clientMeta}>
+                              {item?.total_appointments} agendamentos • Último:{" "}
+                              {item?.last_appointment || "Nunca"}
+                            </Text>
+                          </View>
+                          <ChevronRight size={16} color="#94A3B8" />
+                        </View>
+                      </TouchableOpacity>
+                    ))}
+                  {data?.clients?.length === 0 && (
+                    <Text style={styles.emptyTxt}>Nenhum cliente cadastrado.</Text>
+                  )}
+                </ScrollView>
+              </BottomSheetView>
+            </BottomSheet>
+          )}
+
+          {/* ── SHEET: PERFORMANCE ── */}
+          {openSheets["performance"] && (
+            <BottomSheet
+              ref={performanceSheetRef}
+              onClose={() => setOpenSheets((prev) => ({ ...prev, performance: false }))}
+              index={0}
+              snapPoints={[SCREEN_HEIGHT * 0.6]}
+              enablePanDownToClose
+              backdropComponent={renderBackdrop}
+              backgroundStyle={{ borderRadius: 32 }}
+            >
+              <BottomSheetView style={styles.sheetContent}>
+                <View style={styles.sheetHeader}>
+                  <Text style={styles.sheetTitle}>Insights de Performance</Text>
+                  <TouchableOpacity onPress={() => performanceSheetRef.current?.close()}>
+                    <X size={24} color="#64748B" />
+                  </TouchableOpacity>
+                </View>
+
+                <View style={{ alignItems: "center", marginVertical: 20 }}>
+                  <View
+                    style={[
+                      styles.revenueTotalCard,
+                      { width: "100%", backgroundColor: performanceData.color },
+                    ]}
+                  >
+                    <Text style={[styles.revenueTotalLabel, { color: "rgba(255,255,255,0.7)" }]}>
+                      Sua taxa de aprovação é
+                    </Text>
+                    <Text style={styles.revenueTotalValue}>{performanceData.rate}%</Text>
+                    <View
+                      style={{
+                        marginTop: 10,
+                        paddingHorizontal: 16,
+                        paddingVertical: 6,
+                        borderRadius: 20,
+                        backgroundColor: "rgba(255,255,255,0.2)",
+                      }}
+                    >
+                      <Text style={{ color: "#fff", fontWeight: "800", fontSize: 12 }}>
+                        Status: {performanceData.status}
+                      </Text>
+                    </View>
+                  </View>
+                </View>
+
+                <View style={{ gap: 16 }}>
+                  <View style={{ flexDirection: "row", gap: 12, alignItems: "center" }}>
+                    <View
+                      style={{
+                        width: 40,
+                        height: 40,
+                        borderRadius: 12,
+                        backgroundColor: "#F1F5F9",
+                        alignItems: "center",
+                        justifyContent: "center",
+                      }}
+                    >
+                      <Target size={20} color="#6366F1" />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ fontSize: 14, fontWeight: "700", color: "#1E293B" }}>
+                        Foco no Cliente
+                      </Text>
+                      <Text style={{ fontSize: 12, color: "#64748B" }}>
+                        Você aprovou{" "}
+                        {data?.statusDistribution?.find(
+                          (d: any) => String(d?.label || "").toLowerCase() === "confirmado"
+                        )?.count || 0}{" "}
+                        sessões este mês.
+                      </Text>
+                    </View>
+                  </View>
+
+                  <View style={{ flexDirection: "row", gap: 12, alignItems: "center" }}>
+                    <View
+                      style={{
+                        width: 40,
+                        height: 40,
+                        borderRadius: 12,
+                        backgroundColor: "#F1F5F9",
+                        alignItems: "center",
+                        justifyContent: "center",
+                      }}
+                    >
+                      <Clock size={20} color="#F59E0B" />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ fontSize: 14, fontWeight: "700", color: "#1E293B" }}>
+                        Tempo de Resposta
+                      </Text>
+                      <Text style={{ fontSize: 12, color: "#64748B" }}>
+                        Mantenha suas notificações ativas para responder rápido.
+                      </Text>
+                    </View>
+                  </View>
+
+                  <View
+                    style={{
+                      backgroundColor: "#F8FAFC",
+                      padding: 16,
+                      borderRadius: 20,
+                      marginTop: 10,
+                    }}
+                  >
+                    <Text
+                      style={{ fontSize: 13, fontWeight: "800", color: "#1E293B", marginBottom: 6 }}
+                    >
+                      Dica Pro:
+                    </Text>
+                    <Text style={{ fontSize: 12, color: "#64748B", lineHeight: 18 }}>
+                      Personais que aprovam agendamentos em menos de 1 hora aumentam sua retenção em
+                      até 40%.
+                    </Text>
+                  </View>
+                </View>
+              </BottomSheetView>
+            </BottomSheet>
+          )}
+
+          {/* ── SHEET: HISTÓRICO DO CLIENTE ── */}
+          {openSheets["history"] && (
+            <BottomSheet
+              ref={historySheetRef}
+              onClose={() => setOpenSheets((prev) => ({ ...prev, history: false }))}
+              index={0}
+              snapPoints={["85%"]}
+              enablePanDownToClose
+              backdropComponent={renderBackdrop}
+              backgroundStyle={{ borderRadius: 32 }}
+            >
+              <BottomSheetView style={styles.sheetContent}>
+                <View style={styles.sheetHeader}>
+                  <View>
+                    <Text style={styles.headerTitle}>{selectedClient?.nome || "Histórico"}</Text>
+                    <Text style={styles.cardSubtitle}>Histórico de Treinos</Text>
+                  </View>
+                  <TouchableOpacity onPress={() => historySheetRef.current?.close()}>
+                    <X size={24} color="#64748B" />
+                  </TouchableOpacity>
+                </View>
+                {fetchingHistory ? (
+                  <ActivityIndicator color="#10B981" style={{ marginTop: 40 }} />
+                ) : (
+                  <ScrollView style={{ marginTop: 20 }}>
+                    {clientHistory.map((appt) => (
+                      <View key={appt?.id_agendamento || Math.random()} style={styles.pendingCard}>
+                        <View
+                          style={{
+                            flexDirection: "row",
+                            justifyContent: "space-between",
+                            alignItems: "center",
+                          }}
+                        >
+                          <View>
+                            <Text style={styles.clientName}>
+                              {appt?.data_agendamento} • {appt?.hora_inicio}
+                            </Text>
+                            <View
+                              style={{ flexDirection: "row", alignItems: "center", marginTop: 4 }}
+                            >
+                              <View
+                                style={[
+                                  {
+                                    backgroundColor:
+                                      appt?.status === "concluido" ? "#10B981" : "#94A3B8",
+                                    width: 6,
+                                    height: 6,
+                                  },
+                                ]}
+                              />
+                              <Text style={{ fontSize: 10, marginLeft: 4, color: "#64748B" }}>
+                                {String(appt?.status || "").toUpperCase()}
+                              </Text>
+                            </View>
+                          </View>
+                          {appt?.status === "concluido" || appt?.status === "confirmado" ? (
+                            <TouchableOpacity
+                              style={[
+                                styles.approveBtn,
+                                { paddingHorizontal: 12, height: 32, flex: 0 },
+                              ]}
+                              onPress={() => openEvaluation(appt)}
+                            >
+                              <Text style={{ color: "#fff", fontSize: 12, fontWeight: "700" }}>
+                                {appt.nota_aluno ? "Ver Avaliação" : "Avaliar"}
+                              </Text>
+                            </TouchableOpacity>
+                          ) : null}
+                        </View>
+                        {appt?.comentario_tecnico && (
+                          <View
+                            style={{
+                              marginTop: 10,
+                              padding: 10,
+                              backgroundColor: "#F8FAFC",
+                              borderRadius: 12,
+                            }}
+                          >
+                            <Text style={{ fontSize: 11, fontWeight: "700", color: "#1E293B" }}>
+                              Feedback Técnico:
+                            </Text>
+                            <Text style={{ fontSize: 11, color: "#64748B", marginTop: 2 }}>
+                              {appt?.comentario_tecnico}
+                            </Text>
+                          </View>
+                        )}
+                      </View>
+                    ))}
+                    {clientHistory.length === 0 && (
+                      <Text style={styles.emptyTxt}>Nenhum registro encontrado.</Text>
+                    )}
+                  </ScrollView>
+                )}
+              </BottomSheetView>
+            </BottomSheet>
+          )}
+
+          {/* ── SHEET: AVALIAÇÃO DE TREINO ── */}
+          {openSheets["evaluation"] && (
+            <BottomSheet
+              ref={evaluationSheetRef}
+              onClose={() => setOpenSheets((prev) => ({ ...prev, evaluation: false }))}
+              index={0}
+              snapPoints={[SCREEN_HEIGHT * 0.75]}
+              enablePanDownToClose
+              backdropComponent={renderBackdrop}
+              backgroundStyle={{ borderRadius: 32 }}
+            >
+              <BottomSheetView style={styles.sheetContent}>
+                <View style={styles.sheetHeader}>
+                  <Text style={styles.sheetTitle}>Avaliação do Treino</Text>
+                  <TouchableOpacity onPress={() => evaluationSheetRef.current?.close()}>
+                    <X size={24} color="#64748B" />
+                  </TouchableOpacity>
+                </View>
+
+                <ScrollView style={{ marginTop: 10 }}>
+                  <View style={styles.filterSection}>
+                    <Text style={styles.filterSectionTitle}>Intensidade do Treino (1-5)</Text>
+                    <View style={{ flexDirection: "row", gap: 10, marginTop: 4 }}>
+                      {[1, 2, 3, 4, 5].map((num) => (
+                        <TouchableOpacity
+                          key={num}
+                          onPress={() => setNotaIntensidade(num)}
+                          style={{
+                            width: 44,
+                            height: 44,
+                            borderRadius: 22,
+                            backgroundColor: notaIntensidade === num ? "#10B981" : "#F1F5F9",
+                            alignItems: "center",
+                            justifyContent: "center",
+                          }}
+                        >
+                          <Text
+                            style={{
+                              color: notaIntensidade === num ? "#fff" : "#64748B",
+                              fontWeight: "800",
+                            }}
+                          >
+                            {num}
+                          </Text>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                  </View>
+
+                  <View style={[styles.filterSection, { marginTop: 10 }]}>
+                    <Text style={styles.filterSectionTitle}>Feedback para o Aluno</Text>
+                    <View
+                      style={{
+                        backgroundColor: "#F8FAFC",
+                        borderRadius: 16,
+                        padding: 16,
+                        marginTop: 4,
+                        borderWidth: 1,
+                        borderColor: "#E2E8F0",
+                      }}
+                    >
+                      <TouchableOpacity
+                        onPress={() => {
+                          Alert.prompt(
+                            "Feedback",
+                            "O que o aluno pode melhorar?",
+                            (text) => setComentarioTecnico(text),
+                            "plain-text",
+                            comentarioTecnico
+                          );
+                        }}
+                      >
+                        <Text
+                          style={{ fontSize: 14, color: comentarioTecnico ? "#1E293B" : "#94A3B8" }}
+                        >
+                          {comentarioTecnico || "Toque aqui para escrever o feedback técnico..."}
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+
+                  <View style={[styles.filterSection, { marginTop: 10 }]}>
+                    <Text style={styles.filterSectionTitle}>Nota do Aluno (Performance)</Text>
+                    <View style={{ flexDirection: "row", gap: 10, marginTop: 4 }}>
+                      {[1, 2, 3, 4, 5].map((num) => (
+                        <TouchableOpacity
+                          key={num}
+                          onPress={() => setNotaAluno(num)}
+                          style={{
+                            width: 44,
+                            height: 44,
+                            borderRadius: 22,
+                            backgroundColor: notaAluno === num ? "#10B981" : "#F1F5F9",
+                            alignItems: "center",
+                            justifyContent: "center",
+                          }}
+                        >
+                          <Text
+                            style={{
+                              color: notaAluno === num ? "#fff" : "#64748B",
+                              fontWeight: "800",
+                            }}
+                          >
+                            {num}
+                          </Text>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                  </View>
+
+                  <TouchableOpacity
+                    style={[
+                      styles.applyBtn,
+                      { marginTop: 20, height: 55, alignSelf: "stretch", flex: 0 },
+                    ]}
+                    onPress={submitEvaluation}
+                  >
+                    <LinearGradient
+                      colors={["#10B981", "#059669"]}
+                      style={StyleSheet.absoluteFill}
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 1, y: 0 }}
+                    />
+                    <Text style={styles.applyBtnText}>Salvar Avaliação</Text>
+                  </TouchableOpacity>
+                </ScrollView>
+              </BottomSheetView>
+            </BottomSheet>
+          )}
+
+          {/* ── SHEET: AVALIAÇÕES DO PERSONAL ── */}
+          {openSheets["reviews"] && (
+            <BottomSheet
+              ref={reviewsSheetRef}
+              onClose={() => setOpenSheets((prev) => ({ ...prev, reviews: false }))}
+              index={0}
+              snapPoints={["85%"]}
+              enablePanDownToClose
+              backdropComponent={renderBackdrop}
+              backgroundStyle={{ borderRadius: 32 }}
+            >
+              <BottomSheetView style={styles.sheetContent}>
+                <View style={styles.sheetHeader}>
+                  <Text style={styles.sheetTitle}>Avaliações</Text>
+                  <TouchableOpacity onPress={() => reviewsSheetRef.current?.close()}>
+                    <X size={24} color="#64748B" />
+                  </TouchableOpacity>
+                </View>
+                <ScrollView style={{ marginTop: 20 }}>
+                  {data?.reviews?.map((item: any) => {
+                    const isPositive =
+                      (Number(item?.ratingProfessional || 0) + Number(item?.ratingTraining || 0)) /
+                        2 >=
+                      4;
+                    return (
+                      <View key={item?.id || Math.random()} style={styles.pendingCard}>
+                        <View style={styles.pendingRow}>
+                          <Image
+                            source={
+                              item?.user_avatar
+                                ? { uri: item.user_avatar }
+                                : { uri: "https://via.placeholder.com/40" }
+                            }
+                            style={styles.avatar}
+                          />
+                          <View style={{ flex: 1, marginLeft: 12 }}>
+                            <Text style={styles.clientName}>{item?.user_name}</Text>
+                            <Text style={styles.clientMeta}>
+                              {(() => {
+                                try {
+                                  if (!item?.created_at) return "Data N/A";
+                                  return new Date(item.created_at).toLocaleDateString("pt-BR");
+                                } catch (e) {
+                                  return String(item?.created_at || "").split("T")[0];
+                                }
+                              })()}
+                            </Text>
+                          </View>
+                          <View
+                            style={[
+                              styles.statusBadge,
+                              { backgroundColor: isPositive ? "#DCFCE7" : "#FEF3C7" },
+                            ]}
+                          >
+                            <Text
+                              style={[
+                                styles.statusBadgeText,
+                                { color: isPositive ? "#166534" : "#D97706" },
+                              ]}
+                            >
+                              ★{" "}
+                              {(
+                                (Number(item?.ratingProfessional || 0) +
+                                  Number(item?.ratingTraining || 0)) /
+                                2
+                              ).toFixed(1)}
+                            </Text>
+                          </View>
+                        </View>
+
                         <View
                           style={{
                             marginTop: 10,
                             padding: 10,
                             backgroundColor: "#F8FAFC",
                             borderRadius: 12,
+                            borderWidth: 1,
+                            borderColor: "#F1F5F9",
                           }}
                         >
-                          <Text style={{ fontSize: 11, fontWeight: "700", color: "#1E293B" }}>
-                            Feedback Técnico:
-                          </Text>
-                          <Text style={{ fontSize: 11, color: "#64748B", marginTop: 2 }}>
-                            {appt?.comentario_tecnico}
-                          </Text>
+                          <View
+                            style={{
+                              flexDirection: "row",
+                              justifyContent: "space-between",
+                              marginBottom: 8,
+                            }}
+                          >
+                            <Text style={{ fontSize: 11, fontWeight: "700", color: "#64748B" }}>
+                              Profissional:{" "}
+                              <Text style={{ color: "#1E293B" }}>
+                                {item?.ratingProfessional || 0}
+                              </Text>
+                              /5
+                            </Text>
+                            <Text style={{ fontSize: 11, fontWeight: "700", color: "#64748B" }}>
+                              Treino:{" "}
+                              <Text style={{ color: "#1E293B" }}>{item?.ratingTraining || 0}</Text>
+                              /5
+                            </Text>
+                          </View>
+                          {item?.comment ? (
+                            <Text
+                              style={{
+                                fontSize: 12,
+                                color: "#1E293B",
+                                lineHeight: 18,
+                                marginTop: 4,
+                              }}
+                            >
+                              &quot;{item.comment}&quot;
+                            </Text>
+                          ) : (
+                            <Text
+                              style={{
+                                fontSize: 12,
+                                color: "#94A3B8",
+                                fontStyle: "italic",
+                                marginTop: 4,
+                              }}
+                            >
+                              Sem comentário
+                            </Text>
+                          )}
                         </View>
-                      )}
-                    </View>
-                  ))}
-                  {clientHistory.length === 0 && (
-                    <Text style={styles.emptyTxt}>Nenhum registro encontrado.</Text>
+                      </View>
+                    );
+                  })}
+                  {(!data?.reviews || data.reviews.length === 0) && (
+                    <Text style={styles.emptyTxt}>Nenhuma avaliação encontrada.</Text>
                   )}
                 </ScrollView>
-              )}
-            </BottomSheetView>
-          </BottomSheet>
+              </BottomSheetView>
+            </BottomSheet>
+          )}
 
-          {/* ── SHEET: AVALIAÇÃO DE TREINO ── */}
-          <BottomSheet
-            ref={evaluationSheetRef}
-            index={-1}
-            snapPoints={[SCREEN_HEIGHT * 0.75]}
-            enablePanDownToClose
-            backdropComponent={renderBackdrop}
-            backgroundStyle={{ borderRadius: 32 }}
-          >
-            <BottomSheetView style={styles.sheetContent}>
-              <View style={styles.sheetHeader}>
-                <Text style={styles.sheetTitle}>Avaliação do Treino</Text>
-                <TouchableOpacity onPress={() => evaluationSheetRef.current?.close()}>
-                  <X size={24} color="#64748B" />
-                </TouchableOpacity>
-              </View>
-
-              <ScrollView style={{ marginTop: 10 }}>
-                <View style={styles.filterSection}>
-                  <Text style={styles.filterSectionTitle}>Intensidade do Treino (1-5)</Text>
-                  <View style={{ flexDirection: "row", gap: 10, marginTop: 4 }}>
-                    {[1, 2, 3, 4, 5].map((num) => (
-                      <TouchableOpacity
-                        key={num}
-                        onPress={() => setNotaIntensidade(num)}
-                        style={{
-                          width: 44,
-                          height: 44,
-                          borderRadius: 22,
-                          backgroundColor: notaIntensidade === num ? "#10B981" : "#F1F5F9",
-                          alignItems: "center",
-                          justifyContent: "center",
-                        }}
-                      >
-                        <Text
-                          style={{
-                            color: notaIntensidade === num ? "#fff" : "#64748B",
-                            fontWeight: "800",
-                          }}
-                        >
-                          {num}
-                        </Text>
-                      </TouchableOpacity>
-                    ))}
-                  </View>
+          {/* ── SHEET: COMPROVANTES ── */}
+          {openSheets["payments"] && (
+            <BottomSheet
+              ref={paymentsSheetRef}
+              onClose={() => setOpenSheets((prev) => ({ ...prev, payments: false }))}
+              index={0}
+              snapPoints={["85%"]}
+              enablePanDownToClose
+              backdropComponent={renderBackdrop}
+              backgroundStyle={{ borderRadius: 32 }}
+            >
+              <BottomSheetView style={styles.sheetContent}>
+                <View style={styles.sheetHeader}>
+                  <Text style={styles.sheetTitle}>Comprovantes Enviados</Text>
+                  <TouchableOpacity onPress={() => paymentsSheetRef.current?.close()}>
+                    <X size={24} color="#64748B" />
+                  </TouchableOpacity>
                 </View>
-
-                <View style={[styles.filterSection, { marginTop: 10 }]}>
-                  <Text style={styles.filterSectionTitle}>Feedback para o Aluno</Text>
-                  <View
-                    style={{
-                      backgroundColor: "#F8FAFC",
-                      borderRadius: 16,
-                      padding: 16,
-                      marginTop: 4,
-                      borderWidth: 1,
-                      borderColor: "#E2E8F0",
-                    }}
-                  >
-                    <TouchableOpacity
-                      onPress={() => {
-                        Alert.prompt(
-                          "Feedback",
-                          "O que o aluno pode melhorar?",
-                          (text) => setComentarioTecnico(text),
-                          "plain-text",
-                          comentarioTecnico
-                        );
-                      }}
-                    >
-                      <Text
-                        style={{ fontSize: 14, color: comentarioTecnico ? "#1E293B" : "#94A3B8" }}
-                      >
-                        {comentarioTecnico || "Toque aqui para escrever o feedback técnico..."}
-                      </Text>
-                    </TouchableOpacity>
-                  </View>
-                </View>
-
-                <View style={[styles.filterSection, { marginTop: 10 }]}>
-                  <Text style={styles.filterSectionTitle}>Nota do Aluno (Performance)</Text>
-                  <View style={{ flexDirection: "row", gap: 10, marginTop: 4 }}>
-                    {[1, 2, 3, 4, 5].map((num) => (
-                      <TouchableOpacity
-                        key={num}
-                        onPress={() => setNotaAluno(num)}
-                        style={{
-                          width: 44,
-                          height: 44,
-                          borderRadius: 22,
-                          backgroundColor: notaAluno === num ? "#10B981" : "#F1F5F9",
-                          alignItems: "center",
-                          justifyContent: "center",
-                        }}
-                      >
-                        <Text
-                          style={{
-                            color: notaAluno === num ? "#fff" : "#64748B",
-                            fontWeight: "800",
-                          }}
-                        >
-                          {num}
-                        </Text>
-                      </TouchableOpacity>
-                    ))}
-                  </View>
-                </View>
-
-                <TouchableOpacity
-                  style={[
-                    styles.applyBtn,
-                    { marginTop: 20, height: 55, alignSelf: "stretch", flex: 0 },
-                  ]}
-                  onPress={submitEvaluation}
-                >
-                  <LinearGradient
-                    colors={["#10B981", "#059669"]}
-                    style={StyleSheet.absoluteFill}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 0 }}
-                  />
-                  <Text style={styles.applyBtnText}>Salvar Avaliação</Text>
-                </TouchableOpacity>
-              </ScrollView>
-            </BottomSheetView>
-          </BottomSheet>
-
-          {/* ── SHEET: AVALIAÇÕES DO PERSONAL ── */}
-          <BottomSheet
-            ref={reviewsSheetRef}
-            index={-1}
-            snapPoints={["85%"]}
-            enablePanDownToClose
-            backdropComponent={renderBackdrop}
-            backgroundStyle={{ borderRadius: 32 }}
-          >
-            <BottomSheetView style={styles.sheetContent}>
-              <View style={styles.sheetHeader}>
-                <Text style={styles.sheetTitle}>Avaliações</Text>
-                <TouchableOpacity onPress={() => reviewsSheetRef.current?.close()}>
-                  <X size={24} color="#64748B" />
-                </TouchableOpacity>
-              </View>
-              <ScrollView style={{ marginTop: 20 }}>
-                {data?.reviews?.map((item: any) => {
-                  const isPositive =
-                    (Number(item?.ratingProfessional || 0) + Number(item?.ratingTraining || 0)) /
-                      2 >=
-                    4;
-                  return (
-                    <View key={item?.id || Math.random()} style={styles.pendingCard}>
+                <ScrollView style={{ marginTop: 20 }}>
+                  {data?.receiptHistory?.map((item: any) => (
+                    <View key={item?.id_agendamento || Math.random()} style={styles.pendingCard}>
                       <View style={styles.pendingRow}>
                         <Image
                           source={
@@ -2365,343 +2537,451 @@ const AdminDashboardScreen: React.FC = () => {
                           <Text style={styles.clientMeta}>
                             {(() => {
                               try {
-                                if (!item?.created_at) return "Data N/A";
-                                return new Date(item.created_at).toLocaleDateString("pt-BR");
+                                if (!item?.data_agendamento) return "Data N/A";
+                                return new Date(item.data_agendamento).toLocaleDateString("pt-BR");
                               } catch (e) {
-                                return String(item?.created_at || "").split("T")[0];
+                                return String(item?.data_agendamento || "").split("T")[0];
                               }
-                            })()}
+                            })()}{" "}
+                            • {item?.hora_inicio || "--:--"}
                           </Text>
-                        </View>
-                        <View
-                          style={[
-                            styles.statusBadge,
-                            { backgroundColor: isPositive ? "#DCFCE7" : "#FEF3C7" },
-                          ]}
-                        >
-                          <Text
-                            style={[
-                              styles.statusBadgeText,
-                              { color: isPositive ? "#166534" : "#D97706" },
-                            ]}
-                          >
-                            ★{" "}
-                            {(
-                              (Number(item?.ratingProfessional || 0) +
-                                Number(item?.ratingTraining || 0)) /
-                              2
-                            ).toFixed(1)}
-                          </Text>
-                        </View>
-                      </View>
-
-                      <View
-                        style={{
-                          marginTop: 10,
-                          padding: 10,
-                          backgroundColor: "#F8FAFC",
-                          borderRadius: 12,
-                          borderWidth: 1,
-                          borderColor: "#F1F5F9",
-                        }}
-                      >
-                        <View
-                          style={{
-                            flexDirection: "row",
-                            justifyContent: "space-between",
-                            marginBottom: 8,
-                          }}
-                        >
-                          <Text style={{ fontSize: 11, fontWeight: "700", color: "#64748B" }}>
-                            Profissional:{" "}
-                            <Text style={{ color: "#1E293B" }}>
-                              {item?.ratingProfessional || 0}
-                            </Text>
-                            /5
-                          </Text>
-                          <Text style={{ fontSize: 11, fontWeight: "700", color: "#64748B" }}>
-                            Treino:{" "}
-                            <Text style={{ color: "#1E293B" }}>{item?.ratingTraining || 0}</Text>
-                            /5
-                          </Text>
-                        </View>
-                        {item?.comment ? (
-                          <Text
-                            style={{ fontSize: 12, color: "#1E293B", lineHeight: 18, marginTop: 4 }}
-                          >
-                            &quot;{item.comment}&quot;
-                          </Text>
-                        ) : (
                           <Text
                             style={{
-                              fontSize: 12,
-                              color: "#94A3B8",
-                              fontStyle: "italic",
+                              fontSize: 13,
+                              fontWeight: "800",
+                              color: "#10B981",
                               marginTop: 4,
                             }}
                           >
-                            Sem comentário
+                            + {formatCurrency(item?.valor_recebido || 0)}
                           </Text>
-                        )}
+                        </View>
+                        <View style={{ padding: 8, backgroundColor: "#DCFCE7", borderRadius: 10 }}>
+                          <CheckCircle size={18} color="#10B981" />
+                        </View>
                       </View>
                     </View>
-                  );
-                })}
-                {(!data?.reviews || data.reviews.length === 0) && (
-                  <Text style={styles.emptyTxt}>Nenhuma avaliação encontrada.</Text>
-                )}
-              </ScrollView>
-            </BottomSheetView>
-          </BottomSheet>
-
-          {/* ── SHEET: COMPROVANTES ── */}
-          <BottomSheet
-            ref={paymentsSheetRef}
-            index={-1}
-            snapPoints={["85%"]}
-            enablePanDownToClose
-            backdropComponent={renderBackdrop}
-            backgroundStyle={{ borderRadius: 32 }}
-          >
-            <BottomSheetView style={styles.sheetContent}>
-              <View style={styles.sheetHeader}>
-                <Text style={styles.sheetTitle}>Comprovantes Enviados</Text>
-                <TouchableOpacity onPress={() => paymentsSheetRef.current?.close()}>
-                  <X size={24} color="#64748B" />
-                </TouchableOpacity>
-              </View>
-              <ScrollView style={{ marginTop: 20 }}>
-                {data?.receiptHistory?.map((item: any) => (
-                  <View key={item?.id_agendamento || Math.random()} style={styles.pendingCard}>
-                    <View style={styles.pendingRow}>
-                      <Image
-                        source={
-                          item?.user_avatar
-                            ? { uri: item.user_avatar }
-                            : { uri: "https://via.placeholder.com/40" }
-                        }
-                        style={styles.avatar}
-                      />
-                      <View style={{ flex: 1, marginLeft: 12 }}>
-                        <Text style={styles.clientName}>{item?.user_name}</Text>
-                        <Text style={styles.clientMeta}>
-                          {(() => {
-                            try {
-                              if (!item?.data_agendamento) return "Data N/A";
-                              return new Date(item.data_agendamento).toLocaleDateString("pt-BR");
-                            } catch (e) {
-                              return String(item?.data_agendamento || "").split("T")[0];
-                            }
-                          })()}{" "}
-                          • {item?.hora_inicio || "--:--"}
-                        </Text>
-                        <Text
-                          style={{
-                            fontSize: 13,
-                            fontWeight: "800",
-                            color: "#10B981",
-                            marginTop: 4,
-                          }}
-                        >
-                          + {formatCurrency(item?.valor_recebido || 0)}
-                        </Text>
-                      </View>
-                      <View style={{ padding: 8, backgroundColor: "#DCFCE7", borderRadius: 10 }}>
-                        <CheckCircle size={18} color="#10B981" />
-                      </View>
-                    </View>
-                  </View>
-                ))}
-                {(!data?.receiptHistory || data.receiptHistory.length === 0) && (
-                  <Text style={styles.emptyTxt}>Nenhum comprovante enviado ainda.</Text>
-                )}
-              </ScrollView>
-            </BottomSheetView>
-          </BottomSheet>
+                  ))}
+                  {(!data?.receiptHistory || data.receiptHistory.length === 0) && (
+                    <Text style={styles.emptyTxt}>Nenhum comprovante enviado ainda.</Text>
+                  )}
+                </ScrollView>
+              </BottomSheetView>
+            </BottomSheet>
+          )}
 
           {/* ── SHEET: GERENCIAR USUÁRIOS ── */}
-          <BottomSheet
-            ref={usersSheetRef}
-            index={-1}
-            snapPoints={[SCREEN_HEIGHT]}
-            enablePanDownToClose
-            backdropComponent={renderBackdrop}
-            backgroundStyle={{ borderRadius: 32 }}
-          >
-            <View style={styles.sheetContent}>
-              <View style={[styles.sheetHeader, { marginBottom: 18 }]}>
-                <View>
-                  <Text style={styles.sheetTitle}>Gestão de Usuários</Text>
-                  <Text style={styles.sheetSubtitle}>{adminUsers.length} usuários no total</Text>
-                </View>
-                <TouchableOpacity
-                  onPress={() => usersSheetRef.current?.close()}
-                  style={styles.sheetCloseBtn}
-                >
-                  <X size={22} color="#64748B" />
-                </TouchableOpacity>
-              </View>
-
-              {/* Quick Stats: Role Filters */}
-              <View style={[styles.sheetStatsRow, { marginBottom: 15 }]}>
-                <TouchableOpacity
-                  activeOpacity={0.7}
-                  style={[
-                    styles.sheetStatItem,
-                    userRoleFilter === "cliente_pf" && {
-                      backgroundColor: "#F1F5F9",
-                      borderColor: "#64748B",
-                      borderWidth: 2,
-                    },
-                  ]}
-                  onPress={() =>
-                    setUserRoleFilter(userRoleFilter === "cliente_pf" ? "all" : "cliente_pf")
-                  }
-                >
-                  <Text style={[styles.sheetStatValue, { color: "#64748B" }]}>
-                    {adminUsers.length}
-                  </Text>
-                  <Text style={styles.sheetStatLabel}>Todos</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  activeOpacity={0.7}
-                  style={[
-                    styles.sheetStatItem,
-                    userRoleFilter === "cliente_pj" && {
-                      backgroundColor: "#F0FDF4",
-                      borderColor: "#16A34A",
-                      borderWidth: 2,
-                    },
-                  ]}
-                  onPress={() =>
-                    setUserRoleFilter(userRoleFilter === "cliente_pj" ? "all" : "cliente_pj")
-                  }
-                >
-                  <Text style={[styles.sheetStatValue, { color: "#16A34A" }]}>
-                    {countPersonais}
-                  </Text>
-                  <Text style={styles.sheetStatLabel}>Personais</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  activeOpacity={0.7}
-                  style={[
-                    styles.sheetStatItem,
-                    userRoleFilter === "admin" && {
-                      backgroundColor: "#FAF5FF",
-                      borderColor: "#9333EA",
-                      borderWidth: 2,
-                    },
-                  ]}
-                  onPress={() => setUserRoleFilter(userRoleFilter === "admin" ? "all" : "admin")}
-                >
-                  <Text style={[styles.sheetStatValue, { color: "#9333EA" }]}>{countAdmins}</Text>
-                  <Text style={styles.sheetStatLabel}>Admins</Text>
-                </TouchableOpacity>
-              </View>
-
-              {/* Search Bar */}
-              <View style={[styles.searchContainer, { marginTop: 0 }]}>
-                <Search size={18} color="#94A3B8" style={styles.searchIcon} />
-                <TextInput
-                  placeholder="Buscar por nome ou e-mail..."
-                  placeholderTextColor="#94A3B8"
-                  style={styles.searchInput}
-                  value={userSearchQuery}
-                  onChangeText={setUserSearchQuery}
-                />
-                {userSearchQuery !== "" && (
-                  <TouchableOpacity onPress={() => setUserSearchQuery("")}>
-                    <X size={16} color="#94A3B8" />
+          {openSheets["users"] && (
+            <BottomSheet
+              ref={usersSheetRef}
+              onClose={() => setOpenSheets((prev) => ({ ...prev, users: false }))}
+              index={0}
+              snapPoints={[SCREEN_HEIGHT]}
+              enablePanDownToClose
+              backdropComponent={renderBackdrop}
+              backgroundStyle={{ borderRadius: 32 }}
+            >
+              <View style={styles.sheetContent}>
+                <View style={[styles.sheetHeader, { marginBottom: 18 }]}>
+                  <View>
+                    <Text style={styles.sheetTitle}>Gestão de Usuários</Text>
+                    <Text style={styles.sheetSubtitle}>{adminUsers.length} usuários no total</Text>
+                  </View>
+                  <TouchableOpacity
+                    onPress={() => usersSheetRef.current?.close()}
+                    style={styles.sheetCloseBtn}
+                  >
+                    <X size={22} color="#64748B" />
                   </TouchableOpacity>
+                </View>
+
+                {/* Quick Stats: Role Filters */}
+                <View style={[styles.sheetStatsRow, { marginBottom: 15 }]}>
+                  <TouchableOpacity
+                    activeOpacity={0.7}
+                    style={[
+                      styles.sheetStatItem,
+                      userRoleFilter === "cliente_pf" && {
+                        backgroundColor: "#F1F5F9",
+                        borderColor: "#64748B",
+                        borderWidth: 2,
+                      },
+                    ]}
+                    onPress={() =>
+                      setUserRoleFilter(userRoleFilter === "cliente_pf" ? "all" : "cliente_pf")
+                    }
+                  >
+                    <Text style={[styles.sheetStatValue, { color: "#64748B" }]}>
+                      {adminUsers.length}
+                    </Text>
+                    <Text style={styles.sheetStatLabel}>Todos</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    activeOpacity={0.7}
+                    style={[
+                      styles.sheetStatItem,
+                      userRoleFilter === "cliente_pj" && {
+                        backgroundColor: "#F0FDF4",
+                        borderColor: "#16A34A",
+                        borderWidth: 2,
+                      },
+                    ]}
+                    onPress={() =>
+                      setUserRoleFilter(userRoleFilter === "cliente_pj" ? "all" : "cliente_pj")
+                    }
+                  >
+                    <Text style={[styles.sheetStatValue, { color: "#16A34A" }]}>
+                      {countPersonais}
+                    </Text>
+                    <Text style={styles.sheetStatLabel}>Personais</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    activeOpacity={0.7}
+                    style={[
+                      styles.sheetStatItem,
+                      userRoleFilter === "admin" && {
+                        backgroundColor: "#FAF5FF",
+                        borderColor: "#9333EA",
+                        borderWidth: 2,
+                      },
+                    ]}
+                    onPress={() => setUserRoleFilter(userRoleFilter === "admin" ? "all" : "admin")}
+                  >
+                    <Text style={[styles.sheetStatValue, { color: "#9333EA" }]}>{countAdmins}</Text>
+                    <Text style={styles.sheetStatLabel}>Admins</Text>
+                  </TouchableOpacity>
+                </View>
+
+                {/* Search Bar */}
+                <View style={[styles.searchContainer, { marginTop: 0 }]}>
+                  <Search size={18} color="#94A3B8" style={styles.searchIcon} />
+                  <TextInput
+                    placeholder="Buscar por nome ou e-mail..."
+                    placeholderTextColor="#94A3B8"
+                    style={styles.searchInput}
+                    value={userSearchQuery}
+                    onChangeText={setUserSearchQuery}
+                  />
+                  {userSearchQuery !== "" && (
+                    <TouchableOpacity onPress={() => setUserSearchQuery("")}>
+                      <X size={16} color="#94A3B8" />
+                    </TouchableOpacity>
+                  )}
+                </View>
+
+                {loadingSheet ? (
+                  <View style={{ marginTop: 40, alignItems: "center" }}>
+                    <ActivityIndicator color="#10B981" size="large" />
+                    <Text style={{ marginTop: 12, color: "#94A3B8", fontWeight: "600" }}>
+                      Carregando usuários...
+                    </Text>
+                  </View>
+                ) : (
+                  <BottomSheetFlatList
+                    data={filteredAdminUsers}
+                    keyExtractor={(item: any) => String(item?.id_us || Math.random())}
+                    showsVerticalScrollIndicator={false}
+                    style={{ flex: 1, marginTop: 15 }}
+                    contentContainerStyle={{ paddingBottom: insets.bottom + 150 }}
+                    ListEmptyComponent={() => (
+                      <View style={styles.proEmptyState}>
+                        <Users size={40} color="#E2E8F0" />
+                        <Text style={styles.emptyTxt}>Nenhum usuário encontrado.</Text>
+                      </View>
+                    )}
+                    renderItem={({ item }: { item: any }) => {
+                      if (!item) return null;
+                      const r = String(
+                        item?.role || item?.tipo || item?.role_name || ""
+                      ).toLowerCase();
+                      const isAdmin = r.includes("admin") || Number(item?.id_us) === 15;
+                      const isPJ =
+                        r.includes("personal") ||
+                        r.includes("trainer") ||
+                        r.includes("pj") ||
+                        (item?.cref && String(item?.cref || "").trim().length > 1) ||
+                        [16, 19, 20, 21, 22].includes(Number(item?.id_us));
+
+                      return (
+                        <TouchableOpacity
+                          activeOpacity={0.8}
+                          onPress={() => openUserDetail(item)}
+                          onLongPress={() => {
+                            const isMasterAdmin = item?.email === "comercial.movtapp@gmail.com";
+                            const isCurrentUser = item?.id_us === Number(user?.id_us);
+
+                            if (isMasterAdmin) {
+                              Alert.alert(
+                                "🛡️ Admin Master",
+                                "Este usuário possui acesso vitalício e não pode ser alterado."
+                              );
+                              return;
+                            }
+
+                            if (isCurrentUser) return;
+
+                            Alert.alert(
+                              "Gestão de Privilégios",
+                              `Gerenciar acesso de ${item?.nome}:`,
+                              [
+                                { text: "Cancelar", style: "cancel" },
+                                isAdmin
+                                  ? {
+                                      text: "Retirar Admin",
+                                      style: "destructive",
+                                      onPress: () => {
+                                        Alert.alert(
+                                          "⚠️ Revogar Acesso",
+                                          `Retirar os poderes de Administrador de ${item?.nome}?`,
+                                          [
+                                            { text: "Cancelar", style: "cancel" },
+                                            {
+                                              text: "Sim, Revogar",
+                                              style: "destructive",
+                                              onPress: () =>
+                                                changeUserRole(item?.id_us, "client_pf"),
+                                            },
+                                          ]
+                                        );
+                                      },
+                                    }
+                                  : {
+                                      text: "Promover a Admin",
+                                      style: "destructive",
+                                      onPress: () => changeUserRole(item?.id_us, "admin"),
+                                    },
+                              ]
+                            );
+                          }}
+                          style={styles.proUserCard}
+                        >
+                          <View style={styles.proUserMain}>
+                            <View style={styles.proAvatarContainer}>
+                              <Image
+                                source={{
+                                  uri:
+                                    item?.foto_url ||
+                                    "https://images.unsplash.com/photo-1633332755192-727a05c4013d?w=100&h=100&fit=crop",
+                                }}
+                                style={styles.proAvatar}
+                              />
+                            </View>
+
+                            <View style={{ flex: 1, marginLeft: 16 }}>
+                              <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                                <Text style={[styles.proName, { flexShrink: 1 }]} numberOfLines={1}>
+                                  {item?.nome}
+                                </Text>
+                                {(isAdmin || isPJ) && (
+                                  <View
+                                    style={[
+                                      styles.proBadge,
+                                      {
+                                        backgroundColor: isAdmin ? "#FAF5FF" : "#F0FDF4",
+                                        borderColor: isAdmin ? "#E9D5FF" : "#DCFCE7",
+                                        borderWidth: 1,
+                                        paddingHorizontal: 8,
+                                      },
+                                    ]}
+                                  >
+                                    <Text
+                                      style={[
+                                        styles.proBadgeText,
+                                        {
+                                          color: isAdmin ? "#9333EA" : "#16A34A",
+                                          fontSize: 10,
+                                          fontWeight: "800",
+                                        },
+                                      ]}
+                                    >
+                                      {isAdmin ? "ADMIN" : "PRO"}
+                                    </Text>
+                                  </View>
+                                )}
+                                <View
+                                  style={[
+                                    styles.proBadge,
+                                    {
+                                      backgroundColor: item?.ativo ? "#DCFCE7" : "#FEE2E2",
+                                      marginTop: 0,
+                                    },
+                                  ]}
+                                >
+                                  <View
+                                    style={[
+                                      styles.dot,
+                                      { backgroundColor: item?.ativo ? "#10B981" : "#EF4444" },
+                                    ]}
+                                  />
+                                  <Text
+                                    style={[
+                                      styles.proBadgeText,
+                                      { color: item?.ativo ? "#106534" : "#991B1B" },
+                                    ]}
+                                  >
+                                    {item?.ativo ? "Ativo" : "Bloq."}
+                                  </Text>
+                                </View>
+                              </View>
+                              <Text style={[styles.proEmail, { marginTop: 4 }]}>{item?.email}</Text>
+                            </View>
+
+                            {item?.id_us !== Number(user?.id_us) && (
+                              <TouchableOpacity
+                                style={styles.proActionBtn}
+                                onPress={() => toggleUserStatus(item?.id_us)}
+                              >
+                                {item?.ativo ? (
+                                  <Shield size={20} color="#EF4444" />
+                                ) : (
+                                  <CheckCircle size={20} color="#10B981" />
+                                )}
+                              </TouchableOpacity>
+                            )}
+                          </View>
+                        </TouchableOpacity>
+                      );
+                    }}
+                  />
                 )}
               </View>
+            </BottomSheet>
+          )}
 
-              {loadingSheet ? (
-                <View style={{ marginTop: 40, alignItems: "center" }}>
-                  <ActivityIndicator color="#10B981" size="large" />
-                  <Text style={{ marginTop: 12, color: "#94A3B8", fontWeight: "600" }}>
-                    Carregando usuários...
-                  </Text>
+          {/* ── SHEET: PLANOS ATIVOS ── */}
+          {openSheets["activePlans"] && (
+            <BottomSheet
+              ref={activePlansSheetRef}
+              onClose={() => setOpenSheets((prev) => ({ ...prev, activePlans: false }))}
+              index={0}
+              snapPoints={[SCREEN_HEIGHT]}
+              enablePanDownToClose
+              backdropComponent={renderBackdrop}
+              backgroundStyle={{ borderRadius: 32 }}
+            >
+              <View style={styles.sheetContent}>
+                <View style={styles.sheetHeader}>
+                  <View>
+                    <Text style={styles.sheetTitle}>Planos Ativos</Text>
+                    <Text style={styles.sheetSubtitle}>Distribuição da base de usuários</Text>
+                  </View>
+                  <TouchableOpacity
+                    onPress={() => activePlansSheetRef.current?.close()}
+                    style={styles.sheetCloseBtn}
+                  >
+                    <X size={22} color="#64748B" />
+                  </TouchableOpacity>
                 </View>
-              ) : (
-                <BottomSheetFlatList
-                  data={filteredAdminUsers}
-                  keyExtractor={(item: any) => String(item?.id_us || Math.random())}
-                  showsVerticalScrollIndicator={false}
-                  style={{ flex: 1, marginTop: 15 }}
-                  contentContainerStyle={{ paddingBottom: insets.bottom + 150 }}
-                  ListEmptyComponent={() => (
-                    <View style={styles.proEmptyState}>
-                      <Users size={40} color="#E2E8F0" />
-                      <Text style={styles.emptyTxt}>Nenhum usuário encontrado.</Text>
-                    </View>
-                  )}
-                  renderItem={({ item }: { item: any }) => {
-                    if (!item) return null;
-                    const r = String(
-                      item?.role || item?.tipo || item?.role_name || ""
-                    ).toLowerCase();
-                    const isAdmin = r.includes("admin") || Number(item?.id_us) === 15;
-                    const isPJ =
-                      r.includes("personal") ||
-                      r.includes("trainer") ||
-                      r.includes("pj") ||
-                      (item?.cref && String(item?.cref || "").trim().length > 1) ||
-                      [16, 19, 20, 21, 22].includes(Number(item?.id_us));
 
-                    return (
+                {/* Quick Stats: Plan Filters */}
+                <View style={styles.sheetStatsRow}>
+                  <TouchableOpacity
+                    activeOpacity={0.7}
+                    style={[
+                      styles.sheetStatItem,
+                      activePlanFilter === "FREE" && {
+                        backgroundColor: "#F1F5F9",
+                        borderColor: "#64748B",
+                        borderWidth: 2,
+                      },
+                    ]}
+                    onPress={() =>
+                      setActivePlanFilter(activePlanFilter === "FREE" ? "all" : "FREE")
+                    }
+                  >
+                    <Text style={[styles.sheetStatValue, { color: "#64748B" }]}>
+                      {countFreePlan}
+                    </Text>
+                    <Text style={styles.sheetStatLabel}>Free</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    activeOpacity={0.7}
+                    style={[
+                      styles.sheetStatItem,
+                      activePlanFilter === "premium" && {
+                        backgroundColor: "#EEF2FF",
+                        borderColor: "#6366F1",
+                        borderWidth: 2,
+                      },
+                    ]}
+                    onPress={() =>
+                      setActivePlanFilter(activePlanFilter === "premium" ? "all" : "premium")
+                    }
+                  >
+                    <Text style={[styles.sheetStatValue, { color: "#6366F1" }]}>
+                      {countPremiumPlan}
+                    </Text>
+                    <Text style={styles.sheetStatLabel}>Premium</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    activeOpacity={0.7}
+                    style={[
+                      styles.sheetStatItem,
+                      activePlanFilter === "familia" && {
+                        backgroundColor: "#ECFEFF",
+                        borderColor: "#06B6D4",
+                        borderWidth: 2,
+                      },
+                    ]}
+                    onPress={() =>
+                      setActivePlanFilter(activePlanFilter === "familia" ? "all" : "familia")
+                    }
+                  >
+                    <Text style={[styles.sheetStatValue, { color: "#06B6D4" }]}>
+                      {countFamilyPlan}
+                    </Text>
+                    <Text style={styles.sheetStatLabel}>Família</Text>
+                  </TouchableOpacity>
+                </View>
+
+                {/* Search Bar */}
+                <View style={styles.searchContainer}>
+                  <Search size={18} color="#94A3B8" style={styles.searchIcon} />
+                  <TextInput
+                    placeholder="Buscar por nome ou e-mail..."
+                    placeholderTextColor="#94A3B8"
+                    style={styles.searchInput}
+                    value={activePlanSearchQuery}
+                    onChangeText={setActivePlanSearchQuery}
+                  />
+                  {activePlanSearchQuery !== "" && (
+                    <TouchableOpacity onPress={() => setActivePlanSearchQuery("")}>
+                      <X size={16} color="#94A3B8" />
+                    </TouchableOpacity>
+                  )}
+                </View>
+
+                {loadingSheet ? (
+                  <View style={{ marginTop: 40, alignItems: "center" }}>
+                    <ActivityIndicator color="#10B981" size="large" />
+                    <Text style={{ marginTop: 12, color: "#94A3B8", fontWeight: "600" }}>
+                      Carregando dados...
+                    </Text>
+                  </View>
+                ) : (
+                  <BottomSheetFlatList
+                    data={filteredActivePlansUsers}
+                    keyExtractor={(item: any) => String(item?.id_us || Math.random())}
+                    showsVerticalScrollIndicator={false}
+                    style={{ flex: 1, marginTop: 15 }}
+                    contentContainerStyle={{ paddingBottom: insets.bottom + 150 }}
+                    ListEmptyComponent={() => (
+                      <View style={styles.proEmptyState}>
+                        <Users size={40} color="#E2E8F0" />
+                        <Text style={styles.emptyTxt}>
+                          Nenhum usuário correspondente aos filtros.
+                        </Text>
+                      </View>
+                    )}
+                    renderItem={({ item }: { item: any }) => (
                       <TouchableOpacity
+                        style={styles.proUserCard}
                         activeOpacity={0.8}
                         onPress={() => openUserDetail(item)}
-                        onLongPress={() => {
-                          const isMasterAdmin = item?.email === "comercial.movtapp@gmail.com";
-                          const isCurrentUser = item?.id_us === Number(user?.id_us);
-
-                          if (isMasterAdmin) {
-                            Alert.alert(
-                              "🛡️ Admin Master",
-                              "Este usuário possui acesso vitalício e não pode ser alterado."
-                            );
-                            return;
-                          }
-
-                          if (isCurrentUser) return;
-
-                          Alert.alert(
-                            "Gestão de Privilégios",
-                            `Gerenciar acesso de ${item?.nome}:`,
-                            [
-                              { text: "Cancelar", style: "cancel" },
-                              isAdmin
-                                ? {
-                                    text: "Retirar Admin",
-                                    style: "destructive",
-                                    onPress: () => {
-                                      Alert.alert(
-                                        "⚠️ Revogar Acesso",
-                                        `Retirar os poderes de Administrador de ${item?.nome}?`,
-                                        [
-                                          { text: "Cancelar", style: "cancel" },
-                                          {
-                                            text: "Sim, Revogar",
-                                            style: "destructive",
-                                            onPress: () => changeUserRole(item?.id_us, "client_pf"),
-                                          },
-                                        ]
-                                      );
-                                    },
-                                  }
-                                : {
-                                    text: "Promover a Admin",
-                                    style: "destructive",
-                                    onPress: () => changeUserRole(item?.id_us, "admin"),
-                                  },
-                            ]
-                          );
-                        }}
-                        style={styles.proUserCard}
                       >
                         <View style={styles.proUserMain}>
                           <View style={styles.proAvatarContainer}>
@@ -2720,443 +3000,31 @@ const AdminDashboardScreen: React.FC = () => {
                               <Text style={[styles.proName, { flexShrink: 1 }]} numberOfLines={1}>
                                 {item?.nome}
                               </Text>
-                              {(isAdmin || isPJ) && (
-                                <View
-                                  style={[
-                                    styles.proBadge,
-                                    {
-                                      backgroundColor: isAdmin ? "#FAF5FF" : "#F0FDF4",
-                                      borderColor: isAdmin ? "#E9D5FF" : "#DCFCE7",
-                                      borderWidth: 1,
-                                      paddingHorizontal: 8,
-                                    },
-                                  ]}
-                                >
-                                  <Text
-                                    style={[
-                                      styles.proBadgeText,
-                                      {
-                                        color: isAdmin ? "#9333EA" : "#16A34A",
-                                        fontSize: 10,
-                                        fontWeight: "800",
-                                      },
-                                    ]}
-                                  >
-                                    {isAdmin ? "ADMIN" : "PRO"}
-                                  </Text>
-                                </View>
-                              )}
+                            </View>
+                            <Text style={[styles.proEmail, { marginTop: 4 }]}>{item?.email}</Text>
+
+                            <View style={[styles.proBadgeRow, { marginTop: 8 }]}>
                               <View
                                 style={[
                                   styles.proBadge,
                                   {
-                                    backgroundColor: item?.ativo ? "#DCFCE7" : "#FEE2E2",
-                                    marginTop: 0,
+                                    backgroundColor:
+                                      item?.plan && item?.plan !== "FREE" ? "#EEF2FF" : "#F1F5F9",
                                   },
                                 ]}
                               >
-                                <View
-                                  style={[
-                                    styles.dot,
-                                    { backgroundColor: item?.ativo ? "#10B981" : "#EF4444" },
-                                  ]}
-                                />
                                 <Text
                                   style={[
                                     styles.proBadgeText,
-                                    { color: item?.ativo ? "#106534" : "#991B1B" },
+                                    {
+                                      color:
+                                        item?.plan && item?.plan !== "FREE" ? "#6366F1" : "#64748B",
+                                    },
                                   ]}
                                 >
-                                  {item?.ativo ? "Ativo" : "Bloq."}
+                                  {item?.plan || "FREE"}
                                 </Text>
                               </View>
-                            </View>
-                            <Text style={[styles.proEmail, { marginTop: 4 }]}>{item?.email}</Text>
-                          </View>
-
-                          {item?.id_us !== Number(user?.id_us) && (
-                            <TouchableOpacity
-                              style={styles.proActionBtn}
-                              onPress={() => toggleUserStatus(item?.id_us)}
-                            >
-                              {item?.ativo ? (
-                                <Shield size={20} color="#EF4444" />
-                              ) : (
-                                <CheckCircle size={20} color="#10B981" />
-                              )}
-                            </TouchableOpacity>
-                          )}
-                        </View>
-                      </TouchableOpacity>
-                    );
-                  }}
-                />
-              )}
-            </View>
-          </BottomSheet>
-
-          {/* ── SHEET: PLANOS ATIVOS ── */}
-          <BottomSheet
-            ref={activePlansSheetRef}
-            index={-1}
-            snapPoints={[SCREEN_HEIGHT]}
-            enablePanDownToClose
-            backdropComponent={renderBackdrop}
-            backgroundStyle={{ borderRadius: 32 }}
-          >
-            <View style={styles.sheetContent}>
-              <View style={styles.sheetHeader}>
-                <View>
-                  <Text style={styles.sheetTitle}>Planos Ativos</Text>
-                  <Text style={styles.sheetSubtitle}>Distribuição da base de usuários</Text>
-                </View>
-                <TouchableOpacity
-                  onPress={() => activePlansSheetRef.current?.close()}
-                  style={styles.sheetCloseBtn}
-                >
-                  <X size={22} color="#64748B" />
-                </TouchableOpacity>
-              </View>
-
-              {/* Quick Stats: Plan Filters */}
-              <View style={styles.sheetStatsRow}>
-                <TouchableOpacity
-                  activeOpacity={0.7}
-                  style={[
-                    styles.sheetStatItem,
-                    activePlanFilter === "FREE" && {
-                      backgroundColor: "#F1F5F9",
-                      borderColor: "#64748B",
-                      borderWidth: 2,
-                    },
-                  ]}
-                  onPress={() => setActivePlanFilter(activePlanFilter === "FREE" ? "all" : "FREE")}
-                >
-                  <Text style={[styles.sheetStatValue, { color: "#64748B" }]}>{countFreePlan}</Text>
-                  <Text style={styles.sheetStatLabel}>Free</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  activeOpacity={0.7}
-                  style={[
-                    styles.sheetStatItem,
-                    activePlanFilter === "premium" && {
-                      backgroundColor: "#EEF2FF",
-                      borderColor: "#6366F1",
-                      borderWidth: 2,
-                    },
-                  ]}
-                  onPress={() =>
-                    setActivePlanFilter(activePlanFilter === "premium" ? "all" : "premium")
-                  }
-                >
-                  <Text style={[styles.sheetStatValue, { color: "#6366F1" }]}>
-                    {countPremiumPlan}
-                  </Text>
-                  <Text style={styles.sheetStatLabel}>Premium</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  activeOpacity={0.7}
-                  style={[
-                    styles.sheetStatItem,
-                    activePlanFilter === "familia" && {
-                      backgroundColor: "#ECFEFF",
-                      borderColor: "#06B6D4",
-                      borderWidth: 2,
-                    },
-                  ]}
-                  onPress={() =>
-                    setActivePlanFilter(activePlanFilter === "familia" ? "all" : "familia")
-                  }
-                >
-                  <Text style={[styles.sheetStatValue, { color: "#06B6D4" }]}>
-                    {countFamilyPlan}
-                  </Text>
-                  <Text style={styles.sheetStatLabel}>Família</Text>
-                </TouchableOpacity>
-              </View>
-
-              {/* Search Bar */}
-              <View style={styles.searchContainer}>
-                <Search size={18} color="#94A3B8" style={styles.searchIcon} />
-                <TextInput
-                  placeholder="Buscar por nome ou e-mail..."
-                  placeholderTextColor="#94A3B8"
-                  style={styles.searchInput}
-                  value={activePlanSearchQuery}
-                  onChangeText={setActivePlanSearchQuery}
-                />
-                {activePlanSearchQuery !== "" && (
-                  <TouchableOpacity onPress={() => setActivePlanSearchQuery("")}>
-                    <X size={16} color="#94A3B8" />
-                  </TouchableOpacity>
-                )}
-              </View>
-
-              {loadingSheet ? (
-                <View style={{ marginTop: 40, alignItems: "center" }}>
-                  <ActivityIndicator color="#10B981" size="large" />
-                  <Text style={{ marginTop: 12, color: "#94A3B8", fontWeight: "600" }}>
-                    Carregando dados...
-                  </Text>
-                </View>
-              ) : (
-                <BottomSheetFlatList
-                  data={filteredActivePlansUsers}
-                  keyExtractor={(item: any) => String(item?.id_us || Math.random())}
-                  showsVerticalScrollIndicator={false}
-                  style={{ flex: 1, marginTop: 15 }}
-                  contentContainerStyle={{ paddingBottom: insets.bottom + 150 }}
-                  ListEmptyComponent={() => (
-                    <View style={styles.proEmptyState}>
-                      <Users size={40} color="#E2E8F0" />
-                      <Text style={styles.emptyTxt}>
-                        Nenhum usuário correspondente aos filtros.
-                      </Text>
-                    </View>
-                  )}
-                  renderItem={({ item }: { item: any }) => (
-                    <TouchableOpacity
-                      style={styles.proUserCard}
-                      activeOpacity={0.8}
-                      onPress={() => openUserDetail(item)}
-                    >
-                      <View style={styles.proUserMain}>
-                        <View style={styles.proAvatarContainer}>
-                          <Image
-                            source={{
-                              uri:
-                                item?.foto_url ||
-                                "https://images.unsplash.com/photo-1633332755192-727a05c4013d?w=100&h=100&fit=crop",
-                            }}
-                            style={styles.proAvatar}
-                          />
-                        </View>
-
-                        <View style={{ flex: 1, marginLeft: 16 }}>
-                          <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-                            <Text style={[styles.proName, { flexShrink: 1 }]} numberOfLines={1}>
-                              {item?.nome}
-                            </Text>
-                          </View>
-                          <Text style={[styles.proEmail, { marginTop: 4 }]}>{item?.email}</Text>
-
-                          <View style={[styles.proBadgeRow, { marginTop: 8 }]}>
-                            <View
-                              style={[
-                                styles.proBadge,
-                                {
-                                  backgroundColor:
-                                    item?.plan && item?.plan !== "FREE" ? "#EEF2FF" : "#F1F5F9",
-                                },
-                              ]}
-                            >
-                              <Text
-                                style={[
-                                  styles.proBadgeText,
-                                  {
-                                    color:
-                                      item?.plan && item?.plan !== "FREE" ? "#6366F1" : "#64748B",
-                                  },
-                                ]}
-                              >
-                                {item?.plan || "FREE"}
-                              </Text>
-                            </View>
-                            <View
-                              style={[
-                                styles.proBadge,
-                                { backgroundColor: item?.ativo ? "#DCFCE7" : "#FEE2E2" },
-                              ]}
-                            >
-                              <View
-                                style={[
-                                  styles.dot,
-                                  { backgroundColor: item?.ativo ? "#10B981" : "#EF4444" },
-                                ]}
-                              />
-                              <Text
-                                style={[
-                                  styles.proBadgeText,
-                                  { color: item?.ativo ? "#106534" : "#991B1B" },
-                                ]}
-                              >
-                                {item?.ativo ? "Ativo" : "Bloqueado"}
-                              </Text>
-                            </View>
-                          </View>
-                        </View>
-
-                        <View style={{ justifyContent: "center", paddingLeft: 10 }}>
-                          <ChevronRight size={20} color="#CBD5E1" />
-                        </View>
-                      </View>
-                    </TouchableOpacity>
-                  )}
-                />
-              )}
-            </View>
-          </BottomSheet>
-
-          {/* ── SHEET: ACADEMIAS ── */}
-          <BottomSheet
-            ref={gymsSheetRef}
-            index={-1}
-            snapPoints={[SCREEN_HEIGHT]}
-            enablePanDownToClose
-            backdropComponent={renderBackdrop}
-            backgroundStyle={{ borderRadius: 32 }}
-          >
-            <View style={styles.sheetContent}>
-              <View style={[styles.sheetHeader, { marginBottom: 18 }]}>
-                <View>
-                  <Text style={styles.sheetTitle}>Rede de Academias</Text>
-                  <Text style={styles.sheetSubtitle}>{adminGyms.length} unidades cadastradas</Text>
-                </View>
-                <View style={{ flexDirection: "row", gap: 12 }}>
-                  <TouchableOpacity
-                    style={[styles.sheetCloseBtn, { backgroundColor: "#BBF246" }]}
-                    onPress={() => {
-                      setGoogleSearchQuery("");
-                      setGoogleResults([]);
-                      setGymForm({});
-                      createGymSheetRef.current?.expand();
-                    }}
-                  >
-                    <Plus size={20} color="#192126" />
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    onPress={() => gymsSheetRef.current?.close()}
-                    style={styles.sheetCloseBtn}
-                  >
-                    <X size={22} color="#64748B" />
-                  </TouchableOpacity>
-                </View>
-              </View>
-
-              {/* Quick Stats: Network Insights */}
-              <View style={[styles.sheetStatsRow, { marginBottom: 15 }]}>
-                <TouchableOpacity
-                  activeOpacity={0.7}
-                  style={[
-                    styles.sheetStatItem,
-                    gymListStatusFilter === "all" && {
-                      backgroundColor: "#F1F5F9",
-                      borderColor: "#64748B",
-                      borderWidth: 2,
-                    },
-                  ]}
-                  onPress={() => setGymListStatusFilter("all")}
-                >
-                  <Text style={[styles.sheetStatValue, { color: "#64748B" }]}>
-                    {adminGyms.length}
-                  </Text>
-                  <Text style={styles.sheetStatLabel}>Todas</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  activeOpacity={0.7}
-                  style={[
-                    styles.sheetStatItem,
-                    gymListStatusFilter === "active" && {
-                      backgroundColor: "#F0FDF4",
-                      borderColor: "#16A34A",
-                      borderWidth: 2,
-                    },
-                  ]}
-                  onPress={() => setGymListStatusFilter("active")}
-                >
-                  <Text style={[styles.sheetStatValue, { color: "#16A34A" }]}>
-                    {(Array.isArray(adminGyms) ? adminGyms : []).filter((g) => g?.ativo).length}
-                  </Text>
-                  <Text style={styles.sheetStatLabel}>Ativas</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  activeOpacity={0.7}
-                  style={[
-                    styles.sheetStatItem,
-                    gymListStatusFilter === "blocked" && {
-                      backgroundColor: "#FEF2F2",
-                      borderColor: "#DC2626",
-                      borderWidth: 2,
-                    },
-                  ]}
-                  onPress={() => setGymListStatusFilter("blocked")}
-                >
-                  <Text style={[styles.sheetStatValue, { color: "#DC2626" }]}>
-                    {
-                      (Array.isArray(adminGyms) ? adminGyms : []).filter((g) => g && !g?.ativo)
-                        .length
-                    }
-                  </Text>
-                  <Text style={styles.sheetStatLabel}>Bloqueadas</Text>
-                </TouchableOpacity>
-              </View>
-
-              {/* Search Bar */}
-              <View style={[styles.searchContainer, { marginBottom: 10 }]}>
-                <Search size={18} color="#94A3B8" style={styles.searchIcon} />
-                <TextInput
-                  placeholder="Buscar unidade por nome ou cidade..."
-                  placeholderTextColor="#94A3B8"
-                  style={styles.searchInput}
-                  value={gymListSearchQuery}
-                  onChangeText={setGymListSearchQuery}
-                />
-                {gymListSearchQuery.length > 0 && (
-                  <TouchableOpacity
-                    onPress={() => setGymListSearchQuery("")}
-                    style={{ marginRight: 15 }}
-                  >
-                    <XCircle size={18} color="#94A3B8" />
-                  </TouchableOpacity>
-                )}
-              </View>
-
-              {loadingSheet ? (
-                <ActivityIndicator color="#BBF246" style={{ marginTop: 40 }} />
-              ) : (
-                <BottomSheetFlatList
-                  data={filteredAdminGyms}
-                  keyExtractor={(item: any) => String(item?.id_academia || Math.random())}
-                  showsVerticalScrollIndicator={false}
-                  style={{ flex: 1, marginTop: 5 }}
-                  contentContainerStyle={{ paddingBottom: insets.bottom + 150 }}
-                  ListEmptyComponent={() => (
-                    <View style={styles.proEmptyState}>
-                      <Building2 size={40} color="#E2E8F0" />
-                      <Text style={styles.emptyTxt}>Nenhuma academia encontrada.</Text>
-                    </View>
-                  )}
-                  renderItem={({ item }: { item: any }) => {
-                    if (!item) return null;
-                    return (
-                      <TouchableOpacity
-                        style={styles.proUserCard}
-                        activeOpacity={0.8}
-                        onPress={() => openGymDetails(item)}
-                        onLongPress={() =>
-                          toggleGymStatus(item?.id_academia, item?.nome, item?.ativo)
-                        }
-                      >
-                        <View style={styles.proUserMain}>
-                          <View style={[styles.proAvatarContainer, { backgroundColor: "#F8FAFC" }]}>
-                            <Building2 size={24} color="#64748B" />
-                          </View>
-
-                          <View style={{ flex: 1, marginLeft: 16 }}>
-                            <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-                              <Text style={[styles.proName, { flexShrink: 1 }]} numberOfLines={1}>
-                                {item?.nome}
-                              </Text>
-                            </View>
-                            <Text style={styles.proEmail} numberOfLines={1}>
-                              {item?.endereco_completo || item?.endereco}
-                            </Text>
-
-                            <View style={[styles.proBadgeRow, { marginTop: 8 }]}>
                               <View
                                 style={[
                                   styles.proBadge,
@@ -3175,13 +3043,7 @@ const AdminDashboardScreen: React.FC = () => {
                                     { color: item?.ativo ? "#106534" : "#991B1B" },
                                   ]}
                                 >
-                                  {item?.ativo ? "Ativa" : "Bloqueada"}
-                                </Text>
-                              </View>
-                              <View style={[styles.proBadge, { backgroundColor: "#EEF2FF" }]}>
-                                <Users size={12} color="#6366F1" style={{ marginRight: 4 }} />
-                                <Text style={[styles.proBadgeText, { color: "#6366F1" }]}>
-                                  {item?.trainers_count || 0} Trainers
+                                  {item?.ativo ? "Ativo" : "Bloqueado"}
                                 </Text>
                               </View>
                             </View>
@@ -3192,336 +3054,665 @@ const AdminDashboardScreen: React.FC = () => {
                           </View>
                         </View>
                       </TouchableOpacity>
-                    );
-                  }}
-                />
-              )}
-            </View>
-          </BottomSheet>
-
-          {/* ── SHEET: CRIAR ACADEMIA (GOOGLE) ── */}
-          <BottomSheet
-            ref={createGymSheetRef}
-            index={-1}
-            snapPoints={[SCREEN_HEIGHT * 0.9]}
-            enablePanDownToClose
-            backdropComponent={renderBackdrop}
-            backgroundStyle={{ borderRadius: 32 }}
-          >
-            <BottomSheetView style={styles.sheetContent}>
-              <View style={styles.sheetHeader}>
-                <Text style={styles.sheetTitle}>Nova Academia</Text>
-                <TouchableOpacity onPress={() => createGymSheetRef.current?.close()}>
-                  <X size={24} color="#64748B" />
-                </TouchableOpacity>
-              </View>
-
-              <View style={styles.searchContainer}>
-                <MapPin size={18} color="#94A3B8" style={styles.searchIcon} />
-                <TextInput
-                  placeholder="Pesquisar no Google Maps..."
-                  placeholderTextColor="#94A3B8"
-                  style={styles.searchInput}
-                  value={googleSearchQuery}
-                  onChangeText={searchGoogleGyms}
-                />
-                {isSearchingGoogle && (
-                  <ActivityIndicator color="#10B981" style={{ marginRight: 15 }} />
+                    )}
+                  />
                 )}
               </View>
+            </BottomSheet>
+          )}
 
-              <ScrollView style={{ marginTop: 15 }}>
-                {gymForm.nome ? (
-                  <View style={styles.googleDetailCard}>
-                    <View style={styles.googleHeader}>
-                      <Map size={40} color="#10B981" />
-                      <View style={{ flex: 1, marginLeft: 15 }}>
-                        <Text style={styles.googleGymName}>{gymForm.nome}</Text>
-                        <Text style={styles.googleGymAddr}>{gymForm.endereco_completo}</Text>
-                      </View>
-                    </View>
-
-                    <View style={styles.googleStatsRow}>
-                      <View style={styles.googleStat}>
-                        <Star size={16} color="#F59E0B" fill="#F59E0B" />
-                        <Text style={styles.googleStatTxt}>
-                          {gymForm.rating} ({gymForm.user_ratings_total})
-                        </Text>
-                      </View>
-                      {gymForm.telefone && (
-                        <View style={styles.googleStat}>
-                          <PhoneCall size={16} color="#64748B" />
-                          <Text style={styles.googleStatTxt}>{gymForm.telefone}</Text>
-                        </View>
-                      )}
-                    </View>
-
-                    <TouchableOpacity
-                      style={styles.confirmSaveBtn}
-                      onPress={saveNewGym}
-                      disabled={loadingSheet}
-                    >
-                      {loadingSheet ? (
-                        <ActivityIndicator color="#fff" />
-                      ) : (
-                        <Text style={styles.confirmSaveBtnText}>Confirmar e Cadastrar</Text>
-                      )}
-                    </TouchableOpacity>
-                    <TouchableOpacity style={styles.cancelBtn} onPress={() => setGymForm({})}>
-                      <Text style={styles.cancelBtnText}>Mudar Academia</Text>
-                    </TouchableOpacity>
-                  </View>
-                ) : (
-                  googleResults.map((place) => (
-                    <TouchableOpacity
-                      key={place.place_id}
-                      style={styles.googleResultItem}
-                      onPress={() => selectGoogleGym(place.place_id)}
-                    >
-                      <MapPin size={20} color="#94A3B8" />
-                      <View style={{ flex: 1, marginLeft: 12 }}>
-                        <Text style={styles.googleResultTitle}>
-                          {place.structured_formatting?.main_text}
-                        </Text>
-                        <Text style={styles.googleResultSubtitle}>
-                          {place.structured_formatting?.secondary_text}
-                        </Text>
-                      </View>
-                      <ArrowRight size={18} color="#E2E8F0" />
-                    </TouchableOpacity>
-                  ))
-                )}
-              </ScrollView>
-            </BottomSheetView>
-          </BottomSheet>
-
-          {/* ── SHEET: DETALHES DA ACADEMIA ── */}
-          <BottomSheet
-            ref={gymDetailSheetRef}
-            index={-1}
-            snapPoints={[SCREEN_HEIGHT * 0.9]}
-            enablePanDownToClose
-            backdropComponent={renderBackdrop}
-            backgroundStyle={{ borderRadius: 32 }}
-          >
-            <BottomSheetView style={styles.sheetContent}>
-              <View style={styles.sheetHeader}>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.sheetTitle}>{selectedGym?.nome}</Text>
-                  <View
-                    style={{ flexDirection: "row", alignItems: "center", gap: 6, marginTop: 4 }}
-                  >
-                    <View
-                      style={[
-                        styles.proBadge,
-                        {
-                          backgroundColor: selectedGym?.ativo ? "#DCFCE7" : "#FEE2E2",
-                          paddingVertical: 2,
-                        },
-                      ]}
-                    >
-                      <View
-                        style={[
-                          styles.dot,
-                          { backgroundColor: selectedGym?.ativo ? "#10B981" : "#EF4444" },
-                        ]}
-                      />
-                      <Text
-                        style={[
-                          styles.proBadgeText,
-                          { color: selectedGym?.ativo ? "#106534" : "#991B1B", fontSize: 9 },
-                        ]}
-                      >
-                        {selectedGym?.ativo ? "OPERACIONAL" : "SUSPENSA"}
-                      </Text>
-                    </View>
-                    {selectedGym?.rating > 0 && (
-                      <View style={{ flexDirection: "row", alignItems: "center", gap: 2 }}>
-                        <Star size={12} color="#F59E0B" fill="#F59E0B" />
-                        <Text style={{ fontSize: 12, fontWeight: "700", color: "#B45309" }}>
-                          {selectedGym?.rating}
-                        </Text>
-                      </View>
-                    )}
-                  </View>
-                </View>
-                <TouchableOpacity
-                  onPress={() => gymDetailSheetRef.current?.close()}
-                  style={styles.sheetCloseBtn}
-                >
-                  <X size={22} color="#64748B" />
-                </TouchableOpacity>
-              </View>
-
-              <ScrollView showsVerticalScrollIndicator={false} style={{ flex: 1, marginTop: 20 }}>
-                {/* Contact & Info Section */}
-                <View
-                  style={{
-                    backgroundColor: "#F8FAFC",
-                    padding: 20,
-                    borderRadius: 24,
-                    marginBottom: 25,
-                  }}
-                >
-                  <Text
-                    style={{
-                      fontSize: 13,
-                      fontWeight: "800",
-                      color: "#64748B",
-                      marginBottom: 15,
-                      textTransform: "uppercase",
-                      letterSpacing: 0.5,
-                    }}
-                  >
-                    Info & Contato
-                  </Text>
-
-                  <View style={{ gap: 16 }}>
-                    <View style={{ flexDirection: "row", alignItems: "flex-start", gap: 12 }}>
-                      <View
-                        style={{
-                          width: 36,
-                          height: 36,
-                          backgroundColor: "#fff",
-                          borderRadius: 12,
-                          alignItems: "center",
-                          justifyContent: "center",
-                        }}
-                      >
-                        <MapPin size={18} color="#6366F1" />
-                      </View>
-                      <View style={{ flex: 1 }}>
-                        <Text style={{ fontSize: 14, fontWeight: "600", color: "#1E293B" }}>
-                          Endereço
-                        </Text>
-                        <Text style={{ fontSize: 13, color: "#64748B", marginTop: 2 }}>
-                          {selectedGym?.endereco_completo}
-                        </Text>
-                      </View>
-                    </View>
-
-                    {(selectedGym?.telefone || selectedGym?.whatsapp) && (
-                      <View style={{ flexDirection: "row", gap: 10, marginTop: 5 }}>
-                        {selectedGym?.telefone && (
-                          <TouchableOpacity
-                            style={{
-                              flex: 1,
-                              flexDirection: "row",
-                              alignItems: "center",
-                              justifyContent: "center",
-                              backgroundColor: "#fff",
-                              height: 48,
-                              borderRadius: 14,
-                              gap: 8,
-                              borderWidth: 1,
-                              borderColor: "#E2E8F0",
-                            }}
-                            onPress={() => Linking.openURL(`tel:${selectedGym.telefone}`)}
-                          >
-                            <Phone size={16} color="#1E293B" />
-                            <Text style={{ fontSize: 13, fontWeight: "700", color: "#1E293B" }}>
-                              Ligar
-                            </Text>
-                          </TouchableOpacity>
-                        )}
-                        {selectedGym?.whatsapp && (
-                          <TouchableOpacity
-                            style={{
-                              flex: 1,
-                              flexDirection: "row",
-                              alignItems: "center",
-                              justifyContent: "center",
-                              backgroundColor: "#DCFCE7",
-                              height: 48,
-                              borderRadius: 14,
-                              gap: 8,
-                            }}
-                            onPress={() =>
-                              Linking.openURL(
-                                `https://wa.me/55${selectedGym?.whatsapp?.replace(/\D/g, "")}`
-                              )
-                            }
-                          >
-                            <MessageSquare size={16} color="#16A34A" />
-                            <Text style={{ fontSize: 13, fontWeight: "700", color: "#16A34A" }}>
-                              WhatsApp
-                            </Text>
-                          </TouchableOpacity>
-                        )}
-                      </View>
-                    )}
-
-                    <TouchableOpacity
-                      style={{
-                        flexDirection: "row",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        backgroundColor: selectedGym?.ativo ? "#FEF2F2" : "#F0FDF4",
-                        height: 48,
-                        borderRadius: 14,
-                        gap: 8,
-                        marginTop: 10,
-                      }}
-                      onPress={() =>
-                        toggleGymStatus(
-                          selectedGym.id_academia,
-                          selectedGym.nome,
-                          selectedGym.ativo
-                        )
-                      }
-                    >
-                      <Shield size={16} color={selectedGym?.ativo ? "#DC2626" : "#16A34A"} />
-                      <Text
-                        style={{
-                          fontSize: 13,
-                          fontWeight: "700",
-                          color: selectedGym?.ativo ? "#DC2626" : "#16A34A",
-                        }}
-                      >
-                        {selectedGym?.ativo ? "Bloquear Unidade" : "Ativar Unidade"}
-                      </Text>
-                    </TouchableOpacity>
-                  </View>
-                </View>
-
-                {/* Professionals Header */}
-                <View
-                  style={{
-                    flexDirection: "row",
-                    justifyContent: "space-between",
-                    alignItems: "center",
-                    marginBottom: 15,
-                  }}
-                >
+          {/* ── SHEET: ACADEMIAS ── */}
+          {openSheets["gyms"] && (
+            <BottomSheet
+              ref={gymsSheetRef}
+              onClose={() => setOpenSheets((prev) => ({ ...prev, gyms: false }))}
+              index={0}
+              snapPoints={[SCREEN_HEIGHT]}
+              enablePanDownToClose
+              backdropComponent={renderBackdrop}
+              backgroundStyle={{ borderRadius: 32 }}
+            >
+              <View style={styles.sheetContent}>
+                <View style={[styles.sheetHeader, { marginBottom: 18 }]}>
                   <View>
-                    <Text style={{ fontSize: 16, fontWeight: "800", color: "#1E293B" }}>
-                      Profissionais
-                    </Text>
-                    <Text style={{ fontSize: 12, color: "#64748B" }}>
-                      {gymTrainers.length} vinculados
+                    <Text style={styles.sheetTitle}>Rede de Academias</Text>
+                    <Text style={styles.sheetSubtitle}>
+                      {adminGyms.length} unidades cadastradas
                     </Text>
                   </View>
+                  <View style={{ flexDirection: "row", gap: 12 }}>
+                    <TouchableOpacity
+                      style={[styles.sheetCloseBtn, { backgroundColor: "#BBF246" }]}
+                      onPress={() => {
+                        setGoogleSearchQuery("");
+                        setGoogleResults([]);
+                        setGymForm({});
+                        openSheet("createGym", createGymSheetRef);
+                      }}
+                    >
+                      <Plus size={20} color="#192126" />
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      onPress={() => gymsSheetRef.current?.close()}
+                      style={styles.sheetCloseBtn}
+                    >
+                      <X size={22} color="#64748B" />
+                    </TouchableOpacity>
+                  </View>
+                </View>
+
+                {/* Quick Stats: Network Insights */}
+                <View style={[styles.sheetStatsRow, { marginBottom: 15 }]}>
                   <TouchableOpacity
-                    style={[styles.addLinkBtn, { backgroundColor: "#BBF246" }]}
-                    onPress={() => {
-                      setTrainerSearchQuery("");
-                      if (adminTrainers.length === 0) fetchAdminTrainers(true);
-                      linkTrainerSheetRef.current?.expand();
-                    }}
+                    activeOpacity={0.7}
+                    style={[
+                      styles.sheetStatItem,
+                      gymListStatusFilter === "all" && {
+                        backgroundColor: "#F1F5F9",
+                        borderColor: "#64748B",
+                        borderWidth: 2,
+                      },
+                    ]}
+                    onPress={() => setGymListStatusFilter("all")}
                   >
-                    <Plus size={16} color="#192126" />
-                    <Text style={[styles.addLinkBtnText, { color: "#192126" }]}>Vincular</Text>
+                    <Text style={[styles.sheetStatValue, { color: "#64748B" }]}>
+                      {adminGyms.length}
+                    </Text>
+                    <Text style={styles.sheetStatLabel}>Todas</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    activeOpacity={0.7}
+                    style={[
+                      styles.sheetStatItem,
+                      gymListStatusFilter === "active" && {
+                        backgroundColor: "#F0FDF4",
+                        borderColor: "#16A34A",
+                        borderWidth: 2,
+                      },
+                    ]}
+                    onPress={() => setGymListStatusFilter("active")}
+                  >
+                    <Text style={[styles.sheetStatValue, { color: "#16A34A" }]}>
+                      {(Array.isArray(adminGyms) ? adminGyms : []).filter((g) => g?.ativo).length}
+                    </Text>
+                    <Text style={styles.sheetStatLabel}>Ativas</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    activeOpacity={0.7}
+                    style={[
+                      styles.sheetStatItem,
+                      gymListStatusFilter === "blocked" && {
+                        backgroundColor: "#FEF2F2",
+                        borderColor: "#DC2626",
+                        borderWidth: 2,
+                      },
+                    ]}
+                    onPress={() => setGymListStatusFilter("blocked")}
+                  >
+                    <Text style={[styles.sheetStatValue, { color: "#DC2626" }]}>
+                      {
+                        (Array.isArray(adminGyms) ? adminGyms : []).filter((g) => g && !g?.ativo)
+                          .length
+                      }
+                    </Text>
+                    <Text style={styles.sheetStatLabel}>Bloqueadas</Text>
                   </TouchableOpacity>
                 </View>
 
-                {/* Professionals List */}
+                {/* Search Bar */}
+                <View style={[styles.searchContainer, { marginBottom: 10 }]}>
+                  <Search size={18} color="#94A3B8" style={styles.searchIcon} />
+                  <TextInput
+                    placeholder="Buscar unidade por nome ou cidade..."
+                    placeholderTextColor="#94A3B8"
+                    style={styles.searchInput}
+                    value={gymListSearchQuery}
+                    onChangeText={setGymListSearchQuery}
+                  />
+                  {gymListSearchQuery.length > 0 && (
+                    <TouchableOpacity
+                      onPress={() => setGymListSearchQuery("")}
+                      style={{ marginRight: 15 }}
+                    >
+                      <XCircle size={18} color="#94A3B8" />
+                    </TouchableOpacity>
+                  )}
+                </View>
+
                 {loadingSheet ? (
-                  <ActivityIndicator color="#6366F1" style={{ marginTop: 30 }} />
+                  <ActivityIndicator color="#BBF246" style={{ marginTop: 40 }} />
                 ) : (
-                  gymTrainers.map((trainer) => (
+                  <BottomSheetFlatList
+                    data={filteredAdminGyms}
+                    keyExtractor={(item: any) => String(item?.id_academia || Math.random())}
+                    showsVerticalScrollIndicator={false}
+                    style={{ flex: 1, marginTop: 5 }}
+                    contentContainerStyle={{ paddingBottom: insets.bottom + 150 }}
+                    ListEmptyComponent={() => (
+                      <View style={styles.proEmptyState}>
+                        <Building2 size={40} color="#E2E8F0" />
+                        <Text style={styles.emptyTxt}>Nenhuma academia encontrada.</Text>
+                      </View>
+                    )}
+                    renderItem={({ item }: { item: any }) => {
+                      if (!item) return null;
+                      return (
+                        <TouchableOpacity
+                          style={styles.proUserCard}
+                          activeOpacity={0.8}
+                          onPress={() => openGymDetails(item)}
+                          onLongPress={() =>
+                            toggleGymStatus(item?.id_academia, item?.nome, item?.ativo)
+                          }
+                        >
+                          <View style={styles.proUserMain}>
+                            <View
+                              style={[styles.proAvatarContainer, { backgroundColor: "#F8FAFC" }]}
+                            >
+                              <Building2 size={24} color="#64748B" />
+                            </View>
+
+                            <View style={{ flex: 1, marginLeft: 16 }}>
+                              <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                                <Text style={[styles.proName, { flexShrink: 1 }]} numberOfLines={1}>
+                                  {item?.nome}
+                                </Text>
+                              </View>
+                              <Text style={styles.proEmail} numberOfLines={1}>
+                                {item?.endereco_completo || item?.endereco}
+                              </Text>
+
+                              <View style={[styles.proBadgeRow, { marginTop: 8 }]}>
+                                <View
+                                  style={[
+                                    styles.proBadge,
+                                    { backgroundColor: item?.ativo ? "#DCFCE7" : "#FEE2E2" },
+                                  ]}
+                                >
+                                  <View
+                                    style={[
+                                      styles.dot,
+                                      { backgroundColor: item?.ativo ? "#10B981" : "#EF4444" },
+                                    ]}
+                                  />
+                                  <Text
+                                    style={[
+                                      styles.proBadgeText,
+                                      { color: item?.ativo ? "#106534" : "#991B1B" },
+                                    ]}
+                                  >
+                                    {item?.ativo ? "Ativa" : "Bloqueada"}
+                                  </Text>
+                                </View>
+                                <View style={[styles.proBadge, { backgroundColor: "#EEF2FF" }]}>
+                                  <Users size={12} color="#6366F1" style={{ marginRight: 4 }} />
+                                  <Text style={[styles.proBadgeText, { color: "#6366F1" }]}>
+                                    {item?.trainers_count || 0} Trainers
+                                  </Text>
+                                </View>
+                              </View>
+                            </View>
+
+                            <View style={{ justifyContent: "center", paddingLeft: 10 }}>
+                              <ChevronRight size={20} color="#CBD5E1" />
+                            </View>
+                          </View>
+                        </TouchableOpacity>
+                      );
+                    }}
+                  />
+                )}
+              </View>
+            </BottomSheet>
+          )}
+
+          {/* ── SHEET: CRIAR ACADEMIA (GOOGLE) ── */}
+          {openSheets["createGym"] && (
+            <BottomSheet
+              ref={createGymSheetRef}
+              onClose={() => setOpenSheets((prev) => ({ ...prev, createGym: false }))}
+              index={0}
+              snapPoints={[SCREEN_HEIGHT * 0.9]}
+              enablePanDownToClose
+              backdropComponent={renderBackdrop}
+              backgroundStyle={{ borderRadius: 32 }}
+            >
+              <BottomSheetView style={styles.sheetContent}>
+                <View style={styles.sheetHeader}>
+                  <Text style={styles.sheetTitle}>Nova Academia</Text>
+                  <TouchableOpacity onPress={() => createGymSheetRef.current?.close()}>
+                    <X size={24} color="#64748B" />
+                  </TouchableOpacity>
+                </View>
+
+                <View style={styles.searchContainer}>
+                  <MapPin size={18} color="#94A3B8" style={styles.searchIcon} />
+                  <TextInput
+                    placeholder="Pesquisar no Google Maps..."
+                    placeholderTextColor="#94A3B8"
+                    style={styles.searchInput}
+                    value={googleSearchQuery}
+                    onChangeText={searchGoogleGyms}
+                  />
+                  {isSearchingGoogle && (
+                    <ActivityIndicator color="#10B981" style={{ marginRight: 15 }} />
+                  )}
+                </View>
+
+                <ScrollView style={{ marginTop: 15 }}>
+                  {gymForm.nome ? (
+                    <View style={styles.googleDetailCard}>
+                      <View style={styles.googleHeader}>
+                        <Map size={40} color="#10B981" />
+                        <View style={{ flex: 1, marginLeft: 15 }}>
+                          <Text style={styles.googleGymName}>{gymForm.nome}</Text>
+                          <Text style={styles.googleGymAddr}>{gymForm.endereco_completo}</Text>
+                        </View>
+                      </View>
+
+                      <View style={styles.googleStatsRow}>
+                        <View style={styles.googleStat}>
+                          <Star size={16} color="#F59E0B" fill="#F59E0B" />
+                          <Text style={styles.googleStatTxt}>
+                            {gymForm.rating} ({gymForm.user_ratings_total})
+                          </Text>
+                        </View>
+                        {gymForm.telefone && (
+                          <View style={styles.googleStat}>
+                            <PhoneCall size={16} color="#64748B" />
+                            <Text style={styles.googleStatTxt}>{gymForm.telefone}</Text>
+                          </View>
+                        )}
+                      </View>
+
+                      <TouchableOpacity
+                        style={styles.confirmSaveBtn}
+                        onPress={saveNewGym}
+                        disabled={loadingSheet}
+                      >
+                        {loadingSheet ? (
+                          <ActivityIndicator color="#fff" />
+                        ) : (
+                          <Text style={styles.confirmSaveBtnText}>Confirmar e Cadastrar</Text>
+                        )}
+                      </TouchableOpacity>
+                      <TouchableOpacity style={styles.cancelBtn} onPress={() => setGymForm({})}>
+                        <Text style={styles.cancelBtnText}>Mudar Academia</Text>
+                      </TouchableOpacity>
+                    </View>
+                  ) : (
+                    googleResults.map((place) => (
+                      <TouchableOpacity
+                        key={place.place_id}
+                        style={styles.googleResultItem}
+                        onPress={() => selectGoogleGym(place.place_id)}
+                      >
+                        <MapPin size={20} color="#94A3B8" />
+                        <View style={{ flex: 1, marginLeft: 12 }}>
+                          <Text style={styles.googleResultTitle}>
+                            {place.structured_formatting?.main_text}
+                          </Text>
+                          <Text style={styles.googleResultSubtitle}>
+                            {place.structured_formatting?.secondary_text}
+                          </Text>
+                        </View>
+                        <ArrowRight size={18} color="#E2E8F0" />
+                      </TouchableOpacity>
+                    ))
+                  )}
+                </ScrollView>
+              </BottomSheetView>
+            </BottomSheet>
+          )}
+
+          {/* ── SHEET: DETALHES DA ACADEMIA ── */}
+          {openSheets["gymDetail"] && (
+            <BottomSheet
+              ref={gymDetailSheetRef}
+              onClose={() => setOpenSheets((prev) => ({ ...prev, gymDetail: false }))}
+              index={0}
+              snapPoints={[SCREEN_HEIGHT * 0.9]}
+              enablePanDownToClose
+              backdropComponent={renderBackdrop}
+              backgroundStyle={{ borderRadius: 32 }}
+            >
+              <BottomSheetView style={styles.sheetContent}>
+                <View style={styles.sheetHeader}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.sheetTitle}>{selectedGym?.nome}</Text>
                     <View
+                      style={{ flexDirection: "row", alignItems: "center", gap: 6, marginTop: 4 }}
+                    >
+                      <View
+                        style={[
+                          styles.proBadge,
+                          {
+                            backgroundColor: selectedGym?.ativo ? "#DCFCE7" : "#FEE2E2",
+                            paddingVertical: 2,
+                          },
+                        ]}
+                      >
+                        <View
+                          style={[
+                            styles.dot,
+                            { backgroundColor: selectedGym?.ativo ? "#10B981" : "#EF4444" },
+                          ]}
+                        />
+                        <Text
+                          style={[
+                            styles.proBadgeText,
+                            { color: selectedGym?.ativo ? "#106534" : "#991B1B", fontSize: 9 },
+                          ]}
+                        >
+                          {selectedGym?.ativo ? "OPERACIONAL" : "SUSPENSA"}
+                        </Text>
+                      </View>
+                      {selectedGym?.rating > 0 && (
+                        <View style={{ flexDirection: "row", alignItems: "center", gap: 2 }}>
+                          <Star size={12} color="#F59E0B" fill="#F59E0B" />
+                          <Text style={{ fontSize: 12, fontWeight: "700", color: "#B45309" }}>
+                            {selectedGym?.rating}
+                          </Text>
+                        </View>
+                      )}
+                    </View>
+                  </View>
+                  <TouchableOpacity
+                    onPress={() => gymDetailSheetRef.current?.close()}
+                    style={styles.sheetCloseBtn}
+                  >
+                    <X size={22} color="#64748B" />
+                  </TouchableOpacity>
+                </View>
+
+                <ScrollView showsVerticalScrollIndicator={false} style={{ flex: 1, marginTop: 20 }}>
+                  {/* Contact & Info Section */}
+                  <View
+                    style={{
+                      backgroundColor: "#F8FAFC",
+                      padding: 20,
+                      borderRadius: 24,
+                      marginBottom: 25,
+                    }}
+                  >
+                    <Text
+                      style={{
+                        fontSize: 13,
+                        fontWeight: "800",
+                        color: "#64748B",
+                        marginBottom: 15,
+                        textTransform: "uppercase",
+                        letterSpacing: 0.5,
+                      }}
+                    >
+                      Info & Contato
+                    </Text>
+
+                    <View style={{ gap: 16 }}>
+                      <View style={{ flexDirection: "row", alignItems: "flex-start", gap: 12 }}>
+                        <View
+                          style={{
+                            width: 36,
+                            height: 36,
+                            backgroundColor: "#fff",
+                            borderRadius: 12,
+                            alignItems: "center",
+                            justifyContent: "center",
+                          }}
+                        >
+                          <MapPin size={18} color="#6366F1" />
+                        </View>
+                        <View style={{ flex: 1 }}>
+                          <Text style={{ fontSize: 14, fontWeight: "600", color: "#1E293B" }}>
+                            Endereço
+                          </Text>
+                          <Text style={{ fontSize: 13, color: "#64748B", marginTop: 2 }}>
+                            {selectedGym?.endereco_completo}
+                          </Text>
+                        </View>
+                      </View>
+
+                      {(selectedGym?.telefone || selectedGym?.whatsapp) && (
+                        <View style={{ flexDirection: "row", gap: 10, marginTop: 5 }}>
+                          {selectedGym?.telefone && (
+                            <TouchableOpacity
+                              style={{
+                                flex: 1,
+                                flexDirection: "row",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                backgroundColor: "#fff",
+                                height: 48,
+                                borderRadius: 14,
+                                gap: 8,
+                                borderWidth: 1,
+                                borderColor: "#E2E8F0",
+                              }}
+                              onPress={() => Linking.openURL(`tel:${selectedGym.telefone}`)}
+                            >
+                              <Phone size={16} color="#1E293B" />
+                              <Text style={{ fontSize: 13, fontWeight: "700", color: "#1E293B" }}>
+                                Ligar
+                              </Text>
+                            </TouchableOpacity>
+                          )}
+                          {selectedGym?.whatsapp && (
+                            <TouchableOpacity
+                              style={{
+                                flex: 1,
+                                flexDirection: "row",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                backgroundColor: "#DCFCE7",
+                                height: 48,
+                                borderRadius: 14,
+                                gap: 8,
+                              }}
+                              onPress={() =>
+                                Linking.openURL(
+                                  `https://wa.me/55${selectedGym?.whatsapp?.replace(/\D/g, "")}`
+                                )
+                              }
+                            >
+                              <MessageSquare size={16} color="#16A34A" />
+                              <Text style={{ fontSize: 13, fontWeight: "700", color: "#16A34A" }}>
+                                WhatsApp
+                              </Text>
+                            </TouchableOpacity>
+                          )}
+                        </View>
+                      )}
+
+                      <TouchableOpacity
+                        style={{
+                          flexDirection: "row",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          backgroundColor: selectedGym?.ativo ? "#FEF2F2" : "#F0FDF4",
+                          height: 48,
+                          borderRadius: 14,
+                          gap: 8,
+                          marginTop: 10,
+                        }}
+                        onPress={() =>
+                          toggleGymStatus(
+                            selectedGym.id_academia,
+                            selectedGym.nome,
+                            selectedGym.ativo
+                          )
+                        }
+                      >
+                        <Shield size={16} color={selectedGym?.ativo ? "#DC2626" : "#16A34A"} />
+                        <Text
+                          style={{
+                            fontSize: 13,
+                            fontWeight: "700",
+                            color: selectedGym?.ativo ? "#DC2626" : "#16A34A",
+                          }}
+                        >
+                          {selectedGym?.ativo ? "Bloquear Unidade" : "Ativar Unidade"}
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+
+                  {/* Professionals Header */}
+                  <View
+                    style={{
+                      flexDirection: "row",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                      marginBottom: 15,
+                    }}
+                  >
+                    <View>
+                      <Text style={{ fontSize: 16, fontWeight: "800", color: "#1E293B" }}>
+                        Profissionais
+                      </Text>
+                      <Text style={{ fontSize: 12, color: "#64748B" }}>
+                        {gymTrainers.length} vinculados
+                      </Text>
+                    </View>
+                    <TouchableOpacity
+                      style={[styles.addLinkBtn, { backgroundColor: "#BBF246" }]}
+                      onPress={() => {
+                        setTrainerSearchQuery("");
+                        if (adminTrainers.length === 0) fetchAdminTrainers(true);
+                        openSheet("linkTrainer", linkTrainerSheetRef);
+                      }}
+                    >
+                      <Plus size={16} color="#192126" />
+                      <Text style={[styles.addLinkBtnText, { color: "#192126" }]}>Vincular</Text>
+                    </TouchableOpacity>
+                  </View>
+
+                  {/* Professionals List */}
+                  {loadingSheet ? (
+                    <ActivityIndicator color="#6366F1" style={{ marginTop: 30 }} />
+                  ) : (
+                    gymTrainers.map((trainer) => (
+                      <View
+                        key={trainer.id_us}
+                        style={[styles.proUserCard, { marginBottom: 12, padding: 12 }]}
+                      >
+                        <View style={styles.proUserMain}>
+                          <Image
+                            source={{
+                              uri:
+                                trainer.foto_url ||
+                                trainer.avatar_url ||
+                                "https://images.unsplash.com/photo-1594824476967-48c8b964273f?w=100",
+                            }}
+                            style={[styles.proAvatar, { width: 44, height: 44, borderRadius: 22 }]}
+                          />
+                          <View style={{ flex: 1, marginLeft: 12 }}>
+                            <Text style={[styles.proName, { fontSize: 14 }]}>{trainer.nome}</Text>
+                            <Text style={[styles.proEmail, { fontSize: 12 }]}>{trainer.email}</Text>
+                          </View>
+                          <TouchableOpacity
+                            onPress={() => unlinkTrainer(trainer.id_us, trainer.nome)}
+                            style={{
+                              width: 36,
+                              height: 36,
+                              borderRadius: 10,
+                              backgroundColor: "#FEF2F2",
+                              alignItems: "center",
+                              justifyContent: "center",
+                            }}
+                          >
+                            <Unlink size={18} color="#EF4444" />
+                          </TouchableOpacity>
+                        </View>
+                      </View>
+                    ))
+                  )}
+
+                  {gymTrainers.length === 0 && !loadingSheet && (
+                    <View style={[styles.proEmptyState, { marginTop: 10 }]}>
+                      <Users size={32} color="#E2E8F0" />
+                      <Text style={[styles.emptyTxt, { fontSize: 13, marginTop: 8 }]}>
+                        Nenhum profissional vinculado a esta unidade.
+                      </Text>
+                    </View>
+                  )}
+                </ScrollView>
+              </BottomSheetView>
+            </BottomSheet>
+          )}
+
+          {/* ── SHEET: VINCULAR PROFISSIONAL ── */}
+          {openSheets["linkTrainer"] && (
+            <BottomSheet
+              ref={linkTrainerSheetRef}
+              onClose={() => setOpenSheets((prev) => ({ ...prev, linkTrainer: false }))}
+              index={0}
+              snapPoints={["85%"]}
+              enablePanDownToClose
+              backdropComponent={renderBackdrop}
+              backgroundStyle={{ borderRadius: 32 }}
+            >
+              <BottomSheetView style={styles.sheetContent}>
+                <View style={styles.sheetHeader}>
+                  <View>
+                    <Text style={styles.sheetTitle}>Vincular Profissional</Text>
+                    <Text style={styles.sheetSubtitle}>
+                      Adicione personais à unidade{"\n"}
+                      {selectedGym?.nome}
+                    </Text>
+                  </View>
+                  <TouchableOpacity
+                    onPress={() => linkTrainerSheetRef.current?.close()}
+                    style={styles.sheetCloseBtn}
+                  >
+                    <X size={22} color="#64748B" />
+                  </TouchableOpacity>
+                </View>
+
+                <View style={[styles.searchContainer, { marginTop: 20 }]}>
+                  <Search size={18} color="#94A3B8" style={styles.searchIcon} />
+                  <TextInput
+                    placeholder="Buscar por nome ou e-mail..."
+                    placeholderTextColor="#94A3B8"
+                    style={styles.searchInput}
+                    value={trainerSearchQuery}
+                    onChangeText={searchTrainersToLink}
+                  />
+                  {trainerSearchQuery.length > 0 && (
+                    <TouchableOpacity
+                      onPress={() => searchTrainersToLink("")}
+                      style={{ marginRight: 15 }}
+                    >
+                      <XCircle size={18} color="#94A3B8" />
+                    </TouchableOpacity>
+                  )}
+                </View>
+
+                <View style={{ marginTop: 15, paddingHorizontal: 5 }}>
+                  <Text
+                    style={{
+                      fontSize: 12,
+                      fontWeight: "700",
+                      color: "#64748B",
+                      textTransform: "uppercase",
+                    }}
+                  >
+                    Profissionais Disponíveis ({trainersAvailableToLink.length})
+                  </Text>
+                </View>
+
+                <ScrollView
+                  showsVerticalScrollIndicator={false}
+                  style={{ flex: 1, marginTop: 10 }}
+                  contentContainerStyle={{ paddingBottom: 50 }}
+                >
+                  {trainersAvailableToLink.map((trainer) => (
+                    <TouchableOpacity
                       key={trainer.id_us}
-                      style={[styles.proUserCard, { marginBottom: 12, padding: 12 }]}
+                      style={[styles.proUserCard, { marginBottom: 10, padding: 12 }]}
+                      activeOpacity={0.7}
+                      onPress={() => linkTrainer(trainer.id_us)}
                     >
                       <View style={styles.proUserMain}>
                         <Image
@@ -3537,1144 +3728,1011 @@ const AdminDashboardScreen: React.FC = () => {
                           <Text style={[styles.proName, { fontSize: 14 }]}>{trainer.nome}</Text>
                           <Text style={[styles.proEmail, { fontSize: 12 }]}>{trainer.email}</Text>
                         </View>
-                        <TouchableOpacity
-                          onPress={() => unlinkTrainer(trainer.id_us, trainer.nome)}
+                        <View
                           style={{
                             width: 36,
                             height: 36,
                             borderRadius: 10,
-                            backgroundColor: "#FEF2F2",
+                            backgroundColor: "#F0FDF4",
                             alignItems: "center",
                             justifyContent: "center",
                           }}
                         >
-                          <Unlink size={18} color="#EF4444" />
-                        </TouchableOpacity>
+                          <Link size={18} color="#16A34A" />
+                        </View>
                       </View>
-                    </View>
-                  ))
-                )}
+                    </TouchableOpacity>
+                  ))}
 
-                {gymTrainers.length === 0 && !loadingSheet && (
-                  <View style={[styles.proEmptyState, { marginTop: 10 }]}>
-                    <Users size={32} color="#E2E8F0" />
-                    <Text style={[styles.emptyTxt, { fontSize: 13, marginTop: 8 }]}>
-                      Nenhum profissional vinculado a esta unidade.
-                    </Text>
-                  </View>
-                )}
-              </ScrollView>
-            </BottomSheetView>
-          </BottomSheet>
-
-          {/* ── SHEET: VINCULAR PROFISSIONAL ── */}
-          <BottomSheet
-            ref={linkTrainerSheetRef}
-            index={-1}
-            snapPoints={["85%"]}
-            enablePanDownToClose
-            backdropComponent={renderBackdrop}
-            backgroundStyle={{ borderRadius: 32 }}
-          >
-            <BottomSheetView style={styles.sheetContent}>
-              <View style={styles.sheetHeader}>
-                <View>
-                  <Text style={styles.sheetTitle}>Vincular Profissional</Text>
-                  <Text style={styles.sheetSubtitle}>
-                    Adicione personais à unidade{"\n"}
-                    {selectedGym?.nome}
-                  </Text>
-                </View>
-                <TouchableOpacity
-                  onPress={() => linkTrainerSheetRef.current?.close()}
-                  style={styles.sheetCloseBtn}
-                >
-                  <X size={22} color="#64748B" />
-                </TouchableOpacity>
-              </View>
-
-              <View style={[styles.searchContainer, { marginTop: 20 }]}>
-                <Search size={18} color="#94A3B8" style={styles.searchIcon} />
-                <TextInput
-                  placeholder="Buscar por nome ou e-mail..."
-                  placeholderTextColor="#94A3B8"
-                  style={styles.searchInput}
-                  value={trainerSearchQuery}
-                  onChangeText={searchTrainersToLink}
-                />
-                {trainerSearchQuery.length > 0 && (
-                  <TouchableOpacity
-                    onPress={() => searchTrainersToLink("")}
-                    style={{ marginRight: 15 }}
-                  >
-                    <XCircle size={18} color="#94A3B8" />
-                  </TouchableOpacity>
-                )}
-              </View>
-
-              <View style={{ marginTop: 15, paddingHorizontal: 5 }}>
-                <Text
-                  style={{
-                    fontSize: 12,
-                    fontWeight: "700",
-                    color: "#64748B",
-                    textTransform: "uppercase",
-                  }}
-                >
-                  Profissionais Disponíveis ({trainersAvailableToLink.length})
-                </Text>
-              </View>
-
-              <ScrollView
-                showsVerticalScrollIndicator={false}
-                style={{ flex: 1, marginTop: 10 }}
-                contentContainerStyle={{ paddingBottom: 50 }}
-              >
-                {trainersAvailableToLink.map((trainer) => (
-                  <TouchableOpacity
-                    key={trainer.id_us}
-                    style={[styles.proUserCard, { marginBottom: 10, padding: 12 }]}
-                    activeOpacity={0.7}
-                    onPress={() => linkTrainer(trainer.id_us)}
-                  >
-                    <View style={styles.proUserMain}>
-                      <Image
-                        source={{
-                          uri:
-                            trainer.foto_url ||
-                            trainer.avatar_url ||
-                            "https://images.unsplash.com/photo-1594824476967-48c8b964273f?w=100",
-                        }}
-                        style={[styles.proAvatar, { width: 44, height: 44, borderRadius: 22 }]}
-                      />
-                      <View style={{ flex: 1, marginLeft: 12 }}>
-                        <Text style={[styles.proName, { fontSize: 14 }]}>{trainer.nome}</Text>
-                        <Text style={[styles.proEmail, { fontSize: 12 }]}>{trainer.email}</Text>
-                      </View>
-                      <View
-                        style={{
-                          width: 36,
-                          height: 36,
-                          borderRadius: 10,
-                          backgroundColor: "#F0FDF4",
-                          alignItems: "center",
-                          justifyContent: "center",
-                        }}
-                      >
-                        <Link size={18} color="#16A34A" />
-                      </View>
-                    </View>
-                  </TouchableOpacity>
-                ))}
-
-                {trainersAvailableToLink.length === 0 && (
-                  <View style={[styles.proEmptyState, { marginTop: 40 }]}>
-                    <UserPlus size={40} color="#E2E8F0" />
-                    <Text style={styles.emptyTxt}>
-                      Nenhum profissional disponível para vínculo.
-                    </Text>
-                  </View>
-                )}
-              </ScrollView>
-            </BottomSheetView>
-          </BottomSheet>
-
-          {/* ── SHEET: GERENCIAR TREINADORES ── */}
-          <BottomSheet
-            ref={trainersSheetRef}
-            index={-1}
-            snapPoints={[SCREEN_HEIGHT]}
-            enablePanDownToClose
-            backdropComponent={renderBackdrop}
-            backgroundStyle={{ borderRadius: 32 }}
-          >
-            <View style={styles.sheetContent}>
-              <View style={[styles.sheetHeader, { marginBottom: 18 }]}>
-                <View>
-                  <Text style={styles.sheetTitle}>Gerenciar Personais</Text>
-                  <Text style={styles.sheetSubtitle}>
-                    {adminTrainers.length} profissionais cadastrados
-                  </Text>
-                </View>
-                <TouchableOpacity
-                  onPress={() => trainersSheetRef.current?.close()}
-                  style={styles.sheetCloseBtn}
-                >
-                  <X size={22} color="#64748B" />
-                </TouchableOpacity>
-              </View>
-
-              {/* Quick Stats: Activity Filters */}
-              <View style={[styles.sheetStatsRow, { marginBottom: 15 }]}>
-                <TouchableOpacity
-                  activeOpacity={0.7}
-                  style={[
-                    styles.sheetStatItem,
-                    trainerListStatusFilter === "all" && {
-                      backgroundColor: "#F1F5F9",
-                      borderColor: "#64748B",
-                      borderWidth: 2,
-                    },
-                  ]}
-                  onPress={() => setTrainerListStatusFilter("all")}
-                >
-                  <Text style={[styles.sheetStatValue, { color: "#64748B" }]}>
-                    {adminTrainers.length}
-                  </Text>
-                  <Text style={styles.sheetStatLabel}>Todos</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  activeOpacity={0.7}
-                  style={[
-                    styles.sheetStatItem,
-                    trainerListStatusFilter === "active" && {
-                      backgroundColor: "#F0FDF4",
-                      borderColor: "#16A34A",
-                      borderWidth: 2,
-                    },
-                  ]}
-                  onPress={() => setTrainerListStatusFilter("active")}
-                >
-                  <Text style={[styles.sheetStatValue, { color: "#16A34A" }]}>
-                    {
-                      (Array.isArray(adminTrainers) ? adminTrainers : []).filter((u) => u?.ativo)
-                        .length
-                    }
-                  </Text>
-                  <Text style={styles.sheetStatLabel}>Ativos</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  activeOpacity={0.7}
-                  style={[
-                    styles.sheetStatItem,
-                    trainerListStatusFilter === "blocked" && {
-                      backgroundColor: "#FEF2F2",
-                      borderColor: "#DC2626",
-                      borderWidth: 2,
-                    },
-                  ]}
-                  onPress={() => setTrainerListStatusFilter("blocked")}
-                >
-                  <Text style={[styles.sheetStatValue, { color: "#DC2626" }]}>
-                    {
-                      (Array.isArray(adminTrainers) ? adminTrainers : []).filter(
-                        (u) => u && !u?.ativo
-                      ).length
-                    }
-                  </Text>
-                  <Text style={styles.sheetStatLabel}>Bloqueados</Text>
-                </TouchableOpacity>
-              </View>
-
-              {/* Search Bar */}
-              <View style={[styles.searchContainer, { marginBottom: 10 }]}>
-                <Search size={18} color="#94A3B8" style={styles.searchIcon} />
-                <TextInput
-                  placeholder="Buscar por nome ou e-mail..."
-                  placeholderTextColor="#94A3B8"
-                  style={styles.searchInput}
-                  value={trainerListSearchQuery}
-                  onChangeText={setTrainerListSearchQuery}
-                />
-                {trainerListSearchQuery.length > 0 && (
-                  <TouchableOpacity
-                    onPress={() => setTrainerListSearchQuery("")}
-                    style={{ marginRight: 15 }}
-                  >
-                    <XCircle size={18} color="#94A3B8" />
-                  </TouchableOpacity>
-                )}
-              </View>
-
-              {loadingSheet ? (
-                <ActivityIndicator color="#6366F1" style={{ marginTop: 40 }} />
-              ) : (
-                <BottomSheetFlatList
-                  data={filteredAdminTrainers}
-                  keyExtractor={(item: any) => String(item?.id_us || Math.random())}
-                  showsVerticalScrollIndicator={false}
-                  style={{ flex: 1, marginTop: 5 }}
-                  contentContainerStyle={{ paddingBottom: insets.bottom + 150 }}
-                  ListEmptyComponent={() => (
-                    <View style={styles.proEmptyState}>
-                      <Users size={40} color="#E2E8F0" />
-                      <Text style={styles.emptyTxt}>Nenhum personal encontrado.</Text>
+                  {trainersAvailableToLink.length === 0 && (
+                    <View style={[styles.proEmptyState, { marginTop: 40 }]}>
+                      <UserPlus size={40} color="#E2E8F0" />
+                      <Text style={styles.emptyTxt}>
+                        Nenhum profissional disponível para vínculo.
+                      </Text>
                     </View>
                   )}
-                  renderItem={({ item }: { item: any }) => (
+                </ScrollView>
+              </BottomSheetView>
+            </BottomSheet>
+          )}
+
+          {/* ── SHEET: GERENCIAR TREINADORES ── */}
+          {openSheets["trainers"] && (
+            <BottomSheet
+              ref={trainersSheetRef}
+              onClose={() => setOpenSheets((prev) => ({ ...prev, trainers: false }))}
+              index={0}
+              snapPoints={[SCREEN_HEIGHT]}
+              enablePanDownToClose
+              backdropComponent={renderBackdrop}
+              backgroundStyle={{ borderRadius: 32 }}
+            >
+              <View style={styles.sheetContent}>
+                <View style={[styles.sheetHeader, { marginBottom: 18 }]}>
+                  <View>
+                    <Text style={styles.sheetTitle}>Gerenciar Personais</Text>
+                    <Text style={styles.sheetSubtitle}>
+                      {adminTrainers.length} profissionais cadastrados
+                    </Text>
+                  </View>
+                  <TouchableOpacity
+                    onPress={() => trainersSheetRef.current?.close()}
+                    style={styles.sheetCloseBtn}
+                  >
+                    <X size={22} color="#64748B" />
+                  </TouchableOpacity>
+                </View>
+
+                {/* Quick Stats: Activity Filters */}
+                <View style={[styles.sheetStatsRow, { marginBottom: 15 }]}>
+                  <TouchableOpacity
+                    activeOpacity={0.7}
+                    style={[
+                      styles.sheetStatItem,
+                      trainerListStatusFilter === "all" && {
+                        backgroundColor: "#F1F5F9",
+                        borderColor: "#64748B",
+                        borderWidth: 2,
+                      },
+                    ]}
+                    onPress={() => setTrainerListStatusFilter("all")}
+                  >
+                    <Text style={[styles.sheetStatValue, { color: "#64748B" }]}>
+                      {adminTrainers.length}
+                    </Text>
+                    <Text style={styles.sheetStatLabel}>Todos</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    activeOpacity={0.7}
+                    style={[
+                      styles.sheetStatItem,
+                      trainerListStatusFilter === "active" && {
+                        backgroundColor: "#F0FDF4",
+                        borderColor: "#16A34A",
+                        borderWidth: 2,
+                      },
+                    ]}
+                    onPress={() => setTrainerListStatusFilter("active")}
+                  >
+                    <Text style={[styles.sheetStatValue, { color: "#16A34A" }]}>
+                      {
+                        (Array.isArray(adminTrainers) ? adminTrainers : []).filter((u) => u?.ativo)
+                          .length
+                      }
+                    </Text>
+                    <Text style={styles.sheetStatLabel}>Ativos</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    activeOpacity={0.7}
+                    style={[
+                      styles.sheetStatItem,
+                      trainerListStatusFilter === "blocked" && {
+                        backgroundColor: "#FEF2F2",
+                        borderColor: "#DC2626",
+                        borderWidth: 2,
+                      },
+                    ]}
+                    onPress={() => setTrainerListStatusFilter("blocked")}
+                  >
+                    <Text style={[styles.sheetStatValue, { color: "#DC2626" }]}>
+                      {
+                        (Array.isArray(adminTrainers) ? adminTrainers : []).filter(
+                          (u) => u && !u?.ativo
+                        ).length
+                      }
+                    </Text>
+                    <Text style={styles.sheetStatLabel}>Bloqueados</Text>
+                  </TouchableOpacity>
+                </View>
+
+                {/* Search Bar */}
+                <View style={[styles.searchContainer, { marginBottom: 10 }]}>
+                  <Search size={18} color="#94A3B8" style={styles.searchIcon} />
+                  <TextInput
+                    placeholder="Buscar por nome ou e-mail..."
+                    placeholderTextColor="#94A3B8"
+                    style={styles.searchInput}
+                    value={trainerListSearchQuery}
+                    onChangeText={setTrainerListSearchQuery}
+                  />
+                  {trainerListSearchQuery.length > 0 && (
                     <TouchableOpacity
-                      style={styles.proUserCard}
-                      activeOpacity={0.8}
-                      onPress={() => openUserDetail(item)}
+                      onPress={() => setTrainerListSearchQuery("")}
+                      style={{ marginRight: 15 }}
                     >
-                      <View style={styles.proUserMain}>
-                        <View style={styles.proAvatarContainer}>
+                      <XCircle size={18} color="#94A3B8" />
+                    </TouchableOpacity>
+                  )}
+                </View>
+
+                {loadingSheet ? (
+                  <ActivityIndicator color="#6366F1" style={{ marginTop: 40 }} />
+                ) : (
+                  <BottomSheetFlatList
+                    data={filteredAdminTrainers}
+                    keyExtractor={(item: any) => String(item?.id_us || Math.random())}
+                    showsVerticalScrollIndicator={false}
+                    style={{ flex: 1, marginTop: 5 }}
+                    contentContainerStyle={{ paddingBottom: insets.bottom + 150 }}
+                    ListEmptyComponent={() => (
+                      <View style={styles.proEmptyState}>
+                        <Users size={40} color="#E2E8F0" />
+                        <Text style={styles.emptyTxt}>Nenhum personal encontrado.</Text>
+                      </View>
+                    )}
+                    renderItem={({ item }: { item: any }) => (
+                      <TouchableOpacity
+                        style={styles.proUserCard}
+                        activeOpacity={0.8}
+                        onPress={() => openUserDetail(item)}
+                      >
+                        <View style={styles.proUserMain}>
+                          <View style={styles.proAvatarContainer}>
+                            <Image
+                              source={{
+                                uri:
+                                  item.foto_url ||
+                                  item.avatar_url ||
+                                  "https://images.unsplash.com/photo-1594824476967-48c8b964273f?w=100&h=100&fit=crop",
+                              }}
+                              style={styles.proAvatar}
+                            />
+                          </View>
+
+                          <View style={{ flex: 1, marginLeft: 16 }}>
+                            <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                              <Text style={[styles.proName, { flexShrink: 1 }]} numberOfLines={1}>
+                                {item.nome}
+                              </Text>
+                              {String(item?.role || item?.tipo || "")
+                                .toLowerCase()
+                                .includes("admin") && <ShieldCheck size={14} color="#6366F1" />}
+                            </View>
+                            <Text style={styles.proEmail}>{item.email}</Text>
+
+                            <View style={[styles.proBadgeRow, { marginTop: 8 }]}>
+                              <View style={[styles.proBadge, { backgroundColor: "#F0FDF4" }]}>
+                                <Text style={[styles.proBadgeText, { color: "#16A34A" }]}>
+                                  PERSONAL
+                                </Text>
+                              </View>
+                              <View
+                                style={[
+                                  styles.proBadge,
+                                  { backgroundColor: item.ativo ? "#DCFCE7" : "#FEE2E2" },
+                                ]}
+                              >
+                                <View
+                                  style={[
+                                    styles.dot,
+                                    { backgroundColor: item.ativo ? "#10B981" : "#EF4444" },
+                                  ]}
+                                />
+                                <Text
+                                  style={[
+                                    styles.proBadgeText,
+                                    { color: item?.ativo ? "#106534" : "#991B1B" },
+                                  ]}
+                                >
+                                  {item?.ativo ? "Ativo" : "Bloqueado"}
+                                </Text>
+                              </View>
+                            </View>
+                          </View>
+
+                          <View style={{ justifyContent: "center", paddingLeft: 10 }}>
+                            <ChevronRight size={20} color="#CBD5E1" />
+                          </View>
+                        </View>
+                      </TouchableOpacity>
+                    )}
+                  />
+                )}
+              </View>
+            </BottomSheet>
+          )}
+
+          {/* ── SHEET: PLANOS EXPIRANDO ── */}
+          {openSheets["expiring"] && (
+            <BottomSheet
+              ref={expiringSheetRef}
+              onClose={() => setOpenSheets((prev) => ({ ...prev, expiring: false }))}
+              index={0}
+              snapPoints={[SCREEN_HEIGHT]}
+              enablePanDownToClose
+              backdropComponent={renderBackdrop}
+              backgroundStyle={{ borderRadius: 32 }}
+            >
+              <View style={[styles.sheetContent, { flex: 1, paddingBottom: 0 }]}>
+                <View style={styles.sheetHeader}>
+                  <View>
+                    <Text style={styles.sheetTitle}>Controle de Renovação</Text>
+                    <Text style={styles.sheetSubtitle}>
+                      {rawExpiringUsers.length} mensardes rastreados
+                    </Text>
+                  </View>
+                  <TouchableOpacity
+                    onPress={() => expiringSheetRef.current?.close()}
+                    style={styles.sheetCloseBtn}
+                  >
+                    <X size={22} color="#64748B" />
+                  </TouchableOpacity>
+                </View>
+
+                {/* Quick Stats: Plan Filters */}
+                <View style={styles.sheetStatsRow}>
+                  <TouchableOpacity
+                    activeOpacity={0.7}
+                    style={[
+                      styles.sheetStatItem,
+                      expiringPlanFilter === "premium" && {
+                        backgroundColor: "#EEF2FF",
+                        borderColor: "#6366F1",
+                        borderWidth: 2,
+                      },
+                    ]}
+                    onPress={() =>
+                      setExpiringPlanFilter(expiringPlanFilter === "premium" ? "all" : "premium")
+                    }
+                  >
+                    <Text style={[styles.sheetStatValue, { color: "#6366F1" }]}>
+                      {
+                        rawExpiringUsers.filter((u) => {
+                          const plan = String(u?.plan || u?.plano || "").toLowerCase();
+                          return plan.includes("premium") || plan.includes("gold");
+                        }).length
+                      }
+                    </Text>
+                    <Text style={styles.sheetStatLabel}>Premium</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    activeOpacity={0.7}
+                    style={[
+                      styles.sheetStatItem,
+                      expiringPlanFilter === "familia" && {
+                        backgroundColor: "#ECFEFF",
+                        borderColor: "#06B6D4",
+                        borderWidth: 2,
+                      },
+                    ]}
+                    onPress={() =>
+                      setExpiringPlanFilter(expiringPlanFilter === "familia" ? "all" : "familia")
+                    }
+                  >
+                    <Text style={[styles.sheetStatValue, { color: "#06B6D4" }]}>
+                      {
+                        rawExpiringUsers.filter((u) => {
+                          const plan = String(u?.plan || u?.plano || "").toLowerCase();
+                          return plan.includes("familia") || plan.includes("family");
+                        }).length
+                      }
+                    </Text>
+                    <Text style={styles.sheetStatLabel}>Família</Text>
+                  </TouchableOpacity>
+                </View>
+
+                {/* Search Bar */}
+                <View style={styles.searchContainer}>
+                  <Search size={18} color="#94A3B8" style={styles.searchIcon} />
+                  <TextInput
+                    style={styles.searchInput}
+                    placeholder="Buscar assinante por nome ou e-mail..."
+                    placeholderTextColor="#94A3B8"
+                    value={expiringSearchQuery}
+                    onChangeText={setExpiringSearchQuery}
+                  />
+                  {expiringSearchQuery.length > 0 && (
+                    <TouchableOpacity onPress={() => setExpiringSearchQuery("")}>
+                      <X size={16} color="#94A3B8" />
+                    </TouchableOpacity>
+                  )}
+                </View>
+
+                <BottomSheetFlatList
+                  data={filteredExpiringUsers}
+                  keyExtractor={(item: any) => String(item?.id_us || item?.id || Math.random())}
+                  showsVerticalScrollIndicator={false}
+                  contentContainerStyle={{ paddingBottom: insets.bottom + 40, paddingTop: 10 }}
+                  ListEmptyComponent={() =>
+                    !loadingSheet && (
+                      <View style={[styles.proEmptyState, { marginTop: 80 }]}>
+                        <Bell size={48} color="#E2E8F0" />
+                        <Text style={styles.emptyTxt}>
+                          Nenhuma renovação pendente para os próximos dias.
+                        </Text>
+                      </View>
+                    )
+                  }
+                  renderItem={({ item }: { item: any }) => {
+                    if (!item) return null;
+                    const planType = String(
+                      item?.plano || item?.plan || item?.nome_plano || ""
+                    ).toLowerCase();
+                    const isPremium = planType.includes("premium") || planType.includes("gold");
+                    const isFamilia = planType.includes("familia") || planType.includes("family");
+
+                    // --- LÓGICA DE CÁLCULO DE DATA ---
+                    const rawActivation =
+                      item?.created_at || item?.activated_at || item?.data_ativacao;
+                    let displayExpiry =
+                      item?.vencimento ||
+                      item?.validade ||
+                      item?.expires_at ||
+                      item?.data_expiracao;
+
+                    if ((!displayExpiry || displayExpiry === "Em análise") && rawActivation) {
+                      try {
+                        const actDate = new Date(rawActivation);
+                        // Adiciona 1 mês por padrão para planos mensais
+                        actDate.setMonth(actDate.getMonth() + 1);
+                        try {
+                          displayExpiry = actDate.toLocaleDateString("pt-BR");
+                        } catch (e) {
+                          displayExpiry = actDate.toISOString().split("T")[0];
+                        }
+                      } catch (e) {
+                        displayExpiry = "Em análise";
+                      }
+                    }
+
+                    // Cálculo de dias restantes (aproximado)
+                    let daysLeft = 30;
+                    let progress = 0.5;
+                    if (displayExpiry && displayExpiry.includes("/")) {
+                      const [d, m, y] = displayExpiry.split("/").map(Number);
+                      const expiryObj = new Date(y, m - 1, d);
+                      const diffTime = expiryObj.getTime() - new Date().getTime();
+                      daysLeft = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                      // ProgressBar logic (assumindo ciclo de 30 dias)
+                      progress = Math.max(0, Math.min(1, (30 - daysLeft) / 30));
+                    }
+
+                    const isCritical = daysLeft <= 7 && daysLeft >= 0;
+                    const isExpired = daysLeft < 0;
+
+                    const displayDays = isExpired ? 0 : daysLeft;
+                    const semTextTitle = isExpired ? "#475569" : isCritical ? "#EF4444" : "#1E293B";
+                    const semTextLabel = isExpired ? "#94A3B8" : isCritical ? "#EF4444" : "#64748B";
+
+                    // --- DIAGNÓSTICO PARA VALIDAÇÃO ---
+                    const rawStart =
+                      item.created_at || item.activated_at || item.data_ativacao || "Não informado";
+                    const rawEnd =
+                      item.vencimento ||
+                      item.validade ||
+                      item.expires_at ||
+                      item.data_expiracao ||
+                      "Nulo no DB";
+
+                    return (
+                      <View
+                        style={[
+                          styles.compactRowCard,
+                          isCritical && { borderColor: "#FEE2E2", backgroundColor: "#FFFBFA" },
+                          isExpired && { borderColor: "#E2E8F0", backgroundColor: "#F8FAFC" },
+                        ]}
+                      >
+                        <View style={styles.compactRowMain}>
                           <Image
                             source={{
                               uri:
                                 item.foto_url ||
                                 item.avatar_url ||
-                                "https://images.unsplash.com/photo-1594824476967-48c8b964273f?w=100&h=100&fit=crop",
+                                "https://images.unsplash.com/photo-1633332755192-727a05c4013d?w=100",
                             }}
-                            style={styles.proAvatar}
+                            style={[styles.compactAvatar, isExpired && { opacity: 0.6 }]}
                           />
-                        </View>
-
-                        <View style={{ flex: 1, marginLeft: 16 }}>
-                          <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-                            <Text style={[styles.proName, { flexShrink: 1 }]} numberOfLines={1}>
-                              {item.nome}
-                            </Text>
-                            {String(item?.role || item?.tipo || "")
-                              .toLowerCase()
-                              .includes("admin") && <ShieldCheck size={14} color="#6366F1" />}
-                          </View>
-                          <Text style={styles.proEmail}>{item.email}</Text>
-
-                          <View style={[styles.proBadgeRow, { marginTop: 8 }]}>
-                            <View style={[styles.proBadge, { backgroundColor: "#F0FDF4" }]}>
-                              <Text style={[styles.proBadgeText, { color: "#16A34A" }]}>
-                                PERSONAL
+                          <View style={{ flex: 1, marginLeft: 12 }}>
+                            <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                              <Text
+                                style={[styles.compactName, isExpired && { color: "#475569" }]}
+                                numberOfLines={1}
+                              >
+                                {item.nome}
                               </Text>
-                            </View>
-                            <View
-                              style={[
-                                styles.proBadge,
-                                { backgroundColor: item.ativo ? "#DCFCE7" : "#FEE2E2" },
-                              ]}
-                            >
                               <View
                                 style={[
-                                  styles.dot,
-                                  { backgroundColor: item.ativo ? "#10B981" : "#EF4444" },
-                                ]}
-                              />
-                              <Text
-                                style={[
-                                  styles.proBadgeText,
-                                  { color: item?.ativo ? "#106534" : "#991B1B" },
-                                ]}
-                              >
-                                {item?.ativo ? "Ativo" : "Bloqueado"}
-                              </Text>
-                            </View>
-                          </View>
-                        </View>
-
-                        <View style={{ justifyContent: "center", paddingLeft: 10 }}>
-                          <ChevronRight size={20} color="#CBD5E1" />
-                        </View>
-                      </View>
-                    </TouchableOpacity>
-                  )}
-                />
-              )}
-            </View>
-          </BottomSheet>
-
-          {/* ── SHEET: PLANOS EXPIRANDO ── */}
-          <BottomSheet
-            ref={expiringSheetRef}
-            index={-1}
-            snapPoints={[SCREEN_HEIGHT]}
-            enablePanDownToClose
-            backdropComponent={renderBackdrop}
-            backgroundStyle={{ borderRadius: 32 }}
-          >
-            <View style={[styles.sheetContent, { flex: 1, paddingBottom: 0 }]}>
-              <View style={styles.sheetHeader}>
-                <View>
-                  <Text style={styles.sheetTitle}>Controle de Renovação</Text>
-                  <Text style={styles.sheetSubtitle}>
-                    {rawExpiringUsers.length} mensardes rastreados
-                  </Text>
-                </View>
-                <TouchableOpacity
-                  onPress={() => expiringSheetRef.current?.close()}
-                  style={styles.sheetCloseBtn}
-                >
-                  <X size={22} color="#64748B" />
-                </TouchableOpacity>
-              </View>
-
-              {/* Quick Stats: Plan Filters */}
-              <View style={styles.sheetStatsRow}>
-                <TouchableOpacity
-                  activeOpacity={0.7}
-                  style={[
-                    styles.sheetStatItem,
-                    expiringPlanFilter === "premium" && {
-                      backgroundColor: "#EEF2FF",
-                      borderColor: "#6366F1",
-                      borderWidth: 2,
-                    },
-                  ]}
-                  onPress={() =>
-                    setExpiringPlanFilter(expiringPlanFilter === "premium" ? "all" : "premium")
-                  }
-                >
-                  <Text style={[styles.sheetStatValue, { color: "#6366F1" }]}>
-                    {
-                      rawExpiringUsers.filter((u) => {
-                        const plan = String(u?.plan || u?.plano || "").toLowerCase();
-                        return plan.includes("premium") || plan.includes("gold");
-                      }).length
-                    }
-                  </Text>
-                  <Text style={styles.sheetStatLabel}>Premium</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  activeOpacity={0.7}
-                  style={[
-                    styles.sheetStatItem,
-                    expiringPlanFilter === "familia" && {
-                      backgroundColor: "#ECFEFF",
-                      borderColor: "#06B6D4",
-                      borderWidth: 2,
-                    },
-                  ]}
-                  onPress={() =>
-                    setExpiringPlanFilter(expiringPlanFilter === "familia" ? "all" : "familia")
-                  }
-                >
-                  <Text style={[styles.sheetStatValue, { color: "#06B6D4" }]}>
-                    {
-                      rawExpiringUsers.filter((u) => {
-                        const plan = String(u?.plan || u?.plano || "").toLowerCase();
-                        return plan.includes("familia") || plan.includes("family");
-                      }).length
-                    }
-                  </Text>
-                  <Text style={styles.sheetStatLabel}>Família</Text>
-                </TouchableOpacity>
-              </View>
-
-              {/* Search Bar */}
-              <View style={styles.searchContainer}>
-                <Search size={18} color="#94A3B8" style={styles.searchIcon} />
-                <TextInput
-                  style={styles.searchInput}
-                  placeholder="Buscar assinante por nome ou e-mail..."
-                  placeholderTextColor="#94A3B8"
-                  value={expiringSearchQuery}
-                  onChangeText={setExpiringSearchQuery}
-                />
-                {expiringSearchQuery.length > 0 && (
-                  <TouchableOpacity onPress={() => setExpiringSearchQuery("")}>
-                    <X size={16} color="#94A3B8" />
-                  </TouchableOpacity>
-                )}
-              </View>
-
-              <BottomSheetFlatList
-                data={filteredExpiringUsers}
-                keyExtractor={(item: any) => String(item?.id_us || item?.id || Math.random())}
-                showsVerticalScrollIndicator={false}
-                contentContainerStyle={{ paddingBottom: insets.bottom + 40, paddingTop: 10 }}
-                ListEmptyComponent={() =>
-                  !loadingSheet && (
-                    <View style={[styles.proEmptyState, { marginTop: 80 }]}>
-                      <Bell size={48} color="#E2E8F0" />
-                      <Text style={styles.emptyTxt}>
-                        Nenhuma renovação pendente para os próximos dias.
-                      </Text>
-                    </View>
-                  )
-                }
-                renderItem={({ item }: { item: any }) => {
-                  if (!item) return null;
-                  const planType = String(
-                    item?.plano || item?.plan || item?.nome_plano || ""
-                  ).toLowerCase();
-                  const isPremium = planType.includes("premium") || planType.includes("gold");
-                  const isFamilia = planType.includes("familia") || planType.includes("family");
-
-                  // --- LÓGICA DE CÁLCULO DE DATA ---
-                  const rawActivation =
-                    item?.created_at || item?.activated_at || item?.data_ativacao;
-                  let displayExpiry =
-                    item?.vencimento || item?.validade || item?.expires_at || item?.data_expiracao;
-
-                  if ((!displayExpiry || displayExpiry === "Em análise") && rawActivation) {
-                    try {
-                      const actDate = new Date(rawActivation);
-                      // Adiciona 1 mês por padrão para planos mensais
-                      actDate.setMonth(actDate.getMonth() + 1);
-                      try {
-                        displayExpiry = actDate.toLocaleDateString("pt-BR");
-                      } catch (e) {
-                        displayExpiry = actDate.toISOString().split("T")[0];
-                      }
-                    } catch (e) {
-                      displayExpiry = "Em análise";
-                    }
-                  }
-
-                  // Cálculo de dias restantes (aproximado)
-                  let daysLeft = 30;
-                  let progress = 0.5;
-                  if (displayExpiry && displayExpiry.includes("/")) {
-                    const [d, m, y] = displayExpiry.split("/").map(Number);
-                    const expiryObj = new Date(y, m - 1, d);
-                    const diffTime = expiryObj.getTime() - new Date().getTime();
-                    daysLeft = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-                    // ProgressBar logic (assumindo ciclo de 30 dias)
-                    progress = Math.max(0, Math.min(1, (30 - daysLeft) / 30));
-                  }
-
-                  const isCritical = daysLeft <= 7 && daysLeft >= 0;
-                  const isExpired = daysLeft < 0;
-
-                  const displayDays = isExpired ? 0 : daysLeft;
-                  const semTextTitle = isExpired ? "#475569" : isCritical ? "#EF4444" : "#1E293B";
-                  const semTextLabel = isExpired ? "#94A3B8" : isCritical ? "#EF4444" : "#64748B";
-
-                  // --- DIAGNÓSTICO PARA VALIDAÇÃO ---
-                  const rawStart =
-                    item.created_at || item.activated_at || item.data_ativacao || "Não informado";
-                  const rawEnd =
-                    item.vencimento ||
-                    item.validade ||
-                    item.expires_at ||
-                    item.data_expiracao ||
-                    "Nulo no DB";
-
-                  return (
-                    <View
-                      style={[
-                        styles.compactRowCard,
-                        isCritical && { borderColor: "#FEE2E2", backgroundColor: "#FFFBFA" },
-                        isExpired && { borderColor: "#E2E8F0", backgroundColor: "#F8FAFC" },
-                      ]}
-                    >
-                      <View style={styles.compactRowMain}>
-                        <Image
-                          source={{
-                            uri:
-                              item.foto_url ||
-                              item.avatar_url ||
-                              "https://images.unsplash.com/photo-1633332755192-727a05c4013d?w=100",
-                          }}
-                          style={[styles.compactAvatar, isExpired && { opacity: 0.6 }]}
-                        />
-                        <View style={{ flex: 1, marginLeft: 12 }}>
-                          <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-                            <Text
-                              style={[styles.compactName, isExpired && { color: "#475569" }]}
-                              numberOfLines={1}
-                            >
-                              {item.nome}
-                            </Text>
-                            <View
-                              style={[
-                                styles.compactPlanBadge,
-                                {
-                                  backgroundColor: isExpired
-                                    ? "#E2E8F0"
-                                    : isPremium
-                                      ? "#F3E8FF"
-                                      : "#E0F2FE",
-                                },
-                              ]}
-                            >
-                              <Text
-                                style={[
-                                  styles.compactPlanText,
+                                  styles.compactPlanBadge,
                                   {
-                                    color: isExpired
-                                      ? "#64748B"
+                                    backgroundColor: isExpired
+                                      ? "#E2E8F0"
                                       : isPremium
-                                        ? "#9333EA"
-                                        : "#0284C7",
+                                        ? "#F3E8FF"
+                                        : "#E0F2FE",
                                   },
                                 ]}
                               >
-                                {isPremium ? "PREMIUM" : "FAMÍLIA"}
+                                <Text
+                                  style={[
+                                    styles.compactPlanText,
+                                    {
+                                      color: isExpired
+                                        ? "#64748B"
+                                        : isPremium
+                                          ? "#9333EA"
+                                          : "#0284C7",
+                                    },
+                                  ]}
+                                >
+                                  {isPremium ? "PREMIUM" : "FAMÍLIA"}
+                                </Text>
+                              </View>
+                            </View>
+
+                            <View style={styles.compactDatesRow}>
+                              <Text style={styles.compactDateLabel}>
+                                Início:{" "}
+                                <Text style={styles.compactDateValue}>
+                                  {rawStart
+                                    .split("T")[0]
+                                    .split("-")
+                                    .reverse()
+                                    .slice(0, 2)
+                                    .join("/")}
+                                </Text>
+                              </Text>
+                              <Text style={styles.compactDateDot}> • </Text>
+                              <Text style={styles.compactDateLabel}>
+                                Renov.:{" "}
+                                <Text
+                                  style={[
+                                    styles.compactDateValue,
+                                    isCritical && { color: "#EF4444" },
+                                    isExpired && { color: "#64748B" },
+                                  ]}
+                                >
+                                  {displayExpiry.split("/").slice(0, 2).join("/")}
+                                </Text>
                               </Text>
                             </View>
                           </View>
 
-                          <View style={styles.compactDatesRow}>
-                            <Text style={styles.compactDateLabel}>
-                              Início:{" "}
-                              <Text style={styles.compactDateValue}>
-                                {rawStart.split("T")[0].split("-").reverse().slice(0, 2).join("/")}
-                              </Text>
+                          <View
+                            style={[
+                              styles.compactDaysBox,
+                              {
+                                borderLeftColor: isExpired
+                                  ? "#CBD5E1"
+                                  : isCritical
+                                    ? "#FEE2E2"
+                                    : "#F1F5F9",
+                              },
+                            ]}
+                          >
+                            <Text style={[styles.compactDaysNumber, { color: semTextTitle }]}>
+                              {displayDays}
                             </Text>
-                            <Text style={styles.compactDateDot}> • </Text>
-                            <Text style={styles.compactDateLabel}>
-                              Renov.:{" "}
-                              <Text
-                                style={[
-                                  styles.compactDateValue,
-                                  isCritical && { color: "#EF4444" },
-                                  isExpired && { color: "#64748B" },
-                                ]}
-                              >
-                                {displayExpiry.split("/").slice(0, 2).join("/")}
-                              </Text>
+                            <Text style={[styles.compactDaysLabel, { color: semTextLabel }]}>
+                              {isExpired ? "VENCIDO" : "DIAS"}
                             </Text>
                           </View>
                         </View>
 
-                        <View
-                          style={[
-                            styles.compactDaysBox,
-                            {
-                              borderLeftColor: isExpired
-                                ? "#CBD5E1"
-                                : isCritical
-                                  ? "#FEE2E2"
-                                  : "#F1F5F9",
-                            },
-                          ]}
-                        >
-                          <Text style={[styles.compactDaysNumber, { color: semTextTitle }]}>
-                            {displayDays}
-                          </Text>
-                          <Text style={[styles.compactDaysLabel, { color: semTextLabel }]}>
-                            {isExpired ? "VENCIDO" : "DIAS"}
-                          </Text>
+                        {/* Linha de progresso ultra-fina no rodapé do card */}
+                        <View style={styles.compactProgressBg}>
+                          <View
+                            style={[
+                              styles.compactProgressFill,
+                              {
+                                width: `${(1 - progress) * 100}%`,
+                                backgroundColor: isExpired
+                                  ? "#94A3B8"
+                                  : isCritical
+                                    ? "#EF4444"
+                                    : "#E2E8F0",
+                              },
+                            ]}
+                          />
                         </View>
                       </View>
-
-                      {/* Linha de progresso ultra-fina no rodapé do card */}
-                      <View style={styles.compactProgressBg}>
-                        <View
-                          style={[
-                            styles.compactProgressFill,
-                            {
-                              width: `${(1 - progress) * 100}%`,
-                              backgroundColor: isExpired
-                                ? "#94A3B8"
-                                : isCritical
-                                  ? "#EF4444"
-                                  : "#E2E8F0",
-                            },
-                          ]}
-                        />
-                      </View>
-                    </View>
-                  );
-                }}
-              />
-            </View>
-          </BottomSheet>
+                    );
+                  }}
+                />
+              </View>
+            </BottomSheet>
+          )}
 
           {/* ── SHEET: GESTÃO DE PLANOS ── */}
-          <BottomSheet
-            ref={plansSheetRef}
-            index={-1}
-            snapPoints={[SCREEN_HEIGHT]}
-            enablePanDownToClose
-            backdropComponent={renderBackdrop}
-            backgroundStyle={{ borderRadius: 32 }}
-          >
-            <View style={[styles.sheetContent, { flex: 1, paddingBottom: 0 }]}>
-              <View style={styles.sheetHeader}>
-                <View>
-                  <Text style={styles.sheetTitle}>Catálogo Estratégico</Text>
-                  <Text style={styles.sheetSubtitle}>
-                    {adminPlans.length} Modelos de cobrança ativos
-                  </Text>
+          {openSheets["plans"] && (
+            <BottomSheet
+              ref={plansSheetRef}
+              onClose={() => setOpenSheets((prev) => ({ ...prev, plans: false }))}
+              index={0}
+              snapPoints={[SCREEN_HEIGHT]}
+              enablePanDownToClose
+              backdropComponent={renderBackdrop}
+              backgroundStyle={{ borderRadius: 32 }}
+            >
+              <View style={[styles.sheetContent, { flex: 1, paddingBottom: 0 }]}>
+                <View style={styles.sheetHeader}>
+                  <View>
+                    <Text style={styles.sheetTitle}>Catálogo Estratégico</Text>
+                    <Text style={styles.sheetSubtitle}>
+                      {adminPlans.length} Modelos de cobrança ativos
+                    </Text>
+                  </View>
+                  <TouchableOpacity
+                    onPress={() => plansSheetRef.current?.close()}
+                    style={styles.sheetCloseBtn}
+                  >
+                    <X size={22} color="#64748B" />
+                  </TouchableOpacity>
                 </View>
-                <TouchableOpacity
-                  onPress={() => plansSheetRef.current?.close()}
-                  style={styles.sheetCloseBtn}
-                >
-                  <X size={22} color="#64748B" />
-                </TouchableOpacity>
-              </View>
 
-              <BottomSheetFlatList
-                data={adminPlans}
-                keyExtractor={(item: any) => String(item?.id || Math.random())}
-                showsVerticalScrollIndicator={false}
-                contentContainerStyle={{
-                  paddingBottom: insets.bottom + 120,
-                  paddingTop: 10,
-                }}
-                ListEmptyComponent={() =>
-                  !loadingSheet && (
-                    <View style={[styles.proEmptyState, { marginTop: 80 }]}>
-                      <CreditCard size={48} color="#E2E8F0" />
-                      <Text style={styles.emptyTxt}>Nenhum plano disponível.</Text>
-                    </View>
-                  )
-                }
-                renderItem={({ item }: { item: any }) => {
-                  if (!item) return null;
-                  const planName = String(item?.name || "").toLowerCase();
-                  const isPremium =
-                    planName.includes("premium") ||
-                    planName.includes("gold") ||
-                    planName.includes("vip");
-                  const isFamilia =
-                    planName.includes("familia") ||
-                    planName.includes("family") ||
-                    planName.includes("combo");
+                <BottomSheetFlatList
+                  data={adminPlans}
+                  keyExtractor={(item: any) => String(item?.id || Math.random())}
+                  showsVerticalScrollIndicator={false}
+                  contentContainerStyle={{
+                    paddingBottom: insets.bottom + 120,
+                    paddingTop: 10,
+                  }}
+                  ListEmptyComponent={() =>
+                    !loadingSheet && (
+                      <View style={[styles.proEmptyState, { marginTop: 80 }]}>
+                        <CreditCard size={48} color="#E2E8F0" />
+                        <Text style={styles.emptyTxt}>Nenhum plano disponível.</Text>
+                      </View>
+                    )
+                  }
+                  renderItem={({ item }: { item: any }) => {
+                    if (!item) return null;
+                    const planName = String(item?.name || "").toLowerCase();
+                    const isPremium =
+                      planName.includes("premium") ||
+                      planName.includes("gold") ||
+                      planName.includes("vip");
+                    const isFamilia =
+                      planName.includes("familia") ||
+                      planName.includes("family") ||
+                      planName.includes("combo");
 
-                  let accentColor = "#64748B"; // Default
-                  if (isPremium) accentColor = "#6366F1";
-                  if (isFamilia) accentColor = "#06B6D4";
+                    let accentColor = "#64748B"; // Default
+                    if (isPremium) accentColor = "#6366F1";
+                    if (isFamilia) accentColor = "#06B6D4";
 
-                  return (
-                    <TouchableOpacity
-                      key={item?.id}
-                      style={[
-                        styles.premiumPlanCard,
-                        { borderLeftColor: accentColor, borderLeftWidth: 4 },
-                      ]}
-                      onPress={() => openEditPlan(item)}
-                      activeOpacity={0.85}
-                    >
-                      <View style={styles.stripePlanRow}>
-                        <View style={styles.stripePlanInfo}>
-                          <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-                            <Text style={styles.premiumPlanName}>{item.name}</Text>
-                            {isPremium && (
-                              <View style={[styles.proBadge, { backgroundColor: "#EEF2FF" }]}>
-                                <Star size={10} color="#6366F1" fill="#6366F1" />
-                                <Text
-                                  style={[styles.proBadgeText, { color: "#6366F1", marginLeft: 4 }]}
-                                >
-                                  Popular
-                                </Text>
-                              </View>
-                            )}
-                          </View>
-                          <Text style={[styles.premiumPlanPrice, { color: accentColor }]}>
-                            {formatCurrency(item.price)}
-                            <Text style={styles.premiumPlanInterval}>
-                              {" "}
-                              / {item.interval === "month" ? "mês" : "ano"}
+                    return (
+                      <TouchableOpacity
+                        key={item?.id}
+                        style={[
+                          styles.premiumPlanCard,
+                          { borderLeftColor: accentColor, borderLeftWidth: 4 },
+                        ]}
+                        onPress={() => openEditPlan(item)}
+                        activeOpacity={0.85}
+                      >
+                        <View style={styles.stripePlanRow}>
+                          <View style={styles.stripePlanInfo}>
+                            <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                              <Text style={styles.premiumPlanName}>{item.name}</Text>
+                              {isPremium && (
+                                <View style={[styles.proBadge, { backgroundColor: "#EEF2FF" }]}>
+                                  <Star size={10} color="#6366F1" fill="#6366F1" />
+                                  <Text
+                                    style={[
+                                      styles.proBadgeText,
+                                      { color: "#6366F1", marginLeft: 4 },
+                                    ]}
+                                  >
+                                    Popular
+                                  </Text>
+                                </View>
+                              )}
+                            </View>
+                            <Text style={[styles.premiumPlanPrice, { color: accentColor }]}>
+                              {formatCurrency(item.price)}
+                              <Text style={styles.premiumPlanInterval}>
+                                {" "}
+                                / {item.interval === "month" ? "mês" : "ano"}
+                              </Text>
                             </Text>
-                          </Text>
+                          </View>
+
+                          <TouchableOpacity
+                            style={styles.premiumDeleteBtn}
+                            onPress={() => deletePlan(item.id, item.name)}
+                          >
+                            <Trash2 size={18} color="#EF4444" />
+                          </TouchableOpacity>
                         </View>
 
-                        <TouchableOpacity
-                          style={styles.premiumDeleteBtn}
-                          onPress={() => deletePlan(item.id, item.name)}
-                        >
-                          <Trash2 size={18} color="#EF4444" />
-                        </TouchableOpacity>
-                      </View>
-
-                      <View style={styles.premiumFeatureSummary}>
-                        <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-                          <Layers size={14} color="#94A3B8" />
-                          <Text style={styles.premiumFeatureText}>
-                            {
-                              (Array.isArray(item.features)
-                                ? item.features
-                                : JSON.parse(item.features || "[]")
-                              ).length
-                            }{" "}
-                            vantagens exclusivas
-                          </Text>
+                        <View style={styles.premiumFeatureSummary}>
+                          <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                            <Layers size={14} color="#94A3B8" />
+                            <Text style={styles.premiumFeatureText}>
+                              {
+                                (Array.isArray(item.features)
+                                  ? item.features
+                                  : JSON.parse(item.features || "[]")
+                                ).length
+                              }{" "}
+                              vantagens exclusivas
+                            </Text>
+                          </View>
+                          <ChevronRight size={18} color="#CBD5E1" />
                         </View>
-                        <ChevronRight size={18} color="#CBD5E1" />
-                      </View>
-                    </TouchableOpacity>
-                  );
-                }}
-              />
+                      </TouchableOpacity>
+                    );
+                  }}
+                />
 
-              {/* Premium FAB for Creation */}
-              <View style={[styles.premiumFabContainer, { bottom: insets.bottom + 20 }]}>
-                <TouchableOpacity
-                  style={styles.premiumFAB}
-                  onPress={() => openEditPlan()}
-                  activeOpacity={0.9}
-                >
-                  <LinearGradient colors={["#1E293B", "#0F172A"]} style={styles.premiumFABGradient}>
-                    <Plus size={24} color="#fff" />
-                    <Text style={styles.premiumFABText}>Novo Modelo</Text>
-                  </LinearGradient>
-                </TouchableOpacity>
-              </View>
-            </View>
-          </BottomSheet>
-
-          <BottomSheet
-            ref={editPlanSheetRef}
-            index={-1}
-            snapPoints={[SCREEN_HEIGHT * 0.95]}
-            enablePanDownToClose
-            backdropComponent={renderBackdrop}
-            backgroundStyle={{ borderRadius: 32 }}
-          >
-            <BottomSheetView style={[styles.sheetContent, { flex: 1 }]}>
-              <View style={styles.sheetHeader}>
-                <View>
-                  <Text style={styles.sheetTitle}>
-                    {editingPlan ? "Editar Plano" : "Novo Plano"}
-                  </Text>
-                  <Text style={styles.sheetSubtitle}>Configure os detalhes do produto</Text>
+                {/* Premium FAB for Creation */}
+                <View style={[styles.premiumFabContainer, { bottom: insets.bottom + 20 }]}>
+                  <TouchableOpacity
+                    style={styles.premiumFAB}
+                    onPress={() => openEditPlan()}
+                    activeOpacity={0.9}
+                  >
+                    <LinearGradient
+                      colors={["#1E293B", "#0F172A"]}
+                      style={styles.premiumFABGradient}
+                    >
+                      <Plus size={24} color="#fff" />
+                      <Text style={styles.premiumFABText}>Novo Modelo</Text>
+                    </LinearGradient>
+                  </TouchableOpacity>
                 </View>
-                <TouchableOpacity
-                  onPress={() => editPlanSheetRef.current?.close()}
-                  style={styles.sheetCloseBtn}
-                >
-                  <X size={22} color="#64748B" />
-                </TouchableOpacity>
               </View>
+            </BottomSheet>
+          )}
 
-              <ScrollView
-                style={{ marginTop: 20 }}
-                showsVerticalScrollIndicator={false}
-                contentContainerStyle={{ paddingBottom: insets.bottom + 40 }}
-              >
-                <View style={styles.proFormGroup}>
-                  <Text style={styles.stripeLabel}>NOME DO PRODUTO</Text>
-                  <TextInput
-                    style={styles.stripeInput}
-                    value={planForm.name}
-                    onChangeText={(val) => setPlanForm((f) => ({ ...f, name: val }))}
-                    placeholder="Ex: Plano Gold"
-                    placeholderTextColor="#94A3B8"
-                  />
+          {openSheets["editPlan"] && (
+            <BottomSheet
+              ref={editPlanSheetRef}
+              onClose={() => setOpenSheets((prev) => ({ ...prev, editPlan: false }))}
+              index={0}
+              snapPoints={[SCREEN_HEIGHT * 0.95]}
+              enablePanDownToClose
+              backdropComponent={renderBackdrop}
+              backgroundStyle={{ borderRadius: 32 }}
+            >
+              <BottomSheetView style={[styles.sheetContent, { flex: 1 }]}>
+                <View style={styles.sheetHeader}>
+                  <View>
+                    <Text style={styles.sheetTitle}>
+                      {editingPlan ? "Editar Plano" : "Novo Plano"}
+                    </Text>
+                    <Text style={styles.sheetSubtitle}>Configure os detalhes do produto</Text>
+                  </View>
+                  <TouchableOpacity
+                    onPress={() => editPlanSheetRef.current?.close()}
+                    style={styles.sheetCloseBtn}
+                  >
+                    <X size={22} color="#64748B" />
+                  </TouchableOpacity>
                 </View>
 
-                <View style={{ flexDirection: "row", gap: 16 }}>
-                  <View style={[styles.proFormGroup, { flex: 1 }]}>
-                    <Text style={styles.stripeLabel}>PREÇO (R$)</Text>
+                <ScrollView
+                  style={{ marginTop: 20 }}
+                  showsVerticalScrollIndicator={false}
+                  contentContainerStyle={{ paddingBottom: insets.bottom + 40 }}
+                >
+                  <View style={styles.proFormGroup}>
+                    <Text style={styles.stripeLabel}>NOME DO PRODUTO</Text>
                     <TextInput
                       style={styles.stripeInput}
-                      value={planForm.price}
-                      onChangeText={(val) => setPlanForm((f) => ({ ...f, price: val }))}
-                      placeholder="0.00"
+                      value={planForm.name}
+                      onChangeText={(val) => setPlanForm((f) => ({ ...f, name: val }))}
+                      placeholder="Ex: Plano Gold"
                       placeholderTextColor="#94A3B8"
-                      keyboardType="numeric"
                     />
                   </View>
-                  <View style={[styles.proFormGroup, { flex: 1 }]}>
-                    <Text style={styles.stripeLabel}>INTERVALO</Text>
-                    <View style={styles.stripeIntervalRow}>
-                      <TouchableOpacity
-                        style={[
-                          styles.stripeIntervalBtn,
-                          planForm.interval === "month" && styles.stripeIntervalBtnActive,
-                        ]}
-                        onPress={() => setPlanForm((f) => ({ ...f, interval: "month" }))}
-                      >
-                        <Text
-                          style={[
-                            styles.stripeIntervalText,
-                            planForm.interval === "month" && styles.stripeIntervalTextActive,
-                          ]}
-                        >
-                          Mês
-                        </Text>
-                      </TouchableOpacity>
-                      <TouchableOpacity
-                        style={[
-                          styles.stripeIntervalBtn,
-                          planForm.interval === "year" && styles.stripeIntervalBtnActive,
-                        ]}
-                        onPress={() => setPlanForm((f) => ({ ...f, interval: "year" }))}
-                      >
-                        <Text
-                          style={[
-                            styles.stripeIntervalText,
-                            planForm.interval === "year" && styles.stripeIntervalTextActive,
-                          ]}
-                        >
-                          Ano
-                        </Text>
-                      </TouchableOpacity>
+
+                  <View style={{ flexDirection: "row", gap: 16 }}>
+                    <View style={[styles.proFormGroup, { flex: 1 }]}>
+                      <Text style={styles.stripeLabel}>PREÇO (R$)</Text>
+                      <TextInput
+                        style={styles.stripeInput}
+                        value={planForm.price}
+                        onChangeText={(val) => setPlanForm((f) => ({ ...f, price: val }))}
+                        placeholder="0.00"
+                        placeholderTextColor="#94A3B8"
+                        keyboardType="numeric"
+                      />
                     </View>
-                  </View>
-                </View>
-
-                <View style={styles.proFormGroup}>
-                  <Text style={styles.stripeLabel}>DESCRIÇÃO</Text>
-                  <TextInput
-                    style={[styles.stripeInput, { height: 80, textAlignVertical: "top" }]}
-                    value={planForm.description}
-                    onChangeText={(val) => setPlanForm((f) => ({ ...f, description: val }))}
-                    placeholder="Breve descrição do plano..."
-                    placeholderTextColor="#94A3B8"
-                    multiline
-                  />
-                </View>
-
-                <View style={styles.proFormGroup}>
-                  <Text style={styles.stripeLabel}>BENEFÍCIOS E VANTAGENS</Text>
-                  <View style={styles.stripeFeatureInputRow}>
-                    <TextInput
-                      style={[styles.stripeInput, { flex: 1, marginTop: 0 }]}
-                      value={newFeature}
-                      onChangeText={setNewFeature}
-                      placeholder="Adicionar benefício..."
-                      placeholderTextColor="#94A3B8"
-                      onSubmitEditing={addFeature}
-                    />
-                    <TouchableOpacity style={styles.stripeAddFeatureBtn} onPress={addFeature}>
-                      <Plus size={20} color="#fff" />
-                    </TouchableOpacity>
-                  </View>
-
-                  <View style={{ marginTop: 12, gap: 8 }}>
-                    {planForm.features.map((feat, idx) => (
-                      <View key={idx} style={styles.stripeFeatureItem}>
-                        <Check size={14} color="#10B981" />
-                        <Text style={styles.stripeFeatureText}>{feat}</Text>
-                        <TouchableOpacity onPress={() => removeFeature(idx)}>
-                          <X size={14} color="#94A3B8" />
+                    <View style={[styles.proFormGroup, { flex: 1 }]}>
+                      <Text style={styles.stripeLabel}>INTERVALO</Text>
+                      <View style={styles.stripeIntervalRow}>
+                        <TouchableOpacity
+                          style={[
+                            styles.stripeIntervalBtn,
+                            planForm.interval === "month" && styles.stripeIntervalBtnActive,
+                          ]}
+                          onPress={() => setPlanForm((f) => ({ ...f, interval: "month" }))}
+                        >
+                          <Text
+                            style={[
+                              styles.stripeIntervalText,
+                              planForm.interval === "month" && styles.stripeIntervalTextActive,
+                            ]}
+                          >
+                            Mês
+                          </Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          style={[
+                            styles.stripeIntervalBtn,
+                            planForm.interval === "year" && styles.stripeIntervalBtnActive,
+                          ]}
+                          onPress={() => setPlanForm((f) => ({ ...f, interval: "year" }))}
+                        >
+                          <Text
+                            style={[
+                              styles.stripeIntervalText,
+                              planForm.interval === "year" && styles.stripeIntervalTextActive,
+                            ]}
+                          >
+                            Ano
+                          </Text>
                         </TouchableOpacity>
                       </View>
-                    ))}
-                  </View>
-                </View>
-
-                <TouchableOpacity
-                  style={styles.stripeSaveBtn}
-                  onPress={savePlanEdits}
-                  disabled={loadingSheet}
-                >
-                  {loadingSheet ? (
-                    <ActivityIndicator color="#fff" />
-                  ) : (
-                    <Text style={styles.stripeSaveBtnText}>
-                      {editingPlan ? "Atualizar Plano" : "Criar Plano no Stripe"}
-                    </Text>
-                  )}
-                </TouchableOpacity>
-              </ScrollView>
-            </BottomSheetView>
-          </BottomSheet>
-
-          <BottomSheet
-            ref={userDetailSheetRef}
-            index={-1}
-            snapPoints={[SCREEN_HEIGHT * 0.75]}
-            enablePanDownToClose
-            backdropComponent={renderBackdrop}
-            backgroundStyle={{ borderRadius: 32 }}
-          >
-            <BottomSheetView style={styles.sheetContent}>
-              {selectedUserDetail && (
-                <View style={{ flex: 1 }}>
-                  <View style={styles.sheetHeader}>
-                    <View>
-                      <Text style={styles.sheetTitle}>Perfil do Usuário</Text>
-                      <Text style={styles.sheetSubtitle}>Visão detalhada do membro</Text>
                     </View>
-                    <TouchableOpacity
-                      onPress={() => userDetailSheetRef.current?.close()}
-                      style={styles.sheetCloseBtn}
-                    >
-                      <X size={22} color="#64748B" />
-                    </TouchableOpacity>
                   </View>
 
-                  <ScrollView
-                    showsVerticalScrollIndicator={false}
-                    contentContainerStyle={{ paddingBottom: 40 }}
+                  <View style={styles.proFormGroup}>
+                    <Text style={styles.stripeLabel}>DESCRIÇÃO</Text>
+                    <TextInput
+                      style={[styles.stripeInput, { height: 80, textAlignVertical: "top" }]}
+                      value={planForm.description}
+                      onChangeText={(val) => setPlanForm((f) => ({ ...f, description: val }))}
+                      placeholder="Breve descrição do plano..."
+                      placeholderTextColor="#94A3B8"
+                      multiline
+                    />
+                  </View>
+
+                  <View style={styles.proFormGroup}>
+                    <Text style={styles.stripeLabel}>BENEFÍCIOS E VANTAGENS</Text>
+                    <View style={styles.stripeFeatureInputRow}>
+                      <TextInput
+                        style={[styles.stripeInput, { flex: 1, marginTop: 0 }]}
+                        value={newFeature}
+                        onChangeText={setNewFeature}
+                        placeholder="Adicionar benefício..."
+                        placeholderTextColor="#94A3B8"
+                        onSubmitEditing={addFeature}
+                      />
+                      <TouchableOpacity style={styles.stripeAddFeatureBtn} onPress={addFeature}>
+                        <Plus size={20} color="#fff" />
+                      </TouchableOpacity>
+                    </View>
+
+                    <View style={{ marginTop: 12, gap: 8 }}>
+                      {planForm.features.map((feat, idx) => (
+                        <View key={idx} style={styles.stripeFeatureItem}>
+                          <Check size={14} color="#10B981" />
+                          <Text style={styles.stripeFeatureText}>{feat}</Text>
+                          <TouchableOpacity onPress={() => removeFeature(idx)}>
+                            <X size={14} color="#94A3B8" />
+                          </TouchableOpacity>
+                        </View>
+                      ))}
+                    </View>
+                  </View>
+
+                  <TouchableOpacity
+                    style={styles.stripeSaveBtn}
+                    onPress={savePlanEdits}
+                    disabled={loadingSheet}
                   >
-                    {/* Perfil Principal */}
-                    <View style={{ alignItems: "center", marginTop: 30, marginBottom: 24 }}>
-                      <View
-                        style={{
-                          padding: 4,
-                          borderRadius: 60,
-                          borderWidth: 2,
-                          borderColor: "#BBF246",
-                        }}
-                      >
-                        <Image
-                          source={{
-                            uri:
-                              selectedUserDetail.foto_url ||
-                              "https://images.unsplash.com/photo-1633332755192-727a05c4013d?w=200&h=200&fit=crop",
-                          }}
-                          style={{ width: 110, height: 110, borderRadius: 55 }}
-                        />
+                    {loadingSheet ? (
+                      <ActivityIndicator color="#fff" />
+                    ) : (
+                      <Text style={styles.stripeSaveBtnText}>
+                        {editingPlan ? "Atualizar Plano" : "Criar Plano no Stripe"}
+                      </Text>
+                    )}
+                  </TouchableOpacity>
+                </ScrollView>
+              </BottomSheetView>
+            </BottomSheet>
+          )}
+
+          {openSheets["userDetail"] && (
+            <BottomSheet
+              ref={userDetailSheetRef}
+              onClose={() => setOpenSheets((prev) => ({ ...prev, userDetail: false }))}
+              index={0}
+              snapPoints={[SCREEN_HEIGHT * 0.75]}
+              enablePanDownToClose
+              backdropComponent={renderBackdrop}
+              backgroundStyle={{ borderRadius: 32 }}
+            >
+              <BottomSheetView style={styles.sheetContent}>
+                {selectedUserDetail && (
+                  <View style={{ flex: 1 }}>
+                    <View style={styles.sheetHeader}>
+                      <View>
+                        <Text style={styles.sheetTitle}>Perfil do Usuário</Text>
+                        <Text style={styles.sheetSubtitle}>Visão detalhada do membro</Text>
                       </View>
-                      <Text
-                        style={{ fontSize: 24, fontWeight: "800", color: "#1E293B", marginTop: 16 }}
+                      <TouchableOpacity
+                        onPress={() => userDetailSheetRef.current?.close()}
+                        style={styles.sheetCloseBtn}
                       >
-                        {selectedUserDetail.nome}
-                      </Text>
-                      <Text style={{ fontSize: 14, color: "#64748B", marginTop: 4 }}>
-                        {selectedUserDetail.email}
-                      </Text>
+                        <X size={22} color="#64748B" />
+                      </TouchableOpacity>
                     </View>
 
-                    {/* Cards de Status */}
-                    <View style={{ flexDirection: "row", gap: 12, paddingHorizontal: 20 }}>
-                      <View
-                        style={{
-                          flex: 1,
-                          backgroundColor: "#F8FAFC",
-                          padding: 16,
-                          borderRadius: 20,
-                          borderWidth: 1,
-                          borderColor: "#E2E8F0",
-                        }}
-                      >
-                        <Text
-                          style={{
-                            fontSize: 10,
-                            color: "#94A3B8",
-                            fontWeight: "800",
-                            textTransform: "uppercase",
-                            marginBottom: 8,
-                          }}
-                        >
-                          Plano Atual
-                        </Text>
+                    <ScrollView
+                      showsVerticalScrollIndicator={false}
+                      contentContainerStyle={{ paddingBottom: 40 }}
+                    >
+                      {/* Perfil Principal */}
+                      <View style={{ alignItems: "center", marginTop: 30, marginBottom: 24 }}>
                         <View
                           style={{
-                            alignSelf: "flex-start",
-                            paddingHorizontal: 8,
-                            paddingVertical: 4,
-                            borderRadius: 8,
-                            backgroundColor:
-                              selectedUserDetail.plan && selectedUserDetail.plan !== "FREE"
-                                ? "#EEF2FF"
-                                : "#F1F5F9",
+                            padding: 4,
+                            borderRadius: 60,
+                            borderWidth: 2,
+                            borderColor: "#BBF246",
+                          }}
+                        >
+                          <Image
+                            source={{
+                              uri:
+                                selectedUserDetail.foto_url ||
+                                "https://images.unsplash.com/photo-1633332755192-727a05c4013d?w=200&h=200&fit=crop",
+                            }}
+                            style={{ width: 110, height: 110, borderRadius: 55 }}
+                          />
+                        </View>
+                        <Text
+                          style={{
+                            fontSize: 24,
+                            fontWeight: "800",
+                            color: "#1E293B",
+                            marginTop: 16,
+                          }}
+                        >
+                          {selectedUserDetail.nome}
+                        </Text>
+                        <Text style={{ fontSize: 14, color: "#64748B", marginTop: 4 }}>
+                          {selectedUserDetail.email}
+                        </Text>
+                      </View>
+
+                      {/* Cards de Status */}
+                      <View style={{ flexDirection: "row", gap: 12, paddingHorizontal: 20 }}>
+                        <View
+                          style={{
+                            flex: 1,
+                            backgroundColor: "#F8FAFC",
+                            padding: 16,
+                            borderRadius: 20,
+                            borderWidth: 1,
+                            borderColor: "#E2E8F0",
                           }}
                         >
                           <Text
                             style={{
-                              color:
-                                selectedUserDetail.plan && selectedUserDetail.plan !== "FREE"
-                                  ? "#6366F1"
-                                  : "#64748B",
-                              fontWeight: "700",
-                              fontSize: 12,
+                              fontSize: 10,
+                              color: "#94A3B8",
+                              fontWeight: "800",
+                              textTransform: "uppercase",
+                              marginBottom: 8,
                             }}
                           >
-                            {selectedUserDetail.plan || "FREE"}
+                            Plano Atual
                           </Text>
-                        </View>
-                      </View>
-                      <View
-                        style={{
-                          flex: 1,
-                          backgroundColor: "#F8FAFC",
-                          padding: 16,
-                          borderRadius: 20,
-                          borderWidth: 1,
-                          borderColor: "#E2E8F0",
-                        }}
-                      >
-                        <Text
-                          style={{
-                            fontSize: 10,
-                            color: "#94A3B8",
-                            fontWeight: "800",
-                            textTransform: "uppercase",
-                            marginBottom: 8,
-                          }}
-                        >
-                          Status de Conta
-                        </Text>
-                        <View
-                          style={{
-                            alignSelf: "flex-start",
-                            paddingHorizontal: 8,
-                            paddingVertical: 4,
-                            borderRadius: 8,
-                            backgroundColor: selectedUserDetail.ativo ? "#DCFCE7" : "#FEE2E2",
-                            flexDirection: "row",
-                            alignItems: "center",
-                            gap: 4,
-                          }}
-                        >
                           <View
                             style={{
-                              width: 6,
-                              height: 6,
-                              borderRadius: 3,
-                              backgroundColor: selectedUserDetail.ativo ? "#10B981" : "#EF4444",
-                            }}
-                          />
-                          <Text
-                            style={{
-                              color: selectedUserDetail.ativo ? "#106534" : "#991B1B",
-                              fontWeight: "700",
-                              fontSize: 12,
+                              alignSelf: "flex-start",
+                              paddingHorizontal: 8,
+                              paddingVertical: 4,
+                              borderRadius: 8,
+                              backgroundColor:
+                                selectedUserDetail.plan && selectedUserDetail.plan !== "FREE"
+                                  ? "#EEF2FF"
+                                  : "#F1F5F9",
                             }}
                           >
-                            {selectedUserDetail.ativo ? "Ativo" : "Bloqueado"}
+                            <Text
+                              style={{
+                                color:
+                                  selectedUserDetail.plan && selectedUserDetail.plan !== "FREE"
+                                    ? "#6366F1"
+                                    : "#64748B",
+                                fontWeight: "700",
+                                fontSize: 12,
+                              }}
+                            >
+                              {selectedUserDetail.plan || "FREE"}
+                            </Text>
+                          </View>
+                        </View>
+                        <View
+                          style={{
+                            flex: 1,
+                            backgroundColor: "#F8FAFC",
+                            padding: 16,
+                            borderRadius: 20,
+                            borderWidth: 1,
+                            borderColor: "#E2E8F0",
+                          }}
+                        >
+                          <Text
+                            style={{
+                              fontSize: 10,
+                              color: "#94A3B8",
+                              fontWeight: "800",
+                              textTransform: "uppercase",
+                              marginBottom: 8,
+                            }}
+                          >
+                            Status de Conta
                           </Text>
+                          <View
+                            style={{
+                              alignSelf: "flex-start",
+                              paddingHorizontal: 8,
+                              paddingVertical: 4,
+                              borderRadius: 8,
+                              backgroundColor: selectedUserDetail.ativo ? "#DCFCE7" : "#FEE2E2",
+                              flexDirection: "row",
+                              alignItems: "center",
+                              gap: 4,
+                            }}
+                          >
+                            <View
+                              style={{
+                                width: 6,
+                                height: 6,
+                                borderRadius: 3,
+                                backgroundColor: selectedUserDetail.ativo ? "#10B981" : "#EF4444",
+                              }}
+                            />
+                            <Text
+                              style={{
+                                color: selectedUserDetail.ativo ? "#106534" : "#991B1B",
+                                fontWeight: "700",
+                                fontSize: 12,
+                              }}
+                            >
+                              {selectedUserDetail.ativo ? "Ativo" : "Bloqueado"}
+                            </Text>
+                          </View>
                         </View>
                       </View>
-                    </View>
 
-                    {/* Detalhes Técnicos */}
-                    <View style={{ marginTop: 24, paddingHorizontal: 20 }}>
-                      <Text
-                        style={{
-                          fontSize: 14,
-                          fontWeight: "800",
-                          color: "#1E293B",
-                          marginBottom: 16,
-                        }}
-                      >
-                        Informações Gerais
-                      </Text>
-
-                      <View style={{ gap: 12 }}>
-                        <View
+                      {/* Detalhes Técnicos */}
+                      <View style={{ marginTop: 24, paddingHorizontal: 20 }}>
+                        <Text
                           style={{
-                            flexDirection: "row",
-                            alignItems: "center",
-                            backgroundColor: "#F8FAFC",
-                            padding: 16,
-                            borderRadius: 16,
+                            fontSize: 14,
+                            fontWeight: "800",
+                            color: "#1E293B",
+                            marginBottom: 16,
                           }}
                         >
-                          <Mail size={18} color="#64748B" />
-                          <View style={{ marginLeft: 12 }}>
-                            <Text style={{ fontSize: 10, color: "#94A3B8", fontWeight: "700" }}>
-                              E-MAIL
-                            </Text>
-                            <Text style={{ fontSize: 14, color: "#1E293B", fontWeight: "600" }}>
-                              {selectedUserDetail.email}
-                            </Text>
-                          </View>
-                        </View>
+                          Informações Gerais
+                        </Text>
 
-                        <View
-                          style={{
-                            flexDirection: "row",
-                            alignItems: "center",
-                            backgroundColor: "#F8FAFC",
-                            padding: 16,
-                            borderRadius: 16,
-                          }}
-                        >
-                          <Calendar size={18} color="#64748B" />
-                          <View style={{ marginLeft: 12 }}>
-                            <Text style={{ fontSize: 10, color: "#94A3B8", fontWeight: "700" }}>
-                              MEMBRO DESDE
-                            </Text>
-                            <Text style={{ fontSize: 14, color: "#1E293B", fontWeight: "600" }}>
-                              {selectedUserDetail.created_at
-                                ? (() => {
-                                    try {
-                                      return new Date(
-                                        selectedUserDetail.created_at
-                                      ).toLocaleDateString("pt-BR");
-                                    } catch (e) {
-                                      return new Date(selectedUserDetail.created_at)
-                                        .toISOString()
-                                        .split("T")[0];
-                                    }
-                                  })()
-                                : "N/A"}
-                            </Text>
-                          </View>
-                        </View>
-
-                        {selectedUserDetail.cref && (
+                        <View style={{ gap: 12 }}>
                           <View
                             style={{
                               flexDirection: "row",
@@ -4684,355 +4742,436 @@ const AdminDashboardScreen: React.FC = () => {
                               borderRadius: 16,
                             }}
                           >
-                            <Shield size={18} color="#64748B" />
+                            <Mail size={18} color="#64748B" />
                             <View style={{ marginLeft: 12 }}>
                               <Text style={{ fontSize: 10, color: "#94A3B8", fontWeight: "700" }}>
-                                REGISTRO PROFISSIONAL (CREF)
+                                E-MAIL
                               </Text>
                               <Text style={{ fontSize: 14, color: "#1E293B", fontWeight: "600" }}>
-                                {selectedUserDetail.cref}
+                                {selectedUserDetail.email}
                               </Text>
                             </View>
                           </View>
-                        )}
+
+                          <View
+                            style={{
+                              flexDirection: "row",
+                              alignItems: "center",
+                              backgroundColor: "#F8FAFC",
+                              padding: 16,
+                              borderRadius: 16,
+                            }}
+                          >
+                            <Calendar size={18} color="#64748B" />
+                            <View style={{ marginLeft: 12 }}>
+                              <Text style={{ fontSize: 10, color: "#94A3B8", fontWeight: "700" }}>
+                                MEMBRO DESDE
+                              </Text>
+                              <Text style={{ fontSize: 14, color: "#1E293B", fontWeight: "600" }}>
+                                {selectedUserDetail.created_at
+                                  ? (() => {
+                                      try {
+                                        return new Date(
+                                          selectedUserDetail.created_at
+                                        ).toLocaleDateString("pt-BR");
+                                      } catch (e) {
+                                        return new Date(selectedUserDetail.created_at)
+                                          .toISOString()
+                                          .split("T")[0];
+                                      }
+                                    })()
+                                  : "N/A"}
+                              </Text>
+                            </View>
+                          </View>
+
+                          {selectedUserDetail.cref && (
+                            <View
+                              style={{
+                                flexDirection: "row",
+                                alignItems: "center",
+                                backgroundColor: "#F8FAFC",
+                                padding: 16,
+                                borderRadius: 16,
+                              }}
+                            >
+                              <Shield size={18} color="#64748B" />
+                              <View style={{ marginLeft: 12 }}>
+                                <Text style={{ fontSize: 10, color: "#94A3B8", fontWeight: "700" }}>
+                                  REGISTRO PROFISSIONAL (CREF)
+                                </Text>
+                                <Text style={{ fontSize: 14, color: "#1E293B", fontWeight: "600" }}>
+                                  {selectedUserDetail.cref}
+                                </Text>
+                              </View>
+                            </View>
+                          )}
+                        </View>
                       </View>
-                    </View>
 
-                    {/* Ações Rápidas */}
-                    <View
-                      style={{
-                        marginTop: 30,
-                        paddingHorizontal: 20,
-                        flexDirection: "row",
-                        gap: 12,
-                      }}
-                    >
-                      <TouchableOpacity
+                      {/* Ações Rápidas */}
+                      <View
                         style={{
-                          flex: 1,
-                          backgroundColor: "#192126",
-                          height: 56,
-                          borderRadius: 16,
-                          alignItems: "center",
-                          justifyContent: "center",
+                          marginTop: 30,
+                          paddingHorizontal: 20,
+                          flexDirection: "row",
+                          gap: 12,
                         }}
-                        onPress={() => changeUserPlan(selectedUserDetail)}
                       >
-                        <Text style={{ color: "#fff", fontWeight: "700" }}>Gerenciar Plano</Text>
-                      </TouchableOpacity>
+                        <TouchableOpacity
+                          style={{
+                            flex: 1,
+                            backgroundColor: "#192126",
+                            height: 56,
+                            borderRadius: 16,
+                            alignItems: "center",
+                            justifyContent: "center",
+                          }}
+                          onPress={() => changeUserPlan(selectedUserDetail)}
+                        >
+                          <Text style={{ color: "#fff", fontWeight: "700" }}>Gerenciar Plano</Text>
+                        </TouchableOpacity>
 
-                      <TouchableOpacity
-                        style={{
-                          width: 56,
-                          height: 56,
-                          backgroundColor: "#F1F5F9",
-                          borderRadius: 16,
-                          alignItems: "center",
-                          justifyContent: "center",
-                        }}
-                        onPress={() => toggleUserStatus(selectedUserDetail.id_us)}
-                      >
-                        {selectedUserDetail.ativo ? (
-                          <XCircle size={22} color="#EF4444" />
-                        ) : (
-                          <CheckCircle size={22} color="#10B981" />
-                        )}
-                      </TouchableOpacity>
-                    </View>
-                  </ScrollView>
-                </View>
-              )}
-            </BottomSheetView>
-          </BottomSheet>
+                        <TouchableOpacity
+                          style={{
+                            width: 56,
+                            height: 56,
+                            backgroundColor: "#F1F5F9",
+                            borderRadius: 16,
+                            alignItems: "center",
+                            justifyContent: "center",
+                          }}
+                          onPress={() => toggleUserStatus(selectedUserDetail.id_us)}
+                        >
+                          {selectedUserDetail.ativo ? (
+                            <XCircle size={22} color="#EF4444" />
+                          ) : (
+                            <CheckCircle size={22} color="#10B981" />
+                          )}
+                        </TouchableOpacity>
+                      </View>
+                    </ScrollView>
+                  </View>
+                )}
+              </BottomSheetView>
+            </BottomSheet>
+          )}
 
           {/* ── SHEET: DETALHE DE CHURN ── */}
-          <BottomSheet
-            ref={churnDetailSheetRef}
-            index={-1}
-            snapPoints={["70%"]}
-            enablePanDownToClose
-            backdropComponent={renderBackdrop}
-            backgroundStyle={{ borderRadius: 32 }}
-          >
-            <BottomSheetView style={styles.sheetContent}>
-              <View style={styles.sheetHeader}>
-                <Text style={styles.sheetTitle}>Análise de Churn</Text>
-                <TouchableOpacity onPress={() => churnDetailSheetRef.current?.close()}>
-                  <X size={24} color="#64748B" />
-                </TouchableOpacity>
-              </View>
-              <ScrollView style={{ marginTop: 20 }}>
-                <View style={styles.dbAuditBox}>
-                  <Text
-                    style={{ fontSize: 13, fontWeight: "700", color: "#1E293B", marginBottom: 10 }}
-                  >
-                    Motivos de Cancelamento
-                  </Text>
-                  {data?.churnBreakdown?.length ? (
-                    data.churnBreakdown.map((item: any, i: number) => (
-                      <View key={i} style={styles.dbAuditRow}>
-                        <Text style={styles.dbAuditLabel}>{item.label}</Text>
-                        <Text style={styles.dbAuditValue}>{item.value}</Text>
-                      </View>
-                    ))
-                  ) : (
+          {openSheets["churnDetail"] && (
+            <BottomSheet
+              ref={churnDetailSheetRef}
+              onClose={() => setOpenSheets((prev) => ({ ...prev, churnDetail: false }))}
+              index={0}
+              snapPoints={["70%"]}
+              enablePanDownToClose
+              backdropComponent={renderBackdrop}
+              backgroundStyle={{ borderRadius: 32 }}
+            >
+              <BottomSheetView style={styles.sheetContent}>
+                <View style={styles.sheetHeader}>
+                  <Text style={styles.sheetTitle}>Análise de Churn</Text>
+                  <TouchableOpacity onPress={() => churnDetailSheetRef.current?.close()}>
+                    <X size={24} color="#64748B" />
+                  </TouchableOpacity>
+                </View>
+                <ScrollView style={{ marginTop: 20 }}>
+                  <View style={styles.dbAuditBox}>
                     <Text
-                      style={{ fontSize: 12, color: "#94A3B8", textAlign: "center", padding: 20 }}
+                      style={{
+                        fontSize: 13,
+                        fontWeight: "700",
+                        color: "#1E293B",
+                        marginBottom: 10,
+                      }}
                     >
-                      Dados de motivos indisponíveis para este período.
+                      Motivos de Cancelamento
                     </Text>
-                  )}
-                </View>
-                <View
-                  style={{
-                    marginTop: 20,
-                    padding: 15,
-                    backgroundColor: "#F8FAFC",
-                    borderRadius: 20,
-                  }}
-                >
-                  <Text style={{ fontSize: 12, color: "#64748B", lineHeight: 18 }}>
-                    * A taxa de churn está 1.2% menor que o mês anterior. Recomendamos campanhas de
-                    {'retenção para o grupo "Preço / Renovação".'}
-                  </Text>
-                </View>
-              </ScrollView>
-            </BottomSheetView>
-          </BottomSheet>
+                    {data?.churnBreakdown?.length ? (
+                      data.churnBreakdown.map((item: any, i: number) => (
+                        <View key={i} style={styles.dbAuditRow}>
+                          <Text style={styles.dbAuditLabel}>{item.label}</Text>
+                          <Text style={styles.dbAuditValue}>{item.value}</Text>
+                        </View>
+                      ))
+                    ) : (
+                      <Text
+                        style={{ fontSize: 12, color: "#94A3B8", textAlign: "center", padding: 20 }}
+                      >
+                        Dados de motivos indisponíveis para este período.
+                      </Text>
+                    )}
+                  </View>
+                  <View
+                    style={{
+                      marginTop: 20,
+                      padding: 15,
+                      backgroundColor: "#F8FAFC",
+                      borderRadius: 20,
+                    }}
+                  >
+                    <Text style={{ fontSize: 12, color: "#64748B", lineHeight: 18 }}>
+                      * A taxa de churn está 1.2% menor que o mês anterior. Recomendamos campanhas
+                      de
+                      {'retenção para o grupo "Preço / Renovação".'}
+                    </Text>
+                  </View>
+                </ScrollView>
+              </BottomSheetView>
+            </BottomSheet>
+          )}
 
           {/* ── SHEET: DETALHE DE LTV ── */}
-          <BottomSheet
-            ref={ltvDetailSheetRef}
-            index={-1}
-            snapPoints={[SCREEN_HEIGHT * 0.6]}
-            enablePanDownToClose
-            backdropComponent={renderBackdrop}
-            backgroundStyle={{ borderRadius: 32 }}
-          >
-            <BottomSheetView style={styles.sheetContent}>
-              <View style={styles.sheetHeader}>
-                <Text style={styles.sheetTitle}>Métrica de LTV</Text>
-                <TouchableOpacity onPress={() => ltvDetailSheetRef.current?.close()}>
-                  <X size={24} color="#64748B" />
-                </TouchableOpacity>
-              </View>
-              <View style={{ marginTop: 20, gap: 15 }}>
-                <View
-                  style={{
-                    padding: 20,
-                    backgroundColor: "#F0FDF4",
-                    borderRadius: 24,
-                    alignItems: "center",
-                  }}
-                >
+          {openSheets["ltvDetail"] && (
+            <BottomSheet
+              ref={ltvDetailSheetRef}
+              onClose={() => setOpenSheets((prev) => ({ ...prev, ltvDetail: false }))}
+              index={0}
+              snapPoints={[SCREEN_HEIGHT * 0.6]}
+              enablePanDownToClose
+              backdropComponent={renderBackdrop}
+              backgroundStyle={{ borderRadius: 32 }}
+            >
+              <BottomSheetView style={styles.sheetContent}>
+                <View style={styles.sheetHeader}>
+                  <Text style={styles.sheetTitle}>Métrica de LTV</Text>
+                  <TouchableOpacity onPress={() => ltvDetailSheetRef.current?.close()}>
+                    <X size={24} color="#64748B" />
+                  </TouchableOpacity>
+                </View>
+                <View style={{ marginTop: 20, gap: 15 }}>
+                  <View
+                    style={{
+                      padding: 20,
+                      backgroundColor: "#F0FDF4",
+                      borderRadius: 24,
+                      alignItems: "center",
+                    }}
+                  >
+                    <Text
+                      style={{
+                        fontSize: 12,
+                        fontWeight: "700",
+                        color: "#16A34A",
+                        textTransform: "uppercase",
+                      }}
+                    >
+                      LTV Projetado Médio
+                    </Text>
+                    <Text
+                      style={{ fontSize: 32, fontWeight: "900", color: "#16A34A", marginTop: 5 }}
+                    >
+                      {formatCurrency(data?.ltv?.value || 0)}
+                    </Text>
+                  </View>
+                  <View style={{ gap: 10 }}>
+                    <Text style={{ fontSize: 14, fontWeight: "800", color: "#1E293B" }}>
+                      Breakdown por Plano
+                    </Text>
+                    {data?.ltvBreakdown?.length ? (
+                      data.ltvBreakdown.map((p: any, i: number) => (
+                        <View
+                          key={i}
+                          style={{
+                            flexDirection: "row",
+                            justifyContent: "space-between",
+                            padding: 12,
+                            backgroundColor: "#F8FAFC",
+                            borderRadius: 14,
+                          }}
+                        >
+                          <Text style={{ fontWeight: "700", color: "#475569" }}>{p.plan}</Text>
+                          <Text style={{ fontWeight: "800", color: "#1E293B" }}>
+                            {formatCurrency(p.val)}
+                          </Text>
+                        </View>
+                      ))
+                    ) : (
+                      <Text
+                        style={{ fontSize: 12, color: "#94A3B8", textAlign: "center", padding: 20 }}
+                      >
+                        Detalhamento por plano ainda não calculado.
+                      </Text>
+                    )}
+                  </View>
+                </View>
+              </BottomSheetView>
+            </BottomSheet>
+          )}
+
+          {/* ── SHEET: MIX DE RECEITA ── */}
+          {openSheets["revenueMix"] && (
+            <BottomSheet
+              ref={revenueMixSheetRef}
+              onClose={() => setOpenSheets((prev) => ({ ...prev, revenueMix: false }))}
+              index={0}
+              snapPoints={["80%"]}
+              enablePanDownToClose
+              backdropComponent={renderBackdrop}
+              backgroundStyle={{ borderRadius: 32 }}
+            >
+              <BottomSheetView style={styles.sheetContent}>
+                <View style={styles.sheetHeader}>
+                  <Text style={styles.sheetTitle}>Mix de Receita</Text>
+                  <TouchableOpacity onPress={() => revenueMixSheetRef.current?.close()}>
+                    <X size={24} color="#64748B" />
+                  </TouchableOpacity>
+                </View>
+                <BottomSheetFlatList
+                  data={
+                    data?.planDistribution || [
+                      { label: "Premium", count: 45, color: "#6366F1" },
+                      { label: "Ouro", count: 30, color: "#F59E0B" },
+                      { label: "Basic", count: 25, color: "#94A3B8" },
+                    ]
+                  }
+                  keyExtractor={(item: any, i: number) => i.toString()}
+                  style={{ marginTop: 20 }}
+                  renderItem={({ item }: { item: any }) => (
+                    <View
+                      style={{
+                        flexDirection: "row",
+                        alignItems: "center",
+                        gap: 15,
+                        padding: 16,
+                        backgroundColor: "#F8FAFC",
+                        borderRadius: 20,
+                        marginBottom: 10,
+                      }}
+                    >
+                      <View
+                        style={{
+                          width: 12,
+                          height: 12,
+                          borderRadius: 6,
+                          backgroundColor: item.color,
+                        }}
+                      />
+                      <View style={{ flex: 1 }}>
+                        <Text style={{ fontSize: 14, fontWeight: "800", color: "#1E293B" }}>
+                          {item.label}
+                        </Text>
+                        <Text style={{ fontSize: 12, color: "#64748B" }}>
+                          {item.count}% da receita total
+                        </Text>
+                      </View>
+                      <ArrowRight size={18} color="#CBD5E1" />
+                    </View>
+                  )}
+                />
+              </BottomSheetView>
+            </BottomSheet>
+          )}
+
+          {/* ── SHEET: AUDITORIA DE UNIDADES ── */}
+          {openSheets["unitAudit"] && (
+            <BottomSheet
+              ref={unitAuditSheetRef}
+              onClose={() => setOpenSheets((prev) => ({ ...prev, unitAudit: false }))}
+              index={0}
+              snapPoints={[SCREEN_HEIGHT * 0.9]}
+              enablePanDownToClose
+              backdropComponent={renderBackdrop}
+              backgroundStyle={{ borderRadius: 32 }}
+            >
+              <BottomSheetView style={styles.sheetContent}>
+                <View style={styles.sheetHeader}>
+                  <Text style={styles.sheetTitle}>Performance de Unidades</Text>
+                  <TouchableOpacity onPress={() => unitAuditSheetRef.current?.close()}>
+                    <X size={24} color="#64748B" />
+                  </TouchableOpacity>
+                </View>
+                <ScrollView style={{ marginTop: 20 }}>
                   <Text
                     style={{
                       fontSize: 12,
-                      fontWeight: "700",
-                      color: "#16A34A",
+                      fontWeight: "800",
+                      color: "#94A3B8",
                       textTransform: "uppercase",
+                      marginBottom: 15,
                     }}
                   >
-                    LTV Projetado Médio
+                    Ranking de Faturamento
                   </Text>
-                  <Text style={{ fontSize: 32, fontWeight: "900", color: "#16A34A", marginTop: 5 }}>
-                    {formatCurrency(data?.ltv?.value || 0)}
-                  </Text>
-                </View>
-                <View style={{ gap: 10 }}>
-                  <Text style={{ fontSize: 14, fontWeight: "800", color: "#1E293B" }}>
-                    Breakdown por Plano
-                  </Text>
-                  {data?.ltvBreakdown?.length ? (
-                    data.ltvBreakdown.map((p: any, i: number) => (
+                  {data?.topUnits?.length ? (
+                    data.topUnits.map((gym: any, i: number) => (
                       <View
                         key={i}
                         style={{
-                          flexDirection: "row",
-                          justifyContent: "space-between",
-                          padding: 12,
-                          backgroundColor: "#F8FAFC",
-                          borderRadius: 14,
+                          padding: 16,
+                          backgroundColor: "#fff",
+                          borderRadius: 20,
+                          borderWidth: 1,
+                          borderColor: "#F1F5F9",
+                          marginBottom: 12,
                         }}
                       >
-                        <Text style={{ fontWeight: "700", color: "#475569" }}>{p.plan}</Text>
-                        <Text style={{ fontWeight: "800", color: "#1E293B" }}>
-                          {formatCurrency(p.val)}
-                        </Text>
+                        <View
+                          style={{
+                            flexDirection: "row",
+                            justifyContent: "space-between",
+                            alignItems: "center",
+                          }}
+                        >
+                          <View>
+                            <Text style={{ fontSize: 15, fontWeight: "800", color: "#1E293B" }}>
+                              {gym.name}
+                            </Text>
+                            <Text style={{ fontSize: 12, color: "#64748B" }}>
+                              {gym.members} membros ativos
+                            </Text>
+                          </View>
+                          <View style={{ alignItems: "flex-end" }}>
+                            <Text style={{ fontSize: 15, fontWeight: "900", color: "#1E293B" }}>
+                              {formatCurrency(gym.rev)}
+                            </Text>
+                            <Text
+                              style={{
+                                fontSize: 11,
+                                fontWeight: "700",
+                                color: gym.grow.startsWith("+") ? "#10B981" : "#EF4444",
+                              }}
+                            >
+                              {gym.grow}
+                            </Text>
+                          </View>
+                        </View>
                       </View>
                     ))
                   ) : (
                     <Text
                       style={{ fontSize: 12, color: "#94A3B8", textAlign: "center", padding: 20 }}
                     >
-                      Detalhamento por plano ainda não calculado.
+                      Nenhuma unidade encontrada.
                     </Text>
                   )}
-                </View>
-              </View>
-            </BottomSheetView>
-          </BottomSheet>
-
-          {/* ── SHEET: MIX DE RECEITA ── */}
-          <BottomSheet
-            ref={revenueMixSheetRef}
-            index={-1}
-            snapPoints={["80%"]}
-            enablePanDownToClose
-            backdropComponent={renderBackdrop}
-            backgroundStyle={{ borderRadius: 32 }}
-          >
-            <BottomSheetView style={styles.sheetContent}>
-              <View style={styles.sheetHeader}>
-                <Text style={styles.sheetTitle}>Mix de Receita</Text>
-                <TouchableOpacity onPress={() => revenueMixSheetRef.current?.close()}>
-                  <X size={24} color="#64748B" />
-                </TouchableOpacity>
-              </View>
-              <BottomSheetFlatList
-                data={
-                  data?.planDistribution || [
-                    { label: "Premium", count: 45, color: "#6366F1" },
-                    { label: "Ouro", count: 30, color: "#F59E0B" },
-                    { label: "Basic", count: 25, color: "#94A3B8" },
-                  ]
-                }
-                keyExtractor={(item: any, i: number) => i.toString()}
-                style={{ marginTop: 20 }}
-                renderItem={({ item }: { item: any }) => (
-                  <View
-                    style={{
-                      flexDirection: "row",
-                      alignItems: "center",
-                      gap: 15,
-                      padding: 16,
-                      backgroundColor: "#F8FAFC",
-                      borderRadius: 20,
-                      marginBottom: 10,
-                    }}
-                  >
-                    <View
-                      style={{
-                        width: 12,
-                        height: 12,
-                        borderRadius: 6,
-                        backgroundColor: item.color,
-                      }}
-                    />
-                    <View style={{ flex: 1 }}>
-                      <Text style={{ fontSize: 14, fontWeight: "800", color: "#1E293B" }}>
-                        {item.label}
-                      </Text>
-                      <Text style={{ fontSize: 12, color: "#64748B" }}>
-                        {item.count}% da receita total
-                      </Text>
-                    </View>
-                    <ArrowRight size={18} color="#CBD5E1" />
-                  </View>
-                )}
-              />
-            </BottomSheetView>
-          </BottomSheet>
-
-          {/* ── SHEET: AUDITORIA DE UNIDADES ── */}
-          <BottomSheet
-            ref={unitAuditSheetRef}
-            index={-1}
-            snapPoints={[SCREEN_HEIGHT * 0.9]}
-            enablePanDownToClose
-            backdropComponent={renderBackdrop}
-            backgroundStyle={{ borderRadius: 32 }}
-          >
-            <BottomSheetView style={styles.sheetContent}>
-              <View style={styles.sheetHeader}>
-                <Text style={styles.sheetTitle}>Performance de Unidades</Text>
-                <TouchableOpacity onPress={() => unitAuditSheetRef.current?.close()}>
-                  <X size={24} color="#64748B" />
-                </TouchableOpacity>
-              </View>
-              <ScrollView style={{ marginTop: 20 }}>
-                <Text
-                  style={{
-                    fontSize: 12,
-                    fontWeight: "800",
-                    color: "#94A3B8",
-                    textTransform: "uppercase",
-                    marginBottom: 15,
-                  }}
-                >
-                  Ranking de Faturamento
-                </Text>
-                {data?.topUnits?.length ? (
-                  data.topUnits.map((gym: any, i: number) => (
-                    <View
-                      key={i}
-                      style={{
-                        padding: 16,
-                        backgroundColor: "#fff",
-                        borderRadius: 20,
-                        borderWidth: 1,
-                        borderColor: "#F1F5F9",
-                        marginBottom: 12,
-                      }}
-                    >
-                      <View
-                        style={{
-                          flexDirection: "row",
-                          justifyContent: "space-between",
-                          alignItems: "center",
-                        }}
-                      >
-                        <View>
-                          <Text style={{ fontSize: 15, fontWeight: "800", color: "#1E293B" }}>
-                            {gym.name}
-                          </Text>
-                          <Text style={{ fontSize: 12, color: "#64748B" }}>
-                            {gym.members} membros ativos
-                          </Text>
-                        </View>
-                        <View style={{ alignItems: "flex-end" }}>
-                          <Text style={{ fontSize: 15, fontWeight: "900", color: "#1E293B" }}>
-                            {formatCurrency(gym.rev)}
-                          </Text>
-                          <Text
-                            style={{
-                              fontSize: 11,
-                              fontWeight: "700",
-                              color: gym.grow.startsWith("+") ? "#10B981" : "#EF4444",
-                            }}
-                          >
-                            {gym.grow}
-                          </Text>
-                        </View>
-                      </View>
-                    </View>
-                  ))
-                ) : (
-                  <Text
-                    style={{ fontSize: 12, color: "#94A3B8", textAlign: "center", padding: 20 }}
-                  >
-                    Nenhuma unidade encontrada.
-                  </Text>
-                )}
-              </ScrollView>
-            </BottomSheetView>
-          </BottomSheet>
+                </ScrollView>
+              </BottomSheetView>
+            </BottomSheet>
+          )}
 
           {/* ── GESTÃO DE COMUNIDADES (componente dedicado) ── */}
-          <CommunityManagementSheet
-            ref={adminCommSheetRef}
-            onClose={() => {
-              api
-                .get("/comunidades")
-                .then((r) => {
-                  const list = r?.data?.data || r?.data;
-                  setAdminCommunitiesCount(Array.isArray(list) ? list.length : 0);
-                })
-                .catch(() => {});
-            }}
-          />
+          {openSheets["comunidades"] && (
+            <CommunityManagementSheet
+              ref={adminCommSheetRef}
+              onClose={() => {
+                api
+                  .get("/comunidades")
+                  .then((r) => {
+                    const list = r?.data?.data || r?.data;
+                    setAdminCommunitiesCount(Array.isArray(list) ? list.length : 0);
+                  })
+                  .catch(() => {});
+              }}
+            />
+          )}
 
-          <WorkoutManagementSheet ref={adminWorkoutSheetRef} />
+          {openSheets["treinos"] && (
+            <WorkoutManagementSheet
+              ref={adminWorkoutSheetRef}
+              onClose={() => setOpenSheets((prev) => ({ ...prev, treinos: false }))}
+            />
+          )}
         </SafeAreaView>
       </GestureHandlerRootView>
     </DashboardErrorBoundary>

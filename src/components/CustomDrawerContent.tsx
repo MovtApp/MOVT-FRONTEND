@@ -89,14 +89,15 @@ export function CustomDrawerContent(props: DrawerContentComponentProps) {
   const panelItems = [
     { name: "Explorar", icon: Layout, route: "FeedScreen" as keyof AppStackParamList },
     ...(user?.role?.toLowerCase()?.includes("admin") ||
-    user?.id_us === 15 ||
-    user?.id_us === "15" ||
-    user?.email === "comercial.movtapp@gmail.com"
+    user?.role?.toLowerCase()?.includes("personal") ||
+    user?.role?.toLowerCase()?.includes("trainer")
       ? [
           {
             name: "Dashboard",
             icon: ShieldEllipsis,
-            route: "AdminDashboard" as keyof AppStackParamList,
+            route: (user?.role?.toLowerCase()?.includes("admin")
+              ? "AdminDashboard"
+              : "PersonalDashboard") as keyof AppStackParamList,
           },
         ]
       : []),

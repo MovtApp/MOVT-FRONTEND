@@ -6,7 +6,6 @@ import {
   Bell,
   Key,
   Target,
-  Globe,
   HelpCircle,
   PhoneCall,
   UserStar,
@@ -137,12 +136,12 @@ const ConfigScreen: React.FC = () => {
           <SettingItem
             icon={Target}
             label="Editar objetivos"
-            onPress={() => navigation.navigate("Info", { screen: "ObjectivesScreen" })}
-          />
-          <SettingItem
-            icon={Globe}
-            label="Idioma"
-            onPress={() => navigation.navigate("LanguageScreen")}
+            onPress={() =>
+              navigation.navigate("Info", {
+                screen: "ObjectivesScreen",
+                params: { isEditing: true },
+              })
+            }
           />
 
           <Separator />
