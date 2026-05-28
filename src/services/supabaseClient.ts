@@ -6,8 +6,7 @@ const supabaseUrl = "https://ypnpdjgsyzdwsmnxsoqj.supabase.co";
 // (vai inline no APK). Proteção real fica no servidor via RLS em TODAS as
 // tabelas (auditoria Fase 6 / Tier 4) + service_role usado só no backend.
 // nosemgrep: no-hardcoded-secrets
-const supabaseAnonKey =
-  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlwbnBkamdzeXpkd3Ntbnhzb3FqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTg5MDI5OTUsImV4cCI6MjA3NDQ3ODk5NX0.SxG2mKbprQkJP1JGWp1PoSaM0LfVHgIqg6STuwp8jAw";
+const supabaseAnonKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlwbnBkamdzeXpkd3Ntbnhzb3FqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTg5MDI5OTUsImV4cCI6MjA3NDQ3ODk5NX0.SxG2mKbprQkJP1JGWp1PoSaM0LfVHgIqg6STuwp8jAw";
 
 // Persiste a sessão Supabase (access_token + refresh_token) no SecureStore
 // (Keychain/Keystore) em vez do AsyncStorage. A interface exigida pelo SDK é
