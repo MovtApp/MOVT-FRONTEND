@@ -1,0 +1,32 @@
+android {
+    signingConfigs {
+        debug {
+            storeFile file('debug.keystore')
+            storePassword 'android'
+            keyAlias 'androiddebugkey'
+            keyPassword 'android'
+        }
+    }
+    buildTypes {
+        // ok: gradle-release-uses-debug-signing
+        debug {
+            signingConfig signingConfigs.debug
+        }
+        // ruleid: gradle-release-uses-debug-signing
+        release {
+            // Caution! In production, you need to generate your own keystore file.
+            signingConfig signingConfigs.debug
+            minifyEnabled false
+        }
+    }
+}
+
+android {
+    buildTypes {
+        // ok: gradle-release-uses-debug-signing
+        release {
+            signingConfig signingConfigs.release
+            minifyEnabled true
+        }
+    }
+}

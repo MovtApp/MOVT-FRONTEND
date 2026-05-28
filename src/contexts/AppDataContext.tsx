@@ -1,11 +1,22 @@
-import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from "react";
+import React, {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  useCallback,
+  useRef,
+  useMemo,
+} from "react";
 import { api } from "../services/api";
 import { useAuth } from "./AuthContext";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Training, DietMeal, Community } from "../@types/routes";
 import axios from "axios";
+import { API_BASE_URL } from "../config/api";
 
-const API_URL = process.env.EXPO_PUBLIC_API_URL || "http://10.0.2.2:3000";
+// API_BASE_URL já termina em /api e respeita prod/dev. Aqui usamos a raiz
+// porque os callers concatenam o próprio /api/... no path.
+const API_URL = API_BASE_URL.replace(/\/api$/, "");
 
 interface AppDataContextData {
   trainings: Training[];
@@ -356,11 +367,16 @@ export const AppDataProvider: React.FC<{ children: React.ReactNode }> = ({ child
       try {
         setLoadingAdminDashboard(true);
 
+        // timeout garante que, se algum endpoint pendurar, a Promise rejeita e o
+        // finally devolve loading=false (evita o spinner infinito do dashboard).
         const [statsResp, usersResp, trainersResp, gymsResp] = await Promise.all([
-          api.get(`/admin/dashboard-stats`, { params: { tab, period: tab, status } }),
-          api.get("/admin/all-users"),
-          api.get("/admin/trainers"),
-          api.get("/admin/gyms"),
+          api.get(`/admin/dashboard-stats`, {
+            params: { tab, period: tab, status },
+            timeout: 15000,
+          }),
+          api.get("/admin/all-users", { timeout: 15000 }),
+          api.get("/admin/trainers", { timeout: 15000 }),
+          api.get("/admin/gyms", { timeout: 15000 }),
         ]);
 
         if (statsResp.data.success) {
@@ -469,43 +485,72 @@ export const AppDataProvider: React.FC<{ children: React.ReactNode }> = ({ child
     }
   }, [user?.sessionId, user?.isPendingSync, refreshAll]);
 
-  return (
-    <AppDataContext.Provider
-      value={{
-        trainings,
-        loadingTrainings,
-        dailyPlans,
-        loadingDailyPlans,
-        communities,
-        loadingCommunities,
-        dietMeals,
-        loadingDietMeals,
-        stripePlans,
-        loadingStripePlans,
-        feedPosts,
-        loadingFeedPosts,
-        feedDiets,
-        loadingFeedDiets,
-        adminDashboardData,
-        loadingAdminDashboard,
-        adminUsers,
-        setAdminUsers,
-        adminTrainers,
-        setAdminTrainers,
-        adminGyms,
-        setAdminGyms,
-        fetchHomeData,
-        fetchDietMeals,
-        fetchCommunities,
-        fetchStripePlans,
-        fetchFeedData,
-        fetchAdminDashboardData,
-        refreshAll,
-      }}
-    >
-      {children}
-    </AppDataContext.Provider>
+  // Memoiza o value para garantir igualdade referencial e evitar re-renders em
+  // cascata em todos os consumidores. setAdminUsers/setAdminTrainers/setAdminGyms
+  // são setters estáveis do useState; as funções fetch* já são useCallback.
+  const value = useMemo(
+    () => ({
+      trainings,
+      loadingTrainings,
+      dailyPlans,
+      loadingDailyPlans,
+      communities,
+      loadingCommunities,
+      dietMeals,
+      loadingDietMeals,
+      stripePlans,
+      loadingStripePlans,
+      feedPosts,
+      loadingFeedPosts,
+      feedDiets,
+      loadingFeedDiets,
+      adminDashboardData,
+      loadingAdminDashboard,
+      adminUsers,
+      setAdminUsers,
+      adminTrainers,
+      setAdminTrainers,
+      adminGyms,
+      setAdminGyms,
+      fetchHomeData,
+      fetchDietMeals,
+      fetchCommunities,
+      fetchStripePlans,
+      fetchFeedData,
+      fetchAdminDashboardData,
+      refreshAll,
+    }),
+    [
+      trainings,
+      loadingTrainings,
+      dailyPlans,
+      loadingDailyPlans,
+      communities,
+      loadingCommunities,
+      dietMeals,
+      loadingDietMeals,
+      stripePlans,
+      loadingStripePlans,
+      feedPosts,
+      loadingFeedPosts,
+      feedDiets,
+      loadingFeedDiets,
+      adminDashboardData,
+      loadingAdminDashboard,
+      adminUsers,
+      adminTrainers,
+      adminGyms,
+      fetchHomeData,
+      fetchDietMeals,
+      fetchCommunities,
+      fetchStripePlans,
+      fetchFeedData,
+      fetchAdminDashboardData,
+      refreshAll,
+    ]
   );
+
+  return <AppDataContext.Provider value={value}>{children}</AppDataContext.Provider>;
 };
 
 export const useAppData = () => {

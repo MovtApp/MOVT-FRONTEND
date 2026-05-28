@@ -1,0 +1,20 @@
+rules:
+  - id: token-in-asyncstorage
+    languages: [typescript, javascript]
+    severity: WARNING
+    message: >
+      Token / sessão / credencial sendo gravado em AsyncStorage, que é armazenamento em
+      TEXTO PURO (extraível via 'adb backup' ou em dispositivo rooted/jailbroken). Use
+      expo-secure-store (Keychain/Keystore) para dados sensíveis e defina allowBackup=false.
+    pattern-either:
+      - patterns:
+          - pattern: AsyncStorage.setItem($KEY, ...)
+          - metavariable-regex:
+              metavariable: $KEY
+              # metavariable-regex é ancorado (re.match) → o .* permite casar em qualquer posição
+              regex: (?i).*(token|session|secret|password|senha|auth|credential|refresh)
+      - patterns:
+          - pattern: AsyncStorage.setItem(..., $VAL)
+          - metavariable-regex:
+              metavariable: $VAL
+              regex: (?i).*(token|session|secret|password|senha|credential|refresh)

@@ -1,0 +1,53 @@
+name: Security - Semgrep
+
+# Esteira de segurança com as regras customizadas em .semgrep/
+# - Regras ERROR (R1-R4) FALHAM o build (gate de segurança).
+# - Regras WARNING (R5-R6) são apenas informativas (não bloqueiam).
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  semgrep:
+    name: Custom Semgrep rules
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Semgrep
+        run: pip install --quiet semgrep
+
+      # Gate bloqueante: qualquer achado de severidade ERROR derruba o build.
+      # --exclude .semgrep impede que os arquivos de TESTE das regras (que contêm
+      # segredos/padrões intencionais) gerem falso-positivo na esteira.
+      - name: Blocking rules (ERROR)
+        run: >
+          semgrep scan
+          --config .semgrep/
+          --severity ERROR
+          --error
+          --exclude .semgrep
+          --metrics off
+
+      # Etapa informativa: lista os WARNINGs (tokens em AsyncStorage, logs sensíveis)
+      # sem reprovar o PR. Roda mesmo que o gate acima falhe.
+      - name: Advisory rules (WARNING)
+        if: always()
+        run: >
+          semgrep scan
+          --config .semgrep/
+          --severity WARNING
+          --exclude .semgrep
+          --metrics off

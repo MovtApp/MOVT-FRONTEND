@@ -66,7 +66,7 @@ react {
 /**
  * Set this to true in release builds to optimize the app using [R8](https://developer.android.com/topic/performance/app-optimization/enable-app-optimization).
  */
-def enableMinifyInReleaseBuilds = (findProperty('android.enableMinifyInReleaseBuilds') ?: false).toBoolean()
+def enableMinifyInReleaseBuilds = (findProperty('android.enableMinifyInReleaseBuilds') ?: true).toBoolean()
 
 /**
  * The preferred build flavor of JavaScriptCore (JSC)
@@ -106,15 +106,26 @@ android {
             keyAlias 'androiddebugkey'
             keyPassword 'android'
         }
+        release {
+            // Credenciais de release NUNCA versionadas. No EAS Build elas são
+            // injetadas automaticamente pelas credenciais gerenciadas. Localmente,
+            // defina MOVT_UPLOAD_* em android/keystore.properties ou via -P/gradle.properties.
+            // Sem credenciais, o build de release FALHA (fail-secure) em vez de
+            // cair na keystore de debug (chave pública 'android').
+            if (project.hasProperty('MOVT_UPLOAD_STORE_FILE')) {
+                storeFile file(project.property('MOVT_UPLOAD_STORE_FILE'))
+                storePassword project.property('MOVT_UPLOAD_STORE_PASSWORD')
+                keyAlias project.property('MOVT_UPLOAD_KEY_ALIAS')
+                keyPassword project.property('MOVT_UPLOAD_KEY_PASSWORD')
+            }
+        }
     }
     buildTypes {
         debug {
             signingConfig signingConfigs.debug
         }
         release {
-            // Caution! In production, you need to generate your own keystore file.
-            // see https://reactnative.dev/docs/signed-apk-android.
-            signingConfig signingConfigs.debug
+            signingConfig signingConfigs.release
             def enableShrinkResources = findProperty('android.enableShrinkResourcesInReleaseBuilds') ?: 'false'
             shrinkResources enableShrinkResources.toBoolean()
             minifyEnabled enableMinifyInReleaseBuilds

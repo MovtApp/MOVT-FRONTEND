@@ -12,8 +12,6 @@ import { supabase } from "../../services/supabaseClient";
 import * as WebBrowser from "expo-web-browser";
 import * as Google from "expo-auth-session/providers/google";
 import * as AuthSession from "expo-auth-session";
-// import { LoginManager, AccessToken } from 'react-native-fbsdk-next'; // Para Facebook (Removido)
-
 import { api } from "../../services/api";
 import { API_CONFIG } from "../../config/api";
 
@@ -243,32 +241,35 @@ export const SignInScreen = () => {
       console.log("Resultado do WebBrowser:", res.type);
 
       if (res.type === "success" && res.url) {
-        console.log("URL de retorno recebida:", res.url);
+        // NÃO logar res.url: contém o authorization code.
+        if (__DEV__) console.log("URL de retorno recebida (sucesso).");
 
-        // Parsing robusto para pegar tokens tanto de hash (#) quanto de query (?)
+        // PKCE: a URL traz ?code=, NÃO mais #access_token=. O code só vira
+        // sessão se combinado com o code_verifier guardado pelo SDK ao iniciar
+        // o fluxo — inutilizável se outro app interceptar o custom scheme.
         const urlObj = new URL(res.url.replace("#", "?"));
-        const access_token = (urlObj.searchParams as any).get("access_token");
-        const refresh_token = (urlObj.searchParams as any).get("refresh_token");
-        const id_token = (urlObj.searchParams as any).get("id_token");
-        const provider_token = (urlObj.searchParams as any).get("provider_token");
+        const code = urlObj.searchParams.get("code");
 
-        if (access_token && refresh_token) {
-          console.log("Tokens extraídos com sucesso. Definindo sessão Supabase...");
-          const {
-            data: { user: supabaseUser },
-            error: userError,
-          } = await supabase.auth.setSession({
-            access_token,
-            refresh_token,
-          });
+        if (!code) {
+          throw new Error("Código de autorização não encontrado na URL de retorno.");
+        }
 
-          if (userError || !supabaseUser) throw userError || new Error("Usuário não encontrado.");
+        const {
+          data: { session, user: supabaseUser },
+          error: exchangeError,
+        } = await supabase.auth.exchangeCodeForSession(code);
 
-          console.log("Sessão Supabase definida. Iniciando Sincronização Direta Vercel...");
+        if (exchangeError || !supabaseUser || !session) {
+          throw exchangeError || new Error("Falha ao trocar code por sessão.");
+        }
 
-          try {
-            // Sincronização DIRETA com o backend da Vercel (Bypass Edge Function)
-            const syncResponse = await api.post("/auth/social-sync", {
+        const access_token = session.access_token;
+
+        if (__DEV__) console.log("Sessão Supabase definida. Iniciando Sincronização Direta Vercel...");
+
+        try {
+          // Sincronização DIRETA com o backend da Vercel (Bypass Edge Function)
+          const syncResponse = await api.post("/auth/social-sync", {
               email: supabaseUser.email,
               nome: supabaseUser.user_metadata?.full_name,
               supabase_uid: supabaseUser.id,
@@ -331,10 +332,6 @@ export const SignInScreen = () => {
               routes: [{ name: "Info" as never }],
             });
           }
-        } else {
-          console.error("Tokens não encontrados na URL de retorno.");
-          Alert.alert("Erro", "Não foi possível extrair os dados de login.");
-        }
       } else if (res.type === "cancel") {
         console.log("Login cancelado pelo usuário no navegador.");
       }

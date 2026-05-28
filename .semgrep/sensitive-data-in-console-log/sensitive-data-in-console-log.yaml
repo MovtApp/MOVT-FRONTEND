@@ -1,0 +1,21 @@
+rules:
+  - id: sensitive-data-in-console-log
+    languages: [typescript, javascript]
+    severity: WARNING
+    message: >
+      Possível log de dado sensível (token/senha/segredo) no console. Em produção esses
+      logs vão para o logcat do dispositivo e/ou para o Sentry, vazando credenciais.
+      Remova o log ou condicione-o a __DEV__ e nunca logue tokens/segredos.
+    patterns:
+      - pattern-either:
+          - pattern: console.log(..., $X, ...)
+          - pattern: console.error(..., $X, ...)
+          - pattern: console.warn(..., $X, ...)
+          - pattern: console.info(..., $X, ...)
+          - pattern: console.debug(..., $X, ...)
+      - metavariable-regex:
+          metavariable: $X
+          # metavariable-regex é ancorado (re.match) → o .* permite casar em qualquer posição.
+          # 'session'/'authorization' adicionados após triagem pegar
+          # console.log("Session ID:", user?.sessionId) e api.defaults.headers.
+          regex: (?i).*(token|password|senha|secret|api[_-]?key|credential|session|authorization)

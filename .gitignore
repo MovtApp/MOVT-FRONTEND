@@ -149,3 +149,18 @@ babel.config.js
 # MOVTServiceModule, edições em MainActivity) que nenhum config plugin recria.
 # Artefatos de build e segredos são ignorados pelo android/.gitignore aninhado.
 /ios
+
+# --- Segurança: segredos e material de assinatura (NUNCA versionar) ---
+# Keystores de assinatura (release e debug)
+*.jks
+*.keystore
+# Sentry CLI (contém SENTRY_AUTH_TOKEN) — usar variável de ambiente SENTRY_AUTH_TOKEN
+.sentryclirc
+# Senhas de assinatura do Gradle
+android/keystore.properties
+# Settings de métrica anônima do Semgrep (nome real: settings<random>.yml)
+settings*.yml
+.semgrep_settings.yml
+# Variáveis de ambiente adicionais
+.env.*
+!.env.example

@@ -404,8 +404,13 @@ export const useMessages = (chatId: string, userId: string) => {
     try {
       const fileExt = fileUri.split(".").pop()?.toLowerCase() || "jpg";
       const fileName = `${Date.now()}.${fileExt}`;
+      // TODO [SEGURANÇA / Fase 6 Camada 2]: anexos de chat (DM privado) estão
+      // sendo gravados no bucket público 'diet-images' como workaround. Migrar
+      // para o bucket privado 'attachments' (path '${chatId}/${fileName}') com
+      // policy de participante e remover a policy temporária
+      // "TEMP_chat_attachments_in_diet_images" do storage.objects.
       const path = `chat_attachments/${chatId}/${fileName}`;
-      const bucketName = "diet-images"; // Usando o bucket que sabemos que funciona no projeto
+      const bucketName = "diet-images";
 
       // 1. Obter uma URL de upload assinada para contornar restrições básicas de RLS
       const { data: signedUploadData, error: signedUploadError } = await supabase.storage

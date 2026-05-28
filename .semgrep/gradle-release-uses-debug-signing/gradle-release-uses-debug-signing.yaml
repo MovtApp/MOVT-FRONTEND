@@ -1,0 +1,16 @@
+rules:
+  - id: gradle-release-uses-debug-signing
+    languages: [generic]
+    severity: ERROR
+    message: >
+      Build de release configurado com a signingConfig de DEBUG. O APK de produção fica
+      assinado com a keystore de debug (senha pública 'android'), permitindo que qualquer
+      pessoa gere um APK com a MESMA assinatura do app (repackaging/adulteração). Crie uma
+      keystore de release dedicada (fora do versionamento) e configure signingConfigs.release.
+    options:
+      generic_ellipsis_max_span: 0
+    patterns:
+      - pattern-regex: (?s)release\s*\{[^{}]*?signingConfig\s+signingConfigs\.debug
+    paths:
+      include:
+        - "*.gradle"

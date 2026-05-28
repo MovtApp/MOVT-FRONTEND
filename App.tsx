@@ -2,8 +2,10 @@ import "react-native-url-polyfill/auto";
 import "./global.css";
 import "./src/i18n";
 import React from "react";
+import { enableFreeze } from "react-native-screens";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
+import { KeyboardProvider } from "react-native-keyboard-controller";
 import { Routes } from "@routes/index";
 import { AuthProvider, useAuth } from "@contexts/AuthContext";
 import { usePreloadChat } from "@/hooks/useChat";
@@ -12,7 +14,7 @@ import { NotificationProvider } from "@contexts/NotificationContext";
 import { BottomNavProvider } from "@contexts/BottomNavContext";
 import { BottomSheetModalProvider } from "@gorhom/bottom-sheet";
 import { AppDataProvider } from "@contexts/AppDataContext";
-import { StatusBar, ActivityIndicator, View } from "react-native";
+import { StatusBar, ActivityIndicator, View, InteractionManager } from "react-native";
 import {
   useFonts,
   Rubik_400Regular,
@@ -24,14 +26,39 @@ import "react-native-reanimated";
 import GlobalErrorBoundary from "./src/components/GlobalErrorBoundary";
 import * as Sentry from "@sentry/react-native";
 import { preInitializeHC } from "@services/healthConnectService";
+import { preloadTodayHealth } from "@/hooks/useHealthTracking";
+
+// Congela telas fora de foco: elas param de renderizar enquanto não estão
+// visíveis, reduzindo o trabalho concorrente na JS thread durante as transições.
+enableFreeze(true);
 
 Sentry.init({
   dsn: "https://63a1a4145497ba9b5cf511732a408323@o4511396537106432.ingest.us.sentry.io/4511396541825024",
   debug: __DEV__,
   tracesSampleRate: 1.0,
   enableNative: true,
-  attachScreenshot: true,
+  // Screenshot só em DEV: em prod capturas vazam PII visual (CPF em forms,
+  // valores, mensagens de chat, dados de saúde) para o Sentry.
+  attachScreenshot: __DEV__,
+  // Defensivo: garante que o SDK não envie email/IP/username junto de eventos.
+  sendDefaultPii: false,
   enableAutoSessionTracking: true,
+  beforeSend(event) {
+    if (event.user) {
+      delete event.user.email;
+      delete event.user.ip_address;
+      delete event.user.username;
+    }
+    if (event.breadcrumbs) {
+      event.breadcrumbs = event.breadcrumbs.map((b) => {
+        if (b.data && typeof b.data === "object" && "request_body" in b.data) {
+          delete (b.data as any).request_body;
+        }
+        return b;
+      });
+    }
+    return event;
+  },
 });
 
 function AppContent() {
@@ -60,6 +87,16 @@ function AppContent() {
 
   // Inicia o carregamento de chats em background
   usePreloadChat();
+
+  // Pré-carrega o resumo de saúde de hoje assim que a sessão está disponível,
+  // para que a tela de Dados já abra com os números prontos (sem fetch no mount).
+  React.useEffect(() => {
+    if (!user?.sessionId || user?.isPendingSync) return;
+    const task = InteractionManager.runAfterInteractions(() => {
+      preloadTodayHealth();
+    });
+    return () => task.cancel();
+  }, [user?.sessionId, user?.isPendingSync]);
 
   // Monitora mudanças no estado de autenticação e atualiza a rota atual
   React.useEffect(() => {
@@ -103,14 +140,16 @@ function App() {
           }}
         >
           <StatusBar barStyle={"dark-content"} />
-          <BottomSheetModalProvider>
-            <AuthProvider>
-              <AppDataProvider>
-                <AppContent />
-              </AppDataProvider>
-            </AuthProvider>
-          </BottomSheetModalProvider>
-          <FlashMessage position="top" />
+          <KeyboardProvider>
+            <BottomSheetModalProvider>
+              <AuthProvider>
+                <AppDataProvider>
+                  <AppContent />
+                </AppDataProvider>
+              </AuthProvider>
+            </BottomSheetModalProvider>
+            <FlashMessage position="top" />
+          </KeyboardProvider>
         </GestureHandlerRootView>
       </SafeAreaProvider>
     </GlobalErrorBoundary>

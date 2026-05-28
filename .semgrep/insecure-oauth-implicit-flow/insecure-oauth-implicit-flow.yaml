@@ -1,0 +1,14 @@
+rules:
+  - id: insecure-oauth-implicit-flow
+    languages: [typescript, javascript]
+    severity: ERROR
+    message: >
+      Fluxo OAuth inseguro (Implicit Grant). 'usePKCE: false' ou 'ResponseType.Token'
+      retornam o access_token diretamente na URL de redirect, que pode ser interceptado
+      por outro app registrado no mesmo custom scheme. Use Authorization Code + PKCE
+      (usePKCE: true e ResponseType.Code).
+    pattern-either:
+      - pattern: "usePKCE: false"
+      - pattern: "responseType: ResponseType.Token"
+      - pattern: "responseType: AuthSession.ResponseType.Token"
+      - pattern: "responseType: ResponseType.IdToken"

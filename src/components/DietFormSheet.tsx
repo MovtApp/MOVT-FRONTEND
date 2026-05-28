@@ -244,14 +244,6 @@ const DietFormSheet: React.FC<DietFormSheetProps> = ({
     };
 
     try {
-      console.log("=== ENVIANDO DIETA PARA O BACKEND ===");
-      console.log("Payload:", JSON.stringify(payload, null, 2));
-      console.log("URL da imagem final:", imageUrlToUpload);
-      console.log("Usuário autenticado:", user?.name);
-      console.log("Session ID:", user?.sessionId);
-      console.log("Base URL da API:", api.defaults.baseURL);
-      console.log("Headers padrão:", api.defaults.headers);
-
       if (initialData?.id_dieta) {
         // Editar dieta existente
         console.log("Editando dieta existente:", initialData.id_dieta);

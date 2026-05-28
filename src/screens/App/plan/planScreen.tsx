@@ -22,7 +22,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import BackButton from "@components/BackButton";
 import axios from "axios";
 import * as WebBrowser from "expo-web-browser";
-import AsyncStorage from "@react-native-async-storage/async-storage";
+import { secureGet } from "../../../services/secureStore";
 import { useAuth } from "../../../contexts/AuthContext";
 import { useAppData } from "../../../contexts/AppDataContext";
 
@@ -39,7 +39,11 @@ import {
   Unlock,
 } from "lucide-react-native";
 
-const API_URL = process.env.EXPO_PUBLIC_API_URL || "http://10.0.2.2:3000";
+// eslint-disable-next-line import/order
+import { API_BASE_URL } from "../../../config/api";
+// API_BASE_URL já termina em /api e respeita prod/dev. Aqui usamos a raiz
+// porque o caller concatena /api/... no path.
+const API_URL = API_BASE_URL.replace(/\/api$/, "");
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 
 const CARD_GAP = 16; // espaço entre cards
@@ -218,7 +222,7 @@ const PlanScreen: React.FC = () => {
 
     try {
       setSubscribing(true);
-      const sessionId = await AsyncStorage.getItem("userSessionId");
+      const sessionId = await secureGet("userSessionId");
       const response = await axios.post(
         `${API_URL}/api/create-checkout-session`,
         {
