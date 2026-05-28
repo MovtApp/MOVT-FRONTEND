@@ -32,6 +32,10 @@
     </intent>
   </queries>
   <application android:name=".MainApplication" android:label="@string/app_name" android:icon="@mipmap/ic_launcher" android:allowBackup="false" android:fullBackupContent="false" android:dataExtractionRules="@xml/data_extraction_rules" android:theme="@style/AppTheme" android:supportsRtl="true" android:enableOnBackInvokedCallback="false">
+    <!-- Maps SDK exige a API key inline no Manifest. Proteção real fica na
+         restrição GCP por SHA-1 + package name. Esta key foi propositalmente
+         restringida no GCP Console na Fase 6 / Tier 4 / 4.1.
+         nosemgrep: no-hardcoded-secrets -->
     <meta-data android:name="com.google.android.geo.API_KEY" android:value="AIzaSyDTRVXtY25ARGfBPaFIqva84QeAgziJ9Ds"/>
     <meta-data android:name="expo.modules.updates.ENABLED" android:value="false"/>
     <meta-data android:name="expo.modules.updates.EXPO_RUNTIME_VERSION" android:value="@string/expo_runtime_version"/>

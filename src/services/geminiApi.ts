@@ -1,47 +1,33 @@
-import { GoogleGenerativeAI } from "@google/generative-ai";
+import { supabase } from "./supabaseClient";
 
-const SUPPORTED_MODELS_TRY_ORDER = [
-  "gemini-1.5-flash-latest",
-  "gemini-1.5-flash-002",
-  "gemini-1.5-flash",
-];
+/**
+ * Analisa a imagem de uma refeição via Edge Function "analyze-meal".
+ *
+ * A chave do Gemini NÃO fica mais no cliente: a função no Supabase é que detém
+ * a GEMINI_API_KEY (server-side) e faz a chamada. Mantém a mesma assinatura e o
+ * mesmo formato de retorno do código anterior, então os callers não mudam.
+ */
+const getGeminiAnalysis = async (
+  imageBase64: string,
+  mimeType: string = "image/jpeg"
+): Promise<{
+  calories: number;
+  carbs: number;
+  protein: number;
+  fat: number;
+  description: string;
+}> => {
+  const { data, error } = await supabase.functions.invoke("analyze-meal", {
+    body: { imageBase64, mimeType },
+  });
 
-function safeParseJsonFromText(text: string): any {
-  try {
-    return JSON.parse(text);
-  } catch {
-    const match = text.match(/\{[\s\S]*\}/);
-    if (match) {
-      return JSON.parse(match[0]);
-    }
-    throw new Error("Resposta da IA não pôde ser parseada como JSON.");
+  if (error) {
+    throw new Error(error.message || "Falha ao analisar a imagem.");
   }
-}
-
-const getGeminiAnalysis = async (imageBase64: string, mimeType: string = "image/jpeg") => {
-  const apiKey = process.env.EXPO_PUBLIC_GEMINI_API_KEY;
-  if (!apiKey) throw new Error("API key não configurada no .env");
-
-  const genAI = new GoogleGenerativeAI(apiKey);
-  const prompt =
-    'Analise esta imagem de refeição e retorne APENAS um JSON válido com as chaves: { "calories": number, "carbs": number, "protein": number, "fat": number, "description": string }';
-
-  let lastError: unknown;
-  for (const modelName of SUPPORTED_MODELS_TRY_ORDER) {
-    try {
-      const model = genAI.getGenerativeModel({ model: modelName });
-      const result = await model.generateContent([
-        { inlineData: { data: imageBase64, mimeType } },
-        { text: prompt },
-      ]);
-      const text = result.response.text();
-      return safeParseJsonFromText(text);
-    } catch (err) {
-      lastError = err;
-      // tenta próximo model
-    }
+  if (!data) {
+    throw new Error("Resposta vazia da análise de imagem.");
   }
-  throw lastError || new Error("Falha ao chamar a API do Gemini");
+  return data as any;
 };
 
 export default { getGeminiAnalysis };

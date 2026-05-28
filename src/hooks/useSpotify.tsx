@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
-import { makeRedirectUri, useAuthRequest, ResponseType } from "expo-auth-session";
+import { makeRedirectUri, useAuthRequest, exchangeCodeAsync, ResponseType } from "expo-auth-session";
 import * as WebBrowser from "expo-web-browser";
-import AsyncStorage from "@react-native-async-storage/async-storage";
+import { secureGet, secureSet, secureRemove } from "../services/secureStore";
 import { SPOTIFY_CONFIG } from "../config/spotifyConfig";
 import { Alert } from "react-native";
 
@@ -36,40 +36,55 @@ export function useSpotify() {
   const [isPlaying, setIsPlaying] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
-  // Setup Auth Request
+  const redirectUri = makeRedirectUri({ scheme: "movt" });
+
+  // Authorization Code + PKCE (sem client secret no cliente). O access_token NÃO
+  // trafega mais na URL de redirect, evitando interceptação por apps registrados
+  // no mesmo custom scheme.
   const [request, response, promptAsync] = useAuthRequest(
     {
-      responseType: ResponseType.Token,
+      responseType: ResponseType.Code,
       clientId: SPOTIFY_CONFIG.clientId,
       scopes: SPOTIFY_CONFIG.scopes,
-      // In order to follow the "Authorization Code Flow" to fetch token after authorizationEndpoint
-      // this must be set to false
-      usePKCE: false,
-      redirectUri: makeRedirectUri({
-        scheme: "movt",
-      }),
+      usePKCE: true,
+      redirectUri,
     },
     SPOTIFY_CONFIG.discovery
   );
 
-  // Load token from storage on mount
+  // Load token from secure storage on mount
   useEffect(() => {
     (async () => {
-      const storedToken = await AsyncStorage.getItem(STORAGE_KEY);
+      const storedToken = await secureGet(STORAGE_KEY);
       if (storedToken) {
         setToken(storedToken);
       }
     })();
   }, []);
 
-  // Handle Auth Response
+  // Handle Auth Response — troca o authorization code por access_token via PKCE
   useEffect(() => {
-    if (response?.type === "success") {
-      const { access_token } = response.params;
-      setToken(access_token);
-      AsyncStorage.setItem(STORAGE_KEY, access_token);
+    if (response?.type === "success" && response.params.code && request?.codeVerifier) {
+      exchangeCodeAsync(
+        {
+          clientId: SPOTIFY_CONFIG.clientId,
+          code: response.params.code,
+          redirectUri,
+          extraParams: { code_verifier: request.codeVerifier },
+        },
+        SPOTIFY_CONFIG.discovery
+      )
+        .then((tokenResponse) => {
+          const accessToken = tokenResponse.accessToken;
+          if (accessToken) {
+            setToken(accessToken);
+            secureSet(STORAGE_KEY, accessToken);
+          }
+        })
+        .catch((e) => console.error("Erro ao trocar code por token do Spotify:", e));
     }
-  }, [response]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [response, request]);
 
   // Polling for Current Track (when connected)
   useEffect(() => {
@@ -96,7 +111,7 @@ export function useSpotify() {
         // If 401, token expired
         if ((error as any)?.status === 401) {
           setToken(null);
-          AsyncStorage.removeItem(STORAGE_KEY);
+          secureRemove(STORAGE_KEY);
         }
       }
     };
