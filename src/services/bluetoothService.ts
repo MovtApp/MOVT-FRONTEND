@@ -129,24 +129,40 @@ class BluetoothService {
       await connectedDevice.discoverAllServicesAndCharacteristics();
       this.connectedDevice = connectedDevice;
 
-      connectedDevice.monitorCharacteristicForService(
-        HEART_RATE_SERVICE_UUID,
-        HEART_RATE_CHARACTERISTIC_UUID,
-        (error, characteristic) => {
-          if (error) {
-            console.error("Erro ao monitorar batimentos:", error);
-            return;
-          }
-          if (characteristic?.value) {
-            try {
-              const bpm = this.decodeHeartRate(characteristic.value);
-              if (bpm > 0) onHeartRateUpdate(bpm);
-            } catch (e) {
-              console.warn("[Bluetooth] Falha ao decodificar pacote:", e);
+      // Nem todo relógio expõe o serviço padrão de Heart Rate (0x180D): Galaxy,
+      // Apple, Amazfit etc. usam protocolo próprio. Só monitoramos batimentos se
+      // o serviço existir de fato — caso contrário a conexão ainda é válida (a
+      // sincronia de saúde ocorre via Health Connect) e evitamos um erro falso.
+      const services = await connectedDevice.services();
+      const hasHeartRate = services.some(
+        (s) => s.uuid.toLowerCase() === HEART_RATE_SERVICE_UUID.toLowerCase()
+      );
+
+      if (hasHeartRate) {
+        connectedDevice.monitorCharacteristicForService(
+          HEART_RATE_SERVICE_UUID,
+          HEART_RATE_CHARACTERISTIC_UUID,
+          (error, characteristic) => {
+            if (error) {
+              console.warn("[Bluetooth] Monitor de batimentos encerrado:", error.message);
+              return;
+            }
+            if (characteristic?.value) {
+              try {
+                const bpm = this.decodeHeartRate(characteristic.value);
+                if (bpm > 0) onHeartRateUpdate(bpm);
+              } catch (e) {
+                console.warn("[Bluetooth] Falha ao decodificar pacote:", e);
+              }
             }
           }
-        }
-      );
+        );
+      } else {
+        console.log(
+          "[Bluetooth] Conectado, mas sem serviço de Heart Rate padrão (0x180D). " +
+            "Sem BPM ao vivo via BLE — dados virão pelo Health Connect."
+        );
+      }
 
       return true;
     } catch (error) {

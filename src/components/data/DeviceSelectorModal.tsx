@@ -24,7 +24,7 @@ import {
   Monitor,
 } from "lucide-react-native";
 import {
-  getAllWearOsDevices,
+  getRegisteredDevices,
   registerWearOsDevice,
   WearOsDeviceData,
 } from "../../services/wearOsHealthService";
@@ -92,7 +92,8 @@ const DeviceSelectorModal: React.FC<DeviceSelectorModalProps> = ({
     if (!user?.id) return;
     setIsLoading(true);
     try {
-      const data = await getAllWearOsDevices(parseInt(user.id, 10));
+      // Backend identifica o usuário pelo token; não passamos id do cliente.
+      const data = await getRegisteredDevices();
       setDevices(data);
     } catch (error) {
       console.error("Error loading devices:", error);
@@ -256,21 +257,31 @@ const DeviceSelectorModal: React.FC<DeviceSelectorModalProps> = ({
   }, [stopScanning]);
 
   const handleRegister = async (device: any) => {
-    if (!user?.id) return;
+    if (!user?.id) {
+      Alert.alert(
+        "Sessão inválida",
+        "Não foi possível identificar sua conta para vincular o dispositivo. Saia e entre novamente."
+      );
+      return;
+    }
     setIsLoading(true);
     try {
-      // 1. Registra no banco (o service já trata o limite de 14 caracteres)
-      await registerWearOsDevice(parseInt(user.id, 10), {
-        deviceName: device.name,
-        deviceModel: device.id,
-        deviceType: "Bluetooth BLE",
-      });
-
-      // 2. Tenta conexão real via Bluetooth para iniciar monitoramento
+      // 1. Conecta via Bluetooth ANTES de gravar.
+      //    Nem todo relógio expõe Heart Rate via BLE (Galaxy/Apple/Amazfit usam
+      //    protocolo próprio); nesses casos a sincronização real ocorre via
+      //    Health Connect. Por isso NÃO bloqueamos o vínculo por falha de BLE,
+      //    mas distinguimos claramente "falha de conexão" de "falha ao salvar".
       console.log(`[BT] Tentando conectar ao dispositivo: ${device.id}`);
-      // Passamos um callback vazio por enquanto, pois o monitoramento global será feito pelo Health Manager
       const connected = await bluetoothService.connectToDevice(device.rawDevice, (bpm) => {
         console.log(`[BT LIVE] Batimento recebido de ${device.name}: ${bpm} BPM`);
+      });
+
+      // 2. Registra via backend (service_role no servidor, ignora a RLS).
+      //    Sem deviceType: o backend usa "Wear OS", que é o tipo que a listagem
+      //    (GET /wearos/devices) filtra — assim o device aparece em "Salvos".
+      await registerWearOsDevice({
+        deviceName: device.name,
+        deviceModel: device.id,
       });
 
       if (connected) {
@@ -278,7 +289,7 @@ const DeviceSelectorModal: React.FC<DeviceSelectorModalProps> = ({
       } else {
         Alert.alert(
           "Vínculo salvo",
-          `${device.name} foi salvo nos seus dispositivos, mas não conseguimos estabelecer uma conexão Bluetooth agora. \n\nCertifique-se de que o dispositivo está ligado e próximo.`
+          `${device.name} foi salvo nos seus dispositivos, mas não conseguimos uma conexão Bluetooth ao vivo agora.\n\nSe for um smartwatch, os dados serão sincronizados pelo Health Connect. Mantenha o dispositivo ligado e próximo.`
         );
       }
 
@@ -288,8 +299,17 @@ const DeviceSelectorModal: React.FC<DeviceSelectorModalProps> = ({
       }
       setScanResults([]);
     } catch (error: any) {
-      console.error("Error registering device:", error);
-      Alert.alert("Erro de Registro", `Não foi possível vincular o dispositivo: ${error.message}`);
+      // A conexão BLE já ocorreu antes deste ponto, então qualquer erro aqui é
+      // do passo de SALVAR no servidor — mensagem específica evita o engano de
+      // "erro ao conectar".
+      const serverMessage = error?.response?.data?.error ?? error?.response?.data?.message;
+      console.error("Error registering device:", error?.response?.data ?? error?.message ?? error);
+      Alert.alert(
+        "Falha ao salvar dispositivo",
+        serverMessage
+          ? `A conexão funcionou, mas o servidor recusou salvar o dispositivo: ${serverMessage}`
+          : "A conexão funcionou, mas não conseguimos salvar o dispositivo na sua conta. Tente novamente mais tarde."
+      );
     } finally {
       setIsLoading(false);
     }

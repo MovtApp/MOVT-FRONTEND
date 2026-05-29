@@ -1,4 +1,5 @@
 import { supabase } from "./supabaseClient";
+import { api } from "./api";
 
 /**
  * Tipos para dados de saúde do Wear OS
@@ -458,58 +459,46 @@ export const monitorWearOsDeviceConnection = (
 };
 
 /**
- * Registra automaticamente um dispositivo Wear OS para o usuário
- * @param userId ID do usuário
+ * Lista os dispositivos do usuário autenticado via backend.
+ *
+ * O INSERT/SELECT direto no Supabase com a anon key é bloqueado pela RLS para
+ * usuários de e-mail/senha (que não têm sessão Supabase / `auth.uid()`). Por
+ * isso o gerenciamento de dispositivos passa pelo backend (`verifyToken` +
+ * `service_role`), que identifica o usuário pelo token e deriva o `id_us`.
+ */
+export const getRegisteredDevices = async (): Promise<WearOsDeviceData[]> => {
+  try {
+    const { data } = await api.get("/wearos/devices");
+    const list = data?.devices ?? [];
+    return Array.isArray(list) ? (list as WearOsDeviceData[]) : [];
+  } catch (error) {
+    console.error("Erro ao buscar dispositivos:", error);
+    return [];
+  }
+};
+
+/**
+ * Registra um dispositivo para o usuário autenticado via backend.
+ *
+ * NUNCA enviamos `id_us` pelo cliente: a identidade vem da sessão validada no
+ * servidor (`verifyToken` -> `req.userId`), que grava via `service_role`,
+ * contornando a RLS. O backend também cuida da deduplicação por usuário+modelo.
  * @param deviceInfo Informações do dispositivo para registro
  * @returns Promise com informações do dispositivo registrado
  */
-export const registerWearOsDevice = async (
-  userId: number,
-  deviceInfo: {
-    deviceName: string;
-    deviceModel: string;
-    deviceType?: string;
-    deviceVersion?: string;
-    tokenAcesso?: string;
-  }
-): Promise<WearOsDeviceData | null> => {
-  try {
-    // Primeiro verificar se já existe um dispositivo com o mesmo modelo
-    const existingDevice = await checkWearOsDeviceRegistered(userId);
-
-    if (existingDevice) {
-      console.log("Dispositivo já registrado para o usuário:", existingDevice);
-      return existingDevice;
-    }
-
-    // Se não existir, registrar um novo dispositivo
-    const { data: newDevice, error } = await supabase
-      .from("dispositivos")
-      .insert([
-        {
-          id_us: userId,
-          nome: deviceInfo.deviceName.substring(0, 50), // Garante limite razoável para nome
-          tipo: deviceInfo.deviceType || "Wear OS",
-          status: "ativo",
-          modelo: deviceInfo.deviceModel.substring(0, 14), // FIX 22001: Trunca para caber no varchar(14)
-          versao_watchos: deviceInfo.deviceVersion,
-          token_acesso: deviceInfo.tokenAcesso,
-          createdat: new Date().toISOString(),
-          updatedat: new Date().toISOString(),
-        },
-      ])
-      .select()
-      .single();
-
-    if (error) {
-      console.error("Erro ao registrar dispositivo Wear OS:", error);
-      throw error;
-    }
-
-    console.log("Novo dispositivo Wear OS registrado:", newDevice);
-    return newDevice as WearOsDeviceData;
-  } catch (error) {
-    console.error("Erro ao registrar dispositivo Wear OS:", error);
-    throw error;
-  }
+export const registerWearOsDevice = async (deviceInfo: {
+  deviceName: string;
+  deviceModel: string;
+  deviceType?: string;
+  deviceVersion?: string;
+  tokenAcesso?: string;
+}): Promise<WearOsDeviceData | null> => {
+  const { data } = await api.post("/wearos/register", {
+    deviceName: deviceInfo.deviceName.substring(0, 50), // limite razoável p/ nome
+    deviceModel: deviceInfo.deviceModel.substring(0, 14), // coluna modelo é varchar(14)
+    deviceType: deviceInfo.deviceType, // backend usa "Wear OS" quando ausente
+    deviceVersion: deviceInfo.deviceVersion,
+    tokenAcesso: deviceInfo.tokenAcesso,
+  });
+  return (data?.device ?? null) as WearOsDeviceData | null;
 };
