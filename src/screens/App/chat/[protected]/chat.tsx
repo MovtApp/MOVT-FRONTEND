@@ -1,4 +1,4 @@
-import { useState, useLayoutEffect, useCallback, useEffect } from "react";
+import { useState, useLayoutEffect, useCallback, useEffect, useRef } from "react";
 import {
   View,
   StyleSheet,
@@ -7,25 +7,19 @@ import {
   Text,
   Alert,
   Image,
-  KeyboardAvoidingView,
-  Keyboard,
-  Animated,
   TouchableOpacity,
   ActionSheetIOS,
   Modal,
   TextInput,
   FlatList,
 } from "react-native";
+import Animated, { useAnimatedStyle } from "react-native-reanimated";
 import {
-  GiftedChat,
-  Bubble,
-  InputToolbar,
-  Send,
-  Actions,
-  ActionsProps,
-  Composer,
-  Message,
-} from "react-native-gifted-chat";
+  KeyboardStickyView,
+  useKeyboardState,
+  useReanimatedKeyboardAnimation,
+} from "react-native-keyboard-controller";
+import { GiftedChat, Bubble, Message } from "react-native-gifted-chat";
 import { useMessages, useProfileCache } from "@/hooks/useChat";
 import { useRoute, useNavigation } from "@react-navigation/native";
 import { Send as SendIcon, CheckCheck, Plus, Heart, MessageCircle, X } from "lucide-react-native";
@@ -37,6 +31,7 @@ import dayjs from "dayjs";
 import "dayjs/locale/pt-br";
 import { userService } from "@/services/userService";
 import { useNotifications } from "@/contexts/NotificationContext";
+import { CommentsSheet, CommentsSheetHandle } from "@components/CommentsSheet";
 
 dayjs.locale("pt-br");
 
@@ -67,18 +62,18 @@ const Chat = () => {
   );
 
   const { profile: cachedProfile, updateProfileCache } = useProfileCache(participantId);
-  const [keyboardOffset] = useState(new Animated.Value(0));
-  const [isKeyboardOpen, setIsKeyboardOpen] = useState(false);
+  // Estado do teclado vindo do react-native-keyboard-controller (lida com edge-to-edge
+  // e barra de navegação nativa no Android automaticamente).
+  const isKeyboardOpen = useKeyboardState((state) => state.isVisible);
+  // SharedValue reanimated: 0 (fechado) -> -altura do teclado (aberto).
+  const { height: keyboardHeightSV } = useReanimatedKeyboardAnimation();
   const [inputText, setInputText] = useState("");
 
   // Post detail states (cloned from profilePFScreen)
   const [selectedPost, setSelectedPost] = useState<any>(null);
   const [viewPostVisible, setViewPostVisible] = useState(false);
-  const [comments, setComments] = useState<any[]>([]);
-  const [loadingComments, setLoadingComments] = useState(false);
   const [isLiking, setIsLiking] = useState(false);
-  const [newComment, setNewComment] = useState("");
-  const [isSendingComment, setIsSendingComment] = useState(false);
+  const commentsSheetRef = useRef<CommentsSheetHandle>(null);
 
   // Image Viewer state
   const [viewImageVisible, setViewImageVisible] = useState(false);
@@ -89,20 +84,14 @@ const Chat = () => {
     setViewImageVisible(true);
   };
 
-  const handleOpenPostDetails = async (post: any) => {
+  const handleOpenPostDetails = (post: any) => {
     setSelectedPost(post);
     setViewPostVisible(true);
-    setLoadingComments(true);
-    try {
-      const res = await userService.getComments(String(post.id));
-      if (res.success) {
-        setComments(res.data);
-      }
-    } catch (error) {
-      console.error("Erro ao buscar comentários do post compartilhado:", error);
-    } finally {
-      setLoadingComments(false);
-    }
+  };
+
+  const handleOpenComments = () => {
+    if (!selectedPost) return;
+    commentsSheetRef.current?.expand();
   };
 
   const handleToggleLike = async () => {
@@ -129,41 +118,6 @@ const Chat = () => {
     }
   };
 
-  const handleSendComment = async () => {
-    if (!newComment.trim() || !selectedPost || isSendingComment) return;
-    setIsSendingComment(true);
-    try {
-      const res = await userService.addComment(String(selectedPost.id), newComment);
-      if (res.success) {
-        console.log(
-          "👤 Dados do usuário logado para comentário:",
-          user?.name,
-          user?.username,
-          user?.photo
-        );
-
-        // Injeta os dados do usuário atual para que o comentário apareça corretamente na UI
-        const newCommentWithUser = {
-          ...res.data,
-          comment_user_id: effectiveUserId,
-          nome: user?.name,
-          username: user?.username,
-          photo: user?.photo,
-        };
-
-        setComments((prev) => [...prev, newCommentWithUser]);
-        setNewComment("");
-        setSelectedPost((prev: any) => ({
-          ...prev,
-          comments_count: (Number(prev.comments_count) || 0) + 1,
-        }));
-      }
-    } catch (error) {
-      Alert.alert("Erro", "Não foi possível enviar o comentário.");
-    } finally {
-      setIsSendingComment(false);
-    }
-  };
 
   useEffect(() => {
     async function prefetchParticipant() {
@@ -198,37 +152,6 @@ const Chat = () => {
     }
     prefetchParticipant();
   }, [participantId]);
-
-  useEffect(() => {
-    // Lidamos com as margens de forma reativa a ambos os sistemas
-    const showEvent = Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow";
-    const hideEvent = Platform.OS === "ios" ? "keyboardWillHide" : "keyboardDidHide";
-
-    const showSubscription = Keyboard.addListener(showEvent, (e) => {
-      setIsKeyboardOpen(true);
-      if (Platform.OS === "ios") {
-        Animated.spring(keyboardOffset, {
-          toValue: e.endCoordinates.height - (insets.bottom || 0),
-          useNativeDriver: false,
-        }).start();
-      }
-    });
-
-    const hideSubscription = Keyboard.addListener(hideEvent, () => {
-      setIsKeyboardOpen(false);
-      if (Platform.OS === "ios") {
-        Animated.spring(keyboardOffset, {
-          toValue: 0,
-          useNativeDriver: false,
-        }).start();
-      }
-    });
-
-    return () => {
-      showSubscription.remove();
-      hideSubscription.remove();
-    };
-  }, []);
 
   useEffect(() => {
     // Só marca como lido se houver mensagens recebidas que não estão lidas localmente
@@ -629,98 +552,24 @@ const Chat = () => {
     );
   };
 
-  const renderFooter = useCallback(
-    () => <Animated.View style={{ height: Platform.OS === "android" ? keyboardOffset : 0 }} />,
-    [keyboardOffset]
-  );
+  // Espaçador no fim da lista (invertida) que cresce com o teclado, levantando o
+  // conteúdo acima do teclado. keyboardHeightSV é negativo, por isso o sinal trocado.
+  const footerStyle = useAnimatedStyle(() => ({ height: -keyboardHeightSV.value }));
+  const renderFooter = useCallback(() => <Animated.View style={footerStyle} />, [footerStyle]);
 
-  const renderInputToolbar = useCallback(
-    (props: any) => {
-      if (Platform.OS === "android") {
-        return (
-          <InputToolbar
-            {...props}
-            containerStyle={[
-              styles.inputToolbar,
-              {
-                paddingBottom: insets.bottom > 0 ? insets.bottom : 0,
-                borderTopWidth: 1,
-                borderTopColor: "#f0f0f0",
-              },
-            ]}
-            primaryStyle={styles.inputToolbarPrimary}
-            renderComposer={renderComposer}
-            renderSend={renderSend}
-            renderActions={() => null}
-          />
-        );
-      }
-
-      return (
-        <Animated.View
-          style={{
-            transform: [{ translateY: Animated.multiply(keyboardOffset, -1) }],
-            width: "100%",
-            zIndex: 10,
-            position: "absolute",
-            bottom: 0,
-            minHeight: 60,
-          }}
-        >
-          <InputToolbar
-            {...props}
-            containerStyle={[
-              styles.inputToolbar,
-              {
-                paddingBottom: insets.bottom,
-              },
-            ]}
-            primaryStyle={styles.inputToolbarPrimary}
-          />
-        </Animated.View>
-      );
-    },
-    [keyboardOffset, insets.bottom]
-  );
-
-  const renderComposer = useCallback(
-    (props: any) => <Composer {...props} textInputStyle={styles.textInput} />,
-    []
-  );
-
-  const renderActions = useCallback(
-    (props: ActionsProps) => (
-      <Actions
-        {...props}
-        onPressActionButton={handlePickImage}
-        icon={() => (
-          <View style={styles.actionIconContainer}>
-            <Plus color="#fff" size={24} />
-          </View>
-        )}
-      />
-    ),
-    []
-  );
-
-  const renderSend = useCallback(
-    (props: any) => (
-      <Send
-        {...props}
-        disabled={!props.text?.trim() && !isUploading}
-        containerStyle={styles.sendLayout}
-      >
-        <View style={styles.sendButton}>
-          {isUploading ? (
-            <ActivityIndicator size="small" color="#192126" />
-          ) : (
-            <SendIcon color="#192126" size={24} />
-          )}
-        </View>
-      </Send>
-    ),
-    [isUploading]
-  );
+  // Anima o paddingBottom da barra de input em sincronia com o keyboardHeightSV
+  // (mesmo SV que move o KeyboardStickyView). Sem flag binária = sem "overshoot".
+  const inputBarStyle = useAnimatedStyle(() => {
+    const closedPadding =
+      Platform.OS === "android"
+        ? Math.max((insets.bottom || 0) + 16, 30)
+        : Math.max(insets.bottom || 0, 8) + 8;
+    const openPadding = 8;
+    const progress = Math.min(Math.abs(keyboardHeightSV.value) / 150, 1);
+    return {
+      paddingBottom: closedPadding + (openPadding - closedPadding) * progress,
+    };
+  });
 
   if (!user || !effectiveUserId) {
     return (
@@ -732,11 +581,7 @@ const Chat = () => {
 
   return (
     <View style={styles.container}>
-      <KeyboardAvoidingView
-        style={styles.keyboardAvoidingView}
-        behavior={Platform.OS === "ios" ? undefined : undefined}
-        keyboardVerticalOffset={0}
-      >
+      <View style={styles.keyboardAvoidingView}>
         <GiftedChat
           messages={messages}
           onSend={onSend}
@@ -744,15 +589,10 @@ const Chat = () => {
           onInputTextChanged={setInputText}
           placeholder="Escreva sua mensagem"
           user={{ _id: effectiveUserId }}
+          isKeyboardInternallyHandled={false}
           renderAvatar={null}
           renderBubble={renderBubble}
-          renderInputToolbar={
-            Platform.OS === "android"
-              ? renderInputToolbar
-              : (props) => <View style={{ height: 60 + (insets.bottom || 0) }} />
-          }
-          renderComposer={Platform.OS === "android" ? renderComposer : undefined}
-          renderSend={renderSend}
+          renderInputToolbar={(props) => <View style={{ height: 60 + (Platform.OS === 'android' ? Math.max(insets.bottom + 16, 30) : (insets.bottom || 0)) }} />}
           renderActions={() => null}
           renderMessageText={renderMessageText}
           renderDay={renderDay}
@@ -781,66 +621,68 @@ const Chat = () => {
           messagesContainerStyle={{ paddingBottom: 10 }}
           renderFooter={renderFooter}
           keyboardShouldPersistTaps="always"
-          extraData={isKeyboardOpen}
+          extraData={{ isKeyboardOpen }}
         />
-      </KeyboardAvoidingView>
+      </View>
 
-      {/* Input de Mensagem Real para iOS (Separado para evitar bugs de visibilidade) */}
-      {Platform.OS === "ios" && (
-        <Animated.View
-          pointerEvents="box-none"
-          style={{
-            transform: [{ translateY: Animated.multiply(keyboardOffset, -1) }],
-            width: "100%",
-            zIndex: 99,
-            position: "absolute",
-            bottom: 0,
-            backgroundColor: "#fff",
-          }}
-        >
-          <InputToolbar
-            {...({
-              onSend: (msgs: any) => onSend(msgs),
-            } as any)}
-            text={inputText}
-            onTextChanged={setInputText}
-            placeholder="Escreva sua mensagem"
-            containerStyle={[
-              styles.inputToolbar,
-              {
-                paddingBottom: insets.bottom,
-                borderTopWidth: 1,
-                borderTopColor: "#f0f0f0", // Mesmo tom do Android
-              },
-            ]}
-            primaryStyle={styles.inputToolbarPrimary}
-            renderComposer={renderComposer}
-            renderSend={() => (
-              <TouchableOpacity
-                onPress={() => {
-                  if (inputText.trim()) {
-                    onSend([
-                      {
-                        text: inputText.trim(),
-                        user: { _id: effectiveUserId },
-                        createdAt: new Date(),
-                        _id: Math.random().toString(),
-                      },
-                    ]);
-                  }
-                }}
-                disabled={!inputText.trim()}
-                style={[styles.sendLayout, { opacity: inputText.trim() ? 1 : 0.5 }]}
-              >
-                <View style={styles.sendButton}>
-                  <SendIcon color="#000" size={24} />
-                </View>
-              </TouchableOpacity>
+      {/* Barra de input customizada. KeyboardStickyView cola a barra no topo do
+          teclado quando aberto e a devolve à base quando fechado. */}
+      <KeyboardStickyView
+        offset={{ closed: 0, opened: 0 }}
+        pointerEvents="box-none"
+        style={{
+          width: "100%",
+          zIndex: 99,
+          position: "absolute",
+          bottom: 0,
+          backgroundColor: "#fff",
+        }}
+      >
+        <Animated.View style={[styles.inputBar, inputBarStyle]}>
+          <TouchableOpacity
+            style={styles.plusButton}
+            onPress={handlePickImage}
+            disabled={isUploading}
+            activeOpacity={0.7}
+          >
+            {isUploading ? (
+              <ActivityIndicator size="small" color="#fff" />
+            ) : (
+              <Plus color="#fff" size={22} />
             )}
-            renderActions={() => null}
+          </TouchableOpacity>
+
+          <TextInput
+            style={styles.composerInput}
+            value={inputText}
+            onChangeText={setInputText}
+            placeholder="Escreva sua mensagem"
+            placeholderTextColor="#94A3B8"
+            multiline
+            maxLength={2000}
           />
+
+          <TouchableOpacity
+            onPress={() => {
+              const trimmed = inputText.trim();
+              if (!trimmed) return;
+              onSend([
+                {
+                  text: trimmed,
+                  user: { _id: effectiveUserId },
+                  createdAt: new Date(),
+                  _id: Math.random().toString(),
+                },
+              ]);
+            }}
+            disabled={!inputText.trim()}
+            style={[styles.sendIconButton, { opacity: inputText.trim() ? 1 : 0.4 }]}
+            activeOpacity={0.7}
+          >
+            <SendIcon color="#192126" size={22} />
+          </TouchableOpacity>
         </Animated.View>
-      )}
+      </KeyboardStickyView>
 
       {/* Modal de Detalhes do Post (Clonado do profilePFScreen) */}
       <Modal
@@ -885,7 +727,7 @@ const Chat = () => {
                   fill={selectedPost?.is_liked ? "#EF4444" : "none"}
                 />
               </TouchableOpacity>
-              <TouchableOpacity style={styles.viewerAction}>
+              <TouchableOpacity style={styles.viewerAction} onPress={handleOpenComments}>
                 <MessageCircle color="#000" size={24} />
               </TouchableOpacity>
             </View>
@@ -896,57 +738,24 @@ const Chat = () => {
                 {selectedPost?.legenda || selectedPost?.caption}
               </Text>
             </View>
-
-            {/* Seção de Comentários */}
-            <View style={styles.commentsSection}>
-              {loadingComments ? (
-                <ActivityIndicator color="#CBFB5E" style={{ marginTop: 20 }} />
-              ) : (
-                <FlatList
-                  data={comments}
-                  keyExtractor={(item, index) => String(item.id || index)}
-                  renderItem={({ item }) => (
-                    <View style={styles.commentItem}>
-                      <Image
-                        source={{ uri: item.photo || "https://i.pravatar.cc/150" }}
-                        style={styles.commentAvatar}
-                      />
-                      <View style={styles.commentContent}>
-                        <Text style={styles.commentUser}>
-                          {item.nome || item.username || "Usuário"}
-                        </Text>
-                        <Text style={styles.commentText}>{item.comentario}</Text>
-                      </View>
-                    </View>
-                  )}
-                  contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 20 }}
-                  ListEmptyComponent={
-                    <Text style={styles.emptyComments}>Nenhum comentário ainda</Text>
-                  }
-                />
-              )}
-            </View>
-
-            {/* Input de Comentário */}
-            <View style={styles.commentInputWrapper}>
-              <TextInput
-                style={styles.commentInput}
-                placeholder="Adicionar comentário..."
-                value={newComment}
-                onChangeText={setNewComment}
-                placeholderTextColor="#94A3B8"
-              />
-              <TouchableOpacity onPress={handleSendComment} disabled={isSendingComment}>
-                {isSendingComment ? (
-                  <ActivityIndicator size="small" color="#000" />
-                ) : (
-                  <SendIcon color="#000" size={20} />
-                )}
-              </TouchableOpacity>
-            </View>
           </View>
         </View>
       </Modal>
+
+      {/* Sheet centralizado de comentários (do post compartilhado) */}
+      <CommentsSheet
+        ref={commentsSheetRef}
+        type="post"
+        targetId={selectedPost?.id ?? null}
+        authorId={selectedPost?.author?.user_id}
+        onCountChange={(delta) =>
+          setSelectedPost((prev: any) =>
+            prev
+              ? { ...prev, comments_count: Math.max(0, (Number(prev.comments_count) || 0) + delta) }
+              : prev
+          )
+        }
+      />
 
       {/* Modal de Visualização de Imagem Pura (Full Screen) */}
       <Modal
@@ -998,63 +807,44 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#e0e0e0",
   },
-  inputToolbar: {
+  inputBar: {
+    flexDirection: "row",
+    alignItems: "flex-end",
+    paddingHorizontal: 10,
+    paddingTop: 8,
     backgroundColor: "#fff",
     borderTopWidth: 1,
     borderTopColor: "#f0f0f0",
-    paddingTop: 4,
-    paddingBottom: 4,
-    width: "100%",
+    gap: 8,
   },
-  inputToolbarPrimary: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: 10,
-    justifyContent: "center",
-    paddingVertical: 8,
-  },
-  textInput: {
-    backgroundColor: "#F2F2F7",
-    borderRadius: 24,
-    paddingHorizontal: 16,
-    paddingTop: Platform.OS === "ios" ? 11 : 10, // Pequeno ajuste no iOS
-    paddingBottom: Platform.OS === "ios" ? 11 : 10,
-    marginRight: 10,
-    flex: 1, // Faz o input crescer para ocupar o espaço
-    fontSize: 15, // Reduzido ligeiramente para centralizar melhor
-    lineHeight: 20,
-    color: "#000",
-    minHeight: 42,
-  },
-  actionsContainer: {
-    marginBottom: 0,
-    marginLeft: 0,
-    marginRight: 8,
-    justifyContent: "center",
-    alignItems: "center",
-    height: "100%",
-  },
-  actionIconContainer: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+  plusButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     backgroundColor: "#192126",
     justifyContent: "center",
     alignItems: "center",
-    marginRight: 8,
-    marginBottom: 0,
+    marginBottom: 4,
   },
-  sendLayout: {
+  composerInput: {
+    flex: 1,
+    backgroundColor: "#F2F2F7",
+    borderRadius: 20,
+    paddingHorizontal: 16,
+    paddingTop: Platform.OS === "ios" ? 10 : 8,
+    paddingBottom: Platform.OS === "ios" ? 10 : 8,
+    fontSize: 15,
+    lineHeight: 20,
+    color: "#000",
+    minHeight: 40,
+    maxHeight: 120,
+  },
+  sendIconButton: {
+    width: 36,
+    height: 36,
     justifyContent: "center",
     alignItems: "center",
-    height: "100%",
-    marginBottom: 0,
-  },
-  sendButton: {
-    width: 44,
-    height: 44,
-    justifyContent: "center",
-    alignItems: "center",
+    marginBottom: 4,
   },
   messageContent: {
     paddingLeft: 12,

@@ -16,7 +16,8 @@ import {
 } from "react-native";
 import { Search, Plus, X } from "lucide-react-native";
 import Header from "@/components/Header";
-import { useNavigation, useFocusEffect } from "@react-navigation/native";
+import { useNavigation } from "@react-navigation/native";
+import { useDeferredFocusEffect } from "../../../hooks/useDeferredFocusEffect";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { AppStackParamList } from "../../../@types/routes";
 import { useChats, Chat } from "@/hooks/useChat";
@@ -70,7 +71,7 @@ const registerForPushNotificationsAsync = async () => {
     const tokenData = await Notifications.getExpoPushTokenAsync({
       projectId: Constants?.expoConfig?.extra?.eas?.projectId,
     });
-    console.log("Expo Push Token:", tokenData.data);
+    if (__DEV__) console.log("Expo Push Token registrado.");
     return tokenData.data;
   } catch (error) {
     console.error("Error registering for push notifications:", error);
@@ -187,22 +188,22 @@ const ChatScreen = () => {
     };
   }, [navigation]);
 
-  useFocusEffect(
-    useCallback(() => {
-      fetchContacts();
-      refreshChats();
+  // Adiado para depois da transição: a lista de chats já vem do cache; contatos,
+  // refresh e registro de push rodam após a navegação assentar.
+  useDeferredFocusEffect(() => {
+    fetchContacts();
+    refreshChats();
 
-      // Registrar para notificações push quando o app estiver em primeiro plano
-      registerForPushNotificationsAsync();
+    // Registrar para notificações push quando o app estiver em primeiro plano
+    registerForPushNotificationsAsync();
 
-      // Limpar ao sair da tela
-      return () => {
-        if (messagesSubscriptionRef.current) {
-          messagesSubscriptionRef.current.unsubscribe();
-        }
-      };
-    }, [supabaseUserId, refreshChats, fetchContacts, registerForPushNotificationsAsync])
-  );
+    // Limpar ao sair da tela
+    return () => {
+      if (messagesSubscriptionRef.current) {
+        messagesSubscriptionRef.current.unsubscribe();
+      }
+    };
+  }, [supabaseUserId, refreshChats, fetchContacts, registerForPushNotificationsAsync]);
 
   const handleStartChat = async (targetUserId: number, targetUserName: string) => {
     setIsModalVisible(false);

@@ -26,10 +26,6 @@
     </intent>
   </queries>
   <application android:name=".MainApplication" android:label="@string/app_name" android:icon="@mipmap/ic_launcher" android:allowBackup="false" android:fullBackupContent="false" android:dataExtractionRules="@xml/data_extraction_rules" android:theme="@style/AppTheme" android:supportsRtl="true" android:enableOnBackInvokedCallback="false">
-    <!-- Maps SDK exige a API key inline no Manifest. Proteção real fica na
-         restrição GCP por SHA-1 + package name. Esta key foi propositalmente
-         restringida no GCP Console na Fase 6 / Tier 4 / 4.1.
-         nosemgrep: no-hardcoded-secrets -->
     <meta-data android:name="com.google.android.geo.API_KEY" android:value="AIzaSyDTRVXtY25ARGfBPaFIqva84QeAgziJ9Ds"/>
     <meta-data android:name="expo.modules.updates.ENABLED" android:value="false"/>
     <meta-data android:name="expo.modules.updates.EXPO_RUNTIME_VERSION" android:value="@string/expo_runtime_version"/>
@@ -40,15 +36,6 @@
         <action android:name="android.intent.action.MAIN"/>
         <category android:name="android.intent.category.LAUNCHER"/>
       </intent-filter>
-      <!--
-        RISCO RESIDUAL ACEITO (Fase 6, F12/F24): custom schemes (movt://, exp+movt://)
-        são, por design, hijackable — outro app no device pode registrar o mesmo
-        scheme e interceptar deeplinks. O fluxo OAuth do Google está mitigado pelo
-        PKCE (F11): o authorization code só vira sessão com o code_verifier guardado
-        localmente pelo SDK Supabase. Para fechar 100% o risco, migrar para HTTPS
-        App Links (android:scheme="https" + android:host="seu-dominio" +
-        autoVerify="true" + assetlinks.json hospedado).
-      -->
       <intent-filter>
         <action android:name="android.intent.action.VIEW"/>
         <category android:name="android.intent.category.DEFAULT"/>
@@ -65,9 +52,6 @@
       </intent-filter>
     </activity>
     <uses-library android:name="org.apache.http.legacy" android:required="false"/>
-    <service
-        android:name=".MOVTForegroundService"
-        android:foregroundServiceType="location|connectedDevice"
-        android:exported="false" />
+    <service android:name=".MOVTForegroundService" android:foregroundServiceType="location|connectedDevice" android:exported="false"/>
   </application>
 </manifest>

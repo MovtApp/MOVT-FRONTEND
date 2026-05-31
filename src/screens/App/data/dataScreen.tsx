@@ -1,5 +1,5 @@
 import { StatusBar } from "expo-status-bar";
-import React, { useState, useRef, useEffect, useMemo } from "react";
+import React, { useState, useRef, useEffect, useMemo, useCallback } from "react";
 import {
   ScrollView,
   Text,
@@ -185,6 +185,9 @@ const formatNumberBR = (num: number): string => {
 
 const DAY_ITEM_WIDTH = 60;
 
+// keyExtractor estável (sem dependências) para a lista de dias.
+const keyExtractorDay = (item: number) => String(item);
+
 const getMonthAndYear = (date: Date) => {
   try {
     const months = [
@@ -260,48 +263,51 @@ const DataScreen: React.FC = () => {
     }
   };
 
-  const renderDay = ({ item }: { item: number }) => {
-    const isSelected = item === selectedDay;
-    const today = new Date();
-    const isFuture =
-      currentYear > today.getFullYear() ||
-      (currentYear === today.getFullYear() && currentMonth > today.getMonth()) ||
-      (currentYear === today.getFullYear() &&
-        currentMonth === today.getMonth() &&
-        item > today.getDate());
+  const renderDay = useCallback(
+    ({ item }: { item: number }) => {
+      const isSelected = item === selectedDay;
+      const today = new Date();
+      const isFuture =
+        currentYear > today.getFullYear() ||
+        (currentYear === today.getFullYear() && currentMonth > today.getMonth()) ||
+        (currentYear === today.getFullYear() &&
+          currentMonth === today.getMonth() &&
+          item > today.getDate());
 
-    return (
-      <TouchableOpacity
-        style={[
-          styles.dayContainer,
-          isSelected && styles.selectedDayContainer,
-          isFuture && styles.disabledDayContainer,
-        ]}
-        onPress={() => !isFuture && setSelectedDay(item)}
-        activeOpacity={isFuture ? 1 : 0.7}
-        disabled={isFuture}
-      >
-        <Text
+      return (
+        <TouchableOpacity
           style={[
-            styles.dayOfWeek,
-            isSelected && styles.selectedDayText,
-            isFuture && styles.disabledDayText,
+            styles.dayContainer,
+            isSelected && styles.selectedDayContainer,
+            isFuture && styles.disabledDayContainer,
           ]}
+          onPress={() => !isFuture && setSelectedDay(item)}
+          activeOpacity={isFuture ? 1 : 0.7}
+          disabled={isFuture}
         >
-          {getDayOfWeek(currentYear, currentMonth, item)}
-        </Text>
-        <Text
-          style={[
-            styles.dayOfMonth,
-            isSelected && styles.selectedDayText,
-            isFuture && styles.disabledDayText,
-          ]}
-        >
-          {item}
-        </Text>
-      </TouchableOpacity>
-    );
-  };
+          <Text
+            style={[
+              styles.dayOfWeek,
+              isSelected && styles.selectedDayText,
+              isFuture && styles.disabledDayText,
+            ]}
+          >
+            {getDayOfWeek(currentYear, currentMonth, item)}
+          </Text>
+          <Text
+            style={[
+              styles.dayOfMonth,
+              isSelected && styles.selectedDayText,
+              isFuture && styles.disabledDayText,
+            ]}
+          >
+            {item}
+          </Text>
+        </TouchableOpacity>
+      );
+    },
+    [selectedDay, currentYear, currentMonth]
+  );
 
   const getItemLayout = (data: ArrayLike<any> | null | undefined, index: number) => ({
     length: DAY_ITEM_WIDTH,
@@ -329,7 +335,7 @@ const DataScreen: React.FC = () => {
             ref={flatListRef}
             data={daysInMonthArray}
             renderItem={renderDay}
-            keyExtractor={(item) => String(item)}
+            keyExtractor={keyExtractorDay}
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={styles.daysListContent}
             style={styles.daysList}

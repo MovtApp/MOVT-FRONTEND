@@ -1,6 +1,6 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { useFocusEffect } from "@react-navigation/native";
+import { useDeferredFocusEffect } from "./useDeferredFocusEffect";
 import { api } from "../services/api";
 import { useAuth } from "./useAuth";
 import {
@@ -29,6 +29,49 @@ const healthDataCache: Record<
 > = {};
 
 const statsCache: Record<string, any> = {};
+
+/**
+ * Pré-carrega o resumo de saúde de hoje no cache de módulo (best-effort, silencioso).
+ * Chamado no login para que a tela de Dados já renderize com os números prontos,
+ * sem fetch no mount nem travadinha ao acessá-la.
+ */
+export async function preloadTodayHealth(): Promise<void> {
+  try {
+    const now = new Date();
+    const dateKey = now.toDateString();
+    const dateStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(
+      now.getDate()
+    ).padStart(2, "0")}`;
+
+    const response = await api.get("/health/daily-summary", { params: { date: dateStr } });
+    if (response.data && response.data.success) {
+      const remote = response.data.data || {};
+      const existing = healthDataCache[dateKey] || {
+        stepsToday: 0,
+        dailyCalories: 0,
+        sleepHours: 0,
+        sleepMinutes: 0,
+        waterConsumedMl: 0,
+        heartRate: 0,
+        oxygen: 0,
+      };
+      healthDataCache[dateKey] = {
+        ...existing,
+        stepsToday: remote.steps ?? existing.stepsToday,
+        dailyCalories: remote.calories ?? existing.dailyCalories,
+        sleepHours:
+          remote.sleep_hours !== undefined ? Math.floor(remote.sleep_hours) : existing.sleepHours,
+        sleepMinutes:
+          remote.sleep_hours !== undefined
+            ? Math.round((remote.sleep_hours % 1) * 60)
+            : existing.sleepMinutes,
+        waterConsumedMl: remote.water_intake ?? existing.waterConsumedMl,
+      };
+    }
+  } catch {
+    // best-effort: se falhar, a tela carrega normalmente no mount
+  }
+}
 
 export const useHealthTracking = (targetDate?: Date) => {
   const { user } = useAuth();
@@ -115,11 +158,15 @@ export const useHealthTracking = (targetDate?: Date) => {
           // Garante autorização automática silenciosa
           await NativeHealthManager.authorize();
 
-          const hcSteps = await NativeHealthManager.fetchSteps();
-          const hcSleep = await NativeHealthManager.fetchSleep();
-          const hcCalories = await NativeHealthManager.fetchCalories();
-          const hcHR = await NativeHealthManager.fetchHeartRate();
-          const hcOxygen = await NativeHealthManager.fetchOxygen();
+          // Paraleliza as leituras de bridge (antes eram 5 awaits sequenciais)
+          // para reduzir a congestão da JS/UI thread e o tempo total de sync.
+          const [hcSteps, hcSleep, hcCalories, hcHR, hcOxygen] = await Promise.all([
+            NativeHealthManager.fetchSteps(),
+            NativeHealthManager.fetchSleep(),
+            NativeHealthManager.fetchCalories(),
+            NativeHealthManager.fetchHeartRate(),
+            NativeHealthManager.fetchOxygen(),
+          ]);
 
           console.log("[HealthConnect] Dados sincronizados no foco.");
 
@@ -201,29 +248,29 @@ export const useHealthTracking = (targetDate?: Date) => {
     cached,
   ]);
 
-  // Sincronização Autônoma Periódica (Foco Ativo)
-  useFocusEffect(
-    useCallback(() => {
-      // Executa a carga/sincronização inicial de imediato
-      loadInitialData();
+  // Sincronização Autônoma Periódica (Foco Ativo).
+  // Adiada para depois da transição de navegação (InteractionManager) para não
+  // travar a abertura da tela com as leituras nativas do Health Connect.
+  useDeferredFocusEffect(() => {
+    // Executa a carga/sincronização inicial assim que a navegação assenta
+    loadInitialData();
 
-      // Configura intervalo de sincronização silenciosa se for a data de hoje
-      let intervalId: any = null;
-      if (isToday) {
-        console.log("[NHM] 🔄 Sincronização automática de saúde ativada (a cada 30s)");
-        intervalId = setInterval(() => {
-          loadInitialData();
-        }, 30000);
+    // Configura intervalo de sincronização silenciosa se for a data de hoje
+    let intervalId: any = null;
+    if (isToday) {
+      console.log("[NHM] 🔄 Sincronização automática de saúde ativada (a cada 3min)");
+      intervalId = setInterval(() => {
+        loadInitialData();
+      }, 180000);
+    }
+
+    return () => {
+      if (intervalId) {
+        clearInterval(intervalId);
+        console.log("[NHM] ⏸️ Sincronização automática de saúde pausada");
       }
-
-      return () => {
-        if (intervalId) {
-          clearInterval(intervalId);
-          console.log("[NHM] ⏸️ Sincronização automática de saúde pausada");
-        }
-      };
-    }, [loadInitialData, isToday])
-  );
+    };
+  }, [loadInitialData, isToday]);
 
   // Wear OS Polling (Background)
   useEffect(() => {
@@ -252,8 +299,8 @@ export const useHealthTracking = (targetDate?: Date) => {
       }
     };
 
-    // Inicia polling real via service
-    const stopPolling = pollWearOsHealthData(userId, 30000, (data) => {
+    // Inicia polling real via service (alinhado ao intervalo de 3min)
+    const stopPolling = pollWearOsHealthData(userId, 180000, (data) => {
       if (isMounted && data) {
         if (data.heartRate) {
           setHeartRate(data.heartRate);
@@ -331,25 +378,28 @@ export const useHealthTracking = (targetDate?: Date) => {
     }
   }, [userId]);
 
-  const addWater = async (amount: number) => {
-    const newAmount = waterIntake + amount;
-    setWaterIntake(newAmount);
-    await AsyncStorage.setItem(waterKey, newAmount.toString());
+  const addWater = useCallback(
+    async (amount: number) => {
+      const newAmount = waterIntake + amount;
+      setWaterIntake(newAmount);
+      await AsyncStorage.setItem(waterKey, newAmount.toString());
 
-    if (healthDataCache[dateKey]) {
-      healthDataCache[dateKey].waterConsumedMl = newAmount;
-    }
+      if (healthDataCache[dateKey]) {
+        healthDataCache[dateKey].waterConsumedMl = newAmount;
+      }
 
-    try {
-      const dateStr = targetDate
-        ? `${targetDate.getFullYear()}-${String(targetDate.getMonth() + 1).padStart(2, "0")}-${String(targetDate.getDate()).padStart(2, "0")}`
-        : `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, "0")}-${String(new Date().getDate()).padStart(2, "0")}`;
+      try {
+        const dateStr = targetDate
+          ? `${targetDate.getFullYear()}-${String(targetDate.getMonth() + 1).padStart(2, "0")}-${String(targetDate.getDate()).padStart(2, "0")}`
+          : `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, "0")}-${String(new Date().getDate()).padStart(2, "0")}`;
 
-      await api.post("/health/water", { amount: newAmount, date: dateStr });
-    } catch (e) {
-      console.warn("Falha ao salvar água no servidor:", e);
-    }
-  };
+        await api.post("/health/water", { amount: newAmount, date: dateStr });
+      } catch (e) {
+        console.warn("Falha ao salvar água no servidor:", e);
+      }
+    },
+    [waterIntake, waterKey, dateKey, targetDate]
+  );
 
   const getHistoricalStats = useCallback(
     async (period: string) => {
@@ -369,28 +419,55 @@ export const useHealthTracking = (targetDate?: Date) => {
     [userId, dateKey]
   );
 
-  return {
-    heartRate,
-    isWearOsConnected,
-    stepsToday,
-    stepsLoading,
-    isWalking,
-    stepsGoal,
-    trainingTime,
-    cyclingRoute,
-    cyclingRegion,
-    locationError,
-    dailyCalories,
-    sleepHours,
-    sleepMinutes,
-    waterConsumedMl: waterIntake,
-    getHistoricalStats,
-    isToday,
-    oxygen,
-    trainingActive,
-    lastUpdate,
-    addWater,
-    refresh: loadInitialData,
-    authorize: NativeHealthManager.authorize,
-  };
+  // Memoiza o objeto de retorno para que consumidores (DataScreen, HomeScreen)
+  // não re-renderizem por nova referência quando nenhuma métrica relevante mudou.
+  return useMemo(
+    () => ({
+      heartRate,
+      isWearOsConnected,
+      stepsToday,
+      stepsLoading,
+      isWalking,
+      stepsGoal,
+      trainingTime,
+      cyclingRoute,
+      cyclingRegion,
+      locationError,
+      dailyCalories,
+      sleepHours,
+      sleepMinutes,
+      waterConsumedMl: waterIntake,
+      getHistoricalStats,
+      isToday,
+      oxygen,
+      trainingActive,
+      lastUpdate,
+      addWater,
+      refresh: loadInitialData,
+      authorize: NativeHealthManager.authorize,
+    }),
+    [
+      heartRate,
+      isWearOsConnected,
+      stepsToday,
+      stepsLoading,
+      isWalking,
+      stepsGoal,
+      trainingTime,
+      cyclingRoute,
+      cyclingRegion,
+      locationError,
+      dailyCalories,
+      sleepHours,
+      sleepMinutes,
+      waterIntake,
+      getHistoricalStats,
+      isToday,
+      oxygen,
+      trainingActive,
+      lastUpdate,
+      addWater,
+      loadInitialData,
+    ]
+  );
 };

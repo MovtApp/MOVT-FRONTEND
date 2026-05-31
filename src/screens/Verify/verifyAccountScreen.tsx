@@ -6,7 +6,7 @@ import { useNavigation, useRoute, RouteProp } from "@react-navigation/native"; /
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { RootStackParamList } from "@typings/routes"; // Já corrigido para @typings/routes
 import { api } from "@/services/api";
-import AsyncStorage from "@react-native-async-storage/async-storage";
+import { secureGet } from "@/services/secureStore";
 import { useAuth } from "@contexts/AuthContext";
 
 type VerifyAccountScreenRouteProp = RouteProp<RootStackParamList, "Verify">;
@@ -29,7 +29,7 @@ const VerifyAccountScreen = () => {
       if (routeSessionId) {
         setCurrentSessionId(routeSessionId);
       } else {
-        const storedSessionId = await AsyncStorage.getItem("userSessionId");
+        const storedSessionId = await secureGet("userSessionId");
         if (storedSessionId) {
           setCurrentSessionId(storedSessionId);
         } else {

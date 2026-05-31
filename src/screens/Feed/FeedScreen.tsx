@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useMemo } from "react";
 import { useFocusEffect } from "@react-navigation/native";
-import { View, Text, FlatList, RefreshControl, ActivityIndicator } from "react-native";
+import { View, FlatList, RefreshControl, ActivityIndicator } from "react-native";
 import { useAuth } from "../../contexts/AuthContext";
 import { useFeed } from "../../hooks/useFeed";
 import { useSelfDiets, DietFeedItem } from "../../hooks/useSelfDiets";
@@ -8,8 +8,10 @@ import PostCard from "./PostCard";
 import DietCard from "./DietCard";
 import SharePostSheet from "../../components/SharePostSheet";
 import Header from "../../components/Header";
+import { CommentsSheet, CommentsTargetType } from "../../components/CommentsSheet";
 import { styles } from "./styles";
 import { FooterVersion } from "../../components/FooterVersion";
+import { FeedListSkeleton } from "../../components/Skeleton";
 
 // A discriminated union for any item that can appear in the feed
 type FeedItem = { _type: "post"; data: any } | { _type: "diet"; data: DietFeedItem };
@@ -22,16 +24,47 @@ const FeedScreen: React.FC = () => {
   const [selectedSharePost, setSelectedSharePost] = useState<any>(null);
   const shareSheetRef = React.useRef<any>(null);
 
-  // Refresh diets every time this screen comes into focus (e.g. after creating one)
+  // CommentsSheet único (lifted da árvore dos cards pra evitar VirtualizedList
+  // aninhada em ScrollView). Montado condicionalmente: só existe quando há um
+  // alvo (clique). Sem alvo, não está na árvore.
+  const [commentTarget, setCommentTarget] = useState<{
+    type: CommentsTargetType;
+    targetId: string | number;
+    authorId?: string | number;
+  } | null>(null);
+
+  // Refresh diets every time this screen comes into focus (e.g. after creating one).
+  // No cleanup (blur) zeramos o alvo → o CommentsSheet desmonta. Como o FeedScreen
+  // fica congelado no stack (freezeOnBlur), manter o sheet montado fazia ele
+  // reaparecer aberto ao voltar pra tela ("abre sozinho"). Desmontando, é impossível.
   useFocusEffect(
     useCallback(() => {
       refreshDiets();
+      return () => {
+        setCommentTarget(null);
+      };
     }, [refreshDiets])
   );
 
   const handleOpenShare = useCallback((post: any) => {
     setSelectedSharePost(post);
     shareSheetRef.current?.present();
+  }, []);
+
+  const handleCommentOnPost = useCallback((post: any) => {
+    setCommentTarget({
+      type: "post",
+      targetId: post.post_id,
+      authorId: post.author?.user_id,
+    });
+  }, []);
+
+  const handleCommentOnDiet = useCallback((diet: any) => {
+    setCommentTarget({
+      type: "diet",
+      targetId: diet.id_dieta,
+      authorId: diet.id_us,
+    });
   }, []);
 
   // Merge posts + diets, sorted chronologically (newest first)
@@ -67,17 +100,32 @@ const FeedScreen: React.FC = () => {
     }
   }, [isLoading, hasMore, loadMore]);
 
-  const renderItem = ({ item }: { item: FeedItem }) => {
-    if (item._type === "diet") {
-      return <DietCard diet={item.data} onShare={handleOpenShare} />;
-    }
-    return <PostCard post={item.data} key={item.data.post_id} onShare={handleOpenShare} />;
-  };
+  const renderItem = useCallback(
+    ({ item }: { item: FeedItem }) => {
+      if (item._type === "diet") {
+        return (
+          <DietCard
+            diet={item.data}
+            onShare={handleOpenShare}
+            onCommentPress={handleCommentOnDiet}
+          />
+        );
+      }
+      return (
+        <PostCard
+          post={item.data}
+          onShare={handleOpenShare}
+          onCommentPress={handleCommentOnPost}
+        />
+      );
+    },
+    [handleOpenShare, handleCommentOnDiet, handleCommentOnPost]
+  );
 
-  const keyExtractor = (item: FeedItem, index: number) => {
+  const keyExtractor = useCallback((item: FeedItem, index: number) => {
     if (item._type === "diet") return `diet-${item.data.id_dieta}-${index}`;
     return `post-${item.data.post_id}-${index}`;
-  };
+  }, []);
 
   const renderFooter = () => {
     if (isLoading && hasMore) {
@@ -99,9 +147,9 @@ const FeedScreen: React.FC = () => {
 
   if (!user && combinedLoading) {
     return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#BBF246" />
-        <Text style={styles.loadingText}>Carregando...</Text>
+      <View style={styles.container}>
+        <Header />
+        <FeedListSkeleton count={4} />
       </View>
     );
   }
@@ -116,6 +164,10 @@ const FeedScreen: React.FC = () => {
         ListFooterComponent={renderFooter}
         onEndReached={handleLoadMore}
         onEndReachedThreshold={0.5}
+        initialNumToRender={5}
+        maxToRenderPerBatch={5}
+        windowSize={7}
+        removeClippedSubviews
         refreshControl={
           <RefreshControl
             refreshing={isRefreshing}
@@ -127,7 +179,7 @@ const FeedScreen: React.FC = () => {
       />
       {combinedLoading && feedItems.length === 0 && (
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#BBF246" />
+          <FeedListSkeleton count={4} />
         </View>
       )}
 
@@ -150,6 +202,19 @@ const FeedScreen: React.FC = () => {
         }
         bottomSheetRef={shareSheetRef}
       />
+
+      {/* CommentsSheet: montado só quando há um alvo (clique). Sem alvo não existe
+          na árvore — não há como reaparecer aberto ao voltar pra tela. autoOpen
+          abre no mount; onClose desmonta quando o usuário fecha. */}
+      {commentTarget && (
+        <CommentsSheet
+          type={commentTarget.type}
+          targetId={commentTarget.targetId}
+          authorId={commentTarget.authorId}
+          autoOpen
+          onClose={() => setCommentTarget(null)}
+        />
+      )}
     </View>
   );
 };

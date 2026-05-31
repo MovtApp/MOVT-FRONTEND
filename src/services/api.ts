@@ -1,6 +1,6 @@
 import axios from "axios";
 import { API_BASE_URL } from "../config/api";
-import AsyncStorage from "@react-native-async-storage/async-storage";
+import { secureGet } from "./secureStore";
 
 const api = axios.create({
   baseURL: API_BASE_URL,
@@ -9,12 +9,14 @@ const api = axios.create({
 
 api.interceptors.request.use(
   async (config) => {
-    const sessionId = await AsyncStorage.getItem("userSessionId");
+    const sessionId = await secureGet("userSessionId");
     if (sessionId) {
       config.headers.Authorization = `Bearer ${sessionId}`;
     }
-    const fullUrl = `${config.baseURL}${config.url}`;
-    console.log("🚀 Requisição enviada:", config.method?.toUpperCase(), fullUrl);
+    if (__DEV__) {
+      const fullUrl = `${config.baseURL}${config.url}`;
+      console.log("🚀 Requisição enviada:", config.method?.toUpperCase(), fullUrl);
+    }
     return config;
   },
   (error) => {
@@ -25,7 +27,9 @@ api.interceptors.request.use(
 
 api.interceptors.response.use(
   (response) => {
-    console.log("✅ Resposta recebida:", response.status, response.config.url);
+    if (__DEV__) {
+      console.log("✅ Resposta recebida:", response.status, response.config.url);
+    }
     return response;
   },
   (error) => {
@@ -37,7 +41,7 @@ api.interceptors.response.use(
     const isUnauthorized = error.response?.status === 401;
 
     // Silencia os logs no console/expo se for apenas um erro de conta inativa ou não autorizado
-    if (!isInactiveError && !isUnauthorized) {
+    if (__DEV__ && !isInactiveError && !isUnauthorized) {
       console.error("❌ Erro na resposta:", error.response?.status, error.config?.url);
       console.error("❌ Dados do erro:", error.response?.data);
     }

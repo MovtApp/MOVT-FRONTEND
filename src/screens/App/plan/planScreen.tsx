@@ -161,6 +161,15 @@ const PlanScreen: React.FC = () => {
 
   const getConfig = (planType: string) => PLAN_CONFIG[planType] || PLAN_CONFIG.free;
 
+  // Normaliza "familia" -> "family" para comparar com o tipo derivado dos planos.
+  const normalizePlan = (t: string) => (t === "familia" ? "family" : t);
+
+  // Plano atual do usuário (campo `plan` do backend: free | premium | familia).
+  const currentUserPlan = useMemo(
+    () => normalizePlan(String(user?.plan ?? "free").toLowerCase()),
+    [user?.plan]
+  );
+
   useEffect(() => {
     fetchStripePlans();
   }, [fetchStripePlans]);
@@ -251,6 +260,7 @@ const PlanScreen: React.FC = () => {
     const pType = getPlanType(item);
     const cfg = getConfig(pType);
     const isActive = index === activeIndex;
+    const isCurrentPlan = normalizePlan(pType) === currentUserPlan;
 
     return (
       <TouchableOpacity
@@ -264,6 +274,17 @@ const PlanScreen: React.FC = () => {
         }}
         style={[styles.cardWrapper]}
       >
+        {/* Slot de altura fixa acima de todos os cards (mantém alinhamento);
+            a badge "Plano Atual" só aparece no card do plano do usuário. */}
+        <View style={styles.currentBadgeSlot}>
+          {isCurrentPlan && (
+            <View style={styles.currentPlanBadge}>
+              <Ionicons name="checkmark-circle" size={13} color="#BBF246" />
+              <Text style={styles.currentPlanBadgeText}>PLANO ATUAL</Text>
+            </View>
+          )}
+        </View>
+
         <Animated.View
           style={[
             styles.card,
@@ -615,6 +636,32 @@ const styles = StyleSheet.create({
   cardWrapper: {
     width: CARD_ITEM_WIDTH,
     paddingRight: CARD_GAP,
+  },
+  currentBadgeSlot: {
+    height: 34,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 4,
+  },
+  currentPlanBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    backgroundColor: "#1A2126",
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    borderRadius: 20,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 4,
+  },
+  currentPlanBadgeText: {
+    color: "#BBF246",
+    fontSize: 11,
+    fontWeight: "800",
+    letterSpacing: 0.5,
   },
   card: {
     borderRadius: 28,

@@ -1,5 +1,5 @@
-import React, { createContext, useState, useEffect } from "react";
-import AsyncStorage from "@react-native-async-storage/async-storage";
+import React, { createContext, useState, useEffect, useCallback, useMemo } from "react";
+import { secureGet, secureSet, secureRemove } from "../services/secureStore";
 import { DeviceEventEmitter, Alert } from "react-native";
 import { api } from "../services/api";
 
@@ -20,6 +20,8 @@ interface User {
   documentType?: "CPF" | "CNPJ" | null;
   isPendingSync?: boolean; // Flag para evitar chamadas de API antes da sincronização final
   role?: string;
+  plan?: string; // Plano real do backend: "free" | "premium" | "familia"
+  plan_expires_at?: string | null;
 }
 
 interface AuthContextData {
@@ -36,11 +38,66 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
 
+  // Funções estáveis (useCallback) declaradas antes dos effects para que possam
+  // ser referenciadas com segurança nas dependências dos useEffect/useMemo.
+  const signIn = useCallback(async (sessionId: string, userDetails: Omit<User, "sessionId">) => {
+    try {
+      console.log(
+        "🔑 [AuthContext] Iniciando signIn para:",
+        userDetails.email,
+        "UID:",
+        userDetails.supabaseUserId
+      );
+      // Salva o sessionId e os detalhes do usuário no AsyncStorage
+      await secureSet("userSessionId", sessionId);
+      await secureSet("@Auth:user", JSON.stringify(userDetails));
+
+      setUser({ ...userDetails, sessionId });
+    } catch {
+      // Erro de sign-in não é usado, removemos a variável
+      throw new Error("Failed to sign in");
+    }
+  }, []);
+
+  const signOut = useCallback(async () => {
+    setUser(null);
+    await secureRemove("userSessionId"); // Remove o sessionId
+    await secureRemove("@Auth:user"); // Remove os dados do usuário
+  }, []);
+
+  const updateUser = useCallback(
+    async (newUserData: Partial<User>) => {
+      if (!user) return;
+
+      const updatedUser = { ...user, ...newUserData };
+      setUser(updatedUser);
+
+      // Atualiza os dados no AsyncStorage
+      await secureSet(
+        "@Auth:user",
+        JSON.stringify({
+          name: updatedUser.name,
+          email: updatedUser.email,
+          username: updatedUser.username,
+          isVerified: updatedUser.isVerified,
+          photo: updatedUser.photo,
+          banner: updatedUser.banner,
+          id: updatedUser.id,
+          supabaseUserId: updatedUser.supabaseUserId,
+          documentId: updatedUser.documentId,
+          documentType: updatedUser.documentType,
+          role: updatedUser.role,
+        })
+      );
+    },
+    [user]
+  );
+
   useEffect(() => {
     async function loadUserData() {
       try {
-        const storedSessionId = await AsyncStorage.getItem("userSessionId");
-        const storedUserDetails = await AsyncStorage.getItem("@Auth:user");
+        const storedSessionId = await secureGet("userSessionId");
+        const storedUserDetails = await secureGet("@Auth:user");
 
         if (storedSessionId && storedUserDetails) {
           const parsedUserDetails = JSON.parse(storedUserDetails);
@@ -71,7 +128,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
               setUser(refreshedUser);
 
-              await AsyncStorage.setItem(
+              await secureSet(
                 "@Auth:user",
                 JSON.stringify({
                   id: refreshedUser.id,
@@ -85,13 +142,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 })
               );
             } else {
-              await AsyncStorage.removeItem("userSessionId");
-              await AsyncStorage.removeItem("@Auth:user");
+              await secureRemove("userSessionId");
+              await secureRemove("@Auth:user");
               setUser(null);
             }
           } catch {
-            await AsyncStorage.removeItem("userSessionId");
-            await AsyncStorage.removeItem("@Auth:user");
+            await secureRemove("userSessionId");
+            await secureRemove("@Auth:user");
             setUser(null);
           }
         } else {
@@ -99,8 +156,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           setLoading(false);
         }
       } catch {
-        await AsyncStorage.removeItem("userSessionId");
-        await AsyncStorage.removeItem("@Auth:user");
+        await secureRemove("userSessionId");
+        await secureRemove("@Auth:user");
         setUser(null);
         setLoading(false);
       }
@@ -122,63 +179,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return () => {
       subscription.remove();
     };
-  }, []);
+  }, [signOut]);
 
-  async function signIn(sessionId: string, userDetails: Omit<User, "sessionId">) {
-    try {
-      console.log(
-        "🔑 [AuthContext] Iniciando signIn para:",
-        userDetails.email,
-        "UID:",
-        userDetails.supabaseUserId
-      );
-      // Salva o sessionId e os detalhes do usuário no AsyncStorage
-      await AsyncStorage.setItem("userSessionId", sessionId);
-      await AsyncStorage.setItem("@Auth:user", JSON.stringify(userDetails));
-
-      setUser({ ...userDetails, sessionId });
-    } catch {
-      // Erro de sign-in não é usado, removemos a variável
-      throw new Error("Failed to sign in");
-    }
-  }
-
-  async function signOut() {
-    setUser(null);
-    await AsyncStorage.removeItem("userSessionId"); // Remove o sessionId
-    await AsyncStorage.removeItem("@Auth:user"); // Remove os dados do usuário
-  }
-
-  async function updateUser(newUserData: Partial<User>) {
-    if (!user) return;
-
-    const updatedUser = { ...user, ...newUserData };
-    setUser(updatedUser);
-
-    // Atualiza os dados no AsyncStorage
-    await AsyncStorage.setItem(
-      "@Auth:user",
-      JSON.stringify({
-        name: updatedUser.name,
-        email: updatedUser.email,
-        username: updatedUser.username,
-        isVerified: updatedUser.isVerified,
-        photo: updatedUser.photo,
-        banner: updatedUser.banner,
-        id: updatedUser.id,
-        supabaseUserId: updatedUser.supabaseUserId,
-        documentId: updatedUser.documentId,
-        documentType: updatedUser.documentType,
-        role: updatedUser.role,
-      })
-    );
-  }
-
-  return (
-    <AuthContext.Provider value={{ user, signIn, signOut, updateUser, loading }}>
-      {children}
-    </AuthContext.Provider>
+  const value = useMemo(
+    () => ({ user, signIn, signOut, updateUser, loading }),
+    [user, signIn, signOut, updateUser, loading]
   );
+
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
 
 // Hook customizado para usar o contexto de autenticação

@@ -1,5 +1,5 @@
 import { View, TouchableOpacity, StyleSheet, Text, Platform } from "react-native";
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { AppStackParamList } from "../@types/routes";
 import { ChartPie, House, Map, MessageCircle, Soup } from "lucide-react-native";
@@ -52,8 +52,18 @@ const HIDDEN_SCREENS = [
   "ActiveWorkout",
   "AdminDashboard",
   "PersonalDashboard",
+  "DietDetails"
 ];
 // ============================================================================
+
+// Itens de navegação como constante de módulo (referência estável entre renders).
+const NAV_ITEMS: NavItem[] = [
+  { name: "HomeScreen", label: "Início", icon: House },
+  { name: "MapScreen", label: "Mapa", icon: Map },
+  { name: "DietScreen", label: "Dieta", icon: Soup },
+  { name: "DataScreen", label: "Dados", icon: ChartPie },
+  { name: "ChatScreen", label: "Chat", icon: MessageCircle },
+];
 
 // Função para verificar se a tela atual deve esconder o BottomNavigationBar
 const shouldHideBottomNavigationBar = (currentScreen: string | null): boolean => {
@@ -118,40 +128,18 @@ const BottomNavigationBar = () => {
     }
   }, [currentScreen, appStackScreenNames]);
 
-  const navItems: NavItem[] = [
-    {
-      name: "HomeScreen",
-      label: "Início",
-      icon: House,
+  const navigateTo = useCallback(
+    (screenName: keyof AppStackParamList) => {
+      setActiveTab(screenName);
+      // As 5 telas principais agora vivem no Tab navigator "MainTabs" (mantidas
+      // montadas). Navegamos: Drawer -> HomeStack -> MainTabs -> aba alvo.
+      (navigation as any).navigate("HomeStack", {
+        screen: "MainTabs",
+        params: { screen: screenName },
+      });
     },
-    {
-      name: "MapScreen",
-      label: "Mapa",
-      icon: Map,
-    },
-    {
-      name: "DietScreen",
-      label: "Dieta",
-      icon: Soup,
-    },
-    {
-      name: "DataScreen",
-      label: "Dados",
-      icon: ChartPie,
-    },
-    {
-      name: "ChatScreen",
-      label: "Chat",
-      icon: MessageCircle,
-    },
-  ];
-
-  const navigateTo = (screenName: keyof AppStackParamList) => {
-    setActiveTab(screenName);
-    // BottomNavigationBar's useNavigation() returns LeftDrawer navigation,
-    // which only knows "HomeStack". We reach the inner Stack screens via params.
-    (navigation as any).navigate("HomeStack", { screen: screenName });
-  };
+    [navigation]
+  );
 
   // Se deve esconder por tela ou por contexto, retorna null
   if (shouldHide || !isVisibleFromContext) {
@@ -160,7 +148,7 @@ const BottomNavigationBar = () => {
 
   return (
     <View style={[styles.container, { bottom: bottomInset }]}>
-      {navItems.map((item: NavItem) => {
+      {NAV_ITEMS.map((item: NavItem) => {
         const isActive = activeTab === item.name;
         return (
           <TouchableOpacity

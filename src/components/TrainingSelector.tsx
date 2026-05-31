@@ -141,4 +141,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default TrainingSelector;
+export default React.memo(TrainingSelector);

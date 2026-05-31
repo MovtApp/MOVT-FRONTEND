@@ -1,5 +1,5 @@
 import { api } from "./api";
-import AsyncStorage from "@react-native-async-storage/async-storage";
+import { secureGet } from "./secureStore";
 
 export interface CalorieData {
   date: string;
@@ -25,7 +25,7 @@ export const getHealthMetricData = async (
   date?: string
 ): Promise<CalorieStats> => {
   try {
-    const sessionId = await AsyncStorage.getItem("userSessionId");
+    const sessionId = await secureGet("userSessionId");
 
     if (!sessionId) {
       throw new Error("Sessão não encontrada. Faça login novamente.");
@@ -87,7 +87,7 @@ export const saveHealthMetricData = async (
   targetDate?: Date
 ): Promise<void> => {
   try {
-    const sessionId = await AsyncStorage.getItem("userSessionId");
+    const sessionId = await secureGet("userSessionId");
 
     if (!sessionId) {
       throw new Error("Sessão não encontrada. Faça login novamente.");

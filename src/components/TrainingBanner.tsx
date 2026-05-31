@@ -196,4 +196,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default TrainingBanner;
+export default React.memo(TrainingBanner);

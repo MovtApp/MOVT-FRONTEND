@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from "react";
+import React, { useState, useRef } from "react";
 import {
   View,
   Text,
@@ -12,16 +12,10 @@ import {
   Alert,
   Animated,
   FlatList,
-  Keyboard,
   SafeAreaView,
   ScrollView,
   Dimensions,
 } from "react-native";
-import {
-  Swipeable,
-  FlatList as GestureHandlerFlatList,
-  GestureHandlerRootView,
-} from "react-native-gesture-handler";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { useAuth } from "../../contexts/AuthContext";
 import { useLike } from "../../hooks/useLike";
@@ -31,120 +25,29 @@ import { api } from "../../services/api";
 import { getRelativeTime } from "../../utils/timeUtils";
 import { styles } from "./styles";
 import { COLORS } from "../../styles/colors";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useNavigation } from "@react-navigation/native";
 
 interface PostCardProps {
   post: any;
   onShare?: (post: any) => void;
+  /** Disparado quando o usuário toca pra abrir comentários. A tela hospedeira
+   *  abre um único CommentsSheet centralizado (evita FlatList aninhada em
+   *  ScrollView por card). */
+  onCommentPress?: (post: any) => void;
 }
-
-// const { width } = Dimensions.get("window");
-
-// ─── CommentItem com Swipe-to-Delete ────────────────────────────────────────
-
-interface CommentItemProps {
-  item: any;
-  currentUserId: string | number;
-  postAuthorId: string | number; // Adicionado para verificar permissão do autor do post
-  onDelete: (id: string | number) => void;
-  // Ref do NativeViewGestureHandler que envolve o FlatList
-  // Necessário para que o Swipeable e o FlatList coexistam sem conflito de gestos
-  flatListRef: React.RefObject<any>;
-}
-
-const CommentItem: React.FC<CommentItemProps> = ({
-  item,
-  currentUserId,
-  postAuthorId,
-  onDelete,
-  flatListRef,
-}) => {
-  const isCommentOwner = String(item.user_id) === String(currentUserId);
-  const isPostOwner = String(postAuthorId) === String(currentUserId);
-  const canDelete = isCommentOwner || isPostOwner;
-
-  const renderRightActions = (
-    _progress: Animated.AnimatedInterpolation<number>,
-    dragX: Animated.AnimatedInterpolation<number>
-  ) => {
-    const scale = dragX.interpolate({
-      inputRange: [-72, 0],
-      outputRange: [1, 0.5],
-      extrapolate: "clamp",
-    });
-
-    return (
-      <View style={styles.swipeDeleteContainer}>
-        <TouchableOpacity
-          style={styles.swipeDeleteBtn}
-          onPress={() => {
-            Alert.alert("Excluir comentário", "Tem certeza que deseja excluir este comentário?", [
-              { text: "Cancelar", style: "cancel" },
-              {
-                text: "Excluir",
-                style: "destructive",
-                onPress: () => onDelete(item.id),
-              },
-            ]);
-          }}
-        >
-          <Animated.View style={{ transform: [{ scale }] }}>
-            <Ionicons name="trash" size={22} color="#fff" />
-          </Animated.View>
-        </TouchableOpacity>
-      </View>
-    );
-  };
-
-  const content = (
-    <View style={styles.commentItem}>
-      <Image
-        source={{ uri: item.photo || "https://via.placeholder.com/150" }}
-        style={styles.commentAvatar}
-      />
-      <View style={styles.commentContent}>
-        <View style={{ flexDirection: "row", alignItems: "center", flexWrap: "wrap" }}>
-          <Text style={styles.commentUser}>{item.username || item.nome || "Usuário"}</Text>
-          <Text style={styles.commentDate}> · {getRelativeTime(item.created_at)}</Text>
-        </View>
-        <Text style={styles.commentBody}>{item.comentario}</Text>
-      </View>
-    </View>
-  );
-
-  // Somente permite o swipe se for dono do comentário ou dono do post
-  if (!canDelete) return content;
-
-  return (
-    <Swipeable
-      renderRightActions={renderRightActions}
-      friction={2}
-      rightThreshold={40}
-      overshootRight={false}
-      // Removido simultaneousHandlers para teste de simplicidade
-    >
-      {content}
-    </Swipeable>
-  );
-};
 
 // ─── PostCard Principal ───────────────────────────────────────────────────────
 
-const PostCard: React.FC<PostCardProps> = ({ post, onShare }) => {
+const PostCard: React.FC<PostCardProps> = ({ post, onShare, onCommentPress }) => {
   const { user } = useAuth();
   const navigation = useNavigation<any>();
 
   const { isLiked, toggleLike } = useLike(post.post_id, Boolean(post.is_liked));
   // const { isFollowing, follow, unfollow } = useFollow(post.author.user_id);
 
-  const [showCommentsModal, setShowCommentsModal] = useState(false);
-  // const [commentText, setCommentText] = useState("");
-  const [modalCommentText, setModalCommentText] = useState("");
-  const [isSubmittingComment, setIsSubmittingComment] = useState(false);
-  const [comments, setComments] = useState<any[]>([]);
-  const [loadingComments, setLoadingComments] = useState(false);
-  const [isKeyboardVisible, setKeyboardVisible] = useState(false);
+  const insets = useSafeAreaInsets();
 
   // Refs para detecção de toques (Double Tap)
   const lastTapRef = useRef(0);
@@ -160,47 +63,6 @@ const PostCard: React.FC<PostCardProps> = ({ post, onShare }) => {
   const [heartAnim] = useState(new Animated.Value(0));
 
   // 🔑 Ref que conecta o FlatList ao Swipeable via NativeViewGestureHandler
-  const flatListGestureRef = useRef<any>(null);
-
-  const fetchComments = useCallback(async () => {
-    setLoadingComments(true);
-    try {
-      const response = await userService.getComments(post.post_id);
-      if (response && Array.isArray(response.data)) {
-        setComments(response.data);
-      } else if (Array.isArray(response)) {
-        setComments(response);
-      } else {
-        setComments([]);
-      }
-    } catch (error) {
-      console.error("Erro ao buscar comentários:", error);
-      setComments([]);
-    } finally {
-      setLoadingComments(false);
-    }
-  }, [post.post_id]);
-
-  useEffect(() => {
-    if (showCommentsModal) {
-      fetchComments();
-    }
-
-    const showSubscription = Keyboard.addListener(
-      Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow",
-      () => setKeyboardVisible(true)
-    );
-    const hideSubscription = Keyboard.addListener(
-      Platform.OS === "ios" ? "keyboardWillHide" : "keyboardDidHide",
-      () => setKeyboardVisible(false)
-    );
-
-    return () => {
-      showSubscription.remove();
-      hideSubscription.remove();
-    };
-  }, [showCommentsModal, fetchComments]);
-
   const handleShare = async () => {
     console.log("[PostCard] Clique detectado no ícone de enviar. onShare existe?", !!onShare);
     if (onShare) {
@@ -213,36 +75,6 @@ const PostCard: React.FC<PostCardProps> = ({ post, onShare }) => {
       } catch (error) {
         console.error("Erro ao compartilhar:", error);
       }
-    }
-  };
-
-  const handleSubmitComment = async (text: string, fromModal: boolean) => {
-    if (!text.trim()) return;
-    setIsSubmittingComment(true);
-    try {
-      await userService.addComment(post.post_id, text);
-      if (fromModal) {
-        setModalCommentText("");
-        fetchComments();
-      }
-    } catch (error) {
-      console.error("Erro ao comentar:", error);
-      Alert.alert("Erro", "Não foi possível enviar o comentário.");
-    } finally {
-      setIsSubmittingComment(false);
-    }
-  };
-
-  const handleDeleteComment = async (commentId: string | number) => {
-    try {
-      // Usando o serviço centralizado para exclusão
-      await userService.deleteComment(String(commentId));
-
-      // Remove otimisticamente da lista sem precisar fazer nova requisição
-      setComments((prev) => prev.filter((c) => String(c.id) !== String(commentId)));
-    } catch (error) {
-      console.error("Erro ao deletar comentário:", error);
-      Alert.alert("Erro", "Não foi possível excluir o comentário.");
     }
   };
 
@@ -499,7 +331,7 @@ const PostCard: React.FC<PostCardProps> = ({ post, onShare }) => {
               color={isLiked ? "#ED4956" : COLORS.grayscale[100]}
             />
           </TouchableOpacity>
-          <TouchableOpacity onPress={() => setShowCommentsModal(true)} style={styles.actionIcon}>
+          <TouchableOpacity onPress={() => onCommentPress?.(post)} style={styles.actionIcon}>
             <Ionicons name="chatbubble-outline" size={24} color={COLORS.grayscale[100]} />
           </TouchableOpacity>
           <TouchableOpacity onPress={handleShare} style={styles.actionIcon}>
@@ -516,114 +348,12 @@ const PostCard: React.FC<PostCardProps> = ({ post, onShare }) => {
           <Text style={styles.captionText}>{post.caption}</Text>
         </View>
         {post.comment_count > 0 && (
-          <TouchableOpacity onPress={() => setShowCommentsModal(true)}>
+          <TouchableOpacity onPress={() => onCommentPress?.(post)}>
             <Text style={styles.viewComments}>Ver todos os {post.comment_count} comentários</Text>
           </TouchableOpacity>
         )}
         <Text style={styles.timestamp}>{getRelativeTime(post.created_at)}</Text>
       </View>
-
-      {/* ─── Modal Premium de Comentários ───────────────────────────────── */}
-      <Modal
-        visible={showCommentsModal}
-        transparent
-        animationType="slide"
-        onRequestClose={() => setShowCommentsModal(false)}
-      >
-        <GestureHandlerRootView style={{ flex: 1 }}>
-          <KeyboardAvoidingView
-            style={{ flex: 1 }}
-            behavior={Platform.OS === "ios" ? "padding" : "height"}
-          >
-            <View style={styles.modalOverlay}>
-              {/* Backdrop transparente que fecha o modal */}
-              <TouchableOpacity
-                style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0 }}
-                activeOpacity={1}
-                onPress={() => setShowCommentsModal(false)}
-              />
-
-              <View style={styles.modalContent}>
-                <View style={styles.modalIndicator} />
-
-                <View style={styles.modalHeader}>
-                  <Text style={styles.modalTitle}>Comentários</Text>
-                  <TouchableOpacity onPress={() => setShowCommentsModal(false)}>
-                    <Ionicons name="close" size={24} color={COLORS.grayscale[100]} />
-                  </TouchableOpacity>
-                </View>
-
-                {loadingComments ? (
-                  <ActivityIndicator
-                    size="large"
-                    color={COLORS.primary_green}
-                    style={{ marginTop: 40, flex: 1 }}
-                  />
-                ) : (
-                  <GestureHandlerFlatList
-                    data={comments}
-                    keyExtractor={(item, index) => `comment-${item.id ?? index}`}
-                    renderItem={({ item }) => (
-                      <CommentItem
-                        item={item}
-                        currentUserId={currentUserId}
-                        postAuthorId={post.author.user_id}
-                        onDelete={handleDeleteComment}
-                        flatListRef={flatListGestureRef}
-                      />
-                    )}
-                    ListEmptyComponent={
-                      <Text style={styles.noComments}>
-                        Nenhum comentário ainda. Seja o primeiro! 💬
-                      </Text>
-                    }
-                    style={styles.modalList}
-                    contentContainerStyle={
-                      comments.length === 0 ? { flex: 1 } : { paddingBottom: 8 }
-                    }
-                  />
-                )}
-
-                {/* Input de Comentário (Corrigido para largura full e padding dinâmico) */}
-                <View
-                  style={[
-                    styles.commentInputContainer,
-                    isKeyboardVisible && Platform.OS === "ios" && { paddingBottom: 8 },
-                  ]}
-                >
-                  <TextInput
-                    style={styles.commentInput}
-                    placeholder="Escreva um comentário..."
-                    placeholderTextColor={COLORS.grayscale[45]}
-                    value={modalCommentText}
-                    onChangeText={setModalCommentText}
-                    onSubmitEditing={() => handleSubmitComment(modalCommentText, true)}
-                    returnKeyType="send"
-                    editable={!isSubmittingComment}
-                  />
-                  <TouchableOpacity
-                    onPress={() => handleSubmitComment(modalCommentText, true)}
-                    disabled={!modalCommentText.trim() || isSubmittingComment}
-                    style={styles.sendButton}
-                  >
-                    {isSubmittingComment ? (
-                      <ActivityIndicator size="small" color={COLORS.primary_green} />
-                    ) : (
-                      <Ionicons
-                        name="send"
-                        size={20}
-                        color={
-                          modalCommentText.trim() ? COLORS.primary_green : COLORS.grayscale[30]
-                        }
-                      />
-                    )}
-                  </TouchableOpacity>
-                </View>
-              </View>
-            </View>
-          </KeyboardAvoidingView>
-        </GestureHandlerRootView>
-      </Modal>
 
       {/* ─── Modal de Ações do Post (ActionSheet) ─────────────────────────── */}
       <Modal

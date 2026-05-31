@@ -327,4 +327,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default PlanCardTraining;
+export default React.memo(PlanCardTraining);

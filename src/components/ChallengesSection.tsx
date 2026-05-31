@@ -126,4 +126,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default ChallengesSection;
+export default React.memo(ChallengesSection);

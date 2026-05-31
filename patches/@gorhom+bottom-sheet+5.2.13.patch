@@ -1,0 +1,23 @@
+diff --git a/node_modules/@gorhom/bottom-sheet/src/hooks/useGestureEventsHandlersDefault.tsx b/node_modules/@gorhom/bottom-sheet/src/hooks/useGestureEventsHandlersDefault.tsx
+index 5f02306..d35ffff 100644
+--- a/node_modules/@gorhom/bottom-sheet/src/hooks/useGestureEventsHandlersDefault.tsx
++++ b/node_modules/@gorhom/bottom-sheet/src/hooks/useGestureEventsHandlersDefault.tsx
+@@ -345,13 +345,16 @@ export const useGestureEventsHandlersDefault: GestureEventsHandlersHookType =
+            *
+            * because the the keyboard dismiss is interactive in iOS.
+            */
+-          const WINDOW_HEIGHT = Dimensions.get('window').height;
++          // NOTE: patched — Dimensions.get('window') estoura dentro do worklet na
++          // New Architecture ("Dimensions.get is not a function"). O valor só é
++          // usado no ramo iOS, então inlinamos após `Platform.OS === 'ios'`: no
++          // Android o `&&` curto-circuita e Dimensions nunca é chamado no worklet.
+           if (
+             !(
+               Platform.OS === 'ios' &&
+               isScrollable &&
+               absoluteY >
+-                WINDOW_HEIGHT -
++                Dimensions.get('window').height -
+                   animatedKeyboardState.get().heightWithinContainer
+             )
+           ) {

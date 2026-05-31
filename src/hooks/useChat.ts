@@ -67,19 +67,18 @@ export const useChats = (userId: string) => {
       if (resp.status === 200) {
         const data = resp.data.data || [];
 
-        // Processa as mensagens para limpar JSON de posts compartilhados na lista
+        // Normaliza o preview da última mensagem para a lista de conversas:
+        // - post compartilhado (JSON) -> rótulo legível
+        // - imagem (texto vazio/só espaços ou "Imagem" gravado pelo backend) -> rótulo
         const processedData = data.map((chat: Chat) => {
           let lastMsg = chat.last_message || "";
           if (lastMsg && lastMsg.includes('"type":"shared_post"')) {
-            try {
-              const startIdx = lastMsg.indexOf('{"');
-              const endIdx = lastMsg.lastIndexOf("}") + 1;
-              const jsonStr = lastMsg.substring(startIdx, endIdx);
-              const parsed = JSON.parse(jsonStr);
-              lastMsg = parsed.caption || "Post compartilhado";
-            } catch (e) {
-              lastMsg = "Post compartilhado";
-            }
+            lastMsg = "📷 Post compartilhado";
+          } else if ((lastMsg.length > 0 && lastMsg.trim() === "") || lastMsg === "Imagem") {
+            // Foto: o envio manda text=" " e o backend grava o espaço, deixando o
+            // preview em branco. Também cobre o fallback "Imagem" do backend.
+            // String vazia ("") é mantida para cair no fallback "Iniciar nova conversa...".
+            lastMsg = "📷 Foto";
           }
           return { ...chat, last_message: lastMsg };
         });

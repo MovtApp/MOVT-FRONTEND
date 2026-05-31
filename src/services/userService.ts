@@ -1,12 +1,12 @@
 import { api } from "./api";
-import AsyncStorage from "@react-native-async-storage/async-storage";
+import { secureGet } from "./secureStore";
 import { Platform } from "react-native";
 import { supabase } from "./supabaseClient";
 import * as FileSystem from "expo-file-system/legacy";
 import { decode } from "base64-arraybuffer";
 
 const getAuthHeaders = async () => {
-  const sessionId = await AsyncStorage.getItem("userSessionId");
+  const sessionId = await secureGet("userSessionId");
   return {
     headers: {
       Authorization: `Bearer ${sessionId}`,

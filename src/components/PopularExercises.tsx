@@ -327,4 +327,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default PopularExercises;
+export default React.memo(PopularExercises);

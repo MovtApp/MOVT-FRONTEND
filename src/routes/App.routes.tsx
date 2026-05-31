@@ -1,5 +1,6 @@
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { createDrawerNavigator } from "@react-navigation/drawer";
+import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import HomeScreen from "../screens/App/home/homeScreen";
 import MapScreen from "../screens/App/map/mapScreen";
 import DietScreen from "../screens/App/diet/dietScreen";
@@ -48,33 +49,65 @@ import { NotificationDrawerContent } from "../components/NotificationModal";
 import PostDetailScreen from "../screens/Feed/PostDetailScreen";
 import ArchivedPostsScreen from "../screens/App/profile/ArchivedPostsScreen";
 import EditProfileScreen from "../screens/App/profile/EditProfileScreen";
-import AdminDashboardScreen from "../screens/App/admin/AdminDashboardScreen";
-import PersonalDashboard from "../screens/App/personal/[protected]/PersonalDashboard";
-
 import ActiveWorkout from "../screens/App/training/[protected]/activeWorkout";
 
 import ExpectationRealityScreen from "../screens/App/biometrics/ExpectationRealityScreen";
+import AdminDashboardScreen from "../screens/App/admin/AdminDashboardScreen";
+import PersonalDashboard from "../screens/App/personal/[protected]/PersonalDashboard";
 
 const Stack = createNativeStackNavigator<AppStackParamList>();
 const LeftDrawer = createDrawerNavigator();
 const RightDrawer = createDrawerNavigator();
+const Tab = createBottomTabNavigator();
+
+// Nomes das 5 telas principais que vivem dentro do Tab navigator (mantidas
+// montadas para troca instantânea). Exportado para a navegação saber rotear.
+export const MAIN_TAB_SCREENS = [
+  "HomeScreen",
+  "MapScreen",
+  "DietScreen",
+  "DataScreen",
+  "ChatScreen",
+];
+
+// As 5 telas principais ficam num Bottom Tab navigator. A barra padrão é ocultada
+// (usamos a BottomNavigationBar flutuante externa). As telas são mantidas montadas
+// (lazy: monta na 1a visita e permanece), tornando a troca entre elas instantânea.
+function MainTabs() {
+  return (
+    <Tab.Navigator
+      backBehavior="history"
+      screenOptions={{
+        headerShown: false,
+        tabBarStyle: { display: "none" },
+        // Mantém a tela inativa montada (congelada via enableFreeze) p/ revisita instantânea.
+        freezeOnBlur: true,
+      }}
+    >
+      <Tab.Screen name="HomeScreen" component={HomeScreen} />
+      <Tab.Screen name="MapScreen" component={MapScreen} />
+      {/* DietScreen é tipado com props de native-stack; cast p/ usar no Tab. */}
+      <Tab.Screen name="DietScreen" component={DietScreen as any} />
+      <Tab.Screen name="DataScreen" component={DataScreen} />
+      <Tab.Screen name="ChatScreen" component={ChatScreen} />
+    </Tab.Navigator>
+  );
+}
 
 function AppLayout() {
   // Removendo isDietSheetOpen e setIsDietSheetOpen, pois não são mais usados para controlar a visibilidade da BottomNavigationBar.
   return (
     <View style={styles.container}>
       <Stack.Navigator
-        initialRouteName="HomeScreen"
+        initialRouteName="MainTabs"
         screenOptions={{
           headerShown: false,
+          // Congela a tela ao sair de foco e reduz custo de telas inativas.
+          freezeOnBlur: true,
         }}
       >
-        <Stack.Screen name="HomeScreen" component={HomeScreen} />
-        <Stack.Screen name="MapScreen" component={MapScreen} />
-        <Stack.Screen name="DietScreen" component={DietScreen} />
+        <Stack.Screen name="MainTabs" component={MainTabs} />
         <Stack.Screen name="DietDetails" component={DietDetailsScreen} />
-        <Stack.Screen name="DataScreen" component={DataScreen} />
-        <Stack.Screen name="ChatScreen" component={ChatScreen} />
         <Stack.Screen name="Chat" component={ChatProtected} />
         <Stack.Screen name="ProfilePFScreen" component={ProfilePFScreen} />
         <Stack.Screen name="ProfilePJ" component={ProfilePJ} />

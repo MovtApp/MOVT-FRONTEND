@@ -104,4 +104,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default PromotionalBanner;
+export default React.memo(PromotionalBanner);

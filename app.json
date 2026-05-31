@@ -3,7 +3,7 @@
     "name": "MOVT",
     "slug": "movt",
     "scheme": "movt",
-    "version": "1.0.2",
+    "version": "1.0.3",
     "orientation": "portrait",
     "icon": "./src/assets/iconBuild.png",
     "splash": {

@@ -1,5 +1,15 @@
 import React, { useMemo, useRef, useState, useEffect, useCallback } from "react";
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Image, Alert } from "react-native";
+import {
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  ScrollView,
+  Image,
+  Alert,
+  Platform,
+} from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
   CirclePlus,
   Clock4,
@@ -12,7 +22,7 @@ import {
 } from "lucide-react-native";
 import SearchInput from "../../../components/SearchInput";
 import { api } from "../../../services/api";
-import AsyncStorage from "@react-native-async-storage/async-storage";
+import { secureGet } from "../../../services/secureStore";
 import DietFormSheet from "../../../components/DietFormSheet";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { AppStackParamList, DietMeal } from "../../../@types/routes";
@@ -31,6 +41,13 @@ const DietScreen: React.FC<NativeStackScreenProps<AppStackParamList, "DietScreen
   const dietFormSheetRef = useRef<any>(null);
   const [selectedDietIds, setSelectedDietIds] = useState<string[]>([]);
   const [sheetIndex, setSheetIndex] = useState(0);
+
+  // Posiciona o FAB acima do BottomNavigationBar: replica o mesmo bottomInset da
+  // barra (ver BottomNavigationBar.tsx), soma a altura dela (60) + um respiro.
+  const insets = useSafeAreaInsets();
+  const navBottomInset =
+    Platform.OS === "android" ? (insets.bottom > 0 ? insets.bottom + 5 : 10) : insets.bottom || 12;
+  const fabBottom = navBottomInset + 60 + 16;
 
   const categories = useMemo(
     () => [
@@ -100,7 +117,7 @@ const DietScreen: React.FC<NativeStackScreenProps<AppStackParamList, "DietScreen
           text: "Excluir",
           onPress: async () => {
             try {
-              const sessionId = await AsyncStorage.getItem("userSessionId");
+              const sessionId = await secureGet("userSessionId");
               if (!sessionId) {
                 Alert.alert("Erro", "Sessão não encontrada. Faça login novamente.");
                 return;
@@ -279,7 +296,11 @@ const DietScreen: React.FC<NativeStackScreenProps<AppStackParamList, "DietScreen
         ))}
       </ScrollView>
 
-      <TouchableOpacity style={styles.fab} activeOpacity={0.9} onPress={handleAddDiet}>
+      <TouchableOpacity
+        style={[styles.fab, { bottom: fabBottom }]}
+        activeOpacity={0.9}
+        onPress={handleAddDiet}
+      >
         <Plus size={24} color="#0F172A" />
       </TouchableOpacity>
 
@@ -488,7 +509,6 @@ const styles = StyleSheet.create({
   fab: {
     position: "absolute",
     right: 20,
-    bottom: 24,
     width: 52,
     height: 52,
     borderRadius: 12,
@@ -500,7 +520,6 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.2,
     shadowRadius: 10,
     elevation: 10,
-    marginBottom: 80,
   },
   sheetPortal: {
     ...(StyleSheet.absoluteFillObject as any),

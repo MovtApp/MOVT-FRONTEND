@@ -1,5 +1,6 @@
 export type AppStackParamList = {
   HomeStack: undefined;
+  MainTabs: undefined;
   HomeScreen: undefined;
   DietScreen: undefined;
   MapScreen: undefined;

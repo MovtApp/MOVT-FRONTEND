@@ -92,10 +92,8 @@ const ProfilePFScreen = () => {
     return [];
   });
   const postSheetRef = useRef<any>(null);
-  const [postSheetIndex, setPostSheetIndex] = useState(0);
 
   // Post setup
-  const [isPostSheetOpen, setIsPostSheetOpen] = useState(false);
   const shareSheetRef = useRef<any>(null);
 
   // Stats and modal states
@@ -272,7 +270,7 @@ const ProfilePFScreen = () => {
 
   const handleCreatePost = () => {
     setSelectedPost(null); // Garante que é um novo post
-    setIsPostSheetOpen(true);
+    postSheetRef.current?.present();
   };
 
   const handleManagePost = (post: any) => {
@@ -311,7 +309,7 @@ const ProfilePFScreen = () => {
 
   const handleEditPost = () => {
     setManageModalVisible(false);
-    setIsPostSheetOpen(true);
+    postSheetRef.current?.present();
   };
 
   const handleOpenShare = (post: any) => {
@@ -630,7 +628,11 @@ const ProfilePFScreen = () => {
       )}
 
       {isOwnProfile && (
-        <TouchableOpacity style={styles.fab} onPress={handleCreatePost} activeOpacity={0.9}>
+        <TouchableOpacity
+          style={[styles.fab, { bottom: (insets.bottom || 0) + 24 }]}
+          onPress={handleCreatePost}
+          activeOpacity={0.9}
+        >
           <Plus color="#0F172A" size={24} />
         </TouchableOpacity>
       )}
@@ -638,15 +640,11 @@ const ProfilePFScreen = () => {
       {/* PostFormSheet Portal */}
       <View pointerEvents="box-none" style={styles.sheetPortal}>
         <PostFormSheet
-          isOpen={isPostSheetOpen}
           initialData={selectedPost}
           onClose={() => {
-            setIsPostSheetOpen(false);
             setSelectedPost(null);
           }}
           bottomSheetRef={postSheetRef}
-          sheetIndex={postSheetIndex}
-          setSheetIndex={setPostSheetIndex}
           onSuccess={fetchPosts}
         />
 

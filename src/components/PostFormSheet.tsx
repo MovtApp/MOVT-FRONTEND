@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
 import {
   View,
   Text,
@@ -9,7 +9,12 @@ import {
   Alert,
   ActivityIndicator,
 } from "react-native";
-import BottomSheet, { BottomSheetScrollView, BottomSheetTextInput } from "@gorhom/bottom-sheet";
+import {
+  BottomSheetModal,
+  BottomSheetScrollView,
+  BottomSheetTextInput,
+  BottomSheetBackdrop,
+} from "@gorhom/bottom-sheet";
 import { Image as ImageIcon, X } from "lucide-react-native";
 import * as ImagePicker from "expo-image-picker";
 import { useForm, Controller } from "react-hook-form";
@@ -27,22 +32,16 @@ interface PostItem {
 }
 
 interface PostFormSheetProps {
-  isOpen: boolean;
   onClose: () => void;
   initialData?: PostItem;
-  bottomSheetRef: React.RefObject<BottomSheet | null>;
-  sheetIndex: number;
-  setSheetIndex: (idx: number) => void;
+  bottomSheetRef: React.RefObject<BottomSheetModal | null>;
   onSuccess?: () => void;
 }
 
 const PostFormSheet: React.FC<PostFormSheetProps> = ({
-  isOpen,
   onClose,
   initialData,
   bottomSheetRef,
-  sheetIndex,
-  setSheetIndex,
   onSuccess,
 }) => {
   const { user } = useAuth();
@@ -65,21 +64,24 @@ const PostFormSheet: React.FC<PostFormSheetProps> = ({
   const [imageUri, setImageUri] = useState<string | null>(initialData?.url || null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // Sincroniza o formulário com o post alvo. O parent define selectedPost (ou
+  // null para novo post) ANTES de chamar present(), então quando initialData
+  // muda preenchemos/limpamos os campos. A abertura é 100% imperativa via
+  // bottomSheetRef.present() — o sheet nasce fechado (não auto-abre no mount).
   useEffect(() => {
-    if (isOpen) {
-      reset({
-        legenda: initialData?.legenda || "",
-        imageurl: initialData?.url || "",
-      });
-      setImageUri(initialData?.url || null);
+    reset({
+      legenda: initialData?.legenda || "",
+      imageurl: initialData?.url || "",
+    });
+    setImageUri(initialData?.url || null);
+  }, [initialData, reset]);
 
-      if (bottomSheetRef.current) {
-        setTimeout(() => {
-          bottomSheetRef.current?.snapToIndex(0);
-        }, 100);
-      }
-    }
-  }, [isOpen, initialData, reset, bottomSheetRef]);
+  const renderBackdrop = useCallback(
+    (props: any) => (
+      <BottomSheetBackdrop {...props} disappearsOnIndex={-1} appearsOnIndex={0} opacity={0.5} />
+    ),
+    []
+  );
 
   const handleImageSelection = () => {
     if (initialData?.id) return; // Impede seleção se estiver editando
@@ -160,8 +162,7 @@ const PostFormSheet: React.FC<PostFormSheetProps> = ({
         if (response.success) {
           Alert.alert("Sucesso", "Legenda atualizada!");
           if (onSuccess) onSuccess();
-          bottomSheetRef.current?.close();
-          onClose();
+          bottomSheetRef.current?.dismiss();
           reset();
         } else {
           throw new Error(response.message || "Erro ao atualizar");
@@ -182,8 +183,7 @@ const PostFormSheet: React.FC<PostFormSheetProps> = ({
         if (response.status === 200 || response.status === 201 || response.data?.success) {
           Alert.alert("Sucesso", "Publicação enviada!");
           if (onSuccess) onSuccess();
-          bottomSheetRef.current?.close();
-          onClose();
+          bottomSheetRef.current?.dismiss();
           reset();
         } else {
           throw new Error(response.data?.message || "Erro desconhecido");
@@ -198,19 +198,16 @@ const PostFormSheet: React.FC<PostFormSheetProps> = ({
   };
 
   const handleInternalClose = () => {
-    bottomSheetRef.current?.close();
-    onClose();
+    bottomSheetRef.current?.dismiss();
   };
 
-  // No longer returning null to ensure the component is always mounted and ref is attached
   return (
-    <BottomSheet
+    <BottomSheetModal
       ref={bottomSheetRef}
       snapPoints={snapPoints}
       enablePanDownToClose={true}
-      onClose={onClose}
-      index={isOpen ? sheetIndex : -1}
-      onChange={setSheetIndex}
+      onDismiss={onClose}
+      backdropComponent={renderBackdrop}
       backgroundStyle={styles.sheetBackground}
       handleIndicatorStyle={styles.sheetHandle}
       keyboardBehavior="extend"
@@ -275,7 +272,7 @@ const PostFormSheet: React.FC<PostFormSheetProps> = ({
           </TouchableOpacity>
         </View>
       </BottomSheetScrollView>
-    </BottomSheet>
+    </BottomSheetModal>
   );
 };
 

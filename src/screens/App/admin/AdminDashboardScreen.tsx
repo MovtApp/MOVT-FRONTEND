@@ -432,7 +432,9 @@ const AdminDashboardScreen: React.FC = () => {
         (userStatusFilter === "blocked" && !u?.ativo);
 
       const r = String(u?.role || u?.tipo || u?.role_name || "").toLowerCase();
-      const isAdmin = r.includes("admin") || Number(u?.id_us) === 15;
+      // Autorização baseada APENAS em role (sem backdoor por id). A decisão de
+      // privilégio real deve ser reforçada no backend, nunca só no cliente.
+      const isAdmin = r.includes("admin");
       const isPJ =
         r.includes("personal") ||
         r.includes("trainer") ||
@@ -1278,7 +1280,7 @@ const AdminDashboardScreen: React.FC = () => {
     () =>
       safeUsers.filter((u) => {
         const r = String(u?.role || u?.tipo || u?.role_name || "").toLowerCase();
-        return r.includes("admin") || Number(u?.id_us) === 15;
+        return r.includes("admin");
       }).length,
     [safeUsers]
   );
@@ -2696,7 +2698,7 @@ const AdminDashboardScreen: React.FC = () => {
                       const r = String(
                         item?.role || item?.tipo || item?.role_name || ""
                       ).toLowerCase();
-                      const isAdmin = r.includes("admin") || Number(item?.id_us) === 15;
+                      const isAdmin = r.includes("admin");
                       const isPJ =
                         r.includes("personal") ||
                         r.includes("trainer") ||

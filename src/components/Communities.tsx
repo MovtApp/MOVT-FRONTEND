@@ -135,4 +135,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default Communities;
+export default React.memo(Communities);

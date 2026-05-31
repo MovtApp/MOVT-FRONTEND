@@ -277,4 +277,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default TheBestForYou;
+export default React.memo(TheBestForYou);

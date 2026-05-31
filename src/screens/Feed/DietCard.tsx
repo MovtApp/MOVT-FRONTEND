@@ -1,117 +1,31 @@
-import React, { useState, useEffect, useRef, useCallback } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   View,
   Text,
   Image,
   TouchableOpacity,
   StyleSheet,
-  Modal,
-  TextInput,
-  ActivityIndicator,
-  KeyboardAvoidingView,
-  Platform,
   Alert,
-  Keyboard,
-  ScrollView,
   Animated,
 } from "react-native";
 import { Flame, Clock4, Beef, Wheat, Droplets, Heart } from "lucide-react-native";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
-import {
-  Swipeable,
-  FlatList as GestureHandlerFlatList,
-  GestureHandlerRootView,
-} from "react-native-gesture-handler";
 
 import { useNavigation } from "@react-navigation/native";
 import { DietFeedItem } from "../../hooks/useSelfDiets";
 import { COLORS } from "../../styles/colors";
 import { getRelativeTime } from "../../utils/timeUtils";
-import { useAuth } from "../../hooks/useAuth";
 import { api } from "../../services/api";
+import { useAuth } from "../../hooks/useAuth";
 import { styles } from "./styles";
 
 interface DietCardProps {
   diet: DietFeedItem;
   onShare?: (data: any) => void;
+  /** Disparado quando o usuário toca pra abrir comentários. A tela hospedeira
+   *  abre um único CommentsSheet centralizado. */
+  onCommentPress?: (diet: any) => void;
 }
-
-// ─── CommentItem com Swipe-to-Delete (Adaptado do PostCard) ─────────────────
-interface DietCommentItemProps {
-  item: any;
-  currentUserId: string | number;
-  dietAuthorId: string | number;
-  onDelete: (id: string | number) => void;
-}
-
-const DietCommentItem: React.FC<DietCommentItemProps> = ({
-  item,
-  currentUserId,
-  dietAuthorId,
-  onDelete,
-}) => {
-  const isCommentOwner = String(item.user_id) === String(currentUserId);
-  const isDietOwner = String(dietAuthorId) === String(currentUserId);
-  const canDelete = isCommentOwner || isDietOwner;
-
-  const renderRightActions = (
-    _progress: Animated.AnimatedInterpolation<number>,
-    dragX: Animated.AnimatedInterpolation<number>
-  ) => {
-    const scale = dragX.interpolate({
-      inputRange: [-72, 0],
-      outputRange: [1, 0.5],
-      extrapolate: "clamp",
-    });
-
-    return (
-      <View style={styles.swipeDeleteContainer}>
-        <TouchableOpacity
-          style={styles.swipeDeleteBtn}
-          onPress={() => {
-            Alert.alert("Excluir comentário", "Tem certeza que deseja excluir este comentário?", [
-              { text: "Cancelar", style: "cancel" },
-              { text: "Excluir", style: "destructive", onPress: () => onDelete(item.id) },
-            ]);
-          }}
-        >
-          <Animated.View style={{ transform: [{ scale }] }}>
-            <Ionicons name="trash" size={22} color="#fff" />
-          </Animated.View>
-        </TouchableOpacity>
-      </View>
-    );
-  };
-
-  const content = (
-    <View style={styles.commentItem}>
-      <Image
-        source={{ uri: item.photo || "https://gravatar.com/avatar?d=identicon" }}
-        style={styles.commentAvatar}
-      />
-      <View style={styles.commentContent}>
-        <View style={{ flexDirection: "row", alignItems: "center", flexWrap: "wrap" }}>
-          <Text style={styles.commentUser}>{item.username || "Usuário"}</Text>
-          <Text style={styles.commentDate}> · {getRelativeTime(item.created_at)}</Text>
-        </View>
-        <Text style={styles.commentBody}>{item.comentario}</Text>
-      </View>
-    </View>
-  );
-
-  if (!canDelete) return content;
-
-  return (
-    <Swipeable
-      renderRightActions={renderRightActions}
-      friction={2}
-      rightThreshold={40}
-      overshootRight={false}
-    >
-      {content}
-    </Swipeable>
-  );
-};
 
 const MacroChip: React.FC<{
   icon: React.ReactNode;
@@ -125,29 +39,17 @@ const MacroChip: React.FC<{
   </View>
 );
 
-const DietCard: React.FC<DietCardProps> = ({ diet, onShare }) => {
-  const { user } = useAuth();
+const DietCard: React.FC<DietCardProps> = ({ diet, onShare, onCommentPress }) => {
   const navigation = useNavigation<any>();
-  const currentUserId = user?.id_us || user?.id;
+  const { user } = useAuth();
 
   const [isLiked, setIsLiked] = useState(false);
   const [likesCount, setLikesCount] = useState(diet.likes_count || 0);
-  const [commentsCount, setCommentsCount] = useState(diet.comments_count || 0);
+  const [commentsCount] = useState(diet.comments_count || 0);
   const [loading, setLoading] = useState(false);
 
-  // Estados dos Comentários
-  const [showCommentsModal, setShowCommentsModal] = useState(false);
-  const flatListGestureRef = useRef<any>(null);
-  const [comments, setComments] = useState<any[]>([]);
-  const [loadingComments, setLoadingComments] = useState(false);
-  const [modalCommentText, setModalCommentText] = useState("");
-  const [isSubmittingComment, setIsSubmittingComment] = useState(false);
-  const [isKeyboardVisible, setKeyboardVisible] = useState(false);
-
   const handleOpenComments = () => {
-    console.log("[DietCard] Opening comments modal for diet:", diet.id_dieta);
-    fetchComments();
-    setShowCommentsModal(true);
+    onCommentPress?.(diet);
   };
   const [heartAnim] = useState(new Animated.Value(0));
 
@@ -159,43 +61,6 @@ const DietCard: React.FC<DietCardProps> = ({ diet, onShare }) => {
       setIsLiked(diet.isLiked);
     }
   }, [diet.isLiked]);
-
-  useEffect(() => {
-    const showSubscription = Keyboard.addListener(
-      Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow",
-      () => setKeyboardVisible(true)
-    );
-    const hideSubscription = Keyboard.addListener(
-      Platform.OS === "ios" ? "keyboardWillHide" : "keyboardDidHide",
-      () => setKeyboardVisible(false)
-    );
-
-    return () => {
-      showSubscription.remove();
-      hideSubscription.remove();
-    };
-  }, [diet.likes, user?.id]);
-
-  const fetchComments = useCallback(async () => {
-    setLoadingComments(true);
-    try {
-      const response = await api.get(`/dietas/${diet.id_dieta}/comments`);
-      console.log(
-        `[DietCard] Comentários recebidos p/ dieta ${diet.id_dieta}:`,
-        response.data.data?.length || 0
-      );
-      if (response.data.success && Array.isArray(response.data.data)) {
-        setComments(response.data.data);
-      } else {
-        setComments([]);
-      }
-    } catch (error) {
-      console.error("Erro ao buscar comentários da dieta:", error);
-      setComments([]);
-    } finally {
-      setLoadingComments(false);
-    }
-  }, [diet.id_dieta]);
 
   const handlePress = () => {
     navigation.navigate("DietDetails", {
@@ -277,37 +142,6 @@ const DietCard: React.FC<DietCardProps> = ({ diet, onShare }) => {
       console.error("Erro ao curtir dieta:", error);
     } finally {
       setLoading(false);
-    }
-  };
-
-  const handleSubmitComment = async () => {
-    if (!modalCommentText.trim()) return;
-    setIsSubmittingComment(true);
-    try {
-      const response = await api.post(`/dietas/${diet.id_dieta}/comment`, {
-        texto: modalCommentText,
-      });
-      if (response.data.success) {
-        setModalCommentText("");
-        fetchComments();
-        setCommentsCount((prev) => prev + 1);
-      }
-    } catch (error) {
-      console.error("Erro ao comentar na dieta:", error);
-      Alert.alert("Erro", "Não foi possível enviar o comentário.");
-    } finally {
-      setIsSubmittingComment(false);
-    }
-  };
-
-  const handleDeleteComment = async (commentId: string | number) => {
-    try {
-      await api.delete(`/dietas/${diet.id_dieta}/comment/${commentId}`);
-      setComments((prev) => prev.filter((c) => String(c.id) !== String(commentId)));
-      setCommentsCount((prev) => Math.max(0, prev - 1));
-    } catch (error) {
-      console.error("Erro ao deletar comentário da dieta:", error);
-      Alert.alert("Erro", "Não foi possível excluir o comentário.");
     }
   };
 
@@ -465,107 +299,6 @@ const DietCard: React.FC<DietCardProps> = ({ diet, onShare }) => {
         <Text style={styles.timestamp}>{getRelativeTime(diet.created_at)}</Text>
       </View>
 
-      {/* ─── Modal Premium Original de Comentários idêntico ao PostCard ─── */}
-      <Modal
-        visible={showCommentsModal}
-        transparent
-        animationType="slide"
-        onRequestClose={() => setShowCommentsModal(false)}
-      >
-        <GestureHandlerRootView style={{ flex: 1 }}>
-          <KeyboardAvoidingView
-            style={{ flex: 1 }}
-            behavior={Platform.OS === "ios" ? "padding" : "height"}
-          >
-            <View style={styles.modalOverlay}>
-              {/* Backdrop transparente que fecha o modal */}
-              <TouchableOpacity
-                style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0 }}
-                activeOpacity={1}
-                onPress={() => setShowCommentsModal(false)}
-              />
-
-              <View style={styles.modalContent}>
-                <View style={styles.modalIndicator} />
-
-                <View style={styles.modalHeader}>
-                  <Text style={styles.modalTitle}>Comentários</Text>
-                  <TouchableOpacity onPress={() => setShowCommentsModal(false)}>
-                    <Ionicons name="close" size={24} color={COLORS.grayscale[100]} />
-                  </TouchableOpacity>
-                </View>
-
-                {loadingComments ? (
-                  <ActivityIndicator
-                    size="large"
-                    color={COLORS.primary_green}
-                    style={{ marginTop: 40, flex: 1 }}
-                  />
-                ) : (
-                  <GestureHandlerFlatList
-                    ref={flatListGestureRef}
-                    data={comments}
-                    keyExtractor={(item, index) => `diet-comment-${item.id ?? index}`}
-                    renderItem={({ item }) => (
-                      <DietCommentItem
-                        item={item}
-                        currentUserId={currentUserId!}
-                        dietAuthorId={diet.id_us}
-                        onDelete={handleDeleteComment}
-                      />
-                    )}
-                    ListEmptyComponent={
-                      <Text style={styles.noComments}>
-                        Nenhum comentário nesta dieta. Seja o primeiro! 💬
-                      </Text>
-                    }
-                    style={styles.modalList}
-                    contentContainerStyle={
-                      comments.length === 0 ? { flex: 1 } : { paddingBottom: 8 }
-                    }
-                  />
-                )}
-
-                {/* Input de Comentário (Tratamento de teclado) */}
-                <View
-                  style={[
-                    styles.commentInputContainer,
-                    isKeyboardVisible && Platform.OS === "ios" && { paddingBottom: 8 },
-                  ]}
-                >
-                  <TextInput
-                    style={styles.commentInput}
-                    placeholder="Escreva um comentário..."
-                    placeholderTextColor={COLORS.grayscale[45]}
-                    value={modalCommentText}
-                    onChangeText={setModalCommentText}
-                    onSubmitEditing={handleSubmitComment}
-                    returnKeyType="send"
-                    editable={!isSubmittingComment}
-                  />
-                  <TouchableOpacity
-                    onPress={handleSubmitComment}
-                    disabled={!modalCommentText.trim() || isSubmittingComment}
-                    style={styles.sendButton}
-                  >
-                    {isSubmittingComment ? (
-                      <ActivityIndicator size="small" color={COLORS.primary_green} />
-                    ) : (
-                      <Ionicons
-                        name="send"
-                        size={20}
-                        color={
-                          modalCommentText.trim() ? COLORS.primary_green : COLORS.grayscale[30]
-                        }
-                      />
-                    )}
-                  </TouchableOpacity>
-                </View>
-              </View>
-            </View>
-          </KeyboardAvoidingView>
-        </GestureHandlerRootView>
-      </Modal>
     </View>
   );
 };

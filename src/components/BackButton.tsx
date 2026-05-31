@@ -14,6 +14,12 @@ type BackButtonProps = {
   autoTopInset?: boolean;
 };
 
+// Telas que vivem DENTRO do Tab navigator "MainTabs" (ver App.routes.tsx).
+// Navegar para elas pelo nome direto a partir do Stack pai falha com
+// "NAVIGATE ... was not handled by any navigator"; é preciso rotear pelo
+// "MainTabs" passando o screen aninhado. Mantido em sincronia com MAIN_TAB_SCREENS.
+const MAIN_TAB_SCREENS = ["HomeScreen", "MapScreen", "DietScreen", "DataScreen", "ChatScreen"];
+
 const BackButton: React.FC<BackButtonProps> = ({ to, onPress, style, autoTopInset = false }) => {
   const navigation = useNavigation<NavigationProp<Record<string, object | undefined>>>();
   const insets = useSafeAreaInsets();
@@ -38,7 +44,12 @@ const BackButton: React.FC<BackButtonProps> = ({ to, onPress, style, autoTopInse
     }
 
     if (to?.name) {
-      navigation.navigate(to.name, to.params || {});
+      if (MAIN_TAB_SCREENS.includes(to.name)) {
+        // Tela aninhada no Tab navigator: roteia pelo MainTabs.
+        navigation.navigate("MainTabs" as never, { screen: to.name, params: to.params } as never);
+      } else {
+        navigation.navigate(to.name as never, (to.params || {}) as never);
+      }
       return;
     }
 

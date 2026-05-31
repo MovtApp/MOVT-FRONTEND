@@ -1,4 +1,4 @@
-import React, { useRef, useState, useEffect } from "react";
+import React, { useRef, useState, useEffect, useCallback } from "react";
 import {
   Text,
   View,
@@ -18,11 +18,12 @@ import { GymDetailsSheet } from "@components/GymDetailsSheet";
 import BottomSheet from "@gorhom/bottom-sheet";
 import { Globe, Settings2, MapPin, LocateFixed } from "lucide-react-native";
 import { useLocationContext } from "@contexts/LocationContext";
-import { useNavigation } from "@react-navigation/native";
+import { useNavigation, useFocusEffect } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { AppStackParamList } from "../../../@types/routes";
 import { getNearbyGyms, Gym } from "@services/gymService";
 import { useAuth } from "@contexts/AuthContext";
+import { useBottomNav } from "@contexts/BottomNavContext";
 
 const CustomGymMarker = React.memo(({ selected }: { selected: boolean }) => {
   const mainColor = selected ? "#059669" : "#B1F232";
@@ -84,6 +85,7 @@ const OptimizedGymMarker = ({
 const MapScreen: React.FC = () => {
   const { location, refreshLocation, permissionStatus } = useLocationContext();
   const { user } = useAuth();
+  const { setIsVisible: setBottomNavVisible } = useBottomNav();
   const [isSheetOpen, setIsSheetOpen] = useState(false);
   const [sheetIndex, setSheetIndex] = useState(1);
   const bottomSheetRef = useRef<BottomSheet>(null);
@@ -264,18 +266,24 @@ const MapScreen: React.FC = () => {
   // Localização agora é provida pelo LocationProvider em nível de app
 
   const handleOpenSheet = () => {
+    // Pré-seta o índice no maior snap point (100%) antes de montar o sheet.
+    // Sem isso há um race: setIsSheetOpen agenda re-render, mas .expand() roda
+    // antes do BottomSheet montar (ref ainda null), então a primeira abertura
+    // caía no index residual do onChange (ex.: -1/0).
+    setSheetIndex(2);
     setIsSheetOpen(true);
-    bottomSheetRef.current?.expand();
   };
 
   const handleOpenMapSheet = () => {
+    // MapSettingSheet só tem 1 snap point (["56%"]) → index 0.
+    setMapSheetIndex(0);
     setIsMapSheetOpen(true);
-    mapBottomSheetRef.current?.expand();
   };
 
   const handleOpenGymDetails = (gym: Gym) => {
     setSelectedGym(gym);
     setIsGymDetailsOpen(true);
+    // GymDetailsSheet (["50%", "85%"]) → expand original ia para o maior = index 1.
     gymDetailsSheetRef.current?.expand();
   };
 
@@ -293,6 +301,18 @@ const MapScreen: React.FC = () => {
 
   // Mostra o carregamento apenas se não tiver timeout e não tiver localização
   const shouldShowLoading = !loadingTimeout && !location;
+
+  // Esconde a BottomNavigationBar enquanto qualquer sheet do mapa estiver aberto,
+  // mas SÓ enquanto o MapScreen estiver em foco. Sem isso, ao navegar para outra
+  // tela (Home, ProfilePJ, etc.) com um sheet aberto, a barra ficava escondida
+  // globalmente — pois o MapScreen vive no MainTabs e não desmonta.
+  useFocusEffect(
+    useCallback(() => {
+      const anySheetOpen = isSheetOpen || isMapSheetOpen || isGymDetailsOpen;
+      setBottomNavVisible(!anySheetOpen);
+      return () => setBottomNavVisible(true);
+    }, [isSheetOpen, isMapSheetOpen, isGymDetailsOpen, setBottomNavVisible])
+  );
 
   // Efeito para tentar carregar a localização quando o componente montar
   useEffect(() => {

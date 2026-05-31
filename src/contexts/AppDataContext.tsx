@@ -85,6 +85,13 @@ export const AppDataProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
   const lastFetch = useRef<Record<string, number>>({});
 
+  // Espelha "este dataset já tem conteúdo exibível" (de cache ou de um fetch
+  // anterior). Lido fora das deps dos useCallback para decidir se mostramos o
+  // spinner: só acendemos loading no PRIMEIRO carregamento (nada na tela).
+  // Usar ref — e não .length nas deps — evita o loop infinito documentado em
+  // [[appdata-loop-pattern]] (recriar callback a cada mudança de length).
+  const hasData = useRef<Record<string, boolean>>({});
+
   // Helper para salvar cache no disco
   const saveCache = useCallback(async (key: string, data: any) => {
     try {
@@ -168,8 +175,10 @@ export const AppDataProvider: React.FC<{ children: React.ReactNode }> = ({ child
       if (!force && !shouldFetch(`home-${specialty || "all"}`)) return;
 
       try {
-        if (trainings.length === 0) setLoadingTrainings(true);
-        if (dailyPlans.length === 0) setLoadingDailyPlans(true);
+        // Só mostra spinner no primeiro carregamento (nada em cache/tela).
+        // Com dados já exibidos, o refresh roda silencioso (stale-while-revalidate).
+        if (!hasData.current.trainings) setLoadingTrainings(true);
+        if (!hasData.current.dailyPlans) setLoadingDailyPlans(true);
 
         const [trResp, dailyResp] = await Promise.all([
           api.get("/treinos", { params: { specialty } }),
@@ -191,6 +200,7 @@ export const AppDataProvider: React.FC<{ children: React.ReactNode }> = ({ child
             ...t,
           }));
           setTrainings(mapped);
+          hasData.current.trainings = true;
           saveCache(`trainings-${specialty || "all"}`, mapped);
         }
 
@@ -211,6 +221,7 @@ export const AppDataProvider: React.FC<{ children: React.ReactNode }> = ({ child
             ...t,
           }));
           setDailyPlans(mapped);
+          hasData.current.dailyPlans = true;
           saveCache("dailyPlans", mapped);
         }
       } catch (error) {
@@ -220,7 +231,7 @@ export const AppDataProvider: React.FC<{ children: React.ReactNode }> = ({ child
         setLoadingDailyPlans(false);
       }
     },
-    [user?.sessionId, saveCache, trainings.length, dailyPlans.length]
+    [user?.sessionId, user?.isPendingSync, saveCache]
   );
 
   const fetchCommunities = useCallback(
@@ -229,7 +240,7 @@ export const AppDataProvider: React.FC<{ children: React.ReactNode }> = ({ child
       if (!force && !shouldFetch(`communities-${category}`)) return;
 
       try {
-        if (communities.length === 0) setLoadingCommunities(true);
+        if (!hasData.current.communities) setLoadingCommunities(true);
         const { listCommunities } = await import("../services/communityService");
         const data = await listCommunities(user.sessionId, category);
         let formattedData: Community[] = [];
@@ -239,6 +250,7 @@ export const AppDataProvider: React.FC<{ children: React.ReactNode }> = ({ child
           formattedData = data.data;
         }
         setCommunities(formattedData);
+        hasData.current.communities = true;
         saveCache(`communities-${category}`, formattedData);
       } catch (error) {
         console.error("Erro AppDataContext (Communities):", error);
@@ -246,7 +258,7 @@ export const AppDataProvider: React.FC<{ children: React.ReactNode }> = ({ child
         setLoadingCommunities(false);
       }
     },
-    [user?.sessionId, saveCache, communities.length]
+    [user?.sessionId, user?.isPendingSync, saveCache]
   );
 
   const fetchDietMeals = useCallback(
@@ -255,7 +267,7 @@ export const AppDataProvider: React.FC<{ children: React.ReactNode }> = ({ child
       if (!force && !shouldFetch(`diets-${category}`)) return;
 
       try {
-        if (dietMeals.length === 0) setLoadingDietMeals(true);
+        if (!hasData.current.dietMeals) setLoadingDietMeals(true);
         const response = await api.get("/dietas", {
           params: {
             categoria: category === "all" ? undefined : category,
@@ -280,6 +292,7 @@ export const AppDataProvider: React.FC<{ children: React.ReactNode }> = ({ child
           ...backendMeal,
         }));
         setDietMeals(mappedMeals);
+        hasData.current.dietMeals = true;
         saveCache(`diets-${category}`, mappedMeals);
       } catch (error) {
         console.error("Erro AppDataContext (Diets):", error);
@@ -287,16 +300,17 @@ export const AppDataProvider: React.FC<{ children: React.ReactNode }> = ({ child
         setLoadingDietMeals(false);
       }
     },
-    [user, dietMeals.length, saveCache]
+    [user?.sessionId, user?.isPendingSync, saveCache]
   );
 
   const fetchStripePlans = useCallback(
     async (force = false) => {
       if (!force && !shouldFetch("stripe-plans")) return;
       try {
-        if (stripePlans.length === 0) setLoadingStripePlans(true);
+        if (!hasData.current.stripePlans) setLoadingStripePlans(true);
         const response = await axios.get(`${API_URL}/api/plans`);
         setStripePlans(response.data);
+        hasData.current.stripePlans = true;
         saveCache("stripe-plans", response.data);
       } catch (error) {
         console.error("Erro AppDataContext (Stripe):", error);
@@ -304,7 +318,7 @@ export const AppDataProvider: React.FC<{ children: React.ReactNode }> = ({ child
         setLoadingStripePlans(false);
       }
     },
-    [stripePlans.length, saveCache]
+    [saveCache]
   );
 
   const fetchFeedData = useCallback(
@@ -313,8 +327,8 @@ export const AppDataProvider: React.FC<{ children: React.ReactNode }> = ({ child
       if (!force && !shouldFetch("feed-data")) return;
 
       try {
-        if (feedPosts.length === 0) setLoadingFeedPosts(true);
-        if (feedDiets.length === 0) setLoadingFeedDiets(true);
+        if (!hasData.current.feedPosts) setLoadingFeedPosts(true);
+        if (!hasData.current.feedDiets) setLoadingFeedDiets(true);
 
         const [postsResp, dietsResp] = await Promise.all([
           api.get("/feed", { params: { limit: 10 } }),
@@ -323,6 +337,7 @@ export const AppDataProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
         const ps = postsResp.data.posts || [];
         setFeedPosts(ps);
+        hasData.current.feedPosts = true;
         saveCache("feedPosts", ps);
 
         const mappedFeedDiets = (dietsResp.data.data || []).map((d: any) => ({
@@ -347,6 +362,7 @@ export const AppDataProvider: React.FC<{ children: React.ReactNode }> = ({ child
           isLiked: !!d.isLiked,
         }));
         setFeedDiets(mappedFeedDiets);
+        hasData.current.feedDiets = true;
         saveCache("feedDiets", mappedFeedDiets);
       } catch (error) {
         console.error("Erro AppDataContext (Feed):", error);
@@ -355,7 +371,7 @@ export const AppDataProvider: React.FC<{ children: React.ReactNode }> = ({ child
         setLoadingFeedDiets(false);
       }
     },
-    [user, feedPosts.length, feedDiets.length, saveCache]
+    [user?.sessionId, user?.isPendingSync, saveCache]
   );
 
   const fetchAdminDashboardData = useCallback(
@@ -365,7 +381,7 @@ export const AppDataProvider: React.FC<{ children: React.ReactNode }> = ({ child
       if (!force && !shouldFetch(`admin-dashboard-${tab}-${status}`)) return;
 
       try {
-        setLoadingAdminDashboard(true);
+        if (!hasData.current.adminDashboard) setLoadingAdminDashboard(true);
 
         // timeout garante que, se algum endpoint pendurar, a Promise rejeita e o
         // finally devolve loading=false (evita o spinner infinito do dashboard).
@@ -396,27 +412,32 @@ export const AppDataProvider: React.FC<{ children: React.ReactNode }> = ({ child
         const gList = sanitizeList(gymsResp.data.data || []);
         setAdminGyms(gList);
         saveCache("adminGyms", gList);
+
+        hasData.current.adminDashboard = true;
       } catch (error) {
         console.error("Erro AppDataContext (AdminFullData):", error);
       } finally {
         setLoadingAdminDashboard(false);
       }
     },
-    [user, adminDashboardData, saveCache]
+    [user?.sessionId, user?.role, (user as any)?.tipo, saveCache]
   );
 
   const refreshAll = useCallback(async () => {
     const isAdmin = user?.role === "admin" || (user as any)?.tipo === "admin";
+    // Não passa force=true: deixa o TTL do shouldFetch impedir refetch em
+    // bursts de re-render. Pull-to-refresh / triggers explícitos chamam os
+    // fetchX(..., true) diretamente quando precisam forçar.
     const tasks = [
-      fetchHomeData(null, true),
-      fetchCommunities("Todas", true),
-      fetchDietMeals("all", true),
-      fetchStripePlans(true),
-      fetchFeedData(true),
+      fetchHomeData(null),
+      fetchCommunities("Todas"),
+      fetchDietMeals("all"),
+      fetchStripePlans(),
+      fetchFeedData(),
     ];
 
     if (isAdmin) {
-      tasks.push(fetchAdminDashboardData(true));
+      tasks.push(fetchAdminDashboardData());
     }
 
     await Promise.allSettled(tasks);
@@ -428,6 +449,7 @@ export const AppDataProvider: React.FC<{ children: React.ReactNode }> = ({ child
     fetchFeedData,
     fetchAdminDashboardData,
     user?.sessionId,
+    user?.role,
   ]);
 
   // 1. Carrega o cache offline IMEDIATAMENTE ao inicializar o app (Pre-boot Cache)
@@ -460,14 +482,41 @@ export const AppDataProvider: React.FC<{ children: React.ReactNode }> = ({ child
           loadCache("adminGyms"),
         ]);
 
-        if (cTrainings) setTrainings(cTrainings.data);
-        if (cDaily) setDailyPlans(cDaily.data);
-        if (cComm) setCommunities(cComm.data);
-        if (cDiets) setDietMeals(cDiets.data);
-        if (cStripe) setStripePlans(cStripe.data);
-        if (cFPosts) setFeedPosts(cFPosts.data);
-        if (cFDiets) setFeedDiets(cFDiets.data);
-        if (cAdminData) setAdminDashboardData(cAdminData.data);
+        // Ao hidratar do disco, marcamos hasData para que o refresh em background
+        // que vem logo após (refreshAll) rode SILENCIOSO, sem acender spinner por
+        // cima do conteúdo já exibido.
+        if (cTrainings) {
+          setTrainings(cTrainings.data);
+          hasData.current.trainings = true;
+        }
+        if (cDaily) {
+          setDailyPlans(cDaily.data);
+          hasData.current.dailyPlans = true;
+        }
+        if (cComm) {
+          setCommunities(cComm.data);
+          hasData.current.communities = true;
+        }
+        if (cDiets) {
+          setDietMeals(cDiets.data);
+          hasData.current.dietMeals = true;
+        }
+        if (cStripe) {
+          setStripePlans(cStripe.data);
+          hasData.current.stripePlans = true;
+        }
+        if (cFPosts) {
+          setFeedPosts(cFPosts.data);
+          hasData.current.feedPosts = true;
+        }
+        if (cFDiets) {
+          setFeedDiets(cFDiets.data);
+          hasData.current.feedDiets = true;
+        }
+        if (cAdminData) {
+          setAdminDashboardData(cAdminData.data);
+          hasData.current.adminDashboard = true;
+        }
         if (cAdminUsers) setAdminUsers(cAdminUsers.data);
         if (cAdminTrainers) setAdminTrainers(cAdminTrainers.data);
         if (cAdminGyms) setAdminGyms(cAdminGyms.data);

@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect } from "react";
 import { useAuth } from "../contexts/AuthContext";
 import { api } from "../services/api";
-import AsyncStorage from "@react-native-async-storage/async-storage";
+import { secureGet } from "../services/secureStore";
 import { useAppData } from "../contexts/AppDataContext";
 
 /** A diet shaped as a generic feed item so FeedScreen can merge it with posts */
@@ -49,7 +49,7 @@ export const useSelfDiets = (onlyMine: boolean = true): UseSelfDietsReturn => {
     if (!user?.id) return;
     setIsLoading(true);
     try {
-      const sessionId = await AsyncStorage.getItem("userSessionId");
+      const sessionId = await secureGet("userSessionId");
       const response = await api.get("/dietas", {
         headers: { Authorization: `Bearer ${sessionId}` },
         params: { mine: onlyMine ? "true" : "false" },

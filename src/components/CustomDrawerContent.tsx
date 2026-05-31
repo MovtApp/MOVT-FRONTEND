@@ -1,5 +1,14 @@
 import React, { useState, useEffect } from "react";
-import { View, Text, TouchableOpacity, StyleSheet, Image, Alert, Platform } from "react-native";
+import {
+  View,
+  Text,
+  TouchableOpacity,
+  StyleSheet,
+  Alert,
+  Platform,
+  InteractionManager,
+} from "react-native";
+import { Image } from "expo-image";
 import {
   DrawerContentScrollView,
   DrawerContentComponentProps,
@@ -25,6 +34,14 @@ import { AppStackParamList } from "../@types/routes";
 import { useAuth } from "../hooks/useAuth";
 import { userService } from "../services/userService";
 
+// Throttle entre buscas de perfil ao abrir o drawer (evita I/O a cada abertura).
+const PROFILE_FETCH_THROTTLE_MS = 60000;
+let lastProfileFetch = 0;
+
+// As 5 telas principais vivem dentro do Tab navigator "MainTabs"; precisam ser
+// alcançadas via parâmetro aninhado. As demais são telas diretas do Stack.
+const MAIN_TAB_SCREENS = ["HomeScreen", "MapScreen", "DietScreen", "DataScreen", "ChatScreen"];
+
 export function CustomDrawerContent(props: DrawerContentComponentProps) {
   const { user, signOut, updateUser } = useAuth();
   const drawerStatus = useDrawerStatus();
@@ -39,8 +56,16 @@ export function CustomDrawerContent(props: DrawerContentComponentProps) {
   }, [initialAvatar]);
 
   useEffect(() => {
-    if (drawerStatus === "open" && user) {
-      const fetchLiveData = async () => {
+    if (drawerStatus !== "open" || !user) return;
+
+    // Adia para depois da animação de abertura do drawer e aplica throttle,
+    // evitando uma chamada de rede (getUserProfile) a cada abertura.
+    const task = InteractionManager.runAfterInteractions(() => {
+      const now = Date.now();
+      if (now - lastProfileFetch < PROFILE_FETCH_THROTTLE_MS) return;
+      lastProfileFetch = now;
+
+      (async () => {
         try {
           const id = user.id_us || user.id;
           if (!id) return;
@@ -66,9 +91,10 @@ export function CustomDrawerContent(props: DrawerContentComponentProps) {
         } catch (err) {
           console.error("Erro ao atualizar perfil do drawer:", err);
         }
-      };
-      fetchLiveData();
-    }
+      })();
+    });
+
+    return () => task.cancel();
   }, [drawerStatus, user]);
 
   const handleProfilePress = () => {
@@ -107,9 +133,18 @@ export function CustomDrawerContent(props: DrawerContentComponentProps) {
   ];
 
   const handleNavigation = (route: string) => {
-    props.navigation.navigate("HomeStack", {
-      screen: route as keyof AppStackParamList,
-    } as any);
+    if (MAIN_TAB_SCREENS.includes(route)) {
+      // Tela principal -> alcança a aba dentro de MainTabs.
+      props.navigation.navigate("HomeStack", {
+        screen: "MainTabs",
+        params: { screen: route },
+      } as any);
+    } else {
+      // Tela de detalhe -> screen direta do Stack.
+      props.navigation.navigate("HomeStack", {
+        screen: route as keyof AppStackParamList,
+      } as any);
+    }
     props.navigation.closeDrawer();
   };
 
@@ -141,6 +176,9 @@ export function CustomDrawerContent(props: DrawerContentComponentProps) {
                 }
           }
           style={styles.profileImage}
+          contentFit="cover"
+          cachePolicy="memory-disk"
+          transition={150}
         />
         <View style={styles.profileInfo}>
           <Text style={styles.profileName}>{user?.name || ""}</Text>

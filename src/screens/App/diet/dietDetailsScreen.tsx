@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   View,
   Text,
@@ -9,21 +9,7 @@ import {
   Dimensions,
   Platform,
   Alert,
-  Animated,
-  Keyboard,
-  FlatList,
-  ActivityIndicator,
-  Modal,
-  TextInput,
-  KeyboardAvoidingView,
 } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
-import {
-  Swipeable,
-  FlatList as GestureHandlerFlatList,
-  GestureHandlerRootView,
-} from "react-native-gesture-handler";
-import { getRelativeTime } from "../../../utils/timeUtils";
 import {
   Clock4,
   Flame,
@@ -35,12 +21,8 @@ import {
   Wheat,
   Droplets,
 } from "lucide-react-native";
-import BottomSheet, {
-  BottomSheetModal,
-  BottomSheetView,
-  BottomSheetTextInput,
-  BottomSheetBackdrop,
-} from "@gorhom/bottom-sheet";
+import BottomSheet from "@gorhom/bottom-sheet";
+import { CommentsSheet } from "../../../components/CommentsSheet";
 import { api } from "../../../services/api";
 import { useAuth } from "../../../hooks/useAuth";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -50,87 +32,6 @@ import BackButton from "../../../components/BackButton";
 import { COLORS } from "../../../styles/colors";
 
 const { width } = Dimensions.get("window");
-
-// ─── CommentItem com Swipe-to-Delete (Adaptado do PostCard) ─────────────────
-interface DietCommentItemProps {
-  item: any;
-  currentUserId: string | number;
-  dietAuthorId: string | number;
-  onDelete: (id: string | number) => void;
-}
-
-const DietCommentItem: React.FC<DietCommentItemProps> = ({
-  item,
-  currentUserId,
-  dietAuthorId,
-  onDelete,
-}) => {
-  const isCommentOwner = String(item.user_id) === String(currentUserId);
-  const isDietOwner = String(dietAuthorId) === String(currentUserId);
-  const canDelete = isCommentOwner || isDietOwner;
-
-  const renderRightActions = (
-    _progress: Animated.AnimatedInterpolation<number>,
-    dragX: Animated.AnimatedInterpolation<number>
-  ) => {
-    const scale = dragX.interpolate({
-      inputRange: [-72, 0],
-      outputRange: [1, 0.5],
-      extrapolate: "clamp",
-    });
-
-    return (
-      <View style={styles.swipeDeleteContainer}>
-        <TouchableOpacity
-          style={styles.swipeDeleteBtn}
-          onPress={() => {
-            Alert.alert("Excluir comentário", "Tem certeza que deseja excluir este comentário?", [
-              { text: "Cancelar", style: "cancel" },
-              { text: "Excluir", style: "destructive", onPress: () => onDelete(item.id) },
-            ]);
-          }}
-        >
-          <Animated.View style={{ transform: [{ scale }] }}>
-            <Ionicons name="trash" size={22} color="#fff" />
-          </Animated.View>
-        </TouchableOpacity>
-      </View>
-    );
-  };
-
-  if (!item) return null;
-
-  const content = (
-    <View style={styles.commentItem}>
-      <Image
-        source={{
-          uri: item.photo || item.avatar_autor_url || "https://gravatar.com/avatar?d=identicon",
-        }}
-        style={styles.commentAvatar}
-      />
-      <View style={styles.commentContent}>
-        <View style={{ flexDirection: "row", alignItems: "center", flexWrap: "wrap" }}>
-          <Text style={styles.commentUser}>{item.username || item.nome_autor || "Usuário"}</Text>
-          <Text style={styles.commentDate}> · {getRelativeTime(item.created_at)}</Text>
-        </View>
-        <Text style={styles.commentBody}>{item.comentario || item.texto}</Text>
-      </View>
-    </View>
-  );
-
-  if (!canDelete) return content;
-
-  return (
-    <Swipeable
-      renderRightActions={renderRightActions}
-      friction={2}
-      rightThreshold={40}
-      overshootRight={false}
-    >
-      {content}
-    </Swipeable>
-  );
-};
 
 interface DietDetailsScreenProps {
   route?: { params?: { meal?: any; mealId?: string | number } };
@@ -161,29 +62,9 @@ const DietDetailsScreen: React.FC<DietDetailsScreenProps> = ({ route, navigation
   const [sheetIndex, setSheetIndex] = useState(-1);
 
   const shareSheetRef = useRef<any>(null);
-  const [showCommentsModal, setShowCommentsModal] = useState(false);
-  const flatListGestureRef = useRef<any>(null);
-
-  const [comments, setComments] = useState<any[]>([]);
-  const [loadingComments, setLoadingComments] = useState(false);
-  const [commentText, setCommentText] = useState("");
-  const [isKeyboardVisible, setKeyboardVisible] = useState(false);
-  const [isSubmittingComment, setIsSubmittingComment] = useState(false);
-
-  useEffect(() => {
-    const keyboardDidShowListener = Keyboard.addListener(
-      Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow",
-      () => setKeyboardVisible(true)
-    );
-    const keyboardDidHideListener = Keyboard.addListener(
-      Platform.OS === "ios" ? "keyboardWillHide" : "keyboardDidHide",
-      () => setKeyboardVisible(false)
-    );
-    return () => {
-      keyboardDidHideListener.remove();
-      keyboardDidShowListener.remove();
-    };
-  }, []);
+  // CommentsSheet montado só quando aberto (autoOpen). Mesmo padrão do FeedScreen:
+  // evita o sheet ficar montado/persistente e abre de forma confiável no clique.
+  const [showComments, setShowComments] = useState(false);
 
   useEffect(() => {
     const fetchMealById = async (id: string | number) => {
@@ -208,26 +89,6 @@ const DietDetailsScreen: React.FC<DietDetailsScreenProps> = ({ route, navigation
       fetchMealById(currentId);
     }
   }, [route?.params?.mealId, meal?.id_dieta]);
-
-  const fetchComments = useCallback(async () => {
-    const id = meal.id_dieta || meal.id;
-    if (!id) return;
-    setLoadingComments(true);
-    try {
-      const response = await api.get(`/dietas/${id}/comments`);
-      if (response.data.success && Array.isArray(response.data.data)) {
-        setComments(response.data.data);
-      }
-    } catch (error) {
-      console.error("Erro ao buscar comentários da dieta:", error);
-    } finally {
-      setLoadingComments(false);
-    }
-  }, [meal.id_dieta, meal.id]);
-
-  useEffect(() => {
-    fetchComments();
-  }, [fetchComments]);
 
   useEffect(() => {
     if (meal.isLiked !== undefined) {
@@ -263,45 +124,12 @@ const DietDetailsScreen: React.FC<DietDetailsScreenProps> = ({ route, navigation
     }
   };
 
-  const handlePostComment = async () => {
-    if (!commentText.trim()) return;
-    setIsSubmittingComment(true);
-    const id = meal.id_dieta || meal.id;
-    try {
-      const response = await api.post(`/dietas/${id}/comment`, {
-        texto: commentText,
-      });
-      if (response.data.success) {
-        setCommentText("");
-        fetchComments();
-        setCommentsCount((prev: number) => prev + 1);
-      }
-    } catch (error) {
-      console.error("Erro ao comentar na dieta:", error);
-      Alert.alert("Erro", "Não foi possível enviar seu comentário.");
-    } finally {
-      setIsSubmittingComment(false);
-    }
-  };
-
   const handleOpenShare = () => {
     shareSheetRef.current?.present();
   };
 
   const handleComment = () => {
-    fetchComments();
-    setShowCommentsModal(true);
-  };
-
-  const handleDeleteComment = async (commentId: string | number) => {
-    try {
-      await api.delete(`/dietas/${meal.id_dieta || meal.id}/comment/${commentId}`);
-      setComments((prev: any[]) => prev.filter((c) => String(c.id) !== String(commentId)));
-      setCommentsCount((prev: number) => Math.max(0, prev - 1));
-    } catch (error) {
-      console.error("Erro ao deletar comentário da dieta:", error);
-      Alert.alert("Erro", "Não foi possível excluir o comentário.");
-    }
+    setShowComments(true);
   };
 
   const handleMorePress = () => {
@@ -571,105 +399,18 @@ const DietDetailsScreen: React.FC<DietDetailsScreenProps> = ({ route, navigation
         </View>
       )}
 
-      {/* --- Modal Premium Original de Comentários idêntico ao PostCard --- */}
-      <Modal
-        visible={showCommentsModal}
-        transparent
-        animationType="slide"
-        onRequestClose={() => setShowCommentsModal(false)}
-      >
-        <GestureHandlerRootView style={{ flex: 1 }}>
-          <KeyboardAvoidingView
-            style={{ flex: 1 }}
-            behavior={Platform.OS === "ios" ? "padding" : "height"}
-          >
-            <View style={styles.modalOverlay}>
-              {/* Backdrop transparente que fecha o modal */}
-              <TouchableOpacity
-                style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0 }}
-                activeOpacity={1}
-                onPress={() => setShowCommentsModal(false)}
-              />
-
-              <View style={styles.modalContent}>
-                <View style={styles.modalIndicator} />
-
-                <View style={styles.modalHeader}>
-                  <Text style={styles.modalTitle}>Comentários</Text>
-                  <TouchableOpacity onPress={() => setShowCommentsModal(false)}>
-                    <Ionicons name="close" size={24} color={COLORS.grayscale[100]} />
-                  </TouchableOpacity>
-                </View>
-
-                {loadingComments ? (
-                  <ActivityIndicator
-                    size="large"
-                    color={COLORS.primary_green}
-                    style={{ marginTop: 40, flex: 1 }}
-                  />
-                ) : (
-                  <GestureHandlerFlatList
-                    ref={flatListGestureRef}
-                    data={comments}
-                    keyExtractor={(item, index) => `diet-comment-${item.id ?? index}`}
-                    renderItem={({ item }) => (
-                      <DietCommentItem
-                        item={item}
-                        currentUserId={user?.id || (user as any)?.id_us || 0}
-                        dietAuthorId={meal.id_us}
-                        onDelete={handleDeleteComment}
-                      />
-                    )}
-                    ListEmptyComponent={
-                      <Text style={styles.noComments}>
-                        Nenhum comentário nesta dieta. Seja o primeiro! 💬
-                      </Text>
-                    }
-                    style={styles.modalList}
-                    contentContainerStyle={
-                      comments.length === 0 ? { flex: 1 } : { paddingBottom: 8 }
-                    }
-                  />
-                )}
-
-                {/* Input de Comentário (Tratamento de teclado) */}
-                <View
-                  style={[
-                    styles.commentInputContainer,
-                    isKeyboardVisible && Platform.OS === "ios" && { paddingBottom: 8 },
-                  ]}
-                >
-                  <TextInput
-                    style={styles.commentInput}
-                    placeholder="Escreva um comentário..."
-                    placeholderTextColor={COLORS.grayscale[45]}
-                    value={commentText}
-                    onChangeText={setCommentText}
-                    onSubmitEditing={handlePostComment}
-                    returnKeyType="send"
-                    editable={!isSubmittingComment}
-                  />
-                  <TouchableOpacity
-                    onPress={handlePostComment}
-                    disabled={!commentText.trim() || isSubmittingComment}
-                    style={styles.sendButton}
-                  >
-                    {isSubmittingComment ? (
-                      <ActivityIndicator size="small" color={COLORS.primary_green} />
-                    ) : (
-                      <Ionicons
-                        name="send"
-                        size={20}
-                        color={commentText.trim() ? COLORS.primary_green : COLORS.grayscale[30]}
-                      />
-                    )}
-                  </TouchableOpacity>
-                </View>
-              </View>
-            </View>
-          </KeyboardAvoidingView>
-        </GestureHandlerRootView>
-      </Modal>
+      {/* Sheet centralizado de comentários — montado só quando aberto. autoOpen
+          abre no mount; onClose desmonta quando o usuário fecha. */}
+      {showComments && (
+        <CommentsSheet
+          type="diet"
+          targetId={meal.id_dieta || meal.id}
+          authorId={meal.id_us}
+          autoOpen
+          onClose={() => setShowComments(false)}
+          onCountChange={(delta) => setCommentsCount((prev: number) => Math.max(0, prev + delta))}
+        />
+      )}
     </View>
   );
 };

@@ -6,6 +6,8 @@ import React, {
   useState,
   useCallback,
   useEffect,
+  useMemo,
+  useRef,
 } from "react";
 import { useAuth } from "./AuthContext";
 import { userService } from "../services/userService";
@@ -104,6 +106,7 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({ chil
   const [followRequests, setFollowRequests] = useState<FollowRequest[]>([]);
   const [activeChatId, setActiveChatId] = useState<string | null>(null);
   const [unreadChatCount, setUnreadChatCount] = useState(0);
+  const fetchDebounceRef = useRef<any>(null);
 
   const fetchRemoteData = useCallback(async () => {
     if (!user) return;
@@ -156,57 +159,73 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({ chil
     }
   }, [user]);
 
-  const respondToFollowRequest = async (senderId: string | number, accept: boolean) => {
-    try {
-      const resp = await userService.respondToFollowRequest(String(senderId), accept);
-      if (resp.success) {
-        setFollowRequests((prev) => prev.filter((req) => String(req.id) !== String(senderId)));
-        fetchRemoteData();
+  // Versão com debounce: coalesce rajadas de eventos realtime (o listener de
+  // "messages" não tem filtro e dispara para qualquer mensagem do app) em uma
+  // única chamada de fetchRemoteData, reduzindo rede, bateria e re-renders.
+  const scheduleRemoteFetch = useCallback(() => {
+    if (fetchDebounceRef.current) clearTimeout(fetchDebounceRef.current);
+    fetchDebounceRef.current = setTimeout(() => fetchRemoteData(), 500);
+  }, [fetchRemoteData]);
+
+  const respondToFollowRequest = useCallback(
+    async (senderId: string | number, accept: boolean) => {
+      try {
+        const resp = await userService.respondToFollowRequest(String(senderId), accept);
+        if (resp.success) {
+          setFollowRequests((prev) => prev.filter((req) => String(req.id) !== String(senderId)));
+          fetchRemoteData();
+        }
+      } catch (err) {
+        console.error("Erro ao responder solicitação:", err);
       }
-    } catch (err) {
-      console.error("Erro ao responder solicitação:", err);
-    }
-  };
+    },
+    [fetchRemoteData]
+  );
 
   // Function to add a new notification
-  const addNotification = (notificationData: Omit<Notification, "id" | "timestamp" | "read">) => {
-    const newNotification: Notification = {
-      id: Math.random().toString(36).substring(7),
-      ...notificationData,
-      timestamp: new Date(),
-      read: false,
-    };
-    dispatch({ type: "ADD_NOTIFICATION", payload: newNotification });
-  };
+  const addNotification = useCallback(
+    (notificationData: Omit<Notification, "id" | "timestamp" | "read">) => {
+      const newNotification: Notification = {
+        id: Math.random().toString(36).substring(7),
+        ...notificationData,
+        timestamp: new Date(),
+        read: false,
+      };
+      dispatch({ type: "ADD_NOTIFICATION", payload: newNotification });
+    },
+    []
+  );
 
-  const markAsRead = async (id: string) => {
+  const markAsRead = useCallback(async (id: string) => {
     dispatch({ type: "MARK_AS_READ", payload: { id } });
     try {
       await userService.markNotificationAsRead(id);
     } catch (err) {
       console.error("Erro ao sincronizar leitura de notificação:", err);
     }
-  };
+  }, []);
 
-  const markAllAsRead = async () => {
+  const markAllAsRead = useCallback(async () => {
     dispatch({ type: "MARK_ALL_AS_READ" });
     try {
       await userService.markAllNotificationsAsRead();
     } catch (err) {
       console.error("Erro ao sincronizar limpeza de notificações:", err);
     }
-  };
+  }, []);
 
-  const removeNotification = (id: string) => {
+  const removeNotification = useCallback((id: string) => {
     dispatch({ type: "REMOVE_NOTIFICATION", payload: { id } });
-  };
+  }, []);
 
-  const clearAllNotifications = () => {
+  const clearAllNotifications = useCallback(() => {
     dispatch({ type: "CLEAR_ALL_NOTIFICATIONS" });
-  };
+  }, []);
 
-  const unreadCount =
-    notifications.filter((notification) => !notification.read).length + followRequests.length;
+  const unreadCount = useMemo(
+    () => notifications.filter((notification) => !notification.read).length + followRequests.length,
+    [notifications, followRequests]
+  );
 
   useEffect(() => {
     if (!user) return;
@@ -228,7 +247,7 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({ chil
           table: "notifications",
           filter: `user_id=eq.${userId}`,
         },
-        () => fetchRemoteData()
+        () => scheduleRemoteFetch()
       )
       .on(
         "postgres_changes",
@@ -240,36 +259,49 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({ chil
           // que qualquer mudança no chat atualize o contador, ouvimos as mensagens.
           // O fetchRemoteData fará a filtragem correta via API.
         },
-        () => fetchRemoteData()
+        () => scheduleRemoteFetch()
       )
       .subscribe();
 
     return () => {
+      if (fetchDebounceRef.current) clearTimeout(fetchDebounceRef.current);
       supabase.removeChannel(channel);
     };
-  }, [user, fetchRemoteData]);
+  }, [user, fetchRemoteData, scheduleRemoteFetch]);
 
-  return (
-    <NotificationContext.Provider
-      value={{
-        notifications,
-        followRequests,
-        addNotification,
-        markAsRead,
-        markAllAsRead,
-        removeNotification,
-        clearAllNotifications,
-        unreadCount,
-        unreadChatCount,
-        fetchRemoteData,
-        respondToFollowRequest,
-        activeChatId,
-        setActiveChatId,
-      }}
-    >
-      {children}
-    </NotificationContext.Provider>
+  const value = useMemo(
+    () => ({
+      notifications,
+      followRequests,
+      addNotification,
+      markAsRead,
+      markAllAsRead,
+      removeNotification,
+      clearAllNotifications,
+      unreadCount,
+      unreadChatCount,
+      fetchRemoteData,
+      respondToFollowRequest,
+      activeChatId,
+      setActiveChatId,
+    }),
+    [
+      notifications,
+      followRequests,
+      addNotification,
+      markAsRead,
+      markAllAsRead,
+      removeNotification,
+      clearAllNotifications,
+      unreadCount,
+      unreadChatCount,
+      fetchRemoteData,
+      respondToFollowRequest,
+      activeChatId,
+    ]
   );
+
+  return <NotificationContext.Provider value={value}>{children}</NotificationContext.Provider>;
 };
 
 export const useNotifications = () => {

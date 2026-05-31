@@ -9,6 +9,7 @@ import {
   Alert,
   Image,
   ActivityIndicator,
+  InteractionManager,
 } from "react-native";
 import {
   Search,
@@ -37,6 +38,8 @@ import { AppStackParamList } from "../../../@types/routes";
 import { useAuth } from "@contexts/AuthContext";
 import { FooterVersion } from "@components/FooterVersion";
 import { useAppData } from "@contexts/AppDataContext";
+import { useDeferredMount } from "../../../hooks/useDeferredMount";
+import { Skeleton } from "../../../components/Skeleton";
 
 interface ExerciseItem {
   id: string;
@@ -54,6 +57,8 @@ const HomeScreen: React.FC = () => {
   const [notificationSheetHeight, setNotificationSheetHeight] = useState<number | string>("100%");
   const navigation = useNavigation<NativeStackNavigationProp<AppStackParamList>>();
   const { user } = useAuth();
+  // Adia a montagem do conteúdo pesado para depois da transição de navegação.
+  const contentMounted = useDeferredMount();
 
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [isSearching, setIsSearching] = useState(false);
@@ -92,7 +97,12 @@ const HomeScreen: React.FC = () => {
   }, [trainings]);
 
   useEffect(() => {
-    fetchHomeData(selectedSpecialty);
+    // Adia o fetch para depois da transição: a Home já renderiza do cache do
+    // AppDataContext, então o refresh em background não trava a navegação.
+    const task = InteractionManager.runAfterInteractions(() => {
+      fetchHomeData(selectedSpecialty);
+    });
+    return () => task.cancel();
   }, [selectedSpecialty, fetchHomeData]);
 
   const performSearch = useCallback(
@@ -336,69 +346,80 @@ const HomeScreen: React.FC = () => {
           onSelect={setSelectedSpecialty}
           selectedSpecialty={selectedSpecialty}
         />
-        <Communities />
-        <PopularExercises
-          trainings={
-            trainingsBySection.popular.length > 0
-              ? trainingsBySection.popular
-              : trainingsBySection.allMapped
-          }
-          selectedSpecialty={selectedSpecialty}
-          loadingTrainings={loadingTrainings}
-          onPressExercise={handleTrainingPress}
-        />
-        <PlanCardTraining planData={dailyPlans} onPressPlan={handleTrainingPress} />
-        <TrainingBanner
-          title="Melhor treino de superiores"
-          imageUrl="https://img.freepik.com/free-photo/view-woman-helping-man-exercise-gym_52683-98092.jpg?t=st=1758297406~exp=1758301006~hmac=66860a69d0b54e22b28d0831392e01278764d6b6d47e956a9576e041c9e016c2&w=1480"
-          onPress={() => {
-            Alert.alert(
-              "Destaque",
-              "Este treino está em destaque para você!\n\nFuncionalidade disponível em breve."
-            );
-          }}
-        />
-        <TheBestForYou
-          onPressPlan={handleTrainingPress}
-          planData={(trainingsBySection.melhores_para_voce.length > 0
-            ? trainingsBySection.melhores_para_voce
-            : trainingsBySection.allMapped
-          ).slice(0, 4)}
-        />
-        <ChallengesSection
-          challenges={
-            trainingsBySection.desafio.length > 0
-              ? trainingsBySection.desafio.map((t) => ({
-                  id: t.id,
-                  title: t.title,
-                  image: { uri: t.imageUrl },
-                }))
-              : undefined
-          }
-          onPress={() => {
-            Alert.alert(
-              "Desafio",
-              "Este desafio está em destaque para você!\n\nFuncionalidade disponível em breve."
-            );
-          }}
-        />
-        <HeatingScreen
-          heatingData={
-            trainingsBySection.aquecimento.length > 0
-              ? trainingsBySection.aquecimento.map((t) => ({
-                  id: t.id,
-                  title: t.title,
-                  imageUrl: t.imageUrl,
-                  level: t.level,
-                  minutes: t.minutes,
-                }))
-              : undefined
-          }
-          onPressItem={(item) => {
-            const training = trainings.find((t: any) => String(t.id_treino) === item.id);
-            if (training) handleTrainingPress(training);
-          }}
-        />
+        {contentMounted || trainings.length > 0 ? (
+          <>
+            <Communities />
+            <PopularExercises
+              trainings={
+                trainingsBySection.popular.length > 0
+                  ? trainingsBySection.popular
+                  : trainingsBySection.allMapped
+              }
+              selectedSpecialty={selectedSpecialty}
+              loadingTrainings={loadingTrainings}
+              onPressExercise={handleTrainingPress}
+            />
+            <PlanCardTraining planData={dailyPlans} onPressPlan={handleTrainingPress} />
+            <TrainingBanner
+              title="Melhor treino de superiores"
+              imageUrl="https://img.freepik.com/free-photo/view-woman-helping-man-exercise-gym_52683-98092.jpg?t=st=1758297406~exp=1758301006~hmac=66860a69d0b54e22b28d0831392e01278764d6b6d47e956a9576e041c9e016c2&w=1480"
+              onPress={() => {
+                Alert.alert(
+                  "Destaque",
+                  "Este treino está em destaque para você!\n\nFuncionalidade disponível em breve."
+                );
+              }}
+            />
+            <TheBestForYou
+              onPressPlan={handleTrainingPress}
+              planData={(trainingsBySection.melhores_para_voce.length > 0
+                ? trainingsBySection.melhores_para_voce
+                : trainingsBySection.allMapped
+              ).slice(0, 4)}
+            />
+            <ChallengesSection
+              challenges={
+                trainingsBySection.desafio.length > 0
+                  ? trainingsBySection.desafio.map((t) => ({
+                      id: t.id,
+                      title: t.title,
+                      image: { uri: t.imageUrl },
+                    }))
+                  : undefined
+              }
+              onPress={() => {
+                Alert.alert(
+                  "Desafio",
+                  "Este desafio está em destaque para você!\n\nFuncionalidade disponível em breve."
+                );
+              }}
+            />
+            <HeatingScreen
+              heatingData={
+                trainingsBySection.aquecimento.length > 0
+                  ? trainingsBySection.aquecimento.map((t) => ({
+                      id: t.id,
+                      title: t.title,
+                      imageUrl: t.imageUrl,
+                      level: t.level,
+                      minutes: t.minutes,
+                    }))
+                  : undefined
+              }
+              onPressItem={(item) => {
+                const training = trainings.find((t: any) => String(t.id_treino) === item.id);
+                if (training) handleTrainingPress(training);
+              }}
+            />
+          </>
+        ) : (
+          <View style={{ paddingHorizontal: 20, gap: 16 }}>
+            <Skeleton width="100%" height={140} borderRadius={16} color="#EEF1F4" />
+            <Skeleton width="60%" height={20} color="#EEF1F4" />
+            <Skeleton width="100%" height={120} borderRadius={16} color="#EEF1F4" />
+            <Skeleton width="100%" height={120} borderRadius={16} color="#EEF1F4" />
+          </View>
+        )}
         <FooterVersion style={styles.footer} />
       </ScrollView>
     </View>
