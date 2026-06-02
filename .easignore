@@ -1,0 +1,40 @@
+# .easignore — usado pelo EAS Build NO LUGAR do .gitignore para montar o tarball.
+# Por isso precisa repetir os itens essenciais do .gitignore (node_modules, .env, etc.).
+
+# Dependências
+node_modules/
+
+# Caches/artefatos de build Android (NUNCA enviar — causavam EBUSY no Windows)
+android/.gradle/
+android/.kotlin/
+android/.cxx/
+android/build/
+android/app/build/
+android/.idea/
+android/local.properties
+android/*.iml
+
+# iOS (não versionado neste projeto)
+ios/
+
+# Expo
+.expo/
+.expo-shared/
+
+# Logs e caches
+*.log
+.cache/
+.parcel-cache/
+coverage/
+*.tsbuildinfo
+
+# Segredos e material de assinatura (NUNCA enviar)
+.env
+.env.*
+!.env.example
+*.jks
+*.keystore
+android/keystore.properties
+.sentryclirc
+settings*.yml
+.semgrep_settings.yml
