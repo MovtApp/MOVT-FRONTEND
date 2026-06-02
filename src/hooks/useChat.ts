@@ -104,22 +104,42 @@ export const useChats = (userId: string) => {
 
     // Escutar mudanças na tabela chats para atualizar a lista em tempo real.
     // Nome de canal único por sessão evita colisão de tópico entre re-montagens.
-    const subscription = supabase
-      .channel(`public:chats:${sessionId ?? "anon"}`)
-      .on("postgres_changes", { event: "INSERT", schema: "public", table: "chats" }, () => {
-        scheduleRefetch();
-      })
-      .on("postgres_changes", { event: "UPDATE", schema: "public", table: "chats" }, () => {
-        scheduleRefetch();
-      })
-      .subscribe();
+    const channelName = `public:chats:${sessionId ?? "anon"}`;
+    let subscription: ReturnType<typeof supabase.channel> | null = null;
+
+    try {
+      // Defensivo (Sentry REACT-NATIVE-N): se um canal com este tópico ainda estiver
+      // registrado — cleanup anterior não concluído por remontagem rápida / freeze —,
+      // o cliente reutiliza um canal já inscrito e o .on() lança
+      // "cannot add postgres_changes callbacks ... after subscribe()". Removemos
+      // qualquer resíduo antes de recriar (o nome inclui o sessionId, então o
+      // includes só casa com ESTE canal, nunca com os de mensagens).
+      supabase
+        .getChannels()
+        .filter((c) => c.topic.includes(channelName))
+        .forEach((c) => supabase.removeChannel(c));
+
+      subscription = supabase
+        .channel(channelName)
+        .on("postgres_changes", { event: "INSERT", schema: "public", table: "chats" }, () => {
+          scheduleRefetch();
+        })
+        .on("postgres_changes", { event: "UPDATE", schema: "public", table: "chats" }, () => {
+          scheduleRefetch();
+        })
+        .subscribe();
+    } catch (e) {
+      // Nunca deixar um erro de realtime propagar para o GlobalErrorBoundary
+      // (que derrubaria o app inteiro). Só logamos; a lista ainda funciona via fetch.
+      console.error("useChats realtime subscribe error:", e);
+    }
 
     return () => {
       if (realtimeDebounceRef.current) clearTimeout(realtimeDebounceRef.current);
       // removeChannel (e não unsubscribe) remove o canal do registro interno do
       // Supabase. Sem isso, ao reexecutar o efeito o cliente reutiliza um canal
       // já inscrito e o .on() lança "cannot add postgres_changes after subscribe()".
-      supabase.removeChannel(subscription);
+      if (subscription) supabase.removeChannel(subscription);
     };
   }, [fetchChats, sessionId]);
 
@@ -282,40 +302,54 @@ export const useMessages = (chatId: string, userId: string) => {
     // Não limpa imediatamente para manter o cache visível
     fetchMessages();
 
-    const channel = supabase
-      .channel(`chat_sync_${chatId}`)
-      .on(
-        "postgres_changes",
-        {
-          event: "*",
-          schema: "public",
-          table: "messages",
-          filter: `chat_id=eq.${chatId}`,
-        },
-        (payload) => {
-          console.log("[Chat Realtime] Evento:", payload.eventType);
+    const channelName = `chat_sync_${chatId}`;
+    let channel: ReturnType<typeof supabase.channel> | null = null;
 
-          if (payload.eventType === "DELETE") {
-            const deletedId = payload.old?.id;
-            if (deletedId) {
-              setMessages((prev) => {
-                if (prev.some((m) => String(m._id) === String(deletedId))) {
-                  return prev.filter((m) => String(m._id) !== String(deletedId));
-                }
-                return prev;
-              });
+    try {
+      // Mesmo defensivo do useChats (Sentry REACT-NATIVE-N): remove resíduo de um
+      // canal de mesmo tópico antes de recriar, evitando o .on() em canal já inscrito.
+      supabase
+        .getChannels()
+        .filter((c) => c.topic.includes(channelName))
+        .forEach((c) => supabase.removeChannel(c));
+
+      channel = supabase
+        .channel(channelName)
+        .on(
+          "postgres_changes",
+          {
+            event: "*",
+            schema: "public",
+            table: "messages",
+            filter: `chat_id=eq.${chatId}`,
+          },
+          (payload) => {
+            console.log("[Chat Realtime] Evento:", payload.eventType);
+
+            if (payload.eventType === "DELETE") {
+              const deletedId = payload.old?.id;
+              if (deletedId) {
+                setMessages((prev) => {
+                  if (prev.some((m) => String(m._id) === String(deletedId))) {
+                    return prev.filter((m) => String(m._id) !== String(deletedId));
+                  }
+                  return prev;
+                });
+              }
+            } else {
+              // INSERT ou UPDATE: Fetcha para garantir dados completos/status
+              fetchMessages(true);
             }
-          } else {
-            // INSERT ou UPDATE: Fetcha para garantir dados completos/status
-            fetchMessages(true);
           }
-        }
-      )
-      .subscribe();
+        )
+        .subscribe();
+    } catch (e) {
+      console.error("useMessages realtime subscribe error:", e);
+    }
 
     return () => {
       if (refreshTimerRef.current) clearTimeout(refreshTimerRef.current);
-      supabase.removeChannel(channel);
+      if (channel) supabase.removeChannel(channel);
     };
   }, [chatId, fetchMessages]);
 

@@ -34,7 +34,7 @@
         }
       },
       "package": "com.dsvmTechnology.movtapp",
-      "versionCode": 21,
+      "versionCode": 32,
       "edgeToEdgeEnabled": true,
       "allowBackup": false,
       "permissions": [

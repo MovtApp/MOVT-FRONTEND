@@ -53,7 +53,13 @@ const BackButton: React.FC<BackButtonProps> = ({ to, onPress, style, autoTopInse
       return;
     }
 
-    navigation.goBack();
+    // Só volta se houver histórico. Em telas que são raiz do seu navigator
+    // (ex.: Verify quando é a initialRoute), goBack() dispara o warning de dev
+    // "The action 'GO_BACK' was not handled by any navigator". Telas que precisam
+    // de um destino quando não há histórico devem passar `to` ou `onPress`.
+    if (navigation.canGoBack()) {
+      navigation.goBack();
+    }
   };
 
   return (

@@ -80,8 +80,12 @@ function MainTabs() {
       screenOptions={{
         headerShown: false,
         tabBarStyle: { display: "none" },
-        // Mantém a tela inativa montada (congelada via enableFreeze) p/ revisita instantânea.
-        freezeOnBlur: true,
+        // As 5 tabs ficam MONTADAS (não congeladas) para revisita instantânea.
+        // NÃO usar freezeOnBlur aqui: com enableFreeze(true) global, congelar a tab
+        // inativa fazia a ChatScreen renderizar PRETA ao navegar de uma tela de Stack
+        // empilhada (ex.: FeedScreen) direto pra tab — o pop do Stack + a troca pra
+        // tab congelada no mesmo frame deixava o screen nativo destacado/preto.
+        freezeOnBlur: false,
       }}
     >
       <Tab.Screen name="HomeScreen" component={HomeScreen} />

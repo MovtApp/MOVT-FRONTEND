@@ -112,7 +112,9 @@ const VerifyAccountScreen = () => {
 
   return (
     <View style={styles.container}>
-      <BackButton />
+      {/* A tela Verify é raiz do seu stack (não há histórico para goBack). O back
+          aqui significa "sair do fluxo de verificação" → volta para o login. */}
+      <BackButton onPress={() => navigation.navigate("Auth", { screen: "SignInScreen" })} />
       <Text style={styles.title}>Verifique sua conta </Text>
       <Text style={styles.subtitle}>
         Digite o código de 6 dígitos que enviamos para o seu e-mail.
