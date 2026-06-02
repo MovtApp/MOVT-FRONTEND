@@ -71,7 +71,7 @@
       [
         "@sentry/react-native/expo",
         {
-          "organization": "movt-app-pw",
+          "organization": "movt-app",
           "project": "react-native"
         }
       ],
