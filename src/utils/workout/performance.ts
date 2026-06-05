@@ -59,3 +59,34 @@ export function formatDistance(meters: number): string {
 export function estimateCalories(distanceKm: number, weightKg: number = 75): number {
   return distanceKm * weightKg * 1.036; // Running MET formula approx
 }
+
+/**
+ * Deriva a velocidade em m/s entre dois fixes de GPS.
+ *
+ * Muitos dispositivos (especialmente Android) reportam `coords.speed` como
+ * `null` ou `-1` nos primeiros fixes ou de forma intermitente. Nesses casos
+ * caímos para o cálculo distância/tempo, evitando que a velocidade seja lida
+ * como 0 e dispare uma auto-pausa indevida.
+ *
+ * @param reportedSpeedMs velocidade reportada pelo device (m/s) — pode ser null/-1
+ * @param distanceMeters  distância percorrida desde o fix anterior (metros)
+ * @param deltaSeconds    tempo decorrido desde o fix anterior (segundos)
+ */
+export function deriveSpeedMs(
+  reportedSpeedMs: number | null | undefined,
+  distanceMeters: number,
+  deltaSeconds: number
+): number {
+  if (
+    typeof reportedSpeedMs === "number" &&
+    reportedSpeedMs >= 0 &&
+    isFinite(reportedSpeedMs)
+  ) {
+    return reportedSpeedMs;
+  }
+  if (deltaSeconds > 0 && isFinite(distanceMeters) && distanceMeters >= 0) {
+    const derived = distanceMeters / deltaSeconds;
+    return isFinite(derived) ? derived : 0;
+  }
+  return 0;
+}

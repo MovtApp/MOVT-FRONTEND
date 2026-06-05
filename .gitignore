@@ -164,3 +164,5 @@ settings*.yml
 # Variáveis de ambiente adicionais
 .env.*
 !.env.example
+# Saida transpilada do teste de historico (descartavel)
+scripts/.tmp-wh/
