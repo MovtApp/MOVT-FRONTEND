@@ -158,6 +158,59 @@ const CommentItem: React.FC<CommentItemProps> = ({ item, currentUserId, authorId
   );
 };
 
+// Barra de input isolada: mantém o próprio estado de texto/envio. Assim, digitar
+// re-renderiza APENAS esta barra — não o CommentsSheet inteiro — evitando que o
+// footerComponent do gorhom seja recriado a cada tecla (o que remontava o
+// BottomSheetTextInput e fechava o teclado no Android).
+interface CommentInputBarProps {
+  onSubmit: (text: string) => Promise<void>;
+}
+
+const CommentInputBar: React.FC<CommentInputBarProps> = React.memo(({ onSubmit }) => {
+  const [text, setText] = useState("");
+  const [sending, setSending] = useState(false);
+
+  const handlePress = useCallback(async () => {
+    const trimmed = text.trim();
+    if (!trimmed || sending) return;
+    setSending(true);
+    try {
+      await onSubmit(trimmed);
+      setText(""); // só limpa em caso de sucesso (onSubmit lança em erro)
+    } catch {
+      // mantém o texto digitado para o usuário tentar de novo
+    } finally {
+      setSending(false);
+    }
+  }, [text, sending, onSubmit]);
+
+  return (
+    <View style={styles.inputBar}>
+      <BottomSheetTextInput
+        value={text}
+        onChangeText={setText}
+        placeholder="Adicione um comentário..."
+        placeholderTextColor="#94A3B8"
+        style={styles.input}
+        multiline
+        maxLength={2000}
+      />
+      <TouchableOpacity
+        onPress={handlePress}
+        disabled={!text.trim() || sending}
+        style={[styles.sendBtn, { opacity: text.trim() ? 1 : 0.4 }]}
+      >
+        {sending ? (
+          <ActivityIndicator size="small" color="#192126" />
+        ) : (
+          <Send size={20} color="#192126" />
+        )}
+      </TouchableOpacity>
+    </View>
+  );
+});
+CommentInputBar.displayName = "CommentInputBar";
+
 export const CommentsSheet = forwardRef<CommentsSheetHandle, CommentsSheetProps>(
   ({ type, targetId, authorId, onCountChange, autoOpen, onClose }, ref) => {
     const sheetRef = useRef<BottomSheet>(null);
@@ -182,8 +235,9 @@ export const CommentsSheet = forwardRef<CommentsSheetHandle, CommentsSheetProps>
     const androidBottomInset = Platform.OS === "android" ? insets.bottom : 0;
     const [comments, setComments] = useState<any[]>([]);
     const [loading, setLoading] = useState(false);
-    const [text, setText] = useState("");
-    const [sending, setSending] = useState(false);
+    // Remonta a CommentInputBar (limpa o rascunho) ao fechar o sheet. Muda só no
+    // fechamento — nunca durante a digitação — então não afeta o foco do teclado.
+    const [composerKey, setComposerKey] = useState(0);
 
     useImperativeHandle(ref, () => ({
       expand: () => {
@@ -213,32 +267,33 @@ export const CommentsSheet = forwardRef<CommentsSheetHandle, CommentsSheetProps>
       if (targetId != null) fetchComments();
     }, [targetId, fetchComments]);
 
-    const handleSubmit = useCallback(async () => {
-      const trimmed = text.trim();
-      if (!trimmed || targetId == null || sending) return;
-      setSending(true);
-      try {
-        const res: any = await adp.add(String(targetId), trimmed);
-        const saved = res?.data?.data || res?.data || res;
-        const optimistic = {
-          ...(saved && typeof saved === "object" ? saved : {}),
-          user_id: currentUserId,
-          comment_user_id: currentUserId,
-          nome: (user as any)?.name,
-          username: (user as any)?.username,
-          photo: (user as any)?.photo || (user as any)?.avatar_url,
-          comentario: trimmed,
-          created_at: (saved as any)?.created_at || new Date().toISOString(),
-        };
-        setComments((prev) => [...prev, optimistic]);
-        setText("");
-        onCountChange?.(1);
-      } catch (err) {
-        Alert.alert("Erro", "Não foi possível enviar o comentário.");
-      } finally {
-        setSending(false);
-      }
-    }, [adp, targetId, text, sending, user, currentUserId, onCountChange]);
+    // Estável: NÃO depende de `text` (o texto vem por argumento da CommentInputBar).
+    // Lança em caso de erro para a barra preservar o texto digitado.
+    const submitComment = useCallback(
+      async (trimmed: string) => {
+        if (!trimmed || targetId == null) return;
+        try {
+          const res: any = await adp.add(String(targetId), trimmed);
+          const saved = res?.data?.data || res?.data || res;
+          const optimistic = {
+            ...(saved && typeof saved === "object" ? saved : {}),
+            user_id: currentUserId,
+            comment_user_id: currentUserId,
+            nome: (user as any)?.name,
+            username: (user as any)?.username,
+            photo: (user as any)?.photo || (user as any)?.avatar_url,
+            comentario: trimmed,
+            created_at: (saved as any)?.created_at || new Date().toISOString(),
+          };
+          setComments((prev) => [...prev, optimistic]);
+          onCountChange?.(1);
+        } catch (err) {
+          Alert.alert("Erro", "Não foi possível enviar o comentário.");
+          throw err;
+        }
+      },
+      [adp, targetId, user, currentUserId, onCountChange]
+    );
 
     const handleDelete = useCallback(
       async (commentId: string | number) => {
@@ -257,7 +312,7 @@ export const CommentsSheet = forwardRef<CommentsSheetHandle, CommentsSheetProps>
     const handleSheetChange = useCallback(
       (index: number) => {
         if (index === -1) {
-          setText("");
+          setComposerKey((k) => k + 1); // limpa o rascunho ao fechar
           onClose?.();
         }
       },
@@ -280,34 +335,15 @@ export const CommentsSheet = forwardRef<CommentsSheetHandle, CommentsSheetProps>
     // O footer flutua sobre o conteúdo do sheet. Quando o teclado abre, ele
     // sobe sozinho pra ficar acima do teclado (gorhom faz isso internamente);
     // quando fecha, ele desce pra base com bottomInset = nav bar (Android).
+    // Identidade estável durante a digitação (não depende de `text`/`sending`):
+    // muda só quando o destino/inset/composerKey mudam, jamais a cada tecla.
     const renderFooter = useCallback(
       (props: BottomSheetFooterProps) => (
         <BottomSheetFooter {...props} bottomInset={androidBottomInset}>
-          <View style={styles.inputBar}>
-            <BottomSheetTextInput
-              value={text}
-              onChangeText={setText}
-              placeholder="Adicione um comentário..."
-              placeholderTextColor="#94A3B8"
-              style={styles.input}
-              multiline
-              maxLength={2000}
-            />
-            <TouchableOpacity
-              onPress={handleSubmit}
-              disabled={!text.trim() || sending}
-              style={[styles.sendBtn, { opacity: text.trim() ? 1 : 0.4 }]}
-            >
-              {sending ? (
-                <ActivityIndicator size="small" color="#192126" />
-              ) : (
-                <Send size={20} color="#192126" />
-              )}
-            </TouchableOpacity>
-          </View>
+          <CommentInputBar key={composerKey} onSubmit={submitComment} />
         </BottomSheetFooter>
       ),
-      [text, sending, handleSubmit, androidBottomInset]
+      [androidBottomInset, submitComment, composerKey]
     );
 
     return (

@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { View, Text, TouchableOpacity, StyleSheet, Alert } from "react-native";
+import { View, Text, TouchableOpacity, StyleSheet, Alert, Platform } from "react-native";
 import BackButton from "@/components/BackButton"; // Ajustei o caminho para o alias
 import CustomInput from "@/components/CustomInput"; // Ajustei o caminho para o alias
 import { useNavigation, useRoute, RouteProp } from "@react-navigation/native"; // Adicionei useRoute
@@ -114,7 +114,7 @@ const VerifyAccountScreen = () => {
     <View style={styles.container}>
       {/* A tela Verify é raiz do seu stack (não há histórico para goBack). O back
           aqui significa "sair do fluxo de verificação" → volta para o login. */}
-      <BackButton onPress={() => navigation.navigate("Auth", { screen: "SignInScreen" })} />
+      <BackButton autoTopInset onPress={() => navigation.navigate("Auth", { screen: "SignInScreen" })} />
       <Text style={styles.title}>Verifique sua conta </Text>
       <Text style={styles.subtitle}>
         Digite o código de 6 dígitos que enviamos para o seu e-mail.
@@ -156,7 +156,7 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: "#fff",
     paddingHorizontal: 20,
-    paddingTop: 20,
+    paddingTop: Platform.OS === "android" ? 0 : 30, // Inset controlado pelo BackButton (autoTopInset)
   },
   title: {
     fontFamily: "Rubik_700Bold",

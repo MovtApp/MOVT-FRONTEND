@@ -59,9 +59,31 @@ const DietScreen: React.FC<NativeStackScreenProps<AppStackParamList, "DietScreen
     []
   );
 
+  // Normaliza para busca: remove acentos, baixa caixa e apara espaços.
+  const DIACRITICS = new RegExp("[\\u0300-\\u036f]", "g");
+  const normalize = (s?: string | null) =>
+    (s || "")
+      .normalize("NFD")
+      .replace(DIACRITICS, "")
+      .toLowerCase()
+      .trim();
+
+  const filteredMeals = useMemo(() => {
+    const q = normalize(search);
+    if (!q) return dietMeals;
+    // Suporta múltiplos termos: "frango arroz" casa itens que contenham ambos.
+    const terms = q.split(/\s+/).filter(Boolean);
+    return dietMeals.filter((meal) => {
+      const haystack = normalize(
+        [meal?.title, meal?.description, meal?.authorName].filter(Boolean).join(" ")
+      );
+      return terms.every((t) => haystack.includes(t));
+    });
+  }, [dietMeals, search]);
+
   const isAllSelected = useMemo(
-    () => dietMeals.length > 0 && selectedDietIds.length === dietMeals.length,
-    [dietMeals, selectedDietIds]
+    () => filteredMeals.length > 0 && selectedDietIds.length === filteredMeals.length,
+    [filteredMeals, selectedDietIds]
   );
 
   const toggleSelect = (dietId: string) => {
@@ -77,7 +99,7 @@ const DietScreen: React.FC<NativeStackScreenProps<AppStackParamList, "DietScreen
     if (isAllSelected) {
       setSelectedDietIds([]);
     } else {
-      setSelectedDietIds(dietMeals.map((m) => m.id_dieta as string));
+      setSelectedDietIds(filteredMeals.map((m) => m.id_dieta as string));
     }
   };
 
@@ -229,7 +251,7 @@ const DietScreen: React.FC<NativeStackScreenProps<AppStackParamList, "DietScreen
 
         <Text style={styles.sectionTitle}>Refeições</Text>
 
-        {dietMeals.map((meal) => (
+        {filteredMeals.map((meal) => (
           <TouchableOpacity
             key={meal.id_dieta}
             style={[
@@ -294,6 +316,17 @@ const DietScreen: React.FC<NativeStackScreenProps<AppStackParamList, "DietScreen
             </View>
           </TouchableOpacity>
         ))}
+
+        {filteredMeals.length === 0 && (
+          <View style={styles.emptyState}>
+            <Search size={32} color="#CBD5E1" />
+            <Text style={styles.emptyStateText}>
+              {search.trim()
+                ? `Nenhuma refeição encontrada para "${search.trim()}"`
+                : "Nenhuma refeição cadastrada"}
+            </Text>
+          </View>
+        )}
       </ScrollView>
 
       <TouchableOpacity
@@ -410,6 +443,19 @@ const styles = StyleSheet.create({
     color: "#111827",
     marginTop: 8,
     marginBottom: 12,
+  },
+  emptyState: {
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 48,
+    gap: 12,
+  },
+  emptyStateText: {
+    fontSize: 14,
+    color: "#94A3B8",
+    fontWeight: "600",
+    textAlign: "center",
+    paddingHorizontal: 24,
   },
   mealCard: {
     backgroundColor: "#fff",

@@ -159,6 +159,13 @@ const WorkoutManagementSheet = forwardRef<WorkoutManagementSheetRef, WorkoutMana
     });
     const [selectedImage, setSelectedImage] = useState<ImagePicker.ImagePickerAsset | null>(null);
 
+    // ── Catálogo Global: criar/editar exercício ──
+    const [isExerciseFormVisible, setIsExerciseFormVisible] = useState(false);
+    const [editingExercise, setEditingExercise] = useState<GlobalExercise | null>(null);
+    const [savingExercise, setSavingExercise] = useState(false);
+    const [exerciseForm, setExerciseForm] = useState({ nome: "", descricao: "", categoria: "" });
+    const [exerciseImage, setExerciseImage] = useState<ImagePicker.ImagePickerAsset | null>(null);
+
     useImperativeHandle(ref, () => ({
       open: () => bottomSheetRef.current?.expand(),
       close: () => bottomSheetRef.current?.close(),
@@ -375,6 +382,121 @@ const WorkoutManagementSheet = forwardRef<WorkoutManagementSheetRef, WorkoutMana
         ...p,
         exercicios: p.exercicios.filter((_, i) => i !== index),
       }));
+    };
+
+    // ── Criar / editar exercício no catálogo global ──
+    const pickExerciseImage = async () => {
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== "granted") {
+        Alert.alert("Permissão necessária", "Precisamos de permissão para acessar sua galeria.");
+        return;
+      }
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.8,
+      });
+      if (!result.canceled) setExerciseImage(result.assets[0]);
+    };
+
+    const openCreateExercise = () => {
+      setEditingExercise(null);
+      setExerciseForm({ nome: "", descricao: "", categoria: "" });
+      setExerciseImage(null);
+      setIsExerciseFormVisible(true);
+    };
+
+    const openEditExercise = (ex: GlobalExercise) => {
+      setEditingExercise(ex);
+      setExerciseForm({
+        nome: ex.nome || "",
+        descricao: ex.descricao || "",
+        categoria: ex.categoria || "",
+      });
+      setExerciseImage(null);
+      setIsExerciseFormVisible(true);
+    };
+
+    const saveExercise = async () => {
+      if (!exerciseForm.nome.trim()) {
+        Alert.alert("Erro", "O nome do exercício é obrigatório.");
+        return;
+      }
+      if (!editingExercise && !exerciseImage) {
+        Alert.alert("Erro", "A imagem do exercício é obrigatória.");
+        return;
+      }
+      try {
+        setSavingExercise(true);
+        const dataToSend = new FormData();
+        dataToSend.append("nome", exerciseForm.nome.trim());
+        dataToSend.append("descricao", exerciseForm.descricao.trim());
+        dataToSend.append("categoria", exerciseForm.categoria.trim() || "Geral");
+
+        if (exerciseImage) {
+          const uri = exerciseImage.uri;
+          const name = uri.split("/").pop() || "exercicio.jpg";
+          const match = /\.(\w+)$/.exec(name);
+          const type = match ? `image/${match[1] === "gif" ? "gif" : "jpeg"}` : `image/jpeg`;
+          // @ts-ignore
+          dataToSend.append("image", {
+            uri: Platform.OS === "android" ? uri : uri.replace("file://", ""),
+            name,
+            type,
+          });
+        }
+
+        const config = { headers: { "Content-Type": "multipart/form-data" } };
+        if (editingExercise) {
+          await api.put(
+            `/admin/exercicios/${editingExercise.id_exercicio}`,
+            dataToSend,
+            config
+          );
+          Alert.alert("✅ Sucesso", "Exercício atualizado!");
+        } else {
+          await api.post("/admin/exercicios", dataToSend, config);
+          Alert.alert("✅ Sucesso", "Exercício criado!");
+        }
+
+        setIsExerciseFormVisible(false);
+        await fetchGlobalExercises();
+      } catch (error: any) {
+        console.error("Erro ao salvar exercício:", error);
+        Alert.alert("Erro", error.response?.data?.error || "Erro ao salvar exercício.");
+      } finally {
+        setSavingExercise(false);
+      }
+    };
+
+    const deleteExercise = (ex: GlobalExercise) => {
+      Alert.alert("Excluir Exercício", `Deseja realmente excluir "${ex.nome}" do catálogo?`, [
+        { text: "Cancelar", style: "cancel" },
+        {
+          text: "Excluir",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              await api.delete(`/admin/exercicios/${ex.id_exercicio}`);
+              await fetchGlobalExercises();
+              Alert.alert("Sucesso", "Exercício excluído!");
+            } catch (error: any) {
+              const data = error.response?.data;
+              if (error.response?.status === 409) {
+                Alert.alert(
+                  "Exercício em uso",
+                  `Não é possível excluir: está sendo usado em ${
+                    data?.treinos?.length ? `(${data.treinos.join(", ")})` : "treinos"
+                  }.`
+                );
+              } else {
+                Alert.alert("Erro", data?.error || "Não foi possível excluir o exercício.");
+              }
+            }
+          },
+        },
+      ]);
     };
 
     const updateExerciseVariation = (
@@ -926,12 +1048,18 @@ const WorkoutManagementSheet = forwardRef<WorkoutManagementSheetRef, WorkoutMana
             <View style={styles.modalContent}>
               <View style={styles.modalHeader}>
                 <Text style={styles.modalTitle}>Selecionar Exercício</Text>
-                <TouchableOpacity
-                  onPress={() => setIsExercisePickerVisible(false)}
-                  style={styles.modalCloseBtn}
-                >
-                  <X size={20} color="#64748B" />
-                </TouchableOpacity>
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                  <TouchableOpacity onPress={openCreateExercise} style={styles.exModalNewBtn}>
+                    <Plus size={15} color="#1E293B" />
+                    <Text style={styles.exModalNewBtnTxt}>Criar</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    onPress={() => setIsExercisePickerVisible(false)}
+                    style={styles.modalCloseBtn}
+                  >
+                    <X size={20} color="#64748B" />
+                  </TouchableOpacity>
+                </View>
               </View>
 
               <View style={[styles.searchBar, { marginTop: 0 }]}>
@@ -967,7 +1095,23 @@ const WorkoutManagementSheet = forwardRef<WorkoutManagementSheetRef, WorkoutMana
                       <Text style={styles.exerciseItemName}>{item.nome}</Text>
                       <Text style={styles.exerciseItemCat}>{item.categoria}</Text>
                     </View>
-                    <Plus size={18} color="#BBF246" />
+                    <TouchableOpacity
+                      onPress={() => openEditExercise(item)}
+                      style={styles.exRowActionBtn}
+                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                    >
+                      <Edit2 size={16} color="#64748B" />
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      onPress={() => deleteExercise(item)}
+                      style={styles.exRowActionBtn}
+                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                    >
+                      <Trash2 size={16} color="#EF4444" />
+                    </TouchableOpacity>
+                    <View style={styles.exRowAddBtn}>
+                      <Plus size={18} color="#1E293B" />
+                    </View>
                   </TouchableOpacity>
                 )}
                 ListEmptyComponent={() => (
@@ -978,6 +1122,121 @@ const WorkoutManagementSheet = forwardRef<WorkoutManagementSheetRef, WorkoutMana
               />
             </View>
           </View>
+        </Modal>
+
+        {/* ── EXERCISE CREATE/EDIT MODAL ── */}
+        <Modal
+          visible={isExerciseFormVisible}
+          animationType="slide"
+          transparent
+          onRequestClose={() => setIsExerciseFormVisible(false)}
+        >
+          <KeyboardAvoidingView
+            behavior={Platform.OS === "ios" ? "padding" : undefined}
+            style={styles.modalOverlay}
+          >
+            <View style={styles.modalContent}>
+              <View style={styles.modalHeader}>
+                <Text style={styles.modalTitle}>
+                  {editingExercise ? "Editar Exercício" : "Novo Exercício"}
+                </Text>
+                <TouchableOpacity
+                  onPress={() => setIsExerciseFormVisible(false)}
+                  style={styles.modalCloseBtn}
+                >
+                  <X size={20} color="#64748B" />
+                </TouchableOpacity>
+              </View>
+
+              <NativeScrollView
+                keyboardShouldPersistTaps="handled"
+                showsVerticalScrollIndicator={false}
+              >
+                <TouchableOpacity
+                  style={styles.exFormImagePicker}
+                  onPress={pickExerciseImage}
+                  activeOpacity={0.8}
+                >
+                  {exerciseImage ? (
+                    <Image source={{ uri: exerciseImage.uri }} style={styles.exFormImage} />
+                  ) : editingExercise?.image_url ? (
+                    <Image
+                      source={{ uri: editingExercise.image_url }}
+                      style={styles.exFormImage}
+                    />
+                  ) : (
+                    <View style={styles.exFormImagePlaceholder}>
+                      <Upload size={22} color="#94A3B8" />
+                      <Text style={styles.exFormImageHint}>Toque para enviar foto (obrigatória)</Text>
+                    </View>
+                  )}
+                  {(exerciseImage || editingExercise?.image_url) && (
+                    <View style={styles.exFormImageOverlay}>
+                      <Upload size={16} color="#fff" />
+                      <Text style={styles.exFormImageOverlayTxt}>Trocar foto</Text>
+                    </View>
+                  )}
+                </TouchableOpacity>
+
+                <Field label="Nome do exercício">
+                  <TextInput
+                    style={styles.input}
+                    placeholder="Ex: Supino Inclinado"
+                    placeholderTextColor="#94A3B8"
+                    value={exerciseForm.nome}
+                    onChangeText={(t) => setExerciseForm((p) => ({ ...p, nome: t }))}
+                  />
+                </Field>
+
+                <Field label="Categoria / grupo muscular">
+                  <TextInput
+                    style={styles.input}
+                    placeholder="Ex: Peito"
+                    placeholderTextColor="#94A3B8"
+                    value={exerciseForm.categoria}
+                    onChangeText={(t) => setExerciseForm((p) => ({ ...p, categoria: t }))}
+                  />
+                  <View style={styles.chipRow}>
+                    {["Peito", "Costas", "Pernas", "Ombros", "Braços", "Core"].map((cat) => (
+                      <Chip
+                        key={cat}
+                        label={cat}
+                        active={exerciseForm.categoria === cat}
+                        onPress={() => setExerciseForm((p) => ({ ...p, categoria: cat }))}
+                      />
+                    ))}
+                  </View>
+                </Field>
+
+                <Field label="Descrição / instruções">
+                  <TextInput
+                    style={[styles.input, { height: 90, textAlignVertical: "top" }]}
+                    placeholder="Como executar o movimento..."
+                    placeholderTextColor="#94A3B8"
+                    multiline
+                    value={exerciseForm.descricao}
+                    onChangeText={(t) => setExerciseForm((p) => ({ ...p, descricao: t }))}
+                  />
+                </Field>
+
+                <TouchableOpacity
+                  style={[styles.exFormSaveBtn, savingExercise && { opacity: 0.6 }]}
+                  onPress={saveExercise}
+                  disabled={savingExercise}
+                  activeOpacity={0.85}
+                >
+                  {savingExercise ? (
+                    <ActivityIndicator size="small" color="#1E293B" />
+                  ) : (
+                    <Text style={styles.exFormSaveBtnTxt}>
+                      {editingExercise ? "Salvar alterações" : "Criar exercício"}
+                    </Text>
+                  )}
+                </TouchableOpacity>
+                <View style={{ height: 24 }} />
+              </NativeScrollView>
+            </View>
+          </KeyboardAvoidingView>
         </Modal>
       </BottomSheet>
     );
@@ -1275,6 +1534,79 @@ const styles = StyleSheet.create({
   exerciseItemImg: { width: "100%", height: "100%" },
   exerciseItemName: { fontSize: 15, fontWeight: "700", color: "#1E293B" },
   exerciseItemCat: { fontSize: 12, color: "#94A3B8", fontWeight: "600" },
+
+  // Catálogo: criar/editar exercício
+  chipRow: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 10 },
+  exModalNewBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    backgroundColor: "#BBF246",
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 12,
+  },
+  exModalNewBtnTxt: { fontSize: 13, fontWeight: "800", color: "#1E293B" },
+  exRowActionBtn: {
+    width: 34,
+    height: 34,
+    borderRadius: 10,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#F1F5F9",
+  },
+  exRowAddBtn: {
+    width: 34,
+    height: 34,
+    borderRadius: 10,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#BBF246",
+  },
+  exFormImagePicker: {
+    width: "100%",
+    height: 170,
+    borderRadius: 20,
+    overflow: "hidden",
+    backgroundColor: "#F1F5F9",
+    marginTop: 4,
+    marginBottom: 8,
+    position: "relative",
+  },
+  exFormImage: { width: "100%", height: "100%" },
+  exFormImagePlaceholder: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    borderWidth: 1.5,
+    borderColor: "#E2E8F0",
+    borderStyle: "dashed",
+    borderRadius: 20,
+  },
+  exFormImageHint: { fontSize: 13, color: "#94A3B8", fontWeight: "600" },
+  exFormImageOverlay: {
+    position: "absolute",
+    bottom: 10,
+    right: 10,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    backgroundColor: "rgba(15,23,42,0.7)",
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 10,
+  },
+  exFormImageOverlayTxt: { fontSize: 12, color: "#fff", fontWeight: "700" },
+  exFormSaveBtn: {
+    backgroundColor: "#BBF246",
+    borderRadius: 16,
+    paddingVertical: 16,
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: 16,
+  },
+  exFormSaveBtnTxt: { fontSize: 16, fontWeight: "900", color: "#1E293B" },
 
   // Details
   detailsHeader: { marginBottom: 20 },
