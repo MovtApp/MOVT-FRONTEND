@@ -1,55 +1,128 @@
 import React, { useState } from "react";
-import { View, StyleSheet, TouchableOpacity, Text } from "react-native";
+import { View, StyleSheet, TouchableOpacity, Text, Alert, ActivityIndicator } from "react-native";
 import BackButton from "@components/BackButton";
 import CustomInput from "@components/CustomInput";
 import { useNavigation } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import { RootStackParamList } from "@typings/routes"; // Corrigida a importação de RootStackParamList
+import { RootStackParamList } from "@typings/routes";
+import * as ImagePicker from "expo-image-picker";
+import { api } from "@/services/api";
+import { useAuth } from "@contexts/AuthContext";
 
 const VerifyCrefScreen = () => {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
-
-  const handleVerify = () => {
-    navigation.navigate("Info", { screen: "GenderScreen" });
-  };
+  const { updateUser } = useAuth();
 
   const [code, setCode] = useState("");
+  const [loading, setLoading] = useState(false);
 
-  // Função para aplicar a máscara SP/08754-G
+  // Máscara SP/08754-G
   function maskCrefInput(text: string) {
-    // Remove tudo que não for letra ou número
     let value = text.replace(/[^a-zA-Z0-9]/g, "");
-
-    // Pega só as duas primeiras letras e transforma em maiúsculo
-    let letters1 = value
-      .slice(0, 2)
-      .replace(/[^a-zA-Z]/g, "")
-      .toUpperCase();
-    // Pega só os próximos cinco números
+    let letters1 = value.slice(0, 2).replace(/[^a-zA-Z]/g, "").toUpperCase();
     let numbers = value.slice(2, 7).replace(/[^0-9]/g, "");
-    // Pega só a última letra e transforma em maiúsculo
-    let letter2 = value
-      .slice(7, 8)
-      .replace(/[^a-zA-Z]/g, "")
-      .toUpperCase();
+    let letter2 = value.slice(7, 8).replace(/[^a-zA-Z]/g, "").toUpperCase();
 
     let masked = letters1;
-    if (letters1.length === 2 && (numbers.length > 0 || value.length > 2)) {
-      masked += "/";
-    }
+    if (letters1.length === 2 && (numbers.length > 0 || value.length > 2)) masked += "/";
     masked += numbers;
-    if (numbers.length === 5 && (letter2.length > 0 || value.length > 7)) {
-      masked += "-";
-    }
+    if (numbers.length === 5 && (letter2.length > 0 || value.length > 7)) masked += "-";
     masked += letter2;
-
-    // Limita ao tamanho máximo do formato
     return masked.slice(0, 10);
   }
 
-  function handleResend() {
-    // lógica para reenviar SMS
-  }
+  const goToApp = () => {
+    navigation.reset({
+      index: 0,
+      routes: [{ name: "App", params: { screen: "HomeStack" } as never }],
+    });
+  };
+
+  // Sobe a foto do documento para o backend, que roda a análise por IA e cruza
+  // o número do CREF da imagem com o que foi digitado.
+  const uploadDocument = async (uri: string) => {
+    setLoading(true);
+    try {
+      // 1. Salva o número do CREF antes do upload (a IA cruza com este valor)
+      await api.put("/user/professional-data", { cref: code });
+
+      // 2. Envia a foto do documento (multipart) para análise
+      const formData = new FormData();
+      const ext = uri.split(".").pop()?.toLowerCase() || "jpg";
+      formData.append("document", {
+        uri,
+        name: `cref.${ext}`,
+        type: ext === "png" ? "image/png" : "image/jpeg",
+      } as any);
+
+      const response = await api.put("/user/document", formData, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
+
+      const status = response.data?.ai_analysis?.status;
+
+      if (status === "aprovado") {
+        await updateUser({ cref_verified: true, status_verificacao: "aprovado" });
+        Alert.alert("Verificação concluída", "Seu CREF foi validado com sucesso!", [
+          { text: "Continuar", onPress: goToApp },
+        ]);
+      } else {
+        // Hard gate: enquanto não for aprovado, o acesso ao app continua bloqueado.
+        await updateUser({ status_verificacao: "pendente" });
+        Alert.alert(
+          "Documento enviado",
+          response.data?.message ||
+            "Seu documento foi enviado para análise. Você poderá acessar o app assim que for aprovado."
+        );
+      }
+    } catch (err: any) {
+      const message =
+        err.response?.data?.error ||
+        err.response?.data?.message ||
+        "Não foi possível enviar o documento. Tente novamente.";
+      Alert.alert("Erro", message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleVerify = async () => {
+    if (code.replace(/[^a-zA-Z0-9]/g, "").length < 8) {
+      Alert.alert("CREF inválido", "Digite o número completo do CREF (ex: SP/08754-G).");
+      return;
+    }
+
+    Alert.alert("Documento do CREF", "Envie uma foto da sua carteira do CREF para validação:", [
+      { text: "Cancelar", style: "cancel" },
+      {
+        text: "Tirar foto",
+        onPress: async () => {
+          const { status } = await ImagePicker.requestCameraPermissionsAsync();
+          if (status !== "granted") {
+            Alert.alert("Permissão necessária", "Precisamos de permissão para a câmera.");
+            return;
+          }
+          const result = await ImagePicker.launchCameraAsync({ mediaTypes: "images", quality: 0.8 });
+          if (!result.canceled) uploadDocument(result.assets[0].uri);
+        },
+      },
+      {
+        text: "Galeria",
+        onPress: async () => {
+          const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+          if (status !== "granted") {
+            Alert.alert("Permissão necessária", "Precisamos de permissão para a galeria.");
+            return;
+          }
+          const result = await ImagePicker.launchImageLibraryAsync({
+            mediaTypes: "images",
+            quality: 0.8,
+          });
+          if (!result.canceled) uploadDocument(result.assets[0].uri);
+        },
+      },
+    ]);
+  };
 
   return (
     <View style={styles.container}>
@@ -61,7 +134,7 @@ const VerifyCrefScreen = () => {
           Física.
         </Text>
         <View style={{ marginTop: 30 }}>
-          <Text style={styles.subtitle}>Código de verificação</Text>
+          <Text style={styles.subtitle}>Número do CREF</Text>
           <CustomInput
             value={code}
             onChangeText={(text) => setCode(maskCrefInput(text))}
@@ -69,17 +142,19 @@ const VerifyCrefScreen = () => {
             maxLength={10}
             keyboardType="default"
           />
-          <TouchableOpacity
-            onPress={handleResend}
-            style={{ marginBottom: 30, alignSelf: "flex-start" }}
-          >
-            <Text style={styles.resend}>Reenviar</Text>
-          </TouchableOpacity>
         </View>
       </View>
 
-      <TouchableOpacity style={styles.verifyButton} onPress={handleVerify}>
-        <Text style={styles.verifyButtonText}>Verificar</Text>
+      <TouchableOpacity
+        style={[styles.verifyButton, loading && { opacity: 0.6 }]}
+        onPress={handleVerify}
+        disabled={loading}
+      >
+        {loading ? (
+          <ActivityIndicator color="#fff" />
+        ) : (
+          <Text style={styles.verifyButtonText}>Enviar documento e verificar</Text>
+        )}
       </TouchableOpacity>
     </View>
   );
@@ -123,11 +198,5 @@ const styles = StyleSheet.create({
     color: "#fff",
     fontFamily: "Rubik_500Medium",
     fontSize: 16,
-  },
-  resend: {
-    color: "#000",
-    fontFamily: "Rubik_500Medium",
-    fontSize: 15,
-    alignSelf: "flex-start",
   },
 });

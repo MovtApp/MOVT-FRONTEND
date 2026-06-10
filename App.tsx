@@ -102,10 +102,16 @@ function AppContent() {
   React.useEffect(() => {
     let initialRouteName: "Auth" | "Verify" | "App" = "Auth";
     if (user) {
-      if (user.isVerified) {
-        initialRouteName = "App";
-      } else {
+      // Personal trainer (conta CNPJ) precisa passar pela verificação profissional
+      // (CREF) antes de acessar o app — bloqueio total até cref_verified=true.
+      const isTrainer =
+        user.documentType === "CNPJ" || user.role === "trainer" || user.role === "personal";
+      const needsProfessionalVerification = isTrainer && !user.cref_verified;
+
+      if (!user.isVerified || needsProfessionalVerification) {
         initialRouteName = "Verify";
+      } else {
+        initialRouteName = "App";
       }
     }
     setCurrentRoute(initialRouteName);

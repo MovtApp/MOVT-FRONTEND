@@ -98,22 +98,21 @@ export const SignInScreen = () => {
         role: response.data.user.role,
         documentId,
         documentType: resolvedDocumentType,
+        cref_verified: response.data.user.cref_verified,
+        cnpj_verified: response.data.user.cnpj_verified,
+        status_verificacao: response.data.user.status_verificacao,
       });
 
+      // Personal trainer (conta CNPJ) só acessa o app após validar o CREF.
+      const isTrainer =
+        resolvedDocumentType === "CNPJ" ||
+        response.data.user.role === "trainer" ||
+        response.data.user.role === "personal";
+      const needsProfessionalVerification = isTrainer && !response.data.user.cref_verified;
+
       // Redireciona imediatamente sem depender do initialRouteName
-      if (response.data.user.isVerified) {
-        // Vai para a Home dentro do Drawer
-        navigation.reset({
-          index: 0,
-          routes: [
-            {
-              name: "App" as never,
-              params: { screen: "HomeStack" } as never,
-            },
-          ],
-        });
-      } else {
-        // Envia para verificação de conta
+      if (!response.data.user.isVerified) {
+        // E-mail ainda não confirmado → verificação de conta (código por e-mail)
         navigation.reset({
           index: 0,
           routes: [
@@ -123,6 +122,28 @@ export const SignInScreen = () => {
                 screen: "VerifyAccountScreen",
                 params: { sessionId: response.data.sessionId },
               } as never,
+            },
+          ],
+        });
+      } else if (needsProfessionalVerification) {
+        // E-mail ok, mas falta validar empresa/CREF → fluxo profissional
+        navigation.reset({
+          index: 0,
+          routes: [
+            {
+              name: "Verify" as never,
+              params: { screen: "VerifyCompanyScreen" } as never,
+            },
+          ],
+        });
+      } else {
+        // Vai para a Home dentro do Drawer
+        navigation.reset({
+          index: 0,
+          routes: [
+            {
+              name: "App" as never,
+              params: { screen: "HomeStack" } as never,
             },
           ],
         });

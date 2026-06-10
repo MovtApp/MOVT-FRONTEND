@@ -22,6 +22,10 @@ interface User {
   role?: string;
   plan?: string; // Plano real do backend: "free" | "premium" | "familia"
   plan_expires_at?: string | null;
+  // Verificação profissional (personal trainer / CNPJ)
+  cref_verified?: boolean;
+  cnpj_verified?: boolean;
+  status_verificacao?: string; // "pendente" | "aprovado" | ...
 }
 
 interface AuthContextData {
@@ -87,6 +91,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           documentId: updatedUser.documentId,
           documentType: updatedUser.documentType,
           role: updatedUser.role,
+          cref_verified: updatedUser.cref_verified,
+          cnpj_verified: updatedUser.cnpj_verified,
+          status_verificacao: updatedUser.status_verificacao,
         })
       );
     },
@@ -139,6 +146,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                   photo: refreshedUser.photo,
                   supabaseUserId: refreshedUser.supabaseUserId,
                   role: refreshedUser.role,
+                  documentType: refreshedUser.documentType,
+                  cref_verified: refreshedUser.cref_verified,
+                  cnpj_verified: refreshedUser.cnpj_verified,
+                  status_verificacao: refreshedUser.status_verificacao,
                 })
               );
             } else {

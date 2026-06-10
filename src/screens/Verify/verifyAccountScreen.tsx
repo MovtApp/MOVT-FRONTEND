@@ -14,7 +14,7 @@ type VerifyAccountScreenRouteProp = RouteProp<RootStackParamList, "Verify">;
 const VerifyAccountScreen = () => {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const route = useRoute<VerifyAccountScreenRouteProp>();
-  const { updateUser } = useAuth();
+  const { updateUser, user } = useAuth();
 
   const { sessionId: routeSessionId } = route.params?.params || {};
 
@@ -94,10 +94,19 @@ const VerifyAccountScreen = () => {
       Alert.alert("Verificação Concluída", response.data.message);
       await updateUser({ isVerified: true });
 
-      navigation.reset({
-        index: 0,
-        routes: [{ name: "App", params: { screen: "HomeStack" } as never }],
-      });
+      // Personal trainer (conta CNPJ) ainda precisa validar empresa/CREF antes de
+      // entrar no app. Demais contas (CPF) vão direto para a Home.
+      const isTrainer =
+        user?.documentType === "CNPJ" || user?.role === "trainer" || user?.role === "personal";
+
+      if (isTrainer && !user?.cref_verified) {
+        navigation.navigate("Verify", { screen: "VerifyCompanyScreen" });
+      } else {
+        navigation.reset({
+          index: 0,
+          routes: [{ name: "App", params: { screen: "HomeStack" } as never }],
+        });
+      }
     } catch (err: any) {
       const errorMessage =
         err.response?.data?.error ||

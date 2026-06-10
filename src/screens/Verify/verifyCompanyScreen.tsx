@@ -1,24 +1,57 @@
 import React, { useState } from "react";
-import { View, StyleSheet, TouchableOpacity, Text } from "react-native";
+import { View, StyleSheet, TouchableOpacity, Text, Alert, ActivityIndicator } from "react-native";
 import BackButton from "../../components/BackButton";
+import CustomInput from "../../components/CustomInput";
 import { RootStackParamList } from "../../@types/routes";
 import { useNavigation } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import SearchInput from "../../components/SearchInput";
-import { Search } from "lucide-react-native";
+import { api } from "@/services/api";
 
 const VerifyCompanyScreen = () => {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
 
-  const handleVerify = () => {
-    navigation.navigate("Verify", { screen: "VerifyCNPJScreen" });
-  };
+  const [cnpj, setCnpj] = useState("");
+  const [loading, setLoading] = useState(false);
 
-  const [search, setSearch] = useState("");
-
-  function handleResend() {
-    // lógica para reenviar SMS
+  // Máscara 00.000.000/0000-00
+  function formatCNPJ(value: string) {
+    let cleaned = value.replace(/\D/g, "").slice(0, 14);
+    let formatted = "";
+    if (cleaned.length > 0) formatted = cleaned.slice(0, 2);
+    if (cleaned.length >= 3) formatted += "." + cleaned.slice(2, 5);
+    if (cleaned.length >= 6) formatted += "." + cleaned.slice(5, 8);
+    if (cleaned.length >= 9) formatted += "/" + cleaned.slice(8, 12);
+    if (cleaned.length >= 13) formatted += "-" + cleaned.slice(12, 14);
+    return formatted;
   }
+
+  const handleVerify = async () => {
+    const digits = cnpj.replace(/\D/g, "");
+    if (digits.length !== 14) {
+      Alert.alert("CNPJ inválido", "Digite os 14 dígitos do CNPJ da empresa.");
+      return;
+    }
+
+    setLoading(true);
+    try {
+      // 1. Valida o CNPJ na base da Receita Federal (BrasilAPI)
+      await api.get(`/verify/cnpj/${digits}`);
+
+      // 2. Persiste o CNPJ nos dados profissionais do usuário
+      await api.put("/user/professional-data", { cnpj: digits });
+
+      // 3. Segue para a validação do CREF
+      navigation.navigate("Verify", { screen: "VerifyCrefScreen" });
+    } catch (err: any) {
+      const message =
+        err.response?.data?.error ||
+        err.response?.data?.message ||
+        "Não foi possível validar o CNPJ. Tente novamente.";
+      Alert.alert("Erro", message);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <View style={styles.container}>
@@ -29,24 +62,27 @@ const VerifyCompanyScreen = () => {
           Digite o número do CNPJ da empresa para validar as informações cadastrais.
         </Text>
         <View style={{ marginTop: 30 }}>
-          <Text style={styles.subtitle}>Consulta de empresa ou CNPJ</Text>
-          <SearchInput
-            value={search}
-            onChangeText={setSearch}
-            placeholder="Procurar"
-            icon={<Search size={24} color="#888" />}
+          <Text style={styles.subtitle}>CNPJ</Text>
+          <CustomInput
+            value={cnpj}
+            onChangeText={(text: string) => setCnpj(formatCNPJ(text))}
+            placeholder="00.000.000/0000-00"
+            keyboardType="numeric"
+            maxLength={18}
           />
-          <TouchableOpacity
-            onPress={handleResend}
-            style={{ marginBottom: 30, alignSelf: "flex-start" }}
-          >
-            <Text style={styles.resend}>Reenviar</Text>
-          </TouchableOpacity>
         </View>
       </View>
 
-      <TouchableOpacity style={styles.verifyButton} onPress={handleVerify}>
-        <Text style={styles.verifyButtonText}>Verificar</Text>
+      <TouchableOpacity
+        style={[styles.verifyButton, loading && { opacity: 0.6 }]}
+        onPress={handleVerify}
+        disabled={loading}
+      >
+        {loading ? (
+          <ActivityIndicator color="#fff" />
+        ) : (
+          <Text style={styles.verifyButtonText}>Verificar</Text>
+        )}
       </TouchableOpacity>
     </View>
   );
@@ -90,11 +126,5 @@ const styles = StyleSheet.create({
     color: "#fff",
     fontFamily: "Rubik_500Medium",
     fontSize: 16,
-  },
-  resend: {
-    color: "#000",
-    fontFamily: "Rubik_500Medium",
-    fontSize: 15,
-    alignSelf: "flex-start",
   },
 });
