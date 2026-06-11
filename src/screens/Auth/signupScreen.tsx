@@ -1,14 +1,6 @@
 import { useState } from "react";
-import {
-  View,
-  TouchableOpacity,
-  StyleSheet,
-  ScrollView,
-  Text,
-  KeyboardAvoidingView,
-  Platform,
-  Alert,
-} from "react-native";
+import { View, TouchableOpacity, StyleSheet, Text, Alert } from "react-native";
+import { KeyboardAwareScrollView } from "react-native-keyboard-controller";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { api } from "@/services/api";
@@ -17,6 +9,7 @@ import CustomInput from "@/components/CustomInput";
 import DateTimePickerModal from "react-native-modal-datetime-picker";
 import { Calendar, Eye, EyeOff } from "lucide-react-native";
 import { useForm, Controller, ControllerRenderProps } from "react-hook-form";
+import { isValidCNPJ, onlyDigits } from "@/utils/cnpj";
 
 const registerSchema = z.object({
   nome: z.string().min(2, { message: "Nome obrigatório" }),
@@ -97,6 +90,17 @@ export const SignUpScreen = ({ navigation }: Props) => {
   }
 
   const onSubmit = async (data: RegisterFormData) => {
+    // Validação do documento conforme a aba (o schema só checa presença).
+    const docDigits = onlyDigits(data.cpf_cnpj);
+    if (tab === "CNPJ" && !isValidCNPJ(docDigits)) {
+      Alert.alert("CNPJ inválido", "Verifique os 14 dígitos do CNPJ informado.");
+      return;
+    }
+    if (tab === "CPF" && docDigits.length !== 11) {
+      Alert.alert("CPF inválido", "Digite os 11 dígitos do CPF.");
+      return;
+    }
+
     try {
       const response = await api.post("/register", {
         nome: data.nome,
@@ -128,16 +132,14 @@ export const SignUpScreen = ({ navigation }: Props) => {
   }
 
   return (
-    <KeyboardAvoidingView
-      style={{ flex: 1, backgroundColor: "#fff" }}
-      behavior={Platform.OS === "ios" ? "padding" : undefined}
-    >
+    <View style={{ flex: 1, backgroundColor: "#fff" }}>
       <View style={styles.container}>
-        <ScrollView
+        <KeyboardAwareScrollView
           style={{ flex: 1 }}
           contentContainerStyle={{ flexGrow: 1, paddingBottom: 30 }}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
+          bottomOffset={20}
         >
           <BackButton autoTopInset={true} />
           <Text style={styles.title}>Inscrever-se</Text>
@@ -330,9 +332,9 @@ export const SignUpScreen = ({ navigation }: Props) => {
               <Text style={styles.signIn}> Log In</Text>
             </TouchableOpacity>
           </View>
-        </ScrollView>
+        </KeyboardAwareScrollView>
       </View>
-    </KeyboardAvoidingView>
+    </View>
   );
 };
 
