@@ -69,7 +69,7 @@ function estimateCalories(distanceKm, weightKg) {
  * Muitos dispositivos (especialmente Android) reportam `coords.speed` como
  * `null` ou `-1` nos primeiros fixes ou de forma intermitente. Nesses casos
  * caímos para o cálculo distância/tempo, evitando que a velocidade seja lida
- * como 0 e dispare uma auto-pausa indevida.
+ * como 0 de forma indevida.
  *
  * @param reportedSpeedMs velocidade reportada pelo device (m/s) — pode ser null/-1
  * @param distanceMeters  distância percorrida desde o fix anterior (metros)

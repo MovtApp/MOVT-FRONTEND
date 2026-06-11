@@ -8,12 +8,14 @@ import {
   Dimensions,
   Platform,
   Alert,
+  Modal,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRoute } from "@react-navigation/native";
 import MapView, { Polyline, Marker, PROVIDER_GOOGLE } from "react-native-maps";
 import * as Location from "expo-location";
-import { startMOVTService, stopMOVTService } from "../../../../services/movtService";
+import * as Tracker from "../../../../services/locationTrackingService";
+import type { TrackingSnapshot } from "../../../../services/locationTrackingService";
 
 import {
   Bike,
@@ -34,6 +36,8 @@ import {
   Trash2,
   History,
   ChevronLeft,
+  Maximize2,
+  X,
 } from "lucide-react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import BottomSheet, {
@@ -47,7 +51,6 @@ import {
   speedToPace,
   formatDuration,
   estimateCalories,
-  deriveSpeedMs,
 } from "../../../../utils/workout/performance";
 import {
   WorkoutRecord,
@@ -60,22 +63,9 @@ import {
   computeRecords,
 } from "../../../../services/workoutHistoryService";
 
-// ─── Parâmetros de rastreamento ──────────────────────────────────────────────
-// Tempo parado (ms) até a corrida entrar em auto-pausa. A contagem só pausa
-// depois de a velocidade ficar baixa por esse período sustentado — uma única
-// leitura lenta de GPS (ex.: warm-up) não pausa mais o cronômetro.
-const AUTO_PAUSE_DELAY_MS = 5000;
-// Janela inicial (ms) em que ignoramos a auto-pausa: o GPS ainda está "travando"
-// a posição/velocidade e costuma reportar 0 m/s nos primeiros segundos.
-const GPS_WARMUP_MS = 5000;
-// Velocidade (m/s) acima da qual consideramos que o usuário voltou a se mover
-// (~3,6 km/h). Usada para zerar o contador de inatividade e retomar.
-const RESUME_SPEED_MS = 1.0;
-// Acurácia mínima aceitável (metros). Fixes piores que isso são descartados
-// para não poluir distância/velocidade com ruído de GPS.
-const MIN_ACCURACY_M = 30;
-// Ruído mínimo de deslocamento (metros) entre fixes para contar como distância.
-const MIN_SEGMENT_M = 3;
+// Os parâmetros de rastreamento (acurácia, segmento mínimo, etc.) e o cálculo
+// de distância agora vivem em locationTrackingService.ts, que processa os fixes
+// de GPS em background — sobrevivendo ao repouso da tela.
 
 // ─── Error Boundary ────────────────────────────────────────────────────────────
 
@@ -126,18 +116,48 @@ class DataErrorBoundary extends React.Component<{ children: React.ReactNode }, E
 
 const { width, height } = Dimensions.get("window");
 
-const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => {
-  const R = 6371;
-  const dLat = (lat2 - lat1) * (Math.PI / 180);
-  const dLon = (lon2 - lon1) * (Math.PI / 180);
-  const a =
-    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-    Math.cos(lat1 * (Math.PI / 180)) *
-      Math.cos(lat2 * (Math.PI / 180)) *
-      Math.sin(dLon / 2) *
-      Math.sin(dLon / 2);
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-  return R * c;
+type LatLng = { latitude: number; longitude: number };
+
+/**
+ * Calcula a região que enquadra toda a rota (vista de cima ampla, estilo Strava).
+ * Acha o bounding box dos pontos e adiciona uma folga, garantindo um delta mínimo
+ * para rotas muito curtas. Retorna null se não houver pontos.
+ */
+function regionForRoute(route: LatLng[], paddingRatio = 0.3) {
+  if (!route || route.length === 0) return null;
+  let minLat = route[0].latitude;
+  let maxLat = route[0].latitude;
+  let minLng = route[0].longitude;
+  let maxLng = route[0].longitude;
+  for (const p of route) {
+    if (p.latitude < minLat) minLat = p.latitude;
+    if (p.latitude > maxLat) maxLat = p.latitude;
+    if (p.longitude < minLng) minLng = p.longitude;
+    if (p.longitude > maxLng) maxLng = p.longitude;
+  }
+  return {
+    latitude: (minLat + maxLat) / 2,
+    longitude: (minLng + maxLng) / 2,
+    latitudeDelta: Math.max((maxLat - minLat) * (1 + paddingRatio), 0.0025),
+    longitudeDelta: Math.max((maxLng - minLng) * (1 + paddingRatio), 0.0025),
+  };
+}
+
+/** Marcadores de início (verde) e fim (escuro), estilo Strava. */
+const RouteEndpoints: React.FC<{ route: LatLng[] }> = ({ route }) => {
+  if (route.length < 2) return null;
+  const start = route[0];
+  const end = route[route.length - 1];
+  return (
+    <>
+      <Marker coordinate={start} anchor={{ x: 0.5, y: 0.5 }} tracksViewChanges={false}>
+        <View style={hs.startMarker} />
+      </Marker>
+      <Marker coordinate={end} anchor={{ x: 0.5, y: 0.5 }} tracksViewChanges={false}>
+        <View style={hs.endMarker} />
+      </Marker>
+    </>
+  );
 };
 
 // ─── Sheet: Lista de Histórico ──────────────────────────────────────────────
@@ -190,24 +210,24 @@ const HistoryList: React.FC<HistoryListProps> = ({
         <View style={hs.recordCard}>
           <Trophy size={16} color="#F59E0B" />
           <Text style={hs.recordValue}>
-            {records.longestDurationSec > 0
-              ? formatDuration(records.longestDurationSec)
-              : "--"}
+            {records.longestDurationSec > 0 ? formatDuration(records.longestDurationSec) : "--"}
           </Text>
           <Text style={hs.recordLabel}>maior tempo</Text>
         </View>
         <View style={hs.recordCard}>
           <Trophy size={16} color="#F59E0B" />
           <Text style={hs.recordValue}>
-            {records.bestPaceSecPerKm
-              ? speedToPace(1000 / records.bestPaceSecPerKm)
-              : "--"}
+            {records.bestPaceSecPerKm ? speedToPace(1000 / records.bestPaceSecPerKm) : "--"}
           </Text>
           <Text style={hs.recordLabel}>melhor pace</Text>
         </View>
       </View>
 
-      <BottomSheetScrollView contentContainerStyle={{ paddingBottom: 40 }}>
+      <BottomSheetScrollView
+        style={{ flex: 1 }}
+        contentContainerStyle={{ paddingBottom: 40, flexGrow: 1 }}
+        showsVerticalScrollIndicator={true}
+      >
         {workouts.length === 0 ? (
           <View style={hs.empty}>
             <History size={40} color="#CBD5E1" />
@@ -231,9 +251,7 @@ const HistoryList: React.FC<HistoryListProps> = ({
                   {isRecord(w) && <Trophy size={14} color="#F59E0B" />}
                 </View>
                 <View style={hs.itemStats}>
-                  <Text style={hs.itemMain}>
-                    {w.distanceKm.toFixed(2).replace(".", ",")} km
-                  </Text>
+                  <Text style={hs.itemMain}>{w.distanceKm.toFixed(2).replace(".", ",")} km</Text>
                   <Text style={hs.itemSub}>{formatDuration(w.durationSec)}</Text>
                   <Text style={hs.itemSub}>
                     {type === "Ciclismo" ? `${w.avgSpeedKmh} km/h` : `${w.avgPace} /km`}
@@ -281,6 +299,23 @@ const WorkoutDetail: React.FC<WorkoutDetailProps> = ({
   // Diferença vs. recorde da modalidade (para a comparação).
   const distDelta = workout.distanceKm - records.longestDistanceKm;
 
+  // Região que enquadra a rota inteira (vista de cima).
+  const fitRegion = regionForRoute(safeRoute);
+  const hasRoute = safeRoute.length > 1 && fitRegion;
+
+  // Tela cheia interativa do mapa.
+  const [mapFull, setMapFull] = useState(false);
+  const fullMapRef = useRef<MapView>(null);
+  const insets = useSafeAreaInsets();
+
+  const fitFullMap = () => {
+    if (safeRoute.length < 2) return;
+    fullMapRef.current?.fitToCoordinates(safeRoute, {
+      edgePadding: { top: 80, right: 60, bottom: 120, left: 60 },
+      animated: false,
+    });
+  };
+
   return (
     <View style={hs.container}>
       <View style={hs.header}>
@@ -293,35 +328,54 @@ const WorkoutDetail: React.FC<WorkoutDetailProps> = ({
         </TouchableOpacity>
       </View>
 
-      <BottomSheetScrollView contentContainerStyle={{ paddingBottom: 40 }}>
+      <BottomSheetScrollView
+        style={{ flex: 1 }}
+        contentContainerStyle={{ paddingBottom: 40, flexGrow: 1 }}
+        showsVerticalScrollIndicator={true}
+      >
         <Text style={hs.detailTitle}>{workout.type}</Text>
         <Text style={hs.detailDate}>{formatDate(workout.date)}</Text>
 
-        {safeRoute.length > 1 && (
-          <View style={hs.detailMap}>
+        {hasRoute ? (
+          <TouchableOpacity
+            style={hs.detailMap}
+            activeOpacity={0.9}
+            onPress={() => setMapFull(true)}
+          >
             <MapView
               provider={PROVIDER_GOOGLE}
               style={StyleSheet.absoluteFillObject}
               scrollEnabled={false}
               zoomEnabled={false}
+              rotateEnabled={false}
+              pitchEnabled={false}
               pointerEvents="none"
-              region={{
-                latitude: safeRoute[Math.floor(safeRoute.length / 2)].latitude,
-                longitude: safeRoute[Math.floor(safeRoute.length / 2)].longitude,
-                latitudeDelta: 0.012,
-                longitudeDelta: 0.012,
-              }}
+              initialRegion={fitRegion!}
             >
-              <Polyline coordinates={safeRoute} strokeColor={accent} strokeWidth={5} />
+              <Polyline
+                coordinates={safeRoute}
+                strokeColor={accent}
+                strokeWidth={4}
+                lineCap="round"
+                lineJoin="round"
+              />
+              <RouteEndpoints route={safeRoute} />
             </MapView>
+            {/* Botão de expandir (estilo Strava) */}
+            <View style={hs.expandBadge}>
+              <Maximize2 size={16} color="#1E293B" />
+            </View>
+          </TouchableOpacity>
+        ) : (
+          <View style={hs.noRouteBox}>
+            <Navigation size={22} color="#94A3B8" />
+            <Text style={hs.noRouteText}>Sem rota registrada para este treino</Text>
           </View>
         )}
 
         <View style={hs.detailGrid}>
           <View style={hs.detailCard}>
-            <Text style={hs.detailValue}>
-              {workout.distanceKm.toFixed(2).replace(".", ",")}
-            </Text>
+            <Text style={hs.detailValue}>{workout.distanceKm.toFixed(2).replace(".", ",")}</Text>
             <Text style={hs.detailLabel}>km</Text>
           </View>
           <View style={hs.detailCard}>
@@ -373,6 +427,73 @@ const WorkoutDetail: React.FC<WorkoutDetailProps> = ({
           </View>
         )}
       </BottomSheetScrollView>
+
+      {/* ─── Mapa em tela cheia (interativo, estilo Strava) ───────────────── */}
+      <Modal
+        visible={mapFull}
+        animationType="slide"
+        onRequestClose={() => setMapFull(false)}
+        statusBarTranslucent
+      >
+        <View style={hs.fullContainer}>
+          {hasRoute && (
+            <MapView
+              ref={fullMapRef}
+              provider={PROVIDER_GOOGLE}
+              style={StyleSheet.absoluteFillObject}
+              initialRegion={fitRegion!}
+              onMapReady={fitFullMap}
+              showsCompass={false}
+              toolbarEnabled={false}
+            >
+              <Polyline
+                coordinates={safeRoute}
+                strokeColor={accent}
+                strokeWidth={5}
+                lineCap="round"
+                lineJoin="round"
+              />
+              <RouteEndpoints route={safeRoute} />
+            </MapView>
+          )}
+
+          {/* Botão fechar */}
+          <TouchableOpacity
+            style={hs.fullCloseBtn}
+            onPress={() => setMapFull(false)}
+            activeOpacity={0.8}
+          >
+            <X size={24} color="#1E293B" />
+          </TouchableOpacity>
+
+          {/* Overlay com os números do treino — acima dos botões nativos (safe area) */}
+          <View style={[hs.fullStatsBar, { bottom: Math.max(insets.bottom, 12) + 18 }]}>
+            <View style={hs.fullStat}>
+              <Text style={hs.fullStatValue}>
+                {workout.distanceKm.toFixed(2).replace(".", ",")}
+              </Text>
+              <Text style={hs.fullStatLabel}>km</Text>
+            </View>
+            <View style={hs.fullStatDivider} />
+            <View style={hs.fullStat}>
+              <Text style={hs.fullStatValue}>{formatDuration(workout.durationSec)}</Text>
+              <Text style={hs.fullStatLabel}>tempo</Text>
+            </View>
+            <View style={hs.fullStatDivider} />
+            <View style={hs.fullStat}>
+              <Text style={hs.fullStatValue}>
+                {workout.type === "Ciclismo" ? workout.avgSpeedKmh : workout.avgPace}
+              </Text>
+              <Text style={hs.fullStatLabel}>{workout.type === "Ciclismo" ? "km/h" : "pace"}</Text>
+            </View>
+            <View style={hs.fullStatDivider} />
+            <View style={hs.fullStat}>
+              <Text style={hs.fullStatValue}>{workout.kcal}</Text>
+              <Text style={hs.fullStatLabel}>kcal</Text>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 };
@@ -400,18 +521,20 @@ const CyclingScreen: React.FC = () => {
 
   const [activeTab, setActiveTab] = useState<"Ciclismo" | "Corrida" | "Maratona">("Ciclismo");
   const bottomSheetRef = useRef<BottomSheet>(null);
-  const snapPoints = useMemo(() => ["50%", "85%"], []);
+  const snapPoints = useMemo(() => ["50%", "92%"], []);
 
-  // Tracking States
-  const [isTracking, setIsTracking] = useState(false);
-  const [isPaused, setIsPaused] = useState(false);
-  const [isAutoPaused, setIsAutoPaused] = useState(false);
-  const [seconds, setSeconds] = useState(0);
-  const [distance, setDistance] = useState(0);
-  const [route, setRoute] = useState<{ latitude: number; longitude: number }[]>([]);
-  const [currentLocation, setCurrentLocation] = useState<Location.LocationObject | null>(null);
-  const [currentSpeedMs, setCurrentSpeedMs] = useState(0);
-  const [splits, setSplits] = useState<{ km: number; time: string; pace: string }[]>([]);
+  // Estado de rastreamento: agora vem do serviço de tracking em background, que
+  // sobrevive ao repouso da tela (tempo por relógio de parede + GPS via
+  // foreground service). A tela apenas reflete o snapshot e dispara ações.
+  const [snap, setSnap] = useState<TrackingSnapshot>(() => Tracker.getSnapshot());
+  const [initialCenter, setInitialCenter] = useState<LatLng | null>(null);
+
+  const isTracking = snap.active;
+  const isPaused = snap.isPaused;
+  const seconds = snap.elapsedSec;
+  const distance = snap.distanceKm;
+  const route = snap.route;
+  const currentSpeedMs = snap.currentSpeedMs;
 
   // Histórico de treinos
   const [history, setHistory] = useState<WorkoutRecord[]>([]);
@@ -426,191 +549,58 @@ const CyclingScreen: React.FC = () => {
     loadHistory();
   }, [loadHistory]);
 
-  const lastSplitDist = useRef(0);
-  const timerRef = useRef<any>(null);
-  const locationSubscriber = useRef<Location.LocationSubscription | null>(null);
+  // Assina o serviço e re-hidrata uma sessão que tenha sobrevivido a um restart
+  // do JS (ex.: o SO reabriu o app para entregar localização em background).
+  useEffect(() => {
+    const unsub = Tracker.subscribe(setSnap);
+    Tracker.resumeIfActive();
+    return unsub;
+  }, []);
 
-  // Espelhos em ref do estado mutado dentro do callback do GPS. O callback do
-  // watchPositionAsync é criado uma única vez e "congela" o estado da época
-  // (stale closure); lendo via ref ele sempre enxerga o valor atual.
-  const isPausedRef = useRef(false);
-  const isAutoPausedRef = useRef(false);
-  const distanceRef = useRef(0);
-  const secondsRef = useRef(0);
-  const lastPointRef = useRef<{ latitude: number; longitude: number } | null>(null);
-  const lastFixTsRef = useRef(0);
-  const lastMovementTsRef = useRef(0);
-  const trackingStartTsRef = useRef(0);
+  // Enquanto o treino está ativo e a tela focada, um "tick" de 1s mantém o
+  // relógio na tela em dia. NÃO é a fonte da verdade do tempo (isso é o relógio
+  // de parede no serviço) — é só refresh.
+  useEffect(() => {
+    if (!isTracking) return;
+    const id = setInterval(() => Tracker.tick(), 1000);
+    return () => clearInterval(id);
+  }, [isTracking]);
+
+  // Centraliza o mapa na última posição conhecida ao abrir (rápido), antes mesmo
+  // de iniciar o rastreamento.
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        const last = await Location.getLastKnownPositionAsync({});
+        if (mounted && last) {
+          setInitialCenter({
+            latitude: last.coords.latitude,
+            longitude: last.coords.longitude,
+          });
+        }
+      } catch {
+        // sem localização inicial: o mapa usa a região padrão
+      }
+    })();
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   const startTracking = async () => {
-    const { status } = await Location.requestForegroundPermissionsAsync();
-    if (status !== "granted") {
+    const res = await Tracker.startTracking(activeTab === "Ciclismo" ? "Ciclismo" : "Corrida");
+    if (!res.ok) {
       Alert.alert("Permissão negada", "Precisamos de acesso ao GPS para o MOVT Performance.");
-      return;
-    }
-
-    const now = Date.now();
-    setIsTracking(true);
-    setIsPaused(false);
-    setIsAutoPaused(false);
-    setSeconds(0);
-    setDistance(0);
-    setRoute([]);
-    setSplits([]);
-
-    // Reseta todos os espelhos em ref para um novo treino
-    lastSplitDist.current = 0;
-    isPausedRef.current = false;
-    isAutoPausedRef.current = false;
-    distanceRef.current = 0;
-    secondsRef.current = 0;
-    lastPointRef.current = null;
-    lastFixTsRef.current = 0;
-    lastMovementTsRef.current = now;
-    trackingStartTsRef.current = now;
-
-    startMOVTService(
-      "MOVT - Treino em Andamento",
-      `Acompanhando sua atividade de ${activeTab.toLowerCase()} em tempo real...`
-    );
-
-    // Timer como fonte única da verdade: conta o tempo E avalia a auto-pausa
-    // por inatividade sustentada. Não é mais cancelado em pausas — ele apenas
-    // deixa de incrementar enquanto pausado, eliminando o race que congelava
-    // o cronômetro no primeiro fix de GPS.
-    timerRef.current = setInterval(() => {
-      const ts = Date.now();
-
-      // Auto-pausa só após o warm-up do GPS e após ficar parado o tempo limite.
-      if (
-        !isPausedRef.current &&
-        !isAutoPausedRef.current &&
-        ts - trackingStartTsRef.current > GPS_WARMUP_MS &&
-        ts - lastMovementTsRef.current > AUTO_PAUSE_DELAY_MS
-      ) {
-        isAutoPausedRef.current = true;
-        setIsAutoPaused(true);
-        setCurrentSpeedMs(0);
-        return;
-      }
-
-      // Conta o tempo apenas quando ativo (nem manual nem auto pausado).
-      if (!isPausedRef.current && !isAutoPausedRef.current) {
-        secondsRef.current += 1;
-        setSeconds(secondsRef.current);
-      }
-    }, 1000);
-
-    locationSubscriber.current = await Location.watchPositionAsync(
-      {
-        accuracy: Location.Accuracy.BestForNavigation,
-        timeInterval: 1000,
-        distanceInterval: 2,
-      },
-      (location) => {
-        const { latitude, longitude, speed, accuracy } = location.coords;
-        const ts = location.timestamp || Date.now();
-        setCurrentLocation(location);
-
-        // Descarta fixes imprecisos para não poluir distância/velocidade.
-        if (typeof accuracy === "number" && accuracy > MIN_ACCURACY_M) {
-          return;
-        }
-
-        const prevPoint = lastPointRef.current;
-        const prevFixTs = lastFixTsRef.current;
-        let segmentDistanceM = 0;
-        let deltaSeconds = 0;
-        if (prevPoint && prevFixTs) {
-          segmentDistanceM =
-            calculateDistance(prevPoint.latitude, prevPoint.longitude, latitude, longitude) *
-            1000;
-          deltaSeconds = (ts - prevFixTs) / 1000;
-        }
-
-        // Velocidade robusta: usa a derivada quando o device não reporta.
-        const currentSpeed = deriveSpeedMs(speed, segmentDistanceM, deltaSeconds);
-        setCurrentSpeedMs(currentSpeed);
-
-        // Detectou movimento → renova a marca de inatividade e retoma se preciso.
-        if (currentSpeed >= RESUME_SPEED_MS) {
-          lastMovementTsRef.current = ts;
-          if (isAutoPausedRef.current) {
-            isAutoPausedRef.current = false;
-            setIsAutoPaused(false);
-          }
-        }
-
-        lastFixTsRef.current = ts;
-
-        // Primeiro fix válido: marca o início da rota.
-        if (!prevPoint) {
-          lastPointRef.current = { latitude, longitude };
-          setRoute([{ latitude, longitude }]);
-          return;
-        }
-
-        // Não acumula distância enquanto pausado; só atualiza a âncora para
-        // que a retomada não gere um "salto" de distância.
-        if (isPausedRef.current || isAutoPausedRef.current) {
-          lastPointRef.current = { latitude, longitude };
-          return;
-        }
-
-        // Acumula distância filtrando o ruído de GPS abaixo do limite mínimo.
-        if (segmentDistanceM > MIN_SEGMENT_M) {
-          distanceRef.current += segmentDistanceM / 1000; // km
-          setDistance(distanceRef.current);
-          setRoute((prev) => [...prev, { latitude, longitude }]);
-
-          const newTotalKm = distanceRef.current;
-          if (Math.floor(newTotalKm) > lastSplitDist.current) {
-            const currentKm = Math.floor(newTotalKm);
-            lastSplitDist.current = currentKm;
-            const elapsed = secondsRef.current;
-            setSplits((prevSplits) => [
-              ...prevSplits,
-              {
-                km: currentKm,
-                time: formatDuration(elapsed),
-                pace: elapsed > 0 ? speedToPace((newTotalKm * 1000) / elapsed) : "--:--",
-              },
-            ]);
-          }
-        }
-
-        lastPointRef.current = { latitude, longitude };
-      }
-    );
-  };
-
-  const togglePause = () => {
-    if (isPausedRef.current || isAutoPausedRef.current) {
-      // Retomar (de pausa manual ou auto-pausa)
-      isPausedRef.current = false;
-      isAutoPausedRef.current = false;
-      setIsPaused(false);
-      setIsAutoPaused(false);
-      // Evita que a auto-pausa dispare de novo no instante seguinte à retomada.
-      lastMovementTsRef.current = Date.now();
-    } else {
-      // Pausar manualmente
-      isPausedRef.current = true;
-      setIsPaused(true);
-      setCurrentSpeedMs(0);
     }
   };
+
+  const togglePause = () => Tracker.togglePause();
 
   const finalizeAndSave = async () => {
-    setIsTracking(false);
-    isPausedRef.current = false;
-    isAutoPausedRef.current = false;
-    if (timerRef.current) clearInterval(timerRef.current);
-    if (locationSubscriber.current) locationSubscriber.current.remove();
-    stopMOVTService();
-
-    const finalDistance = distanceRef.current;
-    const finalSeconds = secondsRef.current;
+    const final = await Tracker.stopTracking();
+    const finalDistance = final.distanceKm;
+    const finalSeconds = final.elapsedSec;
 
     // Não salva "treinos vazios" (parou logo após iniciar, sem deslocamento).
     if (finalDistance < 0.05 || finalSeconds < 5) {
@@ -624,8 +614,8 @@ const CyclingScreen: React.FC = () => {
         durationSec: finalSeconds,
         distanceKm: finalDistance,
         kcal: estimateCalories(finalDistance),
-        route: [...route],
-        splits: [...splits],
+        route: final.route,
+        splits: final.splits,
       });
 
       await loadHistory();
@@ -676,13 +666,9 @@ const CyclingScreen: React.FC = () => {
     ]);
   };
 
-  useEffect(() => {
-    return () => {
-      if (timerRef.current) clearInterval(timerRef.current);
-      if (locationSubscriber.current) locationSubscriber.current.remove();
-      stopMOVTService();
-    };
-  }, []);
+  // Nota: NÃO encerramos o rastreamento ao desmontar a tela. O treino continua
+  // rodando no serviço em background (foreground service), e a UI é restaurada
+  // via subscribe/resumeIfActive ao voltar. Só "Finalizar" encerra a sessão.
 
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
 
@@ -705,10 +691,7 @@ const CyclingScreen: React.FC = () => {
     () => history.filter((w) => w.type === historyType),
     [history, historyType]
   );
-  const records = useMemo(
-    () => computeRecords(history, historyType),
-    [history, historyType]
-  );
+  const records = useMemo(() => computeRecords(history, historyType), [history, historyType]);
 
   const formatWorkoutDate = (iso: string) => {
     try {
@@ -744,17 +727,20 @@ const CyclingScreen: React.FC = () => {
     );
   }, [route]);
 
+  // Posição "ao vivo": último fix do treino em andamento, ou a posição conhecida
+  // ao abrir a tela (antes de iniciar).
+  const liveLatLng = snap.lastLocation || initialCenter;
   const hasValidLocation = useMemo(() => {
     return (
-      currentLocation?.coords &&
-      typeof currentLocation.coords.latitude === "number" &&
-      !isNaN(currentLocation.coords.latitude) &&
-      isFinite(currentLocation.coords.latitude) &&
-      typeof currentLocation.coords.longitude === "number" &&
-      !isNaN(currentLocation.coords.longitude) &&
-      isFinite(currentLocation.coords.longitude)
+      !!liveLatLng &&
+      typeof liveLatLng.latitude === "number" &&
+      !isNaN(liveLatLng.latitude) &&
+      isFinite(liveLatLng.latitude) &&
+      typeof liveLatLng.longitude === "number" &&
+      !isNaN(liveLatLng.longitude) &&
+      isFinite(liveLatLng.longitude)
     );
-  }, [currentLocation]);
+  }, [liveLatLng]);
 
   return (
     <DataErrorBoundary>
@@ -797,10 +783,10 @@ const CyclingScreen: React.FC = () => {
               provider={PROVIDER_GOOGLE}
               style={styles.map}
               region={
-                hasValidLocation && currentLocation
+                hasValidLocation && liveLatLng
                   ? {
-                      latitude: currentLocation.coords.latitude,
-                      longitude: currentLocation.coords.longitude,
+                      latitude: liveLatLng.latitude,
+                      longitude: liveLatLng.longitude,
                       latitudeDelta: 0.005,
                       longitudeDelta: 0.005,
                     }
@@ -816,14 +802,16 @@ const CyclingScreen: React.FC = () => {
                 <Polyline
                   coordinates={safeRoute}
                   strokeColor={activeTab === "Ciclismo" ? "#3B82F6" : "#10B981"}
-                  strokeWidth={5}
+                  strokeWidth={4}
+                  lineCap="round"
+                  lineJoin="round"
                 />
               )}
-              {hasValidLocation && currentLocation && (
+              {hasValidLocation && liveLatLng && (
                 <Marker
                   coordinate={{
-                    latitude: currentLocation.coords.latitude,
-                    longitude: currentLocation.coords.longitude,
+                    latitude: liveLatLng.latitude,
+                    longitude: liveLatLng.longitude,
                   }}
                 >
                   <View
@@ -835,12 +823,6 @@ const CyclingScreen: React.FC = () => {
                 </Marker>
               )}
             </MapView>
-
-            {isAutoPaused && (
-              <View style={styles.autoPauseOverlay}>
-                <Text style={styles.autoPauseText}>| | AUTO-PAUSA</Text>
-              </View>
-            )}
 
             <View style={styles.hudOverlay}>
               <View style={styles.hudGrid}>
@@ -894,7 +876,7 @@ const CyclingScreen: React.FC = () => {
               ) : (
                 <View style={styles.activeControls}>
                   <TouchableOpacity style={[styles.roundButton]} onPress={togglePause}>
-                    {isPaused || isAutoPaused ? (
+                    {isPaused ? (
                       <Play size={24} color="#000" fill="#000" />
                     ) : (
                       <Pause size={24} color="#000" fill="#000" />
@@ -1011,7 +993,12 @@ const CyclingScreen: React.FC = () => {
                   workouts={filteredHistory}
                   type={historyType}
                   records={records}
-                  onSelect={setSelectedWorkout}
+                  onSelect={(w) => {
+                    setSelectedWorkout(w);
+                    // Abre o sheet por completo para caber o detalhe e habilitar o
+                    // scroll vertical (o scroll do conteúdo só atua no snap do topo).
+                    bottomSheetRef.current?.snapToIndex(1);
+                  }}
                   onClose={handleCloseHistory}
                   formatDate={formatWorkoutDate}
                 />
@@ -1068,17 +1055,6 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
   },
   map: { ...StyleSheet.absoluteFillObject },
-  autoPauseOverlay: {
-    position: "absolute",
-    top: 20,
-    alignSelf: "center",
-    backgroundColor: "rgba(0,0,0,0.8)",
-    paddingHorizontal: 20,
-    paddingVertical: 8,
-    borderRadius: 20,
-    zIndex: 10,
-  },
-  autoPauseText: { color: "#BBF246", fontWeight: "900", fontSize: 12 },
   currentLocationMarker: {
     width: 16,
     height: 16,
@@ -1299,11 +1275,100 @@ const hs = StyleSheet.create({
   detailTitle: { fontSize: 24, fontWeight: "900", color: "#1E293B" },
   detailDate: { fontSize: 13, fontWeight: "700", color: "#94A3B8", marginTop: 2, marginBottom: 16 },
   detailMap: {
-    height: 180,
+    height: 260,
     borderRadius: 24,
     overflow: "hidden",
     marginBottom: 18,
   },
+  expandBadge: {
+    position: "absolute",
+    top: 12,
+    right: 12,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: "rgba(255,255,255,0.95)",
+    alignItems: "center",
+    justifyContent: "center",
+    elevation: 3,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 3,
+  },
+  startMarker: {
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    backgroundColor: "#22C55E",
+    borderWidth: 3,
+    borderColor: "#FFFFFF",
+  },
+  endMarker: {
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    backgroundColor: "#1E293B",
+    borderWidth: 3,
+    borderColor: "#FFFFFF",
+  },
+  noRouteBox: {
+    height: 120,
+    borderRadius: 24,
+    marginBottom: 18,
+    backgroundColor: "#F8FAFC",
+    borderWidth: 1,
+    borderColor: "#F1F5F9",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+  },
+  noRouteText: { fontSize: 13, fontWeight: "600", color: "#94A3B8" },
+  fullContainer: { flex: 1, backgroundColor: "#FFFFFF" },
+  fullCloseBtn: {
+    position: "absolute",
+    top: Platform.OS === "ios" ? 56 : 40,
+    left: 20,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: "rgba(255,255,255,0.95)",
+    alignItems: "center",
+    justifyContent: "center",
+    elevation: 4,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+  },
+  fullStatsBar: {
+    position: "absolute",
+    bottom: 30,
+    left: 16,
+    right: 16,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-around",
+    backgroundColor: "rgba(255,255,255,0.97)",
+    borderRadius: 24,
+    paddingVertical: 16,
+    paddingHorizontal: 12,
+    elevation: 8,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 10,
+  },
+  fullStat: { alignItems: "center", flex: 1 },
+  fullStatValue: { fontSize: 18, fontWeight: "900", color: "#1E293B" },
+  fullStatLabel: {
+    fontSize: 10,
+    fontWeight: "800",
+    color: "#64748B",
+    textTransform: "uppercase",
+    marginTop: 2,
+  },
+  fullStatDivider: { width: 1, height: 28, backgroundColor: "#E2E8F0" },
   detailGrid: { flexDirection: "row", flexWrap: "wrap", gap: 10, marginBottom: 18 },
   detailCard: {
     flex: 1,
@@ -1348,7 +1413,13 @@ const hs = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: "#E2E8F0",
   },
-  splitHeadText: { fontSize: 10, fontWeight: "900", color: "#94A3B8", flex: 1, textAlign: "center" },
+  splitHeadText: {
+    fontSize: 10,
+    fontWeight: "900",
+    color: "#94A3B8",
+    flex: 1,
+    textAlign: "center",
+  },
   splitRow: {
     flexDirection: "row",
     justifyContent: "space-between",
