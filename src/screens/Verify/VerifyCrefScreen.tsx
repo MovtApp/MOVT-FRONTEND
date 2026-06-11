@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { View, StyleSheet, TouchableOpacity, Text, Alert, ActivityIndicator } from "react-native";
+import { View, StyleSheet, TouchableOpacity, Text, Alert, ActivityIndicator, Platform } from "react-native";
 import BackButton from "@components/BackButton";
 import CustomInput from "@components/CustomInput";
 import { useNavigation } from "@react-navigation/native";
@@ -16,19 +16,18 @@ const VerifyCrefScreen = () => {
   const [code, setCode] = useState("");
   const [loading, setLoading] = useState(false);
 
-  // Máscara SP/08754-G
+  // Máscara 171844-G/SP  (número-categoria/UF)
   function maskCrefInput(text: string) {
-    let value = text.replace(/[^a-zA-Z0-9]/g, "");
-    let letters1 = value.slice(0, 2).replace(/[^a-zA-Z]/g, "").toUpperCase();
-    let numbers = value.slice(2, 7).replace(/[^0-9]/g, "");
-    let letter2 = value.slice(7, 8).replace(/[^a-zA-Z]/g, "").toUpperCase();
+    const clean = text.replace(/[^a-zA-Z0-9]/g, "").toUpperCase();
+    const numbers = (clean.match(/^\d{0,6}/) || [""])[0]; // até 6 dígitos
+    const rest = clean.slice(numbers.length).replace(/[^A-Z]/g, "");
+    const category = rest.slice(0, 1); // categoria (G/P)
+    const uf = rest.slice(1, 3); // UF
 
-    let masked = letters1;
-    if (letters1.length === 2 && (numbers.length > 0 || value.length > 2)) masked += "/";
-    masked += numbers;
-    if (numbers.length === 5 && (letter2.length > 0 || value.length > 7)) masked += "-";
-    masked += letter2;
-    return masked.slice(0, 10);
+    let masked = numbers;
+    if (category) masked += "-" + category;
+    if (uf) masked += "/" + uf;
+    return masked;
   }
 
   const goToApp = () => {
@@ -87,8 +86,8 @@ const VerifyCrefScreen = () => {
   };
 
   const handleVerify = async () => {
-    if (code.replace(/[^a-zA-Z0-9]/g, "").length < 8) {
-      Alert.alert("CREF inválido", "Digite o número completo do CREF (ex: SP/08754-G).");
+    if (!/^\d{4,6}-[A-Z]\/[A-Z]{2}$/.test(code)) {
+      Alert.alert("CREF inválido", "Digite o número completo do CREF (ex: 171844-G/SP).");
       return;
     }
 
@@ -127,7 +126,7 @@ const VerifyCrefScreen = () => {
   return (
     <View style={styles.container}>
       <View style={styles.topSection}>
-        <BackButton />
+        <BackButton autoTopInset />
         <Text style={styles.title}>Validar seu cref</Text>
         <Text style={styles.subtitle}>
           Digite o número do registro CREF para confirmar a identidade do profissional de Educação
@@ -138,8 +137,8 @@ const VerifyCrefScreen = () => {
           <CustomInput
             value={code}
             onChangeText={(text) => setCode(maskCrefInput(text))}
-            placeholder="SP/08754-G"
-            maxLength={10}
+            placeholder="171844-G/SP"
+            maxLength={11}
             keyboardType="default"
           />
         </View>
@@ -167,7 +166,7 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: "#fff",
     paddingHorizontal: 20,
-    paddingTop: 20,
+    paddingTop: Platform.OS === "android" ? 0 : 30, // Inset controlado pelo BackButton (autoTopInset)
     justifyContent: "space-between",
   },
   topSection: {
