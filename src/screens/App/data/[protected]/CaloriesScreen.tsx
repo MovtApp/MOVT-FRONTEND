@@ -641,7 +641,7 @@ const CaloriesScreen: React.FC = () => {
               </View>
 
               <TouchableOpacity style={styles.saveButton} onPress={handleSaveMission}>
-                <Text style={styles.saveButtonText}>Iniciar Missão</Text>
+                <Text style={styles.saveButtonText}>Iniciar missão</Text>
               </TouchableOpacity>
             </ScrollView>
           </SafeAreaView>
@@ -780,7 +780,7 @@ const styles = StyleSheet.create({
     color: "#192126",
   },
   saveButton: {
-    backgroundColor: "#FF7D00",
+    backgroundColor: "#192126",
     borderRadius: 15,
     padding: 18,
     alignItems: "center",

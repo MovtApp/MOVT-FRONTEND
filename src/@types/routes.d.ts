@@ -89,8 +89,8 @@ export type AppStackParamList = {
   CommunityDetails: { community: Community };
   TrainingScreen: undefined;
   TrainingDetails: { training: Training };
+  ChallengeDetails: { challenge: Training };
   ActiveWorkout: { training: Training };
-  ExplorerScreen: undefined;
   AppointmentScreen:
     | {
         trainerId?: string;
@@ -184,7 +184,6 @@ export type VerifyStackParamList = {
   VerifyAccountScreen: { sessionId?: string };
   VerifyPhoneScreen: undefined;
   VerifyCompanyScreen: undefined;
-  VerifyCNPJScreen: undefined;
   VerifyCrefScreen: undefined;
   RecoveryScreen: undefined;
 };

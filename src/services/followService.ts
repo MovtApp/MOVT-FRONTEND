@@ -3,10 +3,44 @@ import { API_BASE_URL } from "../config/api";
 interface FollowResponse {
   success: boolean;
   following?: boolean;
+  isFollowing?: boolean;
+  status?: "pending" | "accepted" | null;
   message?: string;
   followedCount?: number;
   unfollowedCount?: number;
   error?: string;
+}
+
+/**
+ * Segue / solicita seguir um usuário genérico (não-trainer). O backend trata
+ * como toggle e cria a relação com status "pending" (solicitação de amizade);
+ * o destinatário aceita pela aba de solicitações.
+ * @param userId - id_us do usuário a seguir
+ * @param sessionToken - Token de autenticação
+ */
+export async function followUser(
+  userId: string | number,
+  sessionToken: string
+): Promise<FollowResponse> {
+  if (!API_BASE_URL) {
+    throw new Error("API_BASE_URL não configurada. Verifique src/config/api.ts");
+  }
+  if (!userId) throw new Error("userId é obrigatório");
+  if (!sessionToken) throw new Error("sessionToken é obrigatório");
+
+  const response = await fetch(`${API_BASE_URL}/user/${userId}/follow`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${sessionToken}`,
+    },
+  });
+
+  const responseData = await response.json();
+  if (!response.ok) {
+    throw new Error(responseData?.error || `Erro HTTP ${response.status}`);
+  }
+  return responseData;
 }
 
 /**

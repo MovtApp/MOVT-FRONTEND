@@ -1,52 +1,152 @@
-import React, { useState } from "react";
-import { View, StyleSheet, TouchableOpacity, Text } from "react-native";
+import React, { useState, useEffect } from "react";
+import {
+  View,
+  StyleSheet,
+  TouchableOpacity,
+  Text,
+  Platform,
+  Alert,
+  ActivityIndicator,
+} from "react-native";
 import BackButton from "@components/BackButton";
 import CustomInput from "@components/CustomInput";
 import { useNavigation } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import { RootStackParamList } from "@typings/routes"; // Corrigida a importação de RootStackParamList
+import { RootStackParamList } from "@typings/routes";
+import { api } from "@/services/api";
+import { useAuth } from "@contexts/AuthContext";
 
 const VerifyPhoneScreen = () => {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
-
-  const handleVerify = () => {
-    navigation.navigate("Verify", { screen: "VerifyCompanyScreen" });
-  };
+  const { user, updateUser } = useAuth();
 
   const [code, setCode] = useState("");
+  const [sending, setSending] = useState(false); // enviando/reenviando o SMS
+  const [verifying, setVerifying] = useState(false); // conferindo o código
+  const [sent, setSent] = useState(false); // já enviou ao menos uma vez
 
-  function handleResend() {
-    // lógica para reenviar SMS
-  }
+  // Envia o código por SMS para o telefone do cadastro.
+  const sendCode = async (isResend = false) => {
+    setSending(true);
+    try {
+      const { data } = await api.post("/user/send-phone-code");
+      // Telefone já verificado no backend → segue o fluxo.
+      if (data?.alreadyVerified) {
+        await updateUser({ phone_verified: true });
+        goNext();
+        return;
+      }
+      setSent(true);
+      if (isResend) Alert.alert("Código reenviado", "Enviamos um novo código por SMS.");
+    } catch (err: any) {
+      Alert.alert(
+        "Erro",
+        err.response?.data?.error || "Não foi possível enviar o código por SMS. Tente novamente."
+      );
+    } finally {
+      setSending(false);
+    }
+  };
+
+  // Dispara o primeiro envio ao abrir a tela.
+  useEffect(() => {
+    sendCode(false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Próxima etapa após validar o telefone. Usa os mesmos padrões de navegação já
+  // usados em verifyAccountScreen (navigate p/ irmão do Verify; reset p/ App).
+  const goNext = () => {
+    const isTrainer =
+      user?.documentType === "CNPJ" || user?.role === "trainer" || user?.role === "personal";
+    if (isTrainer && !user?.cref_verified) {
+      navigation.navigate("Verify", { screen: "VerifyCompanyScreen" });
+    } else if (user?.onboarding_completed === false) {
+      // CPF (ou trainer já com CREF) sem dados pessoais → onboarding Info
+      navigation.reset({ index: 0, routes: [{ name: "Info" as never }] });
+    } else {
+      navigation.reset({
+        index: 0,
+        routes: [{ name: "App", params: { screen: "HomeStack" } as never }],
+      });
+    }
+  };
+
+  const handleVerify = async () => {
+    if (code.length !== 6) {
+      Alert.alert("Código incompleto", "Digite os 6 dígitos recebidos por SMS.");
+      return;
+    }
+    setVerifying(true);
+    try {
+      await api.post("/user/verify-phone", { code });
+      await updateUser({ phone_verified: true });
+      goNext();
+    } catch (err: any) {
+      Alert.alert(
+        "Erro",
+        err.response?.data?.error || "Código inválido ou expirado. Tente novamente."
+      );
+    } finally {
+      setVerifying(false);
+    }
+  };
+
+  const canSubmit = code.length === 6 && !verifying && !sending;
 
   return (
     <View style={styles.container}>
       <View style={styles.topSection}>
-        <BackButton />
+        {/* Verify é raiz do stack: o back sai do fluxo e volta ao login. */}
+        <BackButton
+          autoTopInset
+          onPress={() => navigation.navigate("Auth", { screen: "SignInScreen" } as never)}
+        />
         <Text style={styles.title}>Validar telefone</Text>
         <Text style={styles.subtitle}>
-          Digite o código de 6 dígitos enviado por SMS para validar seu telefone.
+          Enviamos um código de 6 dígitos por SMS para o telefone do seu cadastro. Digite-o abaixo
+          para confirmar seu número.
         </Text>
+
         <View style={{ marginTop: 30 }}>
           <Text style={styles.subtitle}>Código de verificação</Text>
           <CustomInput
             value={code}
-            onChangeText={setCode}
-            placeholder="Digite o código"
+            onChangeText={(text) => setCode(text.replace(/\D/g, "").slice(0, 6))}
+            placeholder="______"
             maxLength={6}
             keyboardType="numeric"
           />
+
           <TouchableOpacity
-            onPress={handleResend}
-            style={{ marginBottom: 30, alignSelf: "flex-start" }}
+            style={styles.resendButton}
+            onPress={() => sendCode(true)}
+            disabled={sending}
           >
-            <Text style={styles.resend}>Reenviar</Text>
+            <Text style={styles.resendButtonText}>
+              {sending ? "Reenviando..." : "Reenviar Código"}
+            </Text>
           </TouchableOpacity>
+
+          {sending && !sent && (
+            <View style={styles.sendingRow}>
+              <ActivityIndicator color="#192126" />
+              <Text style={styles.sendingText}>Enviando código…</Text>
+            </View>
+          )}
         </View>
       </View>
 
-      <TouchableOpacity style={styles.verifyButton} onPress={handleVerify}>
-        <Text style={styles.verifyButtonText}>Verificar</Text>
+      <TouchableOpacity
+        style={[styles.verifyButton, !canSubmit && { opacity: 0.6 }]}
+        onPress={handleVerify}
+        disabled={!canSubmit}
+      >
+        {verifying ? (
+          <ActivityIndicator color="#fff" />
+        ) : (
+          <Text style={styles.verifyButtonText}>Verificar</Text>
+        )}
       </TouchableOpacity>
     </View>
   );
@@ -59,7 +159,7 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: "#fff",
     paddingHorizontal: 20,
-    paddingTop: 20,
+    paddingTop: Platform.OS === "android" ? 0 : 30, // Inset controlado pelo BackButton (autoTopInset)
     justifyContent: "space-between",
   },
   topSection: {
@@ -79,6 +179,16 @@ const styles = StyleSheet.create({
     color: "#666",
     marginBottom: 8,
   },
+  sendingRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+  },
+  sendingText: {
+    fontFamily: "Rubik_400Regular",
+    fontSize: 14,
+    color: "#666",
+  },
   verifyButton: {
     backgroundColor: "#192126",
     borderRadius: 10,
@@ -91,10 +201,14 @@ const styles = StyleSheet.create({
     fontFamily: "Rubik_500Medium",
     fontSize: 16,
   },
-  resend: {
-    color: "#000",
+  resendButton: {
+    marginTop: 20,
+    paddingVertical: 10,
+    alignItems: "center",
+  },
+  resendButtonText: {
+    color: "#BBF246",
     fontFamily: "Rubik_500Medium",
-    fontSize: 15,
-    alignSelf: "flex-start",
+    fontSize: 16,
   },
 });

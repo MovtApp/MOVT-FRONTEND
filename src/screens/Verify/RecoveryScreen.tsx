@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { View, StyleSheet, TouchableOpacity, Text, Alert, ActivityIndicator } from "react-native";
 import BackButton from "@components/BackButton";
 import { useNavigation } from "@react-navigation/native";
@@ -6,13 +6,22 @@ import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import CustomInput from "@components/CustomInput";
 import { RootStackParamList } from "@typings/routes";
 import { authService } from "@services/authService";
+import { useAuth } from "@contexts/AuthContext";
 import { Eye, EyeOff, CheckCircle2 } from "lucide-react-native";
 
 const RecoveryScreen = () => {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  const { user } = useAuth();
+  const isLoggedIn = !!user;
 
   const [step, setStep] = useState(1); // 1: Email, 2: Code, 3: Password, 4: Success
-  const [email, setEmail] = useState("");
+  // Logado: e-mail vem da conta (bloqueado). Não logado: vazio e editável.
+  const [email, setEmail] = useState(user?.email || "");
+
+  // Se a sessão carregar depois do mount (logado), garante o e-mail preenchido.
+  useEffect(() => {
+    if (user?.email) setEmail(user.email);
+  }, [user?.email]);
   const [code, setCode] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -108,6 +117,7 @@ const RecoveryScreen = () => {
               placeholder="seu@email.com"
               keyboardType="email-address"
               autoCapitalize="none"
+              editable={!isLoggedIn}
             />
           </View>
         </>
@@ -191,7 +201,7 @@ const RecoveryScreen = () => {
   return (
     <View style={styles.container}>
       <View style={styles.topSection}>
-        {step < 4 && <BackButton />}
+        {step < 4 && <BackButton autoTopInset />}
         {renderContent()}
       </View>
 
@@ -213,12 +223,12 @@ const RecoveryScreen = () => {
         ) : (
           <Text style={styles.mainButtonText}>
             {step === 1
-              ? "Enviar Código"
+              ? "Enviar código"
               : step === 2
-                ? "Verificar Código"
+                ? "Verificar código"
                 : step === 3
-                  ? "Redefinir Senha"
-                  : "Voltar ao Login"}
+                  ? "Redefinir senha"
+                  : "Voltar ao login"}
           </Text>
         )}
       </TouchableOpacity>
@@ -233,7 +243,7 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: "#fff",
     paddingHorizontal: 20,
-    paddingTop: 40,
+    paddingTop: 20,
     justifyContent: "space-between",
   },
   topSection: {
@@ -270,7 +280,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     paddingVertical: 16,
     alignItems: "center",
-    marginBottom: 40,
+    marginBottom: 50,
     height: 56,
     justifyContent: "center",
   },

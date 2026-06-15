@@ -49,7 +49,7 @@ const HeightScreen = () => {
 
   return (
     <View style={styles.container}>
-      <BackButton />
+      <BackButton autoTopInset />
       <Text style={styles.title}>Altura</Text>
       <Text style={styles.question}>Qual é sua altura?</Text>
       <Text style={styles.instruction}>Indique sua altura em centímetros</Text>
@@ -67,9 +67,11 @@ const HeightScreen = () => {
             ref={scrollViewRef}
             showsVerticalScrollIndicator={false}
             snapToInterval={ITEM_HEIGHT}
-            snapToAlignment="center"
+            snapToAlignment="start"
+            disableIntervalMomentum
             decelerationRate="fast"
             onMomentumScrollEnd={handleScroll}
+            onScrollEndDrag={handleScroll}
             contentContainerStyle={styles.scrollContent}
             style={styles.scrollView}
           >
@@ -198,8 +200,8 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     paddingVertical: 14,
     alignItems: "center",
-    marginBottom: 30,
-    marginTop: 32,
+    marginTop: "auto", // empurra o botão para o fim da tela (igual à AgeScreen)
+    marginBottom: 50,
   },
   advanceButtonText: {
     color: "#fff",

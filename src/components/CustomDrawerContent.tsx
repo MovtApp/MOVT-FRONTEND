@@ -97,6 +97,14 @@ export function CustomDrawerContent(props: DrawerContentComponentProps) {
     return () => task.cancel();
   }, [drawerStatus, user]);
 
+  // Rótulo amigável do plano da conta, exibido abaixo do nome no drawer.
+  const planLabels: Record<string, string> = {
+    free: "Plano gratuito",
+    premium: "Plano premium",
+    familia: "Plano família",
+  };
+  const planLabel = planLabels[(user?.plan || "free").toLowerCase()] || "Plano gratuito";
+
   const handleProfilePress = () => {
     props.navigation.navigate("HomeStack", {
       screen: "ProfilePFScreen",
@@ -172,7 +180,7 @@ export function CustomDrawerContent(props: DrawerContentComponentProps) {
             liveAvatar
               ? { uri: liveAvatar }
               : {
-                  uri: "https://images.unsplash.com/photo-1633332755192-727a05c4013d?w=400&h=400&fit=crop",
+                  uri: "https://uxwing.com/wp-content/themes/uxwing/download/peoples-avatars/account-grey-icon.png",
                 }
           }
           style={styles.profileImage}
@@ -182,7 +190,7 @@ export function CustomDrawerContent(props: DrawerContentComponentProps) {
         />
         <View style={styles.profileInfo}>
           <Text style={styles.profileName}>{user?.name || ""}</Text>
-          <Text style={styles.profileUsername}>{user?.username ? `@${user.username}` : ""}</Text>
+          <Text style={styles.profileUsername}>{planLabel}</Text>
         </View>
       </TouchableOpacity>
 

@@ -13,7 +13,7 @@ import { InfoRoutes } from "./Info.routes";
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
 interface RoutesProps {
-  initialRouteName?: "Auth" | "Verify" | "App"; // Aceita a rota inicial como prop
+  initialRouteName?: "Auth" | "Verify" | "App" | "Info"; // Aceita a rota inicial como prop
 }
 
 export function Routes({ initialRouteName }: RoutesProps) {

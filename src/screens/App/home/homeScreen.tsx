@@ -6,7 +6,6 @@ import {
   TouchableOpacity,
   ScrollView,
   ImageBackground,
-  Alert,
   Image,
   ActivityIndicator,
   InteractionManager,
@@ -32,7 +31,7 @@ import ChallengesSection from "../../../components/ChallengesSection";
 import PopularExercises from "../../../components/PopularExercises";
 import HeatingScreen from "../../../components/Heating";
 import Header from "@components/Header";
-import { useNavigation } from "@react-navigation/native";
+import { useNavigation, useFocusEffect } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { AppStackParamList } from "../../../@types/routes";
 import { useAuth } from "@contexts/AuthContext";
@@ -50,6 +49,27 @@ interface ExerciseItem {
 }
 
 const exerciseData: ExerciseItem[] = [];
+
+// Normaliza um treino (vindo do backend ou já mapeado) para o tipo Training usado
+// nas telas de detalhe. Aceita tanto chaves em pt-br (nome, imageurl…) quanto as
+// versões já mapeadas na Home (title, imageUrl…).
+const normalizeTraining = (training: any) => ({
+  id_treino: String(training.id_treino || training.id || ""),
+  nome: training.nome || training.title || "Treino",
+  descricao: training.descricao || training.description || "Sem descrição disponível",
+  imageurl:
+    training.imageurl ||
+    training.imageUrl ||
+    training.image_url ||
+    "https://res.cloudinary.com/ditlmzgrh/image/upload/v1757229915/image_71_jntmsv.jpg",
+  duracao: training.duracao || training.minutes || "0 min",
+  calorias: training.calorias || training.calories || "0 kcal",
+  nivel: training.nivel || training.level || "Iniciante",
+  categoria: training.categoria || training.category || "Fitness",
+  exercicios: training.exercicios || training.exercises || [],
+  instrutor: training.instrutor || training.trainerName || "Instrutor MOVT",
+  equipamentos: training.equipamentos || [],
+});
 
 const HomeScreen: React.FC = () => {
   const [search, setSearch] = useState("");
@@ -96,14 +116,27 @@ const HomeScreen: React.FC = () => {
     };
   }, [trainings]);
 
-  useEffect(() => {
-    // Adia o fetch para depois da transição: a Home já renderiza do cache do
-    // AppDataContext, então o refresh em background não trava a navegação.
-    const task = InteractionManager.runAfterInteractions(() => {
-      fetchHomeData(selectedSpecialty);
-    });
-    return () => task.cancel();
-  }, [selectedSpecialty, fetchHomeData]);
+  // Treino em destaque do banner: usa o marcado como 'destaque' pelo admin; se não
+  // houver, cai para o 1º popular / melhores_para_voce / qualquer treino disponível.
+  const featuredTraining = useMemo<any>(() => {
+    const pick = (secao: string) => trainings.find((t: any) => t.secao_home === secao);
+    return pick("destaque") || pick("popular") || pick("melhores_para_voce") || trainings[0];
+  }, [trainings]);
+
+  // Refaz o fetch sempre que a Home GANHA FOCO (com force=true), para refletir
+  // conteúdo recém-criado/editado pelo admin — ex.: desafios (secao_home='desafio'),
+  // que de outra forma só apareceriam após o TTL do cache expirar. Como a Home
+  // fica montada (tabs), um useEffect de mount não dispararia ao voltar do admin.
+  // Stale-while-revalidate: a tela já mostra o cache e o refresh roda silencioso,
+  // adiado via InteractionManager para não travar a transição de navegação.
+  useFocusEffect(
+    useCallback(() => {
+      const task = InteractionManager.runAfterInteractions(() => {
+        fetchHomeData(selectedSpecialty, true);
+      });
+      return () => task.cancel();
+    }, [selectedSpecialty, fetchHomeData])
+  );
 
   const performSearch = useCallback(
     async (query: string) => {
@@ -215,26 +248,14 @@ const HomeScreen: React.FC = () => {
   };
 
   const handleTrainingPress = (training: any) => {
-    // Normaliza os dados para o tipo Training definido em routes.d.ts
-    const trainingData: any = {
-      id_treino: String(training.id_treino || training.id || ""),
-      nome: training.nome || training.title || "Treino",
-      descricao: training.descricao || training.description || "Sem descrição disponível",
-      imageurl:
-        training.imageurl ||
-        training.imageUrl ||
-        training.image_url ||
-        "https://res.cloudinary.com/ditlmzgrh/image/upload/v1757229915/image_71_jntmsv.jpg",
-      duracao: training.duracao || training.minutes || training.description || "0 min",
-      calorias: training.calorias || training.calories || "0 kcal",
-      nivel: training.nivel || training.level || "Iniciante",
-      categoria: training.categoria || training.category || "Fitness",
-      exercicios: training.exercicios || training.exercises || [],
-      instrutor: training.instrutor || training.trainerName || "Instrutor MOVT",
-      equipamentos: training.equipamentos || [],
-    };
+    navigation.navigate("TrainingDetails", { training: normalizeTraining(training) });
+  };
 
-    navigation.navigate("TrainingDetails", { training: trainingData });
+  // Abre o detalhe de Desafio. O card de desafio carrega apenas {id, title, image},
+  // então buscamos o treino completo (com exercícios) em `trainings` pelo id.
+  const handleChallengePress = (item: any) => {
+    const raw = trainings.find((t: any) => String(t.id_treino ?? t.id) === String(item.id)) ?? item;
+    navigation.navigate("ChallengeDetails", { challenge: normalizeTraining(raw) });
   };
 
   return (
@@ -361,13 +382,15 @@ const HomeScreen: React.FC = () => {
             />
             <PlanCardTraining planData={dailyPlans} onPressPlan={handleTrainingPress} />
             <TrainingBanner
-              title="Melhor treino de superiores"
-              imageUrl="https://img.freepik.com/free-photo/view-woman-helping-man-exercise-gym_52683-98092.jpg?t=st=1758297406~exp=1758301006~hmac=66860a69d0b54e22b28d0831392e01278764d6b6d47e956a9576e041c9e016c2&w=1480"
+              title={featuredTraining?.nome || featuredTraining?.title || "Treino em destaque"}
+              imageUrl={
+                featuredTraining?.imageurl ||
+                featuredTraining?.imageUrl ||
+                "https://img.freepik.com/free-photo/view-woman-helping-man-exercise-gym_52683-98092.jpg?t=st=1758297406~exp=1758301006~hmac=66860a69d0b54e22b28d0831392e01278764d6b6d47e956a9576e041c9e016c2&w=1480"
+              }
+              category="EM DESTAQUE"
               onPress={() => {
-                Alert.alert(
-                  "Destaque",
-                  "Este treino está em destaque para você!\n\nFuncionalidade disponível em breve."
-                );
+                if (featuredTraining) handleTrainingPress(featuredTraining);
               }}
             />
             <TheBestForYou
@@ -387,12 +410,7 @@ const HomeScreen: React.FC = () => {
                     }))
                   : undefined
               }
-              onPress={() => {
-                Alert.alert(
-                  "Desafio",
-                  "Este desafio está em destaque para você!\n\nFuncionalidade disponível em breve."
-                );
-              }}
+              onPress={(item) => handleChallengePress(item)}
             />
             <HeatingScreen
               heatingData={

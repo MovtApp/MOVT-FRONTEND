@@ -50,7 +50,7 @@ const AgeScreen = () => {
   return (
     <View style={styles.container}>
       <View style={styles.topSection}>
-        <BackButton />
+        <BackButton autoTopInset />
         <Text style={styles.title}>Idade</Text>
         <Text style={styles.question}>Quantos anos você tem?</Text>
         <Text style={styles.instruction}>Por favor, informe sua idade.</Text>
@@ -69,9 +69,11 @@ const AgeScreen = () => {
               horizontal
               showsHorizontalScrollIndicator={false}
               snapToInterval={ITEM_WIDTH}
-              snapToAlignment="center"
+              snapToAlignment="start"
+              disableIntervalMomentum
               decelerationRate="fast"
               onMomentumScrollEnd={handleScroll}
+              onScrollEndDrag={handleScroll}
               contentContainerStyle={styles.scrollContent}
               style={styles.scrollView}
             >

@@ -11,7 +11,7 @@ import {
   Platform,
   Alert,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRoute, useNavigation, RouteProp } from "@react-navigation/native";
 import {
   Play,
@@ -34,6 +34,7 @@ type ActiveWorkoutRouteProp = RouteProp<AppStackParamList, "ActiveWorkout">;
 const ActiveWorkout: React.FC = () => {
   const route = useRoute<ActiveWorkoutRouteProp>();
   const navigation = useNavigation();
+  const insets = useSafeAreaInsets();
   const { training } = route.params;
   const t = training as any;
 
@@ -229,7 +230,10 @@ const ActiveWorkout: React.FC = () => {
       </ScrollView>
 
       {/* Controles Fixos no Rodapé */}
-      <View style={styles.footer}>
+      {/* paddingBottom dinâmico = inset inferior do sistema (+ folga), com fallback
+          de 24 se o inset reportar 0. Mantém "CONCLUIR TREINO" acima dos botões
+          nativos do Android (voltar/home/recentes) e do home indicator do iOS. */}
+      <View style={[styles.footer, { paddingBottom: (insets.bottom || 24) + 12 }]}>
         <View style={styles.controlsRow}>
           <TouchableOpacity
             onPress={handlePrevious}
@@ -441,7 +445,6 @@ const styles = StyleSheet.create({
     backgroundColor: "#192126",
     paddingHorizontal: 20,
     paddingTop: 20,
-    paddingBottom: Platform.OS === "ios" ? 40 : 25,
     borderTopWidth: 1,
     borderTopColor: "rgba(255,255,255,0.1)",
   },

@@ -27,6 +27,7 @@ import {
   Archive,
   User,
   Settings,
+  ImagePlus,
 } from "lucide-react-native";
 import { userService } from "@services/userService";
 import BackButton from "@components/BackButton";
@@ -327,9 +328,7 @@ const ProfilePFScreen = () => {
 
   // Placeholder URLs
   const DEFAULT_AVATAR =
-    "https://images.unsplash.com/photo-1633332755192-727a05c4013d?w=400&h=400&fit=crop";
-  const DEFAULT_BANNER =
-    "https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?w=800&h=400&fit=crop";
+    "https://uxwing.com/wp-content/themes/uxwing/download/peoples-avatars/account-grey-icon.png";
 
   const renderActiveGrid = () => {
     // Use the posts, highlights, or tagged arrays after filtering them for valid entries
@@ -405,7 +404,18 @@ const ProfilePFScreen = () => {
       <ScrollView showsVerticalScrollIndicator={false} bounces={false}>
         {/* Banner de Topo */}
         <View style={styles.bannerContainer}>
-          <Image source={{ uri: profileData.banner || DEFAULT_BANNER }} style={styles.banner} />
+          {profileData.banner ? (
+            <Image source={{ uri: profileData.banner }} style={styles.banner} />
+          ) : (
+            <TouchableOpacity
+              style={styles.bannerPlaceholder}
+              activeOpacity={0.7}
+              onPress={() => navigation.navigate("EditProfileScreen")}
+            >
+              <ImagePlus size={28} color="#94A3B8" />
+              <Text style={styles.bannerPlaceholderText}>Adicionar capa</Text>
+            </TouchableOpacity>
+          )}
         </View>
 
         {/* Informações do Perfil */}
@@ -704,6 +714,19 @@ const styles = StyleSheet.create({
     width: "100%",
     height: "100%",
     resizeMode: "cover",
+  },
+  bannerPlaceholder: {
+    width: "100%",
+    height: "100%",
+    backgroundColor: "#E2E8F0",
+    justifyContent: "center",
+    alignItems: "center",
+    gap: 6,
+  },
+  bannerPlaceholderText: {
+    color: "#94A3B8",
+    fontSize: 13,
+    fontWeight: "500",
   },
   contentWrap: {
     paddingHorizontal: 24,

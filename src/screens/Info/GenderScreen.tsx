@@ -31,7 +31,7 @@ const GenderScreen = () => {
   return (
     <View style={styles.container}>
       <View style={styles.topSection}>
-        <BackButton />
+        <BackButton autoTopInset />
         <Text style={styles.title}>Gênero</Text>
         <Text style={styles.subtitle}>
           Por gentileza, informe sua identidade de gênero ou selecione prefiro não responder.

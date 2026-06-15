@@ -16,18 +16,35 @@ import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { RootStackParamList } from "@typings/routes";
 import * as ImagePicker from "expo-image-picker";
 import { api } from "@/services/api";
+import { secureGet } from "@/services/secureStore";
+import { API_BASE_URL } from "@/config/api";
 import { useAuth } from "@contexts/AuthContext";
 
 type DocSide = "front" | "back";
 
 const VerifyCrefScreen = () => {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
-  const { updateUser } = useAuth();
+  const { user, updateUser } = useAuth();
 
   const [code, setCode] = useState("");
   const [frontUri, setFrontUri] = useState<string | null>(null);
   const [backUri, setBackUri] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  // "status" = stepper do andamento (já enviou); "form" = enviar/reenviar documentos.
+  // Abre no stepper quando o usuário já enviou o CREF (persistido via session-status).
+  const [mode, setMode] = useState<"status" | "form">(user?.cref_submitted ? "status" : "form");
+  // Observação técnica do último envio (ex.: "IA não reconheceu a FRENTE"), usada
+  // como fallback quando ainda não há motivo de reprovação registrado pelo admin.
+  const [lastObservation, setLastObservation] = useState<string | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
+
+  // Status atual da verificação (vem do backend via AuthContext).
+  const status = user?.status_verificacao || "pendente";
+  const isRejected = status === "reprovado";
+  const isApproved = status === "aprovado" || user?.cref_verified === true;
+  // "pendente" e "pendente_revisao" significam "em análise".
+  const isUnderReview = !isRejected && !isApproved;
+  const rejectionReason = user?.cref_rejeicao_motivo || lastObservation;
 
   // Máscara 171844-G/SP  (número-categoria/UF)
   function maskCrefInput(text: string) {
@@ -43,7 +60,13 @@ const VerifyCrefScreen = () => {
     return masked;
   }
 
+  // Após o CREF, ainda falta preencher os dados pessoais (onboarding) se a conta
+  // nunca preencheu — só então vai pra Home. Contas antigas têm onboarding_completed=true.
   const goToApp = () => {
+    if (user?.onboarding_completed === false) {
+      navigation.reset({ index: 0, routes: [{ name: "Info" as never }] });
+      return;
+    }
     navigation.reset({
       index: 0,
       routes: [{ name: "App", params: { screen: "HomeStack" } as never }],
@@ -90,18 +113,24 @@ const VerifyCrefScreen = () => {
     ]);
   };
 
-  // Sobe frente + verso (multipart) para o backend, que roda a análise por IA,
-  // cruza o número do CREF da frente com o digitado e checa a validade no verso.
+  // Sobe frente + verso (multipart) para o backend. A validação é híbrida (sem IA):
+  // o backend tenta confirmar o número no registro oficial CONFEF/CREF; quando não
+  // consegue, cai em revisão manual (status "pendente"). Ver docs/cref-validacao-hibrida.md.
   const uploadDocuments = async () => {
     setLoading(true);
     try {
-      // 1. Salva o número do CREF antes do upload (a IA cruza com este valor)
+      // 1. Salva o número do CREF antes do upload (cruzado com o registro/curadoria)
       await api.put("/user/professional-data", { cref: code });
 
       // 2. Envia as fotos dos dois lados (multipart) para análise
       const formData = new FormData();
       const appendSide = (field: string, uri: string) => {
-        const ext = uri.split(".").pop()?.toLowerCase() || "jpg";
+        // Deriva a extensão de forma segura: descarta query/fragment e, para
+        // uris sem extensão (ex: content:// da galeria), assume jpg. Evita
+        // jogar a uri inteira dentro do `name` e confundir o parser do backend.
+        const path = uri.split("?")[0].split("#")[0];
+        const rawExt = path.includes(".") ? path.split(".").pop()!.toLowerCase() : "jpg";
+        const ext = rawExt === "png" ? "png" : "jpg";
         formData.append(field, {
           uri,
           name: `${field}.${ext}`,
@@ -111,26 +140,72 @@ const VerifyCrefScreen = () => {
       appendSide("document_front", frontUri as string);
       appendSide("document_back", backUri as string);
 
-      const response = await api.put("/user/document", formData, {
-        headers: { "Content-Type": "multipart/form-data" },
-      });
+      // Upload via fetch nativo (não axios): no React Native o axios não
+      // serializa FormData de forma confiável e exige Content-Type manual sem
+      // boundary, fazendo o backend receber os campos sem os bytes da imagem.
+      // O fetch lê os arquivos das uris e gera o boundary correto sozinho —
+      // por isso NÃO definimos Content-Type aqui (deixar em aberto é proposital).
+      const sessionId = await secureGet("userSessionId");
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 60000);
 
-      const status = response.data?.ai_analysis?.status;
+      let responseData: any = {};
+      try {
+        const res = await fetch(`${API_BASE_URL}/user/document`, {
+          method: "PUT",
+          headers: {
+            Accept: "application/json",
+            ...(sessionId ? { Authorization: `Bearer ${sessionId}` } : {}),
+          },
+          body: formData,
+          signal: controller.signal,
+        });
+        const raw = await res.text();
+        responseData = raw ? JSON.parse(raw) : {};
+        if (!res.ok) {
+          throw { response: { status: res.status, data: responseData } };
+        }
+      } finally {
+        clearTimeout(timeoutId);
+      }
 
-      if (status === "aprovado") {
-        await updateUser({ cref_verified: true, status_verificacao: "aprovado" });
+      // Contrato híbrido: o backend devolve status_verificacao no topo (novo) ou,
+      // por compatibilidade, em ai_analysis.status (legado).
+      const resultStatus = responseData?.status_verificacao || responseData?.ai_analysis?.status;
+      // Observação técnica (ex.: "IA não reconheceu a FRENTE"); guardada para exibir
+      // no stepper enquanto o admin não registra um motivo de reprovação próprio.
+      const observation =
+        responseData?.observation || responseData?.ai_analysis?.observation || null;
+      setLastObservation(observation);
+
+      if (resultStatus === "aprovado") {
+        await updateUser({
+          cref_verified: true,
+          status_verificacao: "aprovado",
+          cref_submitted: true,
+          cref_rejeicao_motivo: null,
+        });
         Alert.alert("Verificação concluída", "Seu CREF foi validado com sucesso!", [
           { text: "Continuar", onPress: goToApp },
         ]);
+      } else if (resultStatus === "reprovado") {
+        await updateUser({
+          status_verificacao: "reprovado",
+          cref_submitted: true,
+          cref_rejeicao_motivo: observation,
+        });
+        // Mostra o andamento (Recusado) em vez de voltar ao formulário vazio.
+        setMode("status");
       } else {
-        // Hard gate: enquanto não for aprovado, o acesso ao app continua bloqueado.
-        await updateUser({ status_verificacao: "pendente" });
-        Alert.alert(
-          "Documento enviado",
-          response.data?.ai_analysis?.observation ||
-            response.data?.message ||
-            "Seu documento foi enviado para análise. Você poderá acessar o app assim que for aprovado."
-        );
+        // Pendente: validação automática indeterminada → entra na curadoria humana.
+        // Acesso segue bloqueado até a aprovação, mas o envio NÃO foi recusado.
+        await updateUser({
+          status_verificacao: "pendente",
+          cref_submitted: true,
+          cref_rejeicao_motivo: null,
+        });
+        // Em vez de só alertar, leva ao stepper "Em validação" (persiste no restart).
+        setMode("status");
       }
     } catch (err: any) {
       const message =
@@ -158,6 +233,132 @@ const VerifyCrefScreen = () => {
     }
     uploadDocuments();
   };
+
+  // Re-consulta o backend para refletir uma decisão recente (aprovação/recusa do admin).
+  const refreshStatus = async () => {
+    setRefreshing(true);
+    try {
+      const { data } = await api.get("/user/session-status");
+      const u = data?.user;
+      if (u) {
+        await updateUser({
+          cref_verified: u.cref_verified,
+          status_verificacao: u.status_verificacao,
+          cref_submitted: u.cref_submitted,
+          cref_rejeicao_motivo: u.cref_rejeicao_motivo,
+        });
+        if (u.cref_verified) goToApp();
+      }
+    } catch {
+      Alert.alert("Erro", "Não foi possível atualizar o status agora. Tente novamente.");
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
+  // Volta ao formulário para reenviar (mesmo número ou outro). Só ofertado após recusa.
+  const startRevalidation = () => {
+    setCode("");
+    setFrontUri(null);
+    setBackUri(null);
+    setLastObservation(null);
+    setMode("form");
+  };
+
+  // Um passo do stepper de andamento.
+  const renderStep = (
+    state: "done" | "active" | "error" | "pending",
+    title: string,
+    desc: string,
+    last = false
+  ) => {
+    const palette = {
+      done: { bg: "#16A34A", glyph: "✓", color: "#16A34A" },
+      active: { bg: "#F59E0B", glyph: "●", color: "#B45309" },
+      error: { bg: "#DC2626", glyph: "✕", color: "#DC2626" },
+      pending: { bg: "#CBD5E1", glyph: "", color: "#94A3B8" },
+    }[state];
+    return (
+      <View style={styles.stepRow}>
+        <View style={styles.stepRail}>
+          <View style={[styles.stepDot, { backgroundColor: palette.bg }]}>
+            <Text style={styles.stepDotGlyph}>{palette.glyph}</Text>
+          </View>
+          {!last && <View style={styles.stepConnector} />}
+        </View>
+        <View style={{ flex: 1, paddingBottom: last ? 0 : 22 }}>
+          <Text style={[styles.stepTitle, { color: palette.color }]}>{title}</Text>
+          <Text style={styles.stepDesc}>{desc}</Text>
+        </View>
+      </View>
+    );
+  };
+
+  const renderStatus = () => (
+    <View style={styles.container}>
+      <View style={styles.topSection}>
+        <BackButton autoTopInset />
+        <Text style={styles.title}>Status do CREF</Text>
+        <Text style={styles.subtitle}>
+          {isApproved
+            ? "Seu registro profissional foi validado."
+            : isRejected
+              ? "Seu envio foi analisado e não pôde ser aprovado."
+              : "Recebemos seus documentos. Acompanhe o andamento abaixo."}
+        </Text>
+
+        <View style={{ marginTop: 28 }}>
+          {renderStep("done", "Documentos enviados", "Frente e verso recebidos com sucesso.")}
+          {renderStep(
+            isUnderReview ? "active" : "done",
+            "Em validação",
+            isUnderReview
+              ? "Estamos conferindo seu registro. Isso pode levar algum tempo."
+              : "Análise concluída."
+          )}
+          {renderStep(
+            isApproved ? "done" : isRejected ? "error" : "pending",
+            isApproved ? "CREF validado" : isRejected ? "CREF recusado" : "Resultado",
+            isApproved
+              ? "Tudo certo! Você já pode acessar o app."
+              : isRejected
+                ? "Confira o motivo abaixo e reenvie."
+                : "Aguardando a decisão da validação.",
+            true
+          )}
+        </View>
+
+        {isRejected && rejectionReason && (
+          <View style={styles.reasonBox}>
+            <Text style={styles.reasonLabel}>Motivo da recusa</Text>
+            <Text style={styles.reasonText}>{rejectionReason}</Text>
+          </View>
+        )}
+      </View>
+
+      {isApproved ? (
+        <TouchableOpacity style={styles.verifyButton} onPress={goToApp}>
+          <Text style={styles.verifyButtonText}>Continuar</Text>
+        </TouchableOpacity>
+      ) : isRejected ? (
+        <TouchableOpacity style={styles.verifyButton} onPress={startRevalidation}>
+          <Text style={styles.verifyButtonText}>Revalidar CREF</Text>
+        </TouchableOpacity>
+      ) : (
+        <TouchableOpacity
+          style={[styles.verifyButton, refreshing && { opacity: 0.6 }]}
+          onPress={refreshStatus}
+          disabled={refreshing}
+        >
+          {refreshing ? (
+            <ActivityIndicator color="#fff" />
+          ) : (
+            <Text style={styles.verifyButtonText}>Atualizar status</Text>
+          )}
+        </TouchableOpacity>
+      )}
+    </View>
+  );
 
   const renderSlot = (side: DocSide, label: string, uri: string | null) => (
     <TouchableOpacity
@@ -187,6 +388,10 @@ const VerifyCrefScreen = () => {
   const canSubmit =
     /^\d{4,6}-[A-Z]\/[A-Z]{2}$/.test(code) && !!frontUri && !!backUri && !loading;
 
+  if (mode === "status") {
+    return renderStatus();
+  }
+
   return (
     <View style={styles.container}>
       <View style={styles.topSection}>
@@ -201,7 +406,7 @@ const VerifyCrefScreen = () => {
           <CustomInput
             value={code}
             onChangeText={(text) => setCode(maskCrefInput(text))}
-            placeholder="171844-G/SP"
+            placeholder="000000-G/SP"
             maxLength={11}
             keyboardType="default"
           />
@@ -333,5 +538,61 @@ const styles = StyleSheet.create({
     color: "#fff",
     fontFamily: "Rubik_500Medium",
     fontSize: 16,
+  },
+  // Stepper de status
+  stepRow: {
+    flexDirection: "row",
+  },
+  stepRail: {
+    alignItems: "center",
+    marginRight: 14,
+  },
+  stepDot: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  stepDotGlyph: {
+    color: "#fff",
+    fontSize: 14,
+    fontFamily: "Rubik_700Bold",
+    lineHeight: 18,
+  },
+  stepConnector: {
+    flex: 1,
+    width: 2,
+    backgroundColor: "#E2E8F0",
+    marginVertical: 2,
+  },
+  stepTitle: {
+    fontFamily: "Rubik_500Medium",
+    fontSize: 16,
+  },
+  stepDesc: {
+    fontFamily: "Rubik_400Regular",
+    fontSize: 13,
+    color: "#64748B",
+    marginTop: 2,
+  },
+  reasonBox: {
+    marginTop: 24,
+    backgroundColor: "#FEF2F2",
+    borderColor: "#FECACA",
+    borderWidth: 1,
+    borderRadius: 12,
+    padding: 14,
+  },
+  reasonLabel: {
+    fontFamily: "Rubik_700Bold",
+    fontSize: 12,
+    color: "#B91C1C",
+    marginBottom: 4,
+  },
+  reasonText: {
+    fontFamily: "Rubik_400Regular",
+    fontSize: 14,
+    color: "#7F1D1D",
   },
 });

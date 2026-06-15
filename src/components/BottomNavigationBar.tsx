@@ -45,6 +45,7 @@ const HIDDEN_SCREENS = [
   "PoliciesScreen",
   "CommunityDetails",
   "TrainingDetails",
+  "ChallengeDetails",
   "FeedScreen",
   "PostDetailScreen",
   "ArchivedPostsScreen",
@@ -52,7 +53,7 @@ const HIDDEN_SCREENS = [
   "ActiveWorkout",
   "AdminDashboard",
   "PersonalDashboard",
-  "DietDetails"
+  "DietDetails",
 ];
 // ============================================================================
 

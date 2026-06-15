@@ -17,7 +17,7 @@ import { userService } from "@services/userService";
 import * as ImagePicker from "expo-image-picker";
 import BackButton from "@components/BackButton";
 import { FooterVersion } from "@components/FooterVersion";
-import { ChevronRight } from "lucide-react-native";
+import { ChevronRight, ImagePlus } from "lucide-react-native";
 
 const EditProfileScreen = () => {
   const navigation = useNavigation<any>();
@@ -32,7 +32,7 @@ const EditProfileScreen = () => {
     photo:
       authUser?.photo ||
       (authUser as any)?.avatar_url ||
-      "https://images.unsplash.com/photo-1633332755192-727a05c4013d?w=400&h=400&fit=crop",
+      "https://uxwing.com/wp-content/themes/uxwing/download/peoples-avatars/account-grey-icon.png",
     banner:
       (authUser as any)?.banner_url ||
       authUser?.banner ||
@@ -159,7 +159,14 @@ const EditProfileScreen = () => {
           onPress={handlePickBanner}
           disabled={loadingUpdate}
         >
-          <Image source={{ uri: profileData.banner }} style={styles.bannerImage} />
+          {profileData.banner ? (
+            <Image source={{ uri: profileData.banner }} style={styles.bannerImage} />
+          ) : (
+            <View style={styles.bannerPlaceholder}>
+              <ImagePlus size={28} color="#94A3B8" />
+              <Text style={styles.bannerPlaceholderText}>Adicionar capa</Text>
+            </View>
+          )}
         </TouchableOpacity>
 
         {/* Avatar Section */}
@@ -278,6 +285,18 @@ const styles = StyleSheet.create({
     width: "100%",
     height: "100%",
     resizeMode: "cover",
+  },
+  bannerPlaceholder: {
+    width: "100%",
+    height: "100%",
+    justifyContent: "center",
+    alignItems: "center",
+    gap: 6,
+  },
+  bannerPlaceholderText: {
+    color: "#94A3B8",
+    fontSize: 13,
+    fontWeight: "500",
   },
   avatarSection: {
     alignItems: "center",

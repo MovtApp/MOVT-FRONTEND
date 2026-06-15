@@ -87,7 +87,17 @@ export const useChats = (userId: string) => {
         globalChatCache.lastFetch = Date.now();
         setChats(processedData);
       }
-    } catch (e) {
+    } catch (e: any) {
+      // 404 é esperado para contas ainda sem vínculo no Supabase Auth
+      // (supabase_uid null) ou sem nenhuma conversa: o backend não encontra o
+      // usuário no sistema de chat. Não é erro real — mostra lista vazia em vez
+      // de poluir o console e deixar a tela em estado inconsistente.
+      if (e?.response?.status === 404) {
+        globalChatCache.list = [];
+        globalChatCache.lastFetch = Date.now();
+        setChats([]);
+        return;
+      }
       console.error("useChats error:", e);
     }
   }, [sessionId]);

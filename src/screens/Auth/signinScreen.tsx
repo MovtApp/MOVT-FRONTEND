@@ -101,14 +101,27 @@ export const SignInScreen = () => {
         cref_verified: response.data.user.cref_verified,
         cnpj_verified: response.data.user.cnpj_verified,
         status_verificacao: response.data.user.status_verificacao,
+        cref_submitted: response.data.user.cref_submitted,
+        cref_rejeicao_motivo: response.data.user.cref_rejeicao_motivo,
+        phone_verified: response.data.user.phone_verified,
+        onboarding_completed: response.data.user.onboarding_completed,
       });
 
       // Personal trainer (conta CNPJ) só acessa o app após validar o CREF.
+      // Admin é isento: nunca passa pela validação de CNPJ/CREF.
+      const isAdmin =
+        typeof response.data.user.role === "string" &&
+        response.data.user.role.toLowerCase().includes("admin");
       const isTrainer =
         resolvedDocumentType === "CNPJ" ||
         response.data.user.role === "trainer" ||
         response.data.user.role === "personal";
-      const needsProfessionalVerification = isTrainer && !response.data.user.cref_verified;
+      const needsProfessionalVerification =
+        !isAdmin && isTrainer && !response.data.user.cref_verified;
+      // Telefone é etapa universal; contas antigas vêm com phone_verified=true.
+      const needsPhoneVerification = !isAdmin && response.data.user.phone_verified === false;
+      // Dados pessoais (onboarding) é o último gate; contas antigas vêm com true.
+      const needsOnboarding = !isAdmin && response.data.user.onboarding_completed === false;
 
       // Redireciona imediatamente sem depender do initialRouteName
       if (!response.data.user.isVerified) {
@@ -125,6 +138,17 @@ export const SignInScreen = () => {
             },
           ],
         });
+      } else if (needsPhoneVerification) {
+        // E-mail ok, mas falta validar o telefone → SMS
+        navigation.reset({
+          index: 0,
+          routes: [
+            {
+              name: "Verify" as never,
+              params: { screen: "VerifyPhoneScreen" } as never,
+            },
+          ],
+        });
       } else if (needsProfessionalVerification) {
         // E-mail ok, mas falta validar empresa/CREF → fluxo profissional
         navigation.reset({
@@ -135,6 +159,12 @@ export const SignInScreen = () => {
               params: { screen: "VerifyCompanyScreen" } as never,
             },
           ],
+        });
+      } else if (needsOnboarding) {
+        // Tudo verificado, mas falta preencher os dados pessoais → onboarding Info
+        navigation.reset({
+          index: 0,
+          routes: [{ name: "Info" as never }],
         });
       } else {
         // Vai para a Home dentro do Drawer
@@ -268,8 +298,10 @@ export const SignInScreen = () => {
         // PKCE: a URL traz ?code=, NÃO mais #access_token=. O code só vira
         // sessão se combinado com o code_verifier guardado pelo SDK ao iniciar
         // o fluxo — inutilizável se outro app interceptar o custom scheme.
-        const urlObj = new URL(res.url.replace("#", "?"));
-        const code = urlObj.searchParams.get("code");
+        // Extração por regex (cobre ?, & e #) para não depender do tipo
+        // incompleto de URLSearchParams no React Native.
+        const codeMatch = res.url.match(/[?&#]code=([^&#]+)/);
+        const code = codeMatch ? decodeURIComponent(codeMatch[1]) : null;
 
         if (!code) {
           throw new Error("Código de autorização não encontrado na URL de retorno.");

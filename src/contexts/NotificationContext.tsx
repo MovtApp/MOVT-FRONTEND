@@ -12,7 +12,7 @@ import React, {
 import { useAuth } from "./AuthContext";
 import { userService } from "../services/userService";
 import { supabase } from "../services/supabaseClient";
-import { api } from "../services/api";
+import { api, isExpectedAuthError } from "../services/api";
 
 // Define the shape of a notification
 export interface Notification {
@@ -140,22 +140,32 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({ chil
         setFollowRequests(requestsResp.data || []);
       }
 
-      // Adicionado: Busca conversas para somar unread_count
-      const chatResp = await api.get("/chat");
-      if (chatResp.status === 200) {
-        const chats = chatResp.data.data || [];
-        const totalUnreadChats = chats.reduce((acc: number, chat: any) => {
-          // Fallback: Se o usuário logado for o último que enviou mensagem,
-          // não deveria haver notificações não lidas para ele nesse chat.
-          const isLastSenderMe = String(chat.last_message_sender_id) === String(user.id);
-          if (isLastSenderMe) return acc;
+      // Busca conversas para somar unread_count — ISOLADA em try/catch próprio.
+      // Contas sem vínculo no Supabase Auth (supabase_uid null) recebem 404 em
+      // /chat; isso não deve mascarar nem abortar o fluxo de notificações (que
+      // já foi resolvido com sucesso acima).
+      try {
+        const chatResp = await api.get("/chat");
+        if (chatResp.status === 200) {
+          const chats = chatResp.data.data || [];
+          const totalUnreadChats = chats.reduce((acc: number, chat: any) => {
+            // Fallback: Se o usuário logado for o último que enviou mensagem,
+            // não deveria haver notificações não lidas para ele nesse chat.
+            const isLastSenderMe = String(chat.last_message_sender_id) === String(user.id);
+            if (isLastSenderMe) return acc;
 
-          return acc + (chat.unread_count || 0);
-        }, 0);
-        setUnreadChatCount(totalUnreadChats);
+            return acc + (chat.unread_count || 0);
+          }, 0);
+          setUnreadChatCount(totalUnreadChats);
+        }
+      } catch (chatErr: any) {
+        // 404 aqui é esperado para contas sem supabase_uid; não polui o log.
+        if (__DEV__ && chatErr?.response?.status !== 404) {
+          console.warn("Falha ao buscar contagem de chats:", chatErr?.response?.status);
+        }
       }
     } catch (err) {
-      console.error("Erro ao buscar dados de notificação:", err);
+      if (!isExpectedAuthError(err)) console.error("Erro ao buscar dados de notificação:", err);
     }
   }, [user]);
 

@@ -9,13 +9,13 @@ import {
   Alert,
   Dimensions,
 } from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAuth } from "@contexts/AuthContext";
 import { listAppointments, cancelAppointment } from "@services/appointmentService";
 import Header from "@components/Header";
 import CalendarComponent from "@components/CalendarComponent";
 import AppointmentCard from "@components/AppointmentCard";
 import RatingModal from "@components/RatingModal";
+import { FooterVersion } from "@components/FooterVersion";
 import { API_BASE_URL } from "@/config/api";
 import { Flame } from "lucide-react-native";
 interface AppointmentData {
@@ -48,7 +48,6 @@ export function Appointment() {
   };
 
   const { user } = useAuth();
-  const insets = useSafeAreaInsets();
   // Função para verificar se uma data é anterior à data atual
   const isPastDate = (dateStr: string) => {
     const currentDate = new Date();
@@ -400,6 +399,8 @@ export function Appointment() {
             )}
           </ScrollView>
         </View>
+        <FooterVersion style={styles.footer} />
+
         {/* Modal de seleção de mês/ano */}
         {showMonthSelector && (
           <View style={styles.modalOverlay}>
@@ -713,6 +714,11 @@ const styles = StyleSheet.create({
   horizontalScroll: {
     paddingVertical: 8,
     paddingHorizontal: 10,
+  },
+  footer: {
+    alignItems: "flex-start",
+    marginTop: 20,
+    marginBottom: 120,
   },
 });
 

@@ -7,7 +7,7 @@ import React, {
   useRef,
   useMemo,
 } from "react";
-import { api } from "../services/api";
+import { api, isExpectedAuthError } from "../services/api";
 import { useAuth } from "./AuthContext";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Training, DietMeal, Community } from "../@types/routes";
@@ -225,7 +225,7 @@ export const AppDataProvider: React.FC<{ children: React.ReactNode }> = ({ child
           saveCache("dailyPlans", mapped);
         }
       } catch (error) {
-        console.error("Erro AppDataContext (Home):", error);
+        if (!isExpectedAuthError(error)) console.error("Erro AppDataContext (Home):", error);
       } finally {
         setLoadingTrainings(false);
         setLoadingDailyPlans(false);
@@ -253,7 +253,7 @@ export const AppDataProvider: React.FC<{ children: React.ReactNode }> = ({ child
         hasData.current.communities = true;
         saveCache(`communities-${category}`, formattedData);
       } catch (error) {
-        console.error("Erro AppDataContext (Communities):", error);
+        if (!isExpectedAuthError(error)) console.error("Erro AppDataContext (Communities):", error);
       } finally {
         setLoadingCommunities(false);
       }
@@ -295,7 +295,7 @@ export const AppDataProvider: React.FC<{ children: React.ReactNode }> = ({ child
         hasData.current.dietMeals = true;
         saveCache(`diets-${category}`, mappedMeals);
       } catch (error) {
-        console.error("Erro AppDataContext (Diets):", error);
+        if (!isExpectedAuthError(error)) console.error("Erro AppDataContext (Diets):", error);
       } finally {
         setLoadingDietMeals(false);
       }
@@ -313,7 +313,7 @@ export const AppDataProvider: React.FC<{ children: React.ReactNode }> = ({ child
         hasData.current.stripePlans = true;
         saveCache("stripe-plans", response.data);
       } catch (error) {
-        console.error("Erro AppDataContext (Stripe):", error);
+        if (!isExpectedAuthError(error)) console.error("Erro AppDataContext (Stripe):", error);
       } finally {
         setLoadingStripePlans(false);
       }
@@ -365,7 +365,7 @@ export const AppDataProvider: React.FC<{ children: React.ReactNode }> = ({ child
         hasData.current.feedDiets = true;
         saveCache("feedDiets", mappedFeedDiets);
       } catch (error) {
-        console.error("Erro AppDataContext (Feed):", error);
+        if (!isExpectedAuthError(error)) console.error("Erro AppDataContext (Feed):", error);
       } finally {
         setLoadingFeedPosts(false);
         setLoadingFeedDiets(false);
@@ -415,7 +415,7 @@ export const AppDataProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
         hasData.current.adminDashboard = true;
       } catch (error) {
-        console.error("Erro AppDataContext (AdminFullData):", error);
+        if (!isExpectedAuthError(error)) console.error("Erro AppDataContext (AdminFullData):", error);
       } finally {
         setLoadingAdminDashboard(false);
       }

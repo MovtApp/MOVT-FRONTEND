@@ -79,6 +79,13 @@ export interface GlobalExercise {
 
 interface WorkoutManagementSheetProps {
   onClose?: () => void;
+  /**
+   * Escopo do gerenciador.
+   * - "all" (padrão): gerencia todos os treinos, com seletor "Destaque na Home".
+   * - "challenges": gerencia apenas Desafios (secao_home='desafio'), com o destaque
+   *   travado em 'desafio' e o seletor oculto.
+   */
+  scope?: "all" | "challenges";
 }
 
 export interface WorkoutManagementSheetRef {
@@ -128,7 +135,12 @@ const Field = ({
 
 const WorkoutManagementSheet = forwardRef<WorkoutManagementSheetRef, WorkoutManagementSheetProps>(
   (props, ref) => {
-    const { onClose } = props;
+    const { onClose, scope = "all" } = props;
+    const isChallenges = scope === "challenges";
+    // Rótulos adaptados ao escopo (Desafio vs Treino).
+    const entityLabel = isChallenges ? "desafio" : "treino";
+    const entityLabelCap = isChallenges ? "Desafio" : "Treino";
+    const entityLabelPlural = isChallenges ? "desafios" : "treinos";
     const bottomSheetRef = useRef<BottomSheet>(null);
     const [mode, setMode] = useState<ViewMode>("list");
     const [loading, setLoading] = useState(false);
@@ -154,7 +166,7 @@ const WorkoutManagementSheet = forwardRef<WorkoutManagementSheetRef, WorkoutMana
       calorias: "",
       nivel: "Iniciante",
       categoria: "Hipertrofia",
-      secao_home: "" as string,
+      secao_home: (isChallenges ? "desafio" : "") as string,
       exercicios: [] as ExerciseVariation[],
     });
     const [selectedImage, setSelectedImage] = useState<ImagePicker.ImagePickerAsset | null>(null);
@@ -263,10 +275,10 @@ const WorkoutManagementSheet = forwardRef<WorkoutManagementSheetRef, WorkoutMana
 
         if (editingWorkout) {
           await api.put(`/admin/workouts/${editingWorkout.id_treino}`, dataToSend, config);
-          Alert.alert("✅ Sucesso", "Treino atualizado com sucesso!");
+          Alert.alert("✅ Sucesso", `${entityLabelCap} atualizado com sucesso!`);
         } else {
           await api.post("/admin/workouts", dataToSend, config);
-          Alert.alert("✅ Sucesso", "Treino criado com sucesso!");
+          Alert.alert("✅ Sucesso", `${entityLabelCap} criado com sucesso!`);
         }
 
         setMode("list");
@@ -301,7 +313,7 @@ const WorkoutManagementSheet = forwardRef<WorkoutManagementSheetRef, WorkoutMana
     };
 
     const handleDelete = (id: number, nome: string) => {
-      Alert.alert("Excluir Treino", `Deseja realmente excluir "${nome}"?`, [
+      Alert.alert(`Excluir ${entityLabelCap}`, `Deseja realmente excluir "${nome}"?`, [
         { text: "Cancelar", style: "cancel" },
         {
           text: "Excluir",
@@ -331,7 +343,7 @@ const WorkoutManagementSheet = forwardRef<WorkoutManagementSheetRef, WorkoutMana
         calorias: "",
         nivel: "Iniciante",
         categoria: "Hipertrofia",
-        secao_home: "",
+        secao_home: isChallenges ? "desafio" : "",
         exercicios: [],
       });
       setEditingWorkout(null);
@@ -449,11 +461,7 @@ const WorkoutManagementSheet = forwardRef<WorkoutManagementSheetRef, WorkoutMana
 
         const config = { headers: { "Content-Type": "multipart/form-data" } };
         if (editingExercise) {
-          await api.put(
-            `/admin/exercicios/${editingExercise.id_exercicio}`,
-            dataToSend,
-            config
-          );
+          await api.put(`/admin/exercicios/${editingExercise.id_exercicio}`, dataToSend, config);
           Alert.alert("✅ Sucesso", "Exercício atualizado!");
         } else {
           await api.post("/admin/exercicios", dataToSend, config);
@@ -511,15 +519,26 @@ const WorkoutManagementSheet = forwardRef<WorkoutManagementSheetRef, WorkoutMana
       });
     };
 
-    const filteredWorkouts = workouts.filter(
-      (w) =>
-        String(w?.nome || "")
-          .toLowerCase()
-          .includes((searchQuery || "").toLowerCase()) ||
-        String(w?.categoria || "")
-          .toLowerCase()
-          .includes((searchQuery || "").toLowerCase())
-    );
+    // Desafios e Treinos são mutuamente exclusivos: o escopo "Treinos" exibe tudo
+    // EXCETO desafios (secao_home="desafio"); o escopo "Desafios" só os desafios.
+    const filteredWorkouts = workouts
+      .filter((w) =>
+        isChallenges ? (w as any)?.secao_home === "desafio" : (w as any)?.secao_home !== "desafio"
+      )
+      .filter(
+        (w) =>
+          String(w?.nome || "")
+            .toLowerCase()
+            .includes((searchQuery || "").toLowerCase()) ||
+          String(w?.categoria || "")
+            .toLowerCase()
+            .includes((searchQuery || "").toLowerCase())
+      );
+
+    // Contagem para o cabeçalho considerando o escopo atual (mutuamente exclusivos).
+    const scopedCount = isChallenges
+      ? workouts.filter((w) => (w as any)?.secao_home === "desafio").length
+      : workouts.filter((w) => (w as any)?.secao_home !== "desafio").length;
 
     const filteredGlobalExercises = globalExercises.filter((ex) =>
       String(ex?.nome || "")
@@ -563,19 +582,21 @@ const WorkoutManagementSheet = forwardRef<WorkoutManagementSheetRef, WorkoutMana
               <View>
                 <Text style={styles.headerTitle}>
                   {mode === "list"
-                    ? "Treinos"
+                    ? isChallenges
+                      ? "Desafios"
+                      : "Treinos"
                     : mode === "details"
-                      ? "Detalhes do treino"
+                      ? `Detalhes do ${entityLabel}`
                       : editingWorkout
-                        ? "Editar treino"
-                        : "Novo treino"}
+                        ? `Editar ${entityLabel}`
+                        : `Novo ${entityLabel}`}
                 </Text>
                 <Text style={styles.headerSubtitle}>
                   {mode === "list"
-                    ? `${workouts.length} treino${workouts.length !== 1 ? "s" : ""} cadastrado${workouts.length !== 1 ? "s" : ""}`
+                    ? `${scopedCount} ${entityLabel}${scopedCount !== 1 ? "s" : ""} cadastrado${scopedCount !== 1 ? "s" : ""}`
                     : mode === "details"
-                      ? "Visualize todas as informações do treino"
-                      : "Configure o treino e adicione os exercícios"}
+                      ? `Visualize todas as informações do ${entityLabel}`
+                      : `Configure o ${entityLabel} e adicione os exercícios`}
                 </Text>
               </View>
             </View>
@@ -627,8 +648,10 @@ const WorkoutManagementSheet = forwardRef<WorkoutManagementSheetRef, WorkoutMana
                   ListEmptyComponent={() => (
                     <View style={styles.emptyState}>
                       <Dumbbell size={48} color="#E2E8F0" />
-                      <Text style={styles.emptyTitle}>Nenhum treino</Text>
-                      <Text style={styles.emptySubtitle}>Cadastre o primeiro treino agora</Text>
+                      <Text style={styles.emptyTitle}>Nenhum {entityLabel}</Text>
+                      <Text style={styles.emptySubtitle}>
+                        Cadastre o primeiro {entityLabel} agora
+                      </Text>
                     </View>
                   )}
                   renderItem={({ item }: { item: Training }) => (
@@ -983,38 +1006,44 @@ const WorkoutManagementSheet = forwardRef<WorkoutManagementSheetRef, WorkoutMana
                 <Text style={styles.addExerciseBtnTxt}>Adicionar exercício</Text>
               </TouchableOpacity>
 
-              {/* ── DESTAQUE NA HOME ── */}
-              <View style={[styles.sectionHeader, { marginTop: 8 }]}>
-                <View style={[styles.sectionDot, { backgroundColor: "#BBF246" }]} />
-                <Text style={styles.sectionTitle}>Destaque na Home</Text>
-              </View>
-              <Text style={{ fontSize: 12, color: "#94A3B8", marginBottom: 12, fontWeight: "500" }}>
-                Escolha onde este treino aparecerá na tela principal dos usuários.
-              </Text>
-              <NativeScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={{ gap: 8, paddingBottom: 4, marginBottom: 20 }}
-              >
-                {(
-                  [
-                    { label: "Sem destaque", value: "" },
-                    { label: "Populares", value: "popular" },
-                    { label: "Plano do Dia", value: "plano_do_dia" },
-                    { label: "Melhores para Você", value: "melhores_para_voce" },
-                    { label: "Desafios", value: "desafio" },
-                    { label: "Aquecimento", value: "aquecimento" },
-                  ] as { label: string; value: string }[]
-                ).map((opt) => (
-                  <Chip
-                    key={opt.value || "none"}
-                    label={opt.label}
-                    active={formData.secao_home === opt.value}
-                    onPress={() => setFormData((p) => ({ ...p, secao_home: opt.value }))}
-                    color={opt.value === "" ? "#94A3B8" : "#BBF246"}
-                  />
-                ))}
-              </NativeScrollView>
+              {/* ── DESTAQUE NA HOME ── (oculto no escopo de Desafios: já travado em 'desafio') */}
+              {!isChallenges && (
+                <>
+                  <View style={[styles.sectionHeader, { marginTop: 8 }]}>
+                    <View style={[styles.sectionDot, { backgroundColor: "#BBF246" }]} />
+                    <Text style={styles.sectionTitle}>Destaque na Home</Text>
+                  </View>
+                  <Text
+                    style={{ fontSize: 12, color: "#94A3B8", marginBottom: 12, fontWeight: "500" }}
+                  >
+                    Escolha onde este treino aparecerá na tela principal dos usuários.
+                  </Text>
+                  <NativeScrollView
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                    contentContainerStyle={{ gap: 8, paddingBottom: 4, marginBottom: 20 }}
+                  >
+                    {(
+                      [
+                        { label: "Sem destaque", value: "" },
+                        { label: "Populares", value: "popular" },
+                        { label: "Plano do Dia", value: "plano_do_dia" },
+                        { label: "Melhores para Você", value: "melhores_para_voce" },
+                        { label: "Desafios", value: "desafio" },
+                        { label: "Aquecimento", value: "aquecimento" },
+                      ] as { label: string; value: string }[]
+                    ).map((opt) => (
+                      <Chip
+                        key={opt.value || "none"}
+                        label={opt.label}
+                        active={formData.secao_home === opt.value}
+                        onPress={() => setFormData((p) => ({ ...p, secao_home: opt.value }))}
+                        color={opt.value === "" ? "#94A3B8" : "#BBF246"}
+                      />
+                    ))}
+                  </NativeScrollView>
+                </>
+              )}
 
               <TouchableOpacity
                 style={[styles.saveBtn, loading && { opacity: 0.65 }]}
@@ -1026,7 +1055,7 @@ const WorkoutManagementSheet = forwardRef<WorkoutManagementSheetRef, WorkoutMana
                     <ActivityIndicator color="#1E293B" />
                   ) : (
                     <Text style={styles.saveBtnTxt}>
-                      {editingWorkout ? "Salvar alterações" : "Criar treino"}
+                      {editingWorkout ? "Salvar alterações" : `Criar ${entityLabel}`}
                     </Text>
                   )}
                 </LinearGradient>
@@ -1160,14 +1189,13 @@ const WorkoutManagementSheet = forwardRef<WorkoutManagementSheetRef, WorkoutMana
                   {exerciseImage ? (
                     <Image source={{ uri: exerciseImage.uri }} style={styles.exFormImage} />
                   ) : editingExercise?.image_url ? (
-                    <Image
-                      source={{ uri: editingExercise.image_url }}
-                      style={styles.exFormImage}
-                    />
+                    <Image source={{ uri: editingExercise.image_url }} style={styles.exFormImage} />
                   ) : (
                     <View style={styles.exFormImagePlaceholder}>
                       <Upload size={22} color="#94A3B8" />
-                      <Text style={styles.exFormImageHint}>Toque para enviar foto (obrigatória)</Text>
+                      <Text style={styles.exFormImageHint}>
+                        Toque para enviar foto (obrigatória)
+                      </Text>
                     </View>
                   )}
                   {(exerciseImage || editingExercise?.image_url) && (

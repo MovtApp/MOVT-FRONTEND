@@ -94,13 +94,17 @@ const VerifyAccountScreen = () => {
       Alert.alert("Verificação Concluída", response.data.message);
       await updateUser({ isVerified: true });
 
-      // Personal trainer (conta CNPJ) ainda precisa validar empresa/CREF antes de
-      // entrar no app. Demais contas (CPF) vão direto para a Home.
+      // Próxima etapa: telefone é universal (todas as contas). Só depois dele o
+      // trainer segue para empresa/CREF; contas CPF vão direto para a Home.
       const isTrainer =
         user?.documentType === "CNPJ" || user?.role === "trainer" || user?.role === "personal";
 
-      if (isTrainer && !user?.cref_verified) {
+      if (user?.phone_verified === false) {
+        navigation.navigate("Verify", { screen: "VerifyPhoneScreen" });
+      } else if (isTrainer && !user?.cref_verified) {
         navigation.navigate("Verify", { screen: "VerifyCompanyScreen" });
+      } else if (user?.onboarding_completed === false) {
+        navigation.reset({ index: 0, routes: [{ name: "Info" as never }] });
       } else {
         navigation.reset({
           index: 0,

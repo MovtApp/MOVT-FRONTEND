@@ -1,7 +1,38 @@
 import React, { createContext, useState, useEffect, useCallback, useMemo } from "react";
 import { secureGet, secureSet, secureRemove } from "../services/secureStore";
 import { DeviceEventEmitter, Alert } from "react-native";
-import { api } from "../services/api";
+import { api, resetForceLogoutGuard } from "../services/api";
+
+// Mensagem exibida quando a sessão deixa de ser válida. A mensagem "neutra"
+// cobre tanto conta removida quanto sessão encerrada, já que o backend ainda
+// não distingue os dois casos (ver docs/account-deleted-backend.md).
+function resolveLogoutAlert(data?: { reason?: string; message?: string }): {
+  title: string;
+  message: string;
+} {
+  switch (data?.reason) {
+    case "deleted":
+      return {
+        title: "Conta removida",
+        message:
+          data.message ||
+          "Sua conta foi removida. Faça login novamente ou entre em contato com o suporte.",
+      };
+    case "inactive":
+      return {
+        title: "Conta inativa",
+        message:
+          data.message ||
+          "Sua conta foi desativada pelo administrador. Entre em contato com o suporte.",
+      };
+    default:
+      return {
+        title: "Sessão encerrada",
+        message:
+          "Sua conta não está mais disponível. Ela pode ter sido removida ou sua sessão encerrada. Faça login novamente.",
+      };
+  }
+}
 
 interface User {
   id: string;
@@ -25,7 +56,11 @@ interface User {
   // Verificação profissional (personal trainer / CNPJ)
   cref_verified?: boolean;
   cnpj_verified?: boolean;
-  status_verificacao?: string; // "pendente" | "aprovado" | ...
+  status_verificacao?: string; // "pendente" | "aprovado" | "reprovado" | ...
+  cref_submitted?: boolean; // já enviou os documentos do CREF (document_url != null)
+  cref_rejeicao_motivo?: string | null; // motivo da reprovação manual, exibido na tela de status
+  phone_verified?: boolean; // telefone validado por SMS (Twilio Verify)
+  onboarding_completed?: boolean; // já preencheu os dados pessoais (Info: altura/peso/etc.)
 }
 
 interface AuthContextData {
@@ -67,6 +102,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setUser(null);
     await secureRemove("userSessionId"); // Remove o sessionId
     await secureRemove("@Auth:user"); // Remove os dados do usuário
+    resetForceLogoutGuard(); // Permite novo alerta caso o próximo login volte a falhar
   }, []);
 
   const updateUser = useCallback(
@@ -94,6 +130,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           cref_verified: updatedUser.cref_verified,
           cnpj_verified: updatedUser.cnpj_verified,
           status_verificacao: updatedUser.status_verificacao,
+          cref_submitted: updatedUser.cref_submitted,
+          cref_rejeicao_motivo: updatedUser.cref_rejeicao_motivo,
+          phone_verified: updatedUser.phone_verified,
+          onboarding_completed: updatedUser.onboarding_completed,
         })
       );
     },
@@ -150,17 +190,34 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                   cref_verified: refreshedUser.cref_verified,
                   cnpj_verified: refreshedUser.cnpj_verified,
                   status_verificacao: refreshedUser.status_verificacao,
+                  cref_submitted: refreshedUser.cref_submitted,
+                  cref_rejeicao_motivo: refreshedUser.cref_rejeicao_motivo,
+                  phone_verified: refreshedUser.phone_verified,
+                  onboarding_completed: refreshedUser.onboarding_completed,
                 })
               );
             } else {
-              await secureRemove("userSessionId");
-              await secureRemove("@Auth:user");
-              setUser(null);
+              // Backend respondeu, mas sem usuário válido: conta não existe mais.
+              await signOut();
+              DeviceEventEmitter.emit("force_logout_inactive", {
+                reason: "account_unavailable",
+              });
             }
-          } catch {
-            await secureRemove("userSessionId");
-            await secureRemove("@Auth:user");
-            setUser(null);
+          } catch (validationError: any) {
+            const status = validationError?.response?.status;
+            // Erro de auth (401/403/404): conta removida ou sessão inválida →
+            // logout com alerta explicando o motivo. Sem resposta (falha de
+            // rede/timeout): mantém o usuário em cache, sem alarme falso.
+            if (status === 401 || status === 403 || status === 404) {
+              await signOut();
+              DeviceEventEmitter.emit("force_logout_inactive", {
+                reason: "account_unavailable",
+              });
+            } else if (__DEV__) {
+              console.log(
+                "[AuthContext] session-status indisponível (rede); mantendo sessão em cache."
+              );
+            }
           }
         } else {
           setUser(null);
@@ -178,13 +235,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   useEffect(() => {
+    // Garante um único Alert por ciclo de logout, mesmo que o interceptor (api.ts)
+    // e o loadUserData emitam o evento quase ao mesmo tempo.
+    let alertVisible = false;
+
     const subscription = DeviceEventEmitter.addListener("force_logout_inactive", (data) => {
       signOut();
-      Alert.alert(
-        "Conta Inativa",
-        data?.message ||
-          "Sua conta foi desativada pelo administrador. Entre em contato com o suporte."
-      );
+
+      if (alertVisible) return;
+      alertVisible = true;
+
+      const { title, message } = resolveLogoutAlert(data);
+      Alert.alert(title, message, [
+        { text: "OK", onPress: () => { alertVisible = false; } },
+      ]);
     });
 
     return () => {

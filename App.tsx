@@ -27,6 +27,10 @@ import GlobalErrorBoundary from "./src/components/GlobalErrorBoundary";
 import * as Sentry from "@sentry/react-native";
 import { preInitializeHC } from "@services/healthConnectService";
 import { preloadTodayHealth } from "@/hooks/useHealthTracking";
+// Import por efeito colateral: registra a TaskManager task de rastreamento de
+// localização no boot, para o SO conseguir entregar fixes de GPS em background
+// (mesmo com a tela apagada / após restart do processo).
+import "@services/locationTrackingService";
 
 // Congela telas fora de foco: elas param de renderizar enquanto não estão
 // visíveis, reduzindo o trabalho concorrente na JS thread durante as transições.
@@ -83,7 +87,9 @@ function AppContent() {
   });
 
   const { loading: isLoadingAuth, user } = useAuth();
-  const [currentRoute, setCurrentRoute] = React.useState<"Auth" | "Verify" | "App">("Auth");
+  const [currentRoute, setCurrentRoute] = React.useState<"Auth" | "Verify" | "App" | "Info">(
+    "Auth"
+  );
 
   // Inicia o carregamento de chats em background
   usePreloadChat();
@@ -100,16 +106,26 @@ function AppContent() {
 
   // Monitora mudanças no estado de autenticação e atualiza a rota atual
   React.useEffect(() => {
-    let initialRouteName: "Auth" | "Verify" | "App" = "Auth";
+    let initialRouteName: "Auth" | "Verify" | "App" | "Info" = "Auth";
     if (user) {
       // Personal trainer (conta CNPJ) precisa passar pela verificação profissional
       // (CREF) antes de acessar o app — bloqueio total até cref_verified=true.
+      // Admin é isento: nunca passa pela validação de CNPJ/CREF.
+      const isAdmin = user.role?.toLowerCase().includes("admin") ?? false;
       const isTrainer =
         user.documentType === "CNPJ" || user.role === "trainer" || user.role === "personal";
-      const needsProfessionalVerification = isTrainer && !user.cref_verified;
+      const needsProfessionalVerification = !isAdmin && isTrainer && !user.cref_verified;
+      // Telefone é etapa universal (todas as contas). Contas antigas já vêm com
+      // phone_verified=true (grandfather no backend), então não são afetadas.
+      const needsPhoneVerification = !isAdmin && user.phone_verified === false;
+      // Dados pessoais (onboarding Info) é o último gate universal, após todas as
+      // verificações. Contas antigas já vêm com onboarding_completed=true.
+      const needsOnboarding = !isAdmin && user.onboarding_completed === false;
 
-      if (!user.isVerified || needsProfessionalVerification) {
+      if (!user.isVerified || needsPhoneVerification || needsProfessionalVerification) {
         initialRouteName = "Verify";
+      } else if (needsOnboarding) {
+        initialRouteName = "Info";
       } else {
         initialRouteName = "App";
       }

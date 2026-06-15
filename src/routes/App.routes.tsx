@@ -43,7 +43,7 @@ import CommunityScreen from "@screens/App/communities/communityScreen";
 import CommunityDetails from "../screens/App/communities/[protected]/community";
 import TrainingScreen from "../screens/App/training/trainingScreen";
 import TrainingDetails from "../screens/App/training/[protected]/training";
-import ExplorerScreen from "../screens/App/explorer/explorerScreen";
+import ChallengeDetails from "../screens/App/training/[protected]/challengeDetails";
 import FeedScreen from "../screens/Feed/FeedScreen";
 import { NotificationDrawerContent } from "../components/NotificationModal";
 import PostDetailScreen from "../screens/Feed/PostDetailScreen";
@@ -131,8 +131,8 @@ function AppLayout() {
         <Stack.Screen name="CommunityDetails" component={CommunityDetails} />
         <Stack.Screen name="TrainingScreen" component={TrainingScreen} />
         <Stack.Screen name="TrainingDetails" component={TrainingDetails} />
+        <Stack.Screen name="ChallengeDetails" component={ChallengeDetails} />
         <Stack.Screen name="ActiveWorkout" component={ActiveWorkout} />
-        <Stack.Screen name="ExplorerScreen" component={ExplorerScreen} />
         <Stack.Screen name="ConfigScreen" component={ConfigScreen} />
         <Stack.Screen name="PlanScreen" component={PlanScreen} />
 

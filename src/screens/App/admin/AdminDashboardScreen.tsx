@@ -26,7 +26,7 @@ import BottomSheet, {
 } from "@gorhom/bottom-sheet";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
-import { useNavigation } from "@react-navigation/native";
+import { useNavigation, useFocusEffect } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { AppStackParamList } from "../../../@types/routes";
 import { useAuth } from "../../../hooks/useAuth";
@@ -269,7 +269,10 @@ const AdminDashboardScreen: React.FC = () => {
   } = useAppData();
 
   const [refreshing, setRefreshing] = useState(false);
-  const [activeTab, setActiveTab] = useState<"day" | "month" | "year">("day");
+  // Inicia em "month" (Mensal): o faturamento Stripe do período "day" é só o de
+  // hoje (quase sempre R$ 0 ao abrir), o que parecia "faturamento não exibido".
+  // O mês já inclui o dia atual e alinha com o default do AppDataContext.
+  const [activeTab, setActiveTab] = useState<"day" | "month" | "year">("month");
 
   // Estados de Filtro
   const [filterStatus, setFilterStatus] = useState<string>("all");
@@ -297,9 +300,12 @@ const AdminDashboardScreen: React.FC = () => {
   const historySheetRef = React.useRef<BottomSheet>(null);
   const activePlansSheetRef = React.useRef<BottomSheet>(null);
   const userDetailSheetRef = React.useRef<BottomSheet>(null);
+  const crefVerificationsSheetRef = React.useRef<BottomSheet>(null);
+  const crefDetailSheetRef = React.useRef<BottomSheet>(null);
   // Ref para Gestão de Comunidades (componente dedicado)
   const adminCommSheetRef = React.useRef<CommunityManagementSheetRef>(null);
   const adminWorkoutSheetRef = React.useRef<WorkoutManagementSheetRef>(null);
+  const adminChallengeSheetRef = React.useRef<WorkoutManagementSheetRef>(null);
 
   // Estado para montagem preguiçosa (Lazy Mount) de TODOS os bottom sheets do dashboard
   const [openSheets, setOpenSheets] = React.useState<Record<string, boolean>>({});
@@ -385,11 +391,57 @@ const AdminDashboardScreen: React.FC = () => {
   }, [adminGyms, gymListSearchQuery, gymListStatusFilter]);
 
   const [adminExpiring, setAdminExpiring] = useState<any[]>([]);
+  // Verificações de CREF (decisão manual + histórico).
+  const [crefVerifications, setCrefVerifications] = useState<any[]>([]);
+  const [crefRejectTarget, setCrefRejectTarget] = useState<any | null>(null);
+  const [crefRejectReason, setCrefRejectReason] = useState("");
+  const [crefStatusTab, setCrefStatusTab] = useState<"pendente" | "aprovado" | "reprovado">(
+    "pendente"
+  );
+  const [crefDetail, setCrefDetail] = useState<any | null>(null);
   // adminPlans vem do contexto se necessário, mas mantemos o local se for específico da aba
   const [adminPlans, setAdminPlans] = useState<any[]>([]);
 
   // Contador de comunidades para exibição no painel
   const [adminCommunitiesCount, setAdminCommunitiesCount] = useState(0);
+
+  // Contadores derivados de /treinos: desafios (secao_home='desafio') e treinos
+  // "reais" (todo o resto). Desafios e treinos vivem na mesma tabela, então a
+  // contagem precisa separá-los — o total_workouts do backend conta os dois
+  // juntos (por isso aparecia 27 = 11 treinos + 16 desafios).
+  const [challengesCount, setChallengesCount] = useState(0);
+  const [workoutsCount, setWorkoutsCount] = useState(0);
+  const fetchChallengesCount = useCallback(() => {
+    api
+      .get("/treinos")
+      .then((r) => {
+        const list = r?.data?.data || r?.data;
+        const arr = Array.isArray(list) ? list : [];
+        setChallengesCount(arr.filter((t: any) => t?.secao_home === "desafio").length);
+        setWorkoutsCount(arr.filter((t: any) => t?.secao_home !== "desafio").length);
+      })
+      .catch(() => {});
+  }, []);
+
+  // Contagem real de comunidades para o painel (mesma fonte usada no sheet).
+  const fetchCommunitiesCount = useCallback(() => {
+    api
+      .get("/comunidades")
+      .then((r) => {
+        const list = r?.data?.data || r?.data;
+        setAdminCommunitiesCount(Array.isArray(list) ? list.length : 0);
+      })
+      .catch(() => {});
+  }, []);
+
+  // Atualiza as contagens sempre que o painel GANHA FOCO — assim refletem dados
+  // criados por fora (ex.: seed/script) ou em outra sessão, não só os do mount.
+  useFocusEffect(
+    useCallback(() => {
+      fetchChallengesCount();
+      fetchCommunitiesCount();
+    }, [fetchChallengesCount, fetchCommunitiesCount])
+  );
   const [fetchingHistory, setFetchingHistory] = useState(false);
   const [selectedAppt, setSelectedAppt] = useState<any | null>(null);
   const [isUploading, setIsUploading] = useState(false);
@@ -580,7 +632,12 @@ const AdminDashboardScreen: React.FC = () => {
   // useAppData já carregado no topo do componente
 
   useEffect(() => {
-    fetchData(false, activeTab, filterStatus);
+    // force=true: o dashboard usa um único `data` compartilhado, mas o cache
+    // (shouldFetch) é por período. Sem forçar, ao voltar para uma aba já buscada
+    // o fetch é pulado e `data` fica preso no valor da outra aba (ex.: Faturamento
+    // travado no 0,00 de "Hoje" ao voltar para "Mensal"). Forçar garante que
+    // `data` sempre reflita a aba/filtro selecionados.
+    fetchData(true, activeTab, filterStatus);
     fetchAdminPlans(false);
   }, [activeTab, filterStatus]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -637,6 +694,68 @@ const AdminDashboardScreen: React.FC = () => {
       console.error("Erro ao buscar planos a vencer:", err);
     } finally {
       setLoadingSheet(false);
+    }
+  };
+
+  // ── Verificações de CREF (decisão manual + histórico) ───────────────────────
+  // Carrega a lista de uma aba (pendente | aprovado | reprovado).
+  const loadCrefList = async (statusTab: "pendente" | "aprovado" | "reprovado") => {
+    try {
+      setCrefStatusTab(statusTab);
+      setCrefRejectTarget(null);
+      setCrefRejectReason("");
+      setLoadingSheet(true);
+      const resp = await api.get("/admin/cref-verifications", { params: { status: statusTab } });
+      setCrefVerifications(resp.data.users || []);
+    } catch (err) {
+      console.error("Erro ao buscar verificações de CREF:", err);
+    } finally {
+      setLoadingSheet(false);
+    }
+  };
+
+  const fetchCrefVerifications = async () => {
+    markSheetAsRendered("crefVerifications");
+    openSheet("crefVerifications", crefVerificationsSheetRef);
+    await loadCrefList("pendente");
+  };
+
+  const openCrefDetail = (item: any) => {
+    setCrefDetail(item);
+    setCrefRejectTarget(null);
+    setCrefRejectReason("");
+    markSheetAsRendered("crefDetail");
+    openSheet("crefDetail", crefDetailSheetRef);
+  };
+
+  const approveCref = async (id: string | number) => {
+    try {
+      await api.post(`/admin/cref-verifications/${id}/approve`);
+      setCrefVerifications((prev) => prev.filter((u) => String(u?.id_us) !== String(id)));
+      if (String(crefDetail?.id_us) === String(id)) crefDetailSheetRef.current?.close();
+      Alert.alert("Aprovado", "CREF aprovado. O personal já está com o acesso liberado.");
+    } catch (err: any) {
+      Alert.alert("Erro", err.response?.data?.error || "Não foi possível aprovar o CREF.");
+    }
+  };
+
+  const confirmRejectCref = async () => {
+    const target = crefRejectTarget;
+    const motivo = crefRejectReason.trim();
+    if (!target) return;
+    if (!motivo) {
+      Alert.alert("Motivo obrigatório", "Descreva o motivo da reprovação.");
+      return;
+    }
+    try {
+      await api.post(`/admin/cref-verifications/${target.id_us}/reject`, { motivo });
+      setCrefVerifications((prev) => prev.filter((u) => String(u?.id_us) !== String(target.id_us)));
+      if (String(crefDetail?.id_us) === String(target.id_us)) crefDetailSheetRef.current?.close();
+      setCrefRejectTarget(null);
+      setCrefRejectReason("");
+      Alert.alert("Reprovado", "CREF reprovado. O personal poderá reenviar com a correção.");
+    } catch (err: any) {
+      Alert.alert("Erro", err.response?.data?.error || "Não foi possível reprovar o CREF.");
     }
   };
 
@@ -1679,7 +1798,37 @@ const AdminDashboardScreen: React.FC = () => {
                     <Text style={styles.statusLabel}>Gestão de Treinos</Text>
                   </View>
                   <View style={styles.statusValueRow}>
-                    <Text style={styles.statusValue}>{data?.operations?.totalWorkouts || 0}</Text>
+                    <Text style={styles.statusValue}>{workoutsCount}</Text>
+                    <ChevronRight size={16} color="#94A3B8" />
+                  </View>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.statusItem}
+                  onPress={() => openSheet("desafios", adminChallengeSheetRef)}
+                >
+                  <View style={styles.statusIndicator}>
+                    <View style={[styles.statusDot, { backgroundColor: "#F97316" }]} />
+                    <Text style={styles.statusLabel}>Desafios</Text>
+                  </View>
+                  <View style={styles.statusValueRow}>
+                    <Text style={styles.statusValue}>{challengesCount}</Text>
+                    <ChevronRight size={16} color="#94A3B8" />
+                  </View>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.statusItem}
+                  onPress={() => fetchCrefVerifications()}
+                >
+                  <View style={styles.statusIndicator}>
+                    <View style={[styles.statusDot, { backgroundColor: "#0EA5E9" }]} />
+                    <Text style={styles.statusLabel}>Verificações de CREF</Text>
+                  </View>
+                  <View style={styles.statusValueRow}>
+                    {crefVerifications.length > 0 && (
+                      <Text style={styles.statusValue}>{crefVerifications.length}</Text>
+                    )}
                     <ChevronRight size={16} color="#94A3B8" />
                   </View>
                 </TouchableOpacity>
@@ -5152,18 +5301,671 @@ const AdminDashboardScreen: React.FC = () => {
             </BottomSheet>
           )}
 
+          {/* ── SHEET: VERIFICAÇÕES DE CREF (decisão manual) ── */}
+          {openSheets["crefVerifications"] && (
+            <BottomSheet
+              ref={crefVerificationsSheetRef}
+              onClose={() => {
+                setOpenSheets((prev) => ({ ...prev, crefVerifications: false }));
+                setCrefRejectTarget(null);
+                setCrefRejectReason("");
+              }}
+              index={0}
+              snapPoints={[SCREEN_HEIGHT]}
+              enablePanDownToClose
+              backdropComponent={renderBackdrop}
+              backgroundStyle={{ borderRadius: 32 }}
+            >
+              <View style={styles.sheetContent}>
+                <View style={[styles.sheetHeader, { marginBottom: 14 }]}>
+                  <View>
+                    <Text style={styles.sheetTitle}>Verificações de CREF</Text>
+                    <Text style={styles.sheetSubtitle}>
+                      {crefStatusTab === "pendente"
+                        ? `${crefVerifications.length} aguardando análise`
+                        : `${crefVerifications.length} no histórico`}
+                    </Text>
+                  </View>
+                  <TouchableOpacity
+                    onPress={() => crefVerificationsSheetRef.current?.close()}
+                    style={styles.sheetCloseBtn}
+                  >
+                    <X size={22} color="#64748B" />
+                  </TouchableOpacity>
+                </View>
+
+                {/* Abas: pendentes (ação) + histórico (aprovados/reprovados) */}
+                <View style={{ flexDirection: "row", gap: 8, marginBottom: 14 }}>
+                  {([
+                    { key: "pendente", label: "Pendentes", color: "#F59E0B" },
+                    { key: "aprovado", label: "Aprovados", color: "#16A34A" },
+                    { key: "reprovado", label: "Reprovados", color: "#DC2626" },
+                  ] as const).map((tab) => {
+                    const active = crefStatusTab === tab.key;
+                    return (
+                      <TouchableOpacity
+                        key={tab.key}
+                        activeOpacity={0.7}
+                        onPress={() => loadCrefList(tab.key)}
+                        style={{
+                          flex: 1,
+                          paddingVertical: 9,
+                          borderRadius: 10,
+                          alignItems: "center",
+                          borderWidth: 1.5,
+                          borderColor: active ? tab.color : "#E2E8F0",
+                          backgroundColor: active ? `${tab.color}14` : "#fff",
+                        }}
+                      >
+                        <Text
+                          style={{
+                            fontSize: 13,
+                            fontWeight: "700",
+                            color: active ? tab.color : "#94A3B8",
+                          }}
+                        >
+                          {tab.label}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+
+                {loadingSheet ? (
+                  <ActivityIndicator color="#0EA5E9" style={{ marginTop: 40 }} />
+                ) : (
+                  <BottomSheetFlatList
+                    data={crefVerifications}
+                    keyExtractor={(item: any) => String(item?.id_us || Math.random())}
+                    showsVerticalScrollIndicator={false}
+                    style={{ flex: 1, marginTop: 5 }}
+                    contentContainerStyle={{ paddingBottom: insets.bottom + 150 }}
+                    ListEmptyComponent={() => (
+                      <View style={{ alignItems: "center", marginTop: 60 }}>
+                        <CheckCircle size={40} color="#16A34A" />
+                        <Text style={{ marginTop: 12, color: "#64748B", fontWeight: "600" }}>
+                          {crefStatusTab === "pendente"
+                            ? "Nenhuma verificação pendente."
+                            : crefStatusTab === "aprovado"
+                              ? "Nenhum CREF aprovado ainda."
+                              : "Nenhum CREF reprovado."}
+                        </Text>
+                      </View>
+                    )}
+                    renderItem={({ item }: { item: any }) => {
+                      const isRejecting = String(crefRejectTarget?.id_us) === String(item?.id_us);
+                      const isPending = crefStatusTab === "pendente";
+                      const decidedAt = item?.updated_at
+                        ? new Date(item.updated_at).toLocaleDateString("pt-BR")
+                        : null;
+                      return (
+                        <View
+                          style={{
+                            backgroundColor: "#fff",
+                            borderRadius: 16,
+                            borderWidth: 1,
+                            borderColor: "#E2E8F0",
+                            padding: 14,
+                            marginBottom: 12,
+                          }}
+                        >
+                          {/* Toque na área de info → detalhe completo */}
+                          <TouchableOpacity activeOpacity={0.7} onPress={() => openCrefDetail(item)}>
+                            <View
+                              style={{
+                                flexDirection: "row",
+                                justifyContent: "space-between",
+                                alignItems: "flex-start",
+                              }}
+                            >
+                              <View style={{ flex: 1, paddingRight: 8 }}>
+                                <Text style={{ fontSize: 15, fontWeight: "700", color: "#1E293B" }}>
+                                  {item?.nome || "Personal"}
+                                </Text>
+                                <Text style={{ fontSize: 12, color: "#94A3B8", marginTop: 2 }}>
+                                  {item?.email}
+                                </Text>
+                              </View>
+                              {!isPending && (
+                                <View
+                                  style={{
+                                    paddingHorizontal: 10,
+                                    paddingVertical: 4,
+                                    borderRadius: 999,
+                                    backgroundColor:
+                                      crefStatusTab === "aprovado" ? "#DCFCE7" : "#FEE2E2",
+                                  }}
+                                >
+                                  <Text
+                                    style={{
+                                      fontSize: 11,
+                                      fontWeight: "700",
+                                      color: crefStatusTab === "aprovado" ? "#16A34A" : "#DC2626",
+                                    }}
+                                  >
+                                    {crefStatusTab === "aprovado" ? "Aprovado" : "Reprovado"}
+                                  </Text>
+                                </View>
+                              )}
+                            </View>
+                            <Text style={{ fontSize: 13, color: "#334155", marginTop: 8 }}>
+                              CREF: <Text style={{ fontWeight: "700" }}>{item?.cref || "—"}</Text>
+                              {item?.cref_validade ? `  ·  validade ${item.cref_validade}` : ""}
+                            </Text>
+                            {!isPending && decidedAt && (
+                              <Text style={{ fontSize: 11, color: "#94A3B8", marginTop: 2 }}>
+                                Decisão em {decidedAt}
+                              </Text>
+                            )}
+
+                            {/* Miniaturas (toque no card abre o detalhe com fotos grandes) */}
+                            <View style={{ flexDirection: "row", gap: 10, marginTop: 12 }}>
+                              {[
+                                { uri: item?.document_url, label: "Frente" },
+                                { uri: item?.document_back_url, label: "Verso" },
+                              ].map((doc) => (
+                                <View key={doc.label} style={{ flex: 1 }}>
+                                  {doc.uri ? (
+                                    <Image
+                                      source={{ uri: doc.uri }}
+                                      style={{
+                                        width: "100%",
+                                        height: 90,
+                                        borderRadius: 10,
+                                        backgroundColor: "#F1F5F9",
+                                      }}
+                                      resizeMode="cover"
+                                    />
+                                  ) : (
+                                    <View
+                                      style={{
+                                        height: 90,
+                                        borderRadius: 10,
+                                        backgroundColor: "#F1F5F9",
+                                        alignItems: "center",
+                                        justifyContent: "center",
+                                      }}
+                                    >
+                                      <Text style={{ color: "#94A3B8", fontSize: 12 }}>
+                                        Sem foto
+                                      </Text>
+                                    </View>
+                                  )}
+                                </View>
+                              ))}
+                            </View>
+
+                            {crefStatusTab === "reprovado" && item?.cref_rejeicao_motivo && (
+                              <Text
+                                style={{ fontSize: 12, color: "#B91C1C", marginTop: 8 }}
+                                numberOfLines={2}
+                              >
+                                Motivo: {item.cref_rejeicao_motivo}
+                              </Text>
+                            )}
+                          </TouchableOpacity>
+
+                          {!isPending ? null : isRejecting ? (
+                            <View style={{ marginTop: 12 }}>
+                              <TextInput
+                                placeholder="Motivo da reprovação (ex: foto ilegível, número divergente)"
+                                placeholderTextColor="#94A3B8"
+                                value={crefRejectReason}
+                                onChangeText={setCrefRejectReason}
+                                multiline
+                                style={{
+                                  borderWidth: 1,
+                                  borderColor: "#FECACA",
+                                  borderRadius: 10,
+                                  padding: 10,
+                                  minHeight: 60,
+                                  textAlignVertical: "top",
+                                  color: "#1E293B",
+                                }}
+                              />
+                              <View style={{ flexDirection: "row", gap: 10, marginTop: 10 }}>
+                                <TouchableOpacity
+                                  style={{
+                                    flex: 1,
+                                    height: 44,
+                                    borderRadius: 12,
+                                    backgroundColor: "#F1F5F9",
+                                    alignItems: "center",
+                                    justifyContent: "center",
+                                  }}
+                                  onPress={() => {
+                                    setCrefRejectTarget(null);
+                                    setCrefRejectReason("");
+                                  }}
+                                >
+                                  <Text style={{ color: "#64748B", fontWeight: "700" }}>Cancelar</Text>
+                                </TouchableOpacity>
+                                <TouchableOpacity
+                                  style={{
+                                    flex: 1,
+                                    height: 44,
+                                    borderRadius: 12,
+                                    backgroundColor: "#DC2626",
+                                    alignItems: "center",
+                                    justifyContent: "center",
+                                  }}
+                                  onPress={confirmRejectCref}
+                                >
+                                  <Text style={{ color: "#fff", fontWeight: "700" }}>
+                                    Confirmar reprovação
+                                  </Text>
+                                </TouchableOpacity>
+                              </View>
+                            </View>
+                          ) : (
+                            <View style={{ flexDirection: "row", gap: 10, marginTop: 12 }}>
+                              <TouchableOpacity
+                                style={{
+                                  flex: 1,
+                                  height: 44,
+                                  borderRadius: 12,
+                                  backgroundColor: "#FEF2F2",
+                                  borderWidth: 1,
+                                  borderColor: "#FECACA",
+                                  flexDirection: "row",
+                                  alignItems: "center",
+                                  justifyContent: "center",
+                                  gap: 6,
+                                }}
+                                onPress={() => {
+                                  setCrefRejectTarget(item);
+                                  setCrefRejectReason("");
+                                }}
+                              >
+                                <XCircle size={18} color="#DC2626" />
+                                <Text style={{ color: "#DC2626", fontWeight: "700" }}>Reprovar</Text>
+                              </TouchableOpacity>
+                              <TouchableOpacity
+                                style={{
+                                  flex: 1,
+                                  height: 44,
+                                  borderRadius: 12,
+                                  backgroundColor: "#16A34A",
+                                  flexDirection: "row",
+                                  alignItems: "center",
+                                  justifyContent: "center",
+                                  gap: 6,
+                                }}
+                                onPress={() =>
+                                  Alert.alert(
+                                    "Aprovar CREF",
+                                    `Confirmar a aprovação do CREF de ${item?.nome || "personal"}?`,
+                                    [
+                                      { text: "Cancelar", style: "cancel" },
+                                      { text: "Aprovar", onPress: () => approveCref(item?.id_us) },
+                                    ]
+                                  )
+                                }
+                              >
+                                <CheckCircle size={18} color="#fff" />
+                                <Text style={{ color: "#fff", fontWeight: "700" }}>Aprovar</Text>
+                              </TouchableOpacity>
+                            </View>
+                          )}
+                        </View>
+                      );
+                    }}
+                  />
+                )}
+              </View>
+            </BottomSheet>
+          )}
+
+          {/* ── SHEET: DETALHE DA VERIFICAÇÃO DE CREF ── */}
+          {openSheets["crefDetail"] && crefDetail && (
+            <BottomSheet
+              ref={crefDetailSheetRef}
+              onClose={() => {
+                setOpenSheets((prev) => ({ ...prev, crefDetail: false }));
+                setCrefDetail(null);
+                setCrefRejectTarget(null);
+                setCrefRejectReason("");
+              }}
+              index={0}
+              snapPoints={[SCREEN_HEIGHT]}
+              enablePanDownToClose
+              backdropComponent={renderBackdrop}
+              backgroundStyle={{ borderRadius: 32 }}
+            >
+              <BottomSheetScrollView
+                style={styles.sheetContent}
+                contentContainerStyle={{ paddingBottom: insets.bottom + 40 }}
+                showsVerticalScrollIndicator={false}
+              >
+                <View style={[styles.sheetHeader, { marginBottom: 18 }]}>
+                  <Text style={styles.sheetTitle}>Detalhe da verificação</Text>
+                  <TouchableOpacity
+                    onPress={() => crefDetailSheetRef.current?.close()}
+                    style={styles.sheetCloseBtn}
+                  >
+                    <X size={22} color="#64748B" />
+                  </TouchableOpacity>
+                </View>
+
+                {/* Perfil */}
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 14 }}>
+                  {crefDetail.foto_url ? (
+                    <Image
+                      source={{ uri: crefDetail.foto_url }}
+                      style={{ width: 60, height: 60, borderRadius: 30, backgroundColor: "#F1F5F9" }}
+                    />
+                  ) : (
+                    <View
+                      style={{
+                        width: 60,
+                        height: 60,
+                        borderRadius: 30,
+                        backgroundColor: "#E2E8F0",
+                        alignItems: "center",
+                        justifyContent: "center",
+                      }}
+                    >
+                      <Text style={{ fontSize: 22, fontWeight: "700", color: "#94A3B8" }}>
+                        {(crefDetail.nome || "?").charAt(0).toUpperCase()}
+                      </Text>
+                    </View>
+                  )}
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ fontSize: 17, fontWeight: "700", color: "#1E293B" }}>
+                      {crefDetail.nome || "Personal"}
+                    </Text>
+                    <Text style={{ fontSize: 13, color: "#94A3B8", marginTop: 2 }}>
+                      {crefDetail.email}
+                    </Text>
+                    <View style={{ flexDirection: "row", gap: 6, marginTop: 6 }}>
+                      <View
+                        style={{
+                          paddingHorizontal: 8,
+                          paddingVertical: 3,
+                          borderRadius: 999,
+                          backgroundColor: "#EEF2FF",
+                        }}
+                      >
+                        <Text style={{ fontSize: 11, fontWeight: "700", color: "#4F46E5" }}>
+                          {(crefDetail.role || "personal").toUpperCase()}
+                        </Text>
+                      </View>
+                      <View
+                        style={{
+                          paddingHorizontal: 8,
+                          paddingVertical: 3,
+                          borderRadius: 999,
+                          backgroundColor: crefDetail.ativo === false ? "#FEE2E2" : "#DCFCE7",
+                        }}
+                      >
+                        <Text
+                          style={{
+                            fontSize: 11,
+                            fontWeight: "700",
+                            color: crefDetail.ativo === false ? "#DC2626" : "#16A34A",
+                          }}
+                        >
+                          {crefDetail.ativo === false ? "Bloqueado" : "Ativo"}
+                        </Text>
+                      </View>
+                    </View>
+                  </View>
+                </View>
+
+                {/* Dados da conta / profissionais */}
+                <View
+                  style={{
+                    marginTop: 18,
+                    backgroundColor: "#F8FAFC",
+                    borderRadius: 16,
+                    padding: 14,
+                  }}
+                >
+                  {[
+                    { label: "Plano", value: (crefDetail.plan || "free").toString().toUpperCase() },
+                    {
+                      label: "Membro desde",
+                      value: crefDetail.created_at
+                        ? new Date(crefDetail.created_at).toLocaleDateString("pt-BR")
+                        : "—",
+                    },
+                    { label: "CNPJ", value: crefDetail.cnpj || "—" },
+                    { label: "Razão social", value: crefDetail.cnpj_razao_social || "—" },
+                    { label: "CNAE", value: crefDetail.cnpj_cnae || "—" },
+                    { label: "CREF", value: crefDetail.cref || "—" },
+                    { label: "Validade do CREF", value: crefDetail.cref_validade || "—" },
+                    { label: "CPF (documento)", value: crefDetail.document_cpf || "—" },
+                    { label: "Status", value: crefDetail.status_verificacao || "—" },
+                  ].map((row) => (
+                    <View
+                      key={row.label}
+                      style={{
+                        flexDirection: "row",
+                        justifyContent: "space-between",
+                        paddingVertical: 6,
+                      }}
+                    >
+                      <Text style={{ fontSize: 13, color: "#94A3B8" }}>{row.label}</Text>
+                      <Text
+                        style={{
+                          fontSize: 13,
+                          fontWeight: "600",
+                          color: "#1E293B",
+                          maxWidth: "60%",
+                          textAlign: "right",
+                        }}
+                      >
+                        {row.value}
+                      </Text>
+                    </View>
+                  ))}
+                </View>
+
+                {/* Fotos frente e verso (toque abre em tela cheia) */}
+                <Text style={{ fontSize: 13, fontWeight: "700", color: "#334155", marginTop: 18 }}>
+                  Carteira do CREF
+                </Text>
+                <View style={{ flexDirection: "row", gap: 10, marginTop: 10 }}>
+                  {[
+                    { uri: crefDetail.document_url, label: "Frente" },
+                    { uri: crefDetail.document_back_url, label: "Verso" },
+                  ].map((doc) => (
+                    <TouchableOpacity
+                      key={doc.label}
+                      style={{ flex: 1 }}
+                      disabled={!doc.uri}
+                      onPress={() => doc.uri && Linking.openURL(doc.uri)}
+                    >
+                      {doc.uri ? (
+                        <Image
+                          source={{ uri: doc.uri }}
+                          style={{
+                            width: "100%",
+                            height: 150,
+                            borderRadius: 12,
+                            backgroundColor: "#F1F5F9",
+                          }}
+                          resizeMode="cover"
+                        />
+                      ) : (
+                        <View
+                          style={{
+                            height: 150,
+                            borderRadius: 12,
+                            backgroundColor: "#F1F5F9",
+                            alignItems: "center",
+                            justifyContent: "center",
+                          }}
+                        >
+                          <Text style={{ color: "#94A3B8", fontSize: 12 }}>Sem foto</Text>
+                        </View>
+                      )}
+                      <Text
+                        style={{
+                          fontSize: 11,
+                          color: "#64748B",
+                          textAlign: "center",
+                          marginTop: 4,
+                        }}
+                      >
+                        {doc.label}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+
+                {crefDetail.status_verificacao === "reprovado" && crefDetail.cref_rejeicao_motivo && (
+                  <View
+                    style={{
+                      marginTop: 16,
+                      backgroundColor: "#FEF2F2",
+                      borderColor: "#FECACA",
+                      borderWidth: 1,
+                      borderRadius: 12,
+                      padding: 12,
+                    }}
+                  >
+                    <Text style={{ fontSize: 12, fontWeight: "700", color: "#B91C1C" }}>
+                      Motivo da recusa
+                    </Text>
+                    <Text style={{ fontSize: 13, color: "#7F1D1D", marginTop: 4 }}>
+                      {crefDetail.cref_rejeicao_motivo}
+                    </Text>
+                  </View>
+                )}
+
+                {/* Ações (só quando ainda pendente) */}
+                {crefDetail.status_verificacao !== "aprovado" &&
+                  crefDetail.status_verificacao !== "reprovado" &&
+                  (String(crefRejectTarget?.id_us) === String(crefDetail.id_us) ? (
+                    <View style={{ marginTop: 18 }}>
+                      <TextInput
+                        placeholder="Motivo da reprovação (ex: foto ilegível, número divergente)"
+                        placeholderTextColor="#94A3B8"
+                        value={crefRejectReason}
+                        onChangeText={setCrefRejectReason}
+                        multiline
+                        style={{
+                          borderWidth: 1,
+                          borderColor: "#FECACA",
+                          borderRadius: 10,
+                          padding: 10,
+                          minHeight: 60,
+                          textAlignVertical: "top",
+                          color: "#1E293B",
+                        }}
+                      />
+                      <View style={{ flexDirection: "row", gap: 10, marginTop: 10 }}>
+                        <TouchableOpacity
+                          style={{
+                            flex: 1,
+                            height: 46,
+                            borderRadius: 12,
+                            backgroundColor: "#F1F5F9",
+                            alignItems: "center",
+                            justifyContent: "center",
+                          }}
+                          onPress={() => {
+                            setCrefRejectTarget(null);
+                            setCrefRejectReason("");
+                          }}
+                        >
+                          <Text style={{ color: "#64748B", fontWeight: "700" }}>Cancelar</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          style={{
+                            flex: 1,
+                            height: 46,
+                            borderRadius: 12,
+                            backgroundColor: "#DC2626",
+                            alignItems: "center",
+                            justifyContent: "center",
+                          }}
+                          onPress={confirmRejectCref}
+                        >
+                          <Text style={{ color: "#fff", fontWeight: "700" }}>Confirmar</Text>
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+                  ) : (
+                    <View style={{ flexDirection: "row", gap: 10, marginTop: 18 }}>
+                      <TouchableOpacity
+                        style={{
+                          flex: 1,
+                          height: 46,
+                          borderRadius: 12,
+                          backgroundColor: "#FEF2F2",
+                          borderWidth: 1,
+                          borderColor: "#FECACA",
+                          flexDirection: "row",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          gap: 6,
+                        }}
+                        onPress={() => {
+                          setCrefRejectTarget(crefDetail);
+                          setCrefRejectReason("");
+                        }}
+                      >
+                        <XCircle size={18} color="#DC2626" />
+                        <Text style={{ color: "#DC2626", fontWeight: "700" }}>Reprovar</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={{
+                          flex: 1,
+                          height: 46,
+                          borderRadius: 12,
+                          backgroundColor: "#16A34A",
+                          flexDirection: "row",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          gap: 6,
+                        }}
+                        onPress={() =>
+                          Alert.alert(
+                            "Aprovar CREF",
+                            `Confirmar a aprovação do CREF de ${crefDetail.nome || "personal"}?`,
+                            [
+                              { text: "Cancelar", style: "cancel" },
+                              { text: "Aprovar", onPress: () => approveCref(crefDetail.id_us) },
+                            ]
+                          )
+                        }
+                      >
+                        <CheckCircle size={18} color="#fff" />
+                        <Text style={{ color: "#fff", fontWeight: "700" }}>Aprovar</Text>
+                      </TouchableOpacity>
+                    </View>
+                  ))}
+
+                {/* Ver perfil completo (reusa o sheet de perfil genérico) */}
+                <TouchableOpacity
+                  style={{
+                    marginTop: 14,
+                    height: 46,
+                    borderRadius: 12,
+                    borderWidth: 1.5,
+                    borderColor: "#192126",
+                    alignItems: "center",
+                    justifyContent: "center",
+                  }}
+                  onPress={() => {
+                    crefDetailSheetRef.current?.close();
+                    openUserDetail(crefDetail);
+                  }}
+                >
+                  <Text style={{ color: "#192126", fontWeight: "700" }}>Ver perfil completo</Text>
+                </TouchableOpacity>
+              </BottomSheetScrollView>
+            </BottomSheet>
+          )}
+
           {/* ── GESTÃO DE COMUNIDADES (componente dedicado) ── */}
           {openSheets["comunidades"] && (
             <CommunityManagementSheet
               ref={adminCommSheetRef}
               onClose={() => {
-                api
-                  .get("/comunidades")
-                  .then((r) => {
-                    const list = r?.data?.data || r?.data;
-                    setAdminCommunitiesCount(Array.isArray(list) ? list.length : 0);
-                  })
-                  .catch(() => {});
+                fetchCommunitiesCount();
               }}
             />
           )}
@@ -5171,7 +5973,21 @@ const AdminDashboardScreen: React.FC = () => {
           {openSheets["treinos"] && (
             <WorkoutManagementSheet
               ref={adminWorkoutSheetRef}
-              onClose={() => setOpenSheets((prev) => ({ ...prev, treinos: false }))}
+              onClose={() => {
+                setOpenSheets((prev) => ({ ...prev, treinos: false }));
+                fetchChallengesCount();
+              }}
+            />
+          )}
+
+          {openSheets["desafios"] && (
+            <WorkoutManagementSheet
+              ref={adminChallengeSheetRef}
+              scope="challenges"
+              onClose={() => {
+                setOpenSheets((prev) => ({ ...prev, desafios: false }));
+                fetchChallengesCount();
+              }}
             />
           )}
         </SafeAreaView>

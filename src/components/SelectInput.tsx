@@ -83,7 +83,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     fontSize: 16,
     backgroundColor: "#fff",
-    height: 48,
+    minHeight: 52, // minHeight (não height fixo) evita cortar o texto verticalmente
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
@@ -91,8 +91,10 @@ const styles = StyleSheet.create({
     position: "relative",
   },
   text: {
+    flex: 1, // ocupa o espaço disponível (mantém o chevron à direita sem espremer o texto)
     fontFamily: "Rubik_400Regular",
     fontSize: 16,
+    lineHeight: 22, // garante que ascendentes/descendentes não sejam cortados
     color: "#111",
   },
   iconContainer: {

@@ -49,6 +49,7 @@ const LevelScreen = () => {
           id_us: response.user?.id || response.user?.id_us || user?.id_us,
           sessionId: response.sessionId || response.access_token,
           isPendingSync: false, // Libera chamadas de API
+          onboarding_completed: true, // dados pessoais preenchidos → não volta ao Info
         } as any);
       }
 
@@ -83,7 +84,7 @@ const LevelScreen = () => {
   return (
     <View style={styles.container}>
       <View style={styles.topSection}>
-        <BackButton />
+        <BackButton autoTopInset />
         <Text style={styles.title}>Nível</Text>
         <Text style={styles.question}>Qual seu nível de atividade física?</Text>
         <Text style={styles.instruction}>Classifique seu nível de atividade física.</Text>

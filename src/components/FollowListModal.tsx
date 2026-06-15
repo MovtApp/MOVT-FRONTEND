@@ -105,7 +105,7 @@ const FollowListModal: React.FC<FollowListModalProps> = ({
   const renderUserItem = ({ item }: { item: User }) => {
     const isFollowing = followingStates[item.id];
     const DEFAULT_AVATAR =
-      "https://images.unsplash.com/photo-1633332755192-727a05c4013d?w=400&h=400&fit=crop";
+      "https://img.magnific.com/vetores-gratis/gradiente-azul-do-utilizador_78370-4692.jpg?t=st=1781470161~exp=1781473761~hmac=dbd6590774a9be450a09563bb91da565cebcbef28f69538cc5fc618b9eb7a5ad&w=1480";
 
     return (
       <TouchableOpacity

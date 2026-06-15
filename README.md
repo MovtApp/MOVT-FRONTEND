@@ -109,7 +109,6 @@ Movt/
 │   │   ├── Verify/
 │   │   │   ├── RecoveryScreen.tsx
 │   │   │   ├── verifyAccountScreen.tsx
-│   │   │   ├── VerifyCNPJScreen.tsx
 │   │   │   ├── verifyCompanyScreen.tsx
 │   │   │   ├── VerifyCrefScreen.tsx
 │   │   │   └── verifyPhoneScreen.tsx

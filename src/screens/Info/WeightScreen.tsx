@@ -49,7 +49,7 @@ const WeightScreen = () => {
 
   return (
     <View style={styles.container}>
-      <BackButton />
+      <BackButton autoTopInset />
       <Text style={styles.title}>Peso</Text>
       <Text style={styles.question}>Qual o seu peso?</Text>
       <Text style={styles.instruction}>Informe seu peso em quilogramas (kg)</Text>
@@ -69,9 +69,11 @@ const WeightScreen = () => {
             horizontal
             showsHorizontalScrollIndicator={false}
             snapToInterval={ITEM_WIDTH}
-            snapToAlignment="center"
+            snapToAlignment="start"
+            disableIntervalMomentum
             decelerationRate="fast"
             onMomentumScrollEnd={handleScroll}
+            onScrollEndDrag={handleScroll}
             contentContainerStyle={styles.scrollContent}
             style={styles.scrollView}
           >
@@ -231,8 +233,8 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     paddingVertical: 14,
     alignItems: "center",
-    marginBottom: 30,
-    marginTop: 30,
+    marginTop: "auto", // empurra o botão para o fim da tela (igual à AgeScreen)
+    marginBottom: 50,
   },
   advanceButtonText: {
     color: "#fff",

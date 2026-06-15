@@ -10,12 +10,13 @@ import {
 } from "react-native";
 import BackButton from "../../components/BackButton";
 import CustomInput from "../../components/CustomInput";
-import { RootStackParamList } from "../../@types/routes";
+import { VerifyStackParamList } from "../../@types/routes";
 import { useNavigation } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { api } from "@/services/api";
 import { formatCNPJ, onlyDigits, isValidCNPJ } from "@/utils/cnpj";
 import { CheckCircle2, Search } from "lucide-react-native";
+import { useAuth } from "@contexts/AuthContext";
 
 type Empresa = {
   razaoSocial: string | null;
@@ -27,7 +28,8 @@ type Empresa = {
 type CnaeItem = { codigo: string; descricao: string; permitido: boolean };
 
 const VerifyCompanyScreen = () => {
-  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  const navigation = useNavigation<NativeStackNavigationProp<VerifyStackParamList>>();
+  const { user, updateUser } = useAuth();
 
   const [cnpj, setCnpj] = useState("");
   const [loadingCompany, setLoadingCompany] = useState(true);
@@ -59,8 +61,17 @@ const VerifyCompanyScreen = () => {
     }
   };
 
+  // 0) Empresa já validada (cnpj_verified persistido no backend): esta etapa não
+  // pode retroceder. Pula direto para o CREF, sem reabrir a validação do CNPJ.
+  useEffect(() => {
+    if (user?.cnpj_verified) {
+      navigation.reset({ index: 0, routes: [{ name: "VerifyCrefScreen" }] });
+    }
+  }, [user?.cnpj_verified, navigation]);
+
   // 1) Puxa o CNPJ já cadastrado no signup e valida na Receita.
   useEffect(() => {
+    if (user?.cnpj_verified) return; // já validado → o effect 0 redireciona
     let mounted = true;
     (async () => {
       try {
@@ -130,15 +141,24 @@ const VerifyCompanyScreen = () => {
         cnae: selectedCnae.codigo,
       });
       if (data?.pending) {
+        // Revisão manual (provedores fora do ar): a empresa AINDA não foi validada,
+        // então NÃO marcamos cnpj_verified. Segue para o CREF, mas o status fica
+        // pendente até a aprovação no admin.
         Alert.alert("Em revisão", data.message, [
           {
             text: "Entendi",
-            onPress: () => navigation.navigate("Verify", { screen: "VerifyCrefScreen" }),
+            // reset: o CREF passa a ser a única rota da pilha Verify, impedindo
+            // retroceder a esta tela.
+            onPress: () => navigation.reset({ index: 0, routes: [{ name: "VerifyCrefScreen" }] }),
           },
         ]);
         return;
       }
-      navigation.navigate("Verify", { screen: "VerifyCrefScreen" });
+      // Sucesso definitivo: o backend já gravou cnpj_verified=true. Refletimos no
+      // estado local para que esta etapa não reabra (gate do Verify usa cnpj_verified).
+      await updateUser({ cnpj_verified: true });
+      // Etapa concluída: reseta a pilha para não permitir voltar a esta tela.
+      navigation.reset({ index: 0, routes: [{ name: "VerifyCrefScreen" }] });
     } catch (err: any) {
       Alert.alert(
         "Erro",

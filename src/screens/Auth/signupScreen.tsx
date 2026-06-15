@@ -106,7 +106,7 @@ export const SignUpScreen = ({ navigation }: Props) => {
         nome: data.nome,
         email: data.email,
         senha: data.senha,
-        cpf_cnpj: data.cpf_cnpj,
+        cpf_cnpj: docDigits, // envia só os 14/11 dígitos (sem máscara) para o backend
         data_nascimento: data.data_nascimento,
         telefone: data.telefone,
         tipo_documento: tab,
