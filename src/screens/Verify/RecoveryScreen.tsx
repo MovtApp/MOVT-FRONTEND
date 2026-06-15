@@ -191,7 +191,9 @@ const RecoveryScreen = () => {
           <CheckCircle2 size={80} color="#CBFB5E" />
           <Text style={styles.titleSuccess}>Senha Redefinida!</Text>
           <Text style={styles.subtitleSuccess}>
-            Sua senha foi alterada com sucesso. Você já pode fazer login com sua nova credencial.
+            {isLoggedIn
+              ? "Sua senha foi alterada com sucesso."
+              : "Sua senha foi alterada com sucesso. Você já pode fazer login com sua nova credencial."}
           </Text>
         </View>
       );
@@ -214,7 +216,15 @@ const RecoveryScreen = () => {
               ? handleVerifyCode
               : step === 3
                 ? handleResetPassword
-                : () => navigation.navigate("Auth", { screen: "SignInScreen" })
+                : () =>
+                    isLoggedIn
+                      ? // Logado (veio das Configurações): mantém a sessão e volta à Home.
+                        navigation.reset({
+                          index: 0,
+                          routes: [{ name: "App", params: { screen: "HomeStack" } as never }],
+                        })
+                      : // Não logado (veio do "Esqueci a senha"): volta ao login.
+                        navigation.navigate("Auth", { screen: "SignInScreen" })
         }
         disabled={loading}
       >
@@ -228,7 +238,9 @@ const RecoveryScreen = () => {
                 ? "Verificar código"
                 : step === 3
                   ? "Redefinir senha"
-                  : "Voltar ao login"}
+                  : isLoggedIn
+                    ? "Voltar ao início"
+                    : "Voltar ao login"}
           </Text>
         )}
       </TouchableOpacity>
