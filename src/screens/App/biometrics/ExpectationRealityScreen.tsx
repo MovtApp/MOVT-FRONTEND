@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect, useRef, useCallback } from "react";
+import { withPremiumGate } from "@components/withPremiumGate";
 import {
   View,
   Text,
@@ -615,4 +616,10 @@ const styles = StyleSheet.create({
   closeSheetBtnText: { color: "#1E293B", fontSize: 16, fontWeight: "900" },
 });
 
-export default ExpectationRealityScreen;
+export default withPremiumGate(
+  ExpectationRealityScreen,
+  "dadosAvancados",
+  "Expectativa x Realidade",
+  "O comparativo anatômico e as metas físicas são exclusivos dos planos Premium e Família.",
+  { name: "DataScreen" }
+);

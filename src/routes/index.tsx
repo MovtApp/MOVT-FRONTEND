@@ -3,6 +3,7 @@ import { NavigationContainer } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 // import { SplashScreen } from "../screens/splashScreen"; // Removida importação não utilizada
 import { RootStackParamList } from "../@types/routes"; // Corrigida a importação de RootStackParamList
+import { navigationRef } from "../services/navigationRef";
 
 // Import routes
 import { AuthRoutes } from "./Auth.routes";
@@ -18,7 +19,7 @@ interface RoutesProps {
 
 export function Routes({ initialRouteName }: RoutesProps) {
   return (
-    <NavigationContainer>
+    <NavigationContainer ref={navigationRef}>
       <Stack.Navigator
         initialRouteName={initialRouteName || "Auth"} // Usa a prop, ou 'Auth' como padrão
         screenOptions={{

@@ -2,12 +2,11 @@ import React from "react";
 import {
   View,
   ActivityIndicator,
-  ScrollView,
   StyleSheet,
   TouchableOpacity,
   Text,
 } from "react-native";
-import BottomSheet, { BottomSheetView } from "@gorhom/bottom-sheet";
+import BottomSheet, { BottomSheetScrollView } from "@gorhom/bottom-sheet";
 import { api } from "../services/api";
 import { PersonalTrainerCard, PersonalTrainer } from "@components/PersonalTrainerCard";
 
@@ -110,39 +109,41 @@ export function DetailsBottomSheet({
       backgroundStyle={styles.bottomSheetBackground}
       handleIndicatorStyle={styles.handleIndicator}
     >
-      <BottomSheetView style={styles.bottomSheetView}>
-        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ flexGrow: 1 }}>
-          {/* Cabeçalho */}
-          <View style={styles.headerContainer}>
-            <Text style={styles.headerTitle}>{title}</Text>
+      <BottomSheetScrollView
+        style={styles.bottomSheetView}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* Cabeçalho */}
+        <View style={styles.headerContainer}>
+          <Text style={styles.headerTitle}>{title}</Text>
+        </View>
+        {/* Lista de Personal Trainers */}
+        {loadingToShow ? (
+          <View style={styles.loaderContainer}>
+            <ActivityIndicator size="large" color="#1e3a8a" />
           </View>
-          {/* Lista de Personal Trainers */}
-          {loadingToShow ? (
-            <View style={styles.loaderContainer}>
-              <ActivityIndicator size="large" color="#1e3a8a" />
-            </View>
-          ) : !!trainersToRender.length ? (
-            trainersToRender.map((trainer) => (
-              <PersonalTrainerCard
-                key={trainer.id}
-                trainer={trainer}
-                onPress={onTrainerPress ? onTrainerPress : toggleSelect}
-              />
-            ))
-          ) : (
-            <View style={styles.noDataContainer}>
-              <Text style={styles.noDataText}>{noDataMessage}</Text>
-            </View>
-          )}
-          {!!selectedIds.length && (
-            <View style={styles.footerActions}>
-              <TouchableOpacity style={styles.viewSelectedButton} onPress={handleViewSelected}>
-                <Text style={styles.viewSelectedText}>Ver selecionados ({selectedIds.length})</Text>
-              </TouchableOpacity>
-            </View>
-          )}
-        </ScrollView>
-      </BottomSheetView>
+        ) : !!trainersToRender.length ? (
+          trainersToRender.map((trainer) => (
+            <PersonalTrainerCard
+              key={trainer.id}
+              trainer={trainer}
+              onPress={onTrainerPress ? onTrainerPress : toggleSelect}
+            />
+          ))
+        ) : (
+          <View style={styles.noDataContainer}>
+            <Text style={styles.noDataText}>{noDataMessage}</Text>
+          </View>
+        )}
+        {!!selectedIds.length && (
+          <View style={styles.footerActions}>
+            <TouchableOpacity style={styles.viewSelectedButton} onPress={handleViewSelected}>
+              <Text style={styles.viewSelectedText}>Ver selecionados ({selectedIds.length})</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+      </BottomSheetScrollView>
     </BottomSheet>
   );
 }
@@ -164,10 +165,12 @@ const styles = StyleSheet.create({
   bottomSheetView: {
     backgroundColor: "#fff",
     borderRadius: 8,
-    padding: 16,
-    minHeight: 400,
-    justifyContent: "flex-start",
     flex: 1,
+  },
+  scrollContent: {
+    padding: 16,
+    flexGrow: 1,
+    justifyContent: "flex-start",
   },
   headerContainer: { alignItems: "flex-start", marginBottom: 16 },
   headerTitle: {

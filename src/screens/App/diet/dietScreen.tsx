@@ -1,4 +1,5 @@
 import React, { useMemo, useRef, useState, useEffect, useCallback } from "react";
+import { withPremiumGate } from "@components/withPremiumGate";
 import {
   View,
   Text,
@@ -575,4 +576,10 @@ const styles = StyleSheet.create({
   },
 });
 
-export default DietScreen;
+export default withPremiumGate(
+  DietScreen,
+  "dietas",
+  "Dietas",
+  "Os planos de dieta são exclusivos dos planos Premium e Família.",
+  { name: "HomeScreen" }
+);

@@ -1,3 +1,7 @@
+# Firebase config (secrets) — baixar do Firebase Console, não commitar
+google-services.json
+GoogleService-Info.plist
+
 # Logs
 logs
 *.log

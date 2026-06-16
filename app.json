@@ -15,6 +15,7 @@
     "ios": {
       "bundleIdentifier": "com.dsvmTechnology.movtapp",
       "supportsTablet": false,
+      "googleServicesFile": "./GoogleService-Info.plist",
       "infoPlist": {
         "UIBackgroundModes": [
           "background-fetch",
@@ -24,7 +25,8 @@
         "NSLocationWhenInUseUsageDescription": "Este aplicativo precisa de acesso à sua localização para mostrar você no mapa e rastrear atividades de ciclismo.",
         "NSLocationAlwaysAndWhenInUseUsageDescription": "Este aplicativo precisa de acesso à localização em segundo plano para rastrear suas rotas de exercício.",
         "NSHealthShareUsageDescription": "Este aplicativo precisa de acesso aos seus dados de saúde para mostrar seu progresso fitness.",
-        "NSHealthUpdateUsageDescription": "Este aplicativo precisa registrar seus dados de saúde para rastrear suas atividades."
+        "NSHealthUpdateUsageDescription": "Este aplicativo precisa registrar seus dados de saúde para rastrear suas atividades.",
+        "ITSAppUsesNonExemptEncryption": false
       }
     },
     "android": {
@@ -34,6 +36,7 @@
         }
       },
       "package": "com.dsvmTechnology.movtapp",
+      "googleServicesFile": "./google-services.json",
       "versionCode": 32,
       "edgeToEdgeEnabled": true,
       "allowBackup": false,
@@ -61,6 +64,8 @@
       "favicon": "./assets/icon.png"
     },
     "plugins": [
+      "@react-native-firebase/app",
+      "@react-native-firebase/auth",
       "expo-localization",
       "expo-web-browser",
       "expo-sensors",
@@ -82,6 +87,9 @@
             "minSdkVersion": 26,
             "compileSdkVersion": 35,
             "targetSdkVersion": 35
+          },
+          "ios": {
+            "useFrameworks": "static"
           }
         }
       ]

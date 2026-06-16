@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useRef, useCallback, useEffect } from "react";
+import { withPremiumGate } from "@components/withPremiumGate";
 import {
   View,
   Text,
@@ -1431,4 +1432,10 @@ const hs = StyleSheet.create({
   splitVal: { fontSize: 14, fontWeight: "700", color: "#475569", flex: 1, textAlign: "center" },
 });
 
-export default CyclingScreen;
+export default withPremiumGate(
+  CyclingScreen,
+  "dadosAvancados",
+  "Ciclismo",
+  "O rastreamento de ciclismo por GPS é exclusivo dos planos Premium e Família.",
+  { name: "DataScreen" }
+);

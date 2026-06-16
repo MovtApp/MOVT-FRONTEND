@@ -1,4 +1,5 @@
 import React from "react";
+import { withPremiumGate } from "@components/withPremiumGate";
 import {
   View,
   Text,
@@ -608,4 +609,9 @@ const styles = StyleSheet.create({
   },
 });
 
-export default ChallengeDetails;
+export default withPremiumGate(
+  ChallengeDetails,
+  "desafios",
+  "Desafios",
+  "Os desafios são exclusivos dos planos Premium e Família."
+);

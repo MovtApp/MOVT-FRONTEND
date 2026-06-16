@@ -13,6 +13,7 @@ import { LocationProvider } from "@contexts/LocationContext";
 import { NotificationProvider } from "@contexts/NotificationContext";
 import { BottomNavProvider } from "@contexts/BottomNavContext";
 import { BottomSheetModalProvider } from "@gorhom/bottom-sheet";
+import { UpgradeSheetProvider } from "@components/UpgradeSheetProvider";
 import { AppDataProvider } from "@contexts/AppDataContext";
 import { StatusBar, ActivityIndicator, View, InteractionManager } from "react-native";
 import {
@@ -166,7 +167,9 @@ function App() {
             <BottomSheetModalProvider>
               <AuthProvider>
                 <AppDataProvider>
-                  <AppContent />
+                  <UpgradeSheetProvider>
+                    <AppContent />
+                  </UpgradeSheetProvider>
                 </AppDataProvider>
               </AuthProvider>
             </BottomSheetModalProvider>

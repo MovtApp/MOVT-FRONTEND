@@ -15,6 +15,11 @@ import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { RootStackParamList } from "@typings/routes";
 import { api } from "@/services/api";
 import { useAuth } from "@contexts/AuthContext";
+import {
+  startPhoneVerification,
+  confirmPhoneCode,
+  PhoneConfirmation,
+} from "@/services/firebasePhoneAuth";
 
 const VerifyPhoneScreen = () => {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
@@ -24,24 +29,41 @@ const VerifyPhoneScreen = () => {
   const [sending, setSending] = useState(false); // enviando/reenviando o SMS
   const [verifying, setVerifying] = useState(false); // conferindo o código
   const [sent, setSent] = useState(false); // já enviou ao menos uma vez
+  const [phoneMasked, setPhoneMasked] = useState(""); // número do cadastro, mascarado p/ exibir
+  const phoneRef = React.useRef<string | null>(null); // telefone E.164 do cadastro (fixo)
+  const confirmationRef = React.useRef<PhoneConfirmation | null>(null); // sessão de verificação do Firebase
 
-  // Envia o código por SMS para o telefone do cadastro.
+  // Busca o telefone do cadastro (fixo) e dispara o SMS pelo Firebase.
+  // O número NÃO é editável pelo usuário: vem do backend e o backend confere,
+  // ao validar o ID token, que o número do Firebase bate com o do cadastro.
   const sendCode = async (isResend = false) => {
     setSending(true);
     try {
-      const { data } = await api.post("/user/send-phone-code");
-      // Telefone já verificado no backend → segue o fluxo.
-      if (data?.alreadyVerified) {
-        await updateUser({ phone_verified: true });
-        goNext();
-        return;
+      // Garante que temos o telefone do cadastro em E.164.
+      if (!phoneRef.current) {
+        const { data } = await api.get("/user/phone");
+        // Telefone já verificado no backend → segue o fluxo.
+        if (data?.alreadyVerified) {
+          await updateUser({ phone_verified: true });
+          goNext();
+          return;
+        }
+        if (!data?.phone) {
+          throw new Error("Não encontramos o telefone do seu cadastro.");
+        }
+        phoneRef.current = data.phone; // E.164: +55DDDNNNNNNNNN
+        setPhoneMasked(data.masked || data.phone);
       }
+
+      confirmationRef.current = await startPhoneVerification(phoneRef.current!);
       setSent(true);
       if (isResend) Alert.alert("Código reenviado", "Enviamos um novo código por SMS.");
     } catch (err: any) {
       Alert.alert(
         "Erro",
-        err.response?.data?.error || "Não foi possível enviar o código por SMS. Tente novamente."
+        err.response?.data?.error ||
+          err?.message ||
+          "Não foi possível enviar o código por SMS. Tente novamente."
       );
     } finally {
       setSending(false);
@@ -77,15 +99,25 @@ const VerifyPhoneScreen = () => {
       Alert.alert("Código incompleto", "Digite os 6 dígitos recebidos por SMS.");
       return;
     }
+    if (!confirmationRef.current) {
+      Alert.alert("Erro", "Sessão de verificação expirada. Toque em 'Reenviar Código'.");
+      return;
+    }
     setVerifying(true);
     try {
-      await api.post("/user/verify-phone", { code });
+      // Confirma o código no Firebase e pega o ID token.
+      const idToken = await confirmPhoneCode(confirmationRef.current, code);
+      // Backend valida o token (firebase-admin), confere que o número bate com o
+      // do cadastro e marca phone_verified.
+      await api.post("/user/verify-phone-firebase", { idToken });
       await updateUser({ phone_verified: true });
       goNext();
     } catch (err: any) {
       Alert.alert(
         "Erro",
-        err.response?.data?.error || "Código inválido ou expirado. Tente novamente."
+        err.response?.data?.error ||
+          err?.message ||
+          "Código inválido ou expirado. Tente novamente."
       );
     } finally {
       setVerifying(false);
@@ -104,8 +136,8 @@ const VerifyPhoneScreen = () => {
         />
         <Text style={styles.title}>Validar telefone</Text>
         <Text style={styles.subtitle}>
-          Enviamos um código de 6 dígitos por SMS para o telefone do seu cadastro. Digite-o abaixo
-          para confirmar seu número.
+          Enviamos um código de 6 dígitos por SMS para o telefone do seu cadastro
+          {phoneMasked ? ` (${phoneMasked})` : ""}. Digite-o abaixo para confirmar seu número.
         </Text>
 
         <View style={{ marginTop: 30 }}>

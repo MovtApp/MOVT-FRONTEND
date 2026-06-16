@@ -28,8 +28,10 @@ import {
   ArrowRight,
   ScanFace,
   Sparkles,
+  Lock,
 } from "lucide-react-native";
 import { useAuth } from "../../../contexts/AuthContext";
+import { usePlanAccess } from "@hooks/usePlanAccess";
 import ECGDisplay from "../../../components/ECGDisplay";
 import MiniRadarChart, { RadarData } from "../../../components/MiniRadarChart";
 import WaterWave from "../../../components/WaterWave";
@@ -359,6 +361,9 @@ interface DataContentProps {
 }
 
 const DataContent: React.FC<DataContentProps> = ({ userId, targetDate, navigation }) => {
+  // Expectativa x Realidade é recurso de dados avançados (premium/família).
+  const { isBlocked, goPremium } = usePlanAccess();
+  const erBlocked = isBlocked("dadosAvancados");
   const {
     heartRate,
     isWearOsConnected,
@@ -618,11 +623,13 @@ const DataContent: React.FC<DataContentProps> = ({ userId, targetDate, navigatio
         </TouchableOpacity>
       </View>
 
-      {/* Expectation x Reality Card - Professional Clean Version */}
+      {/* Expectation x Reality Card - bloqueado para o plano free */}
       <TouchableOpacity
         activeOpacity={0.7}
-        style={styles.comparisonCard}
-        onPress={() => navigation.navigate("ExpectationRealityScreen" as never)}
+        style={[styles.comparisonCard, erBlocked && { opacity: 0.6 }]}
+        onPress={() =>
+          erBlocked ? goPremium() : navigation.navigate("ExpectationRealityScreen" as never)
+        }
       >
         <LinearGradient
           colors={["rgba(99, 102, 241, 0.08)", "rgba(167, 139, 250, 0.03)"]}
@@ -633,10 +640,20 @@ const DataContent: React.FC<DataContentProps> = ({ userId, targetDate, navigatio
         <View style={styles.comparisonContent}>
           <View style={{ flex: 1, marginLeft: 16 }}>
             <Text style={styles.comparisonTitle}>Expectativa x Realidade</Text>
-            <Text style={styles.comparisonSubTitle}>Comparativo anatômico e metas físicas</Text>
+            <Text style={styles.comparisonSubTitle}>
+              {erBlocked
+                ? "Exclusivo Premium · toque para desbloquear"
+                : "Comparativo anatômico e metas físicas"}
+            </Text>
           </View>
 
-          <ArrowRight size={18} color="#94A3B8" />
+          {erBlocked ? (
+            <View style={styles.lockBadgeData}>
+              <Lock size={16} color="#192126" />
+            </View>
+          ) : (
+            <ArrowRight size={18} color="#94A3B8" />
+          )}
         </View>
       </TouchableOpacity>
 
@@ -1250,6 +1267,14 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     paddingHorizontal: 16,
+  },
+  lockBadgeData: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: "#BBF246",
+    alignItems: "center",
+    justifyContent: "center",
   },
   comparisonIconBox: {
     width: 48,

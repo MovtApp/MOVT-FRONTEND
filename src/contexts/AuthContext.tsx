@@ -59,7 +59,7 @@ interface User {
   status_verificacao?: string; // "pendente" | "aprovado" | "reprovado" | ...
   cref_submitted?: boolean; // já enviou os documentos do CREF (document_url != null)
   cref_rejeicao_motivo?: string | null; // motivo da reprovação manual, exibido na tela de status
-  phone_verified?: boolean; // telefone validado por SMS (Twilio Verify)
+  phone_verified?: boolean; // telefone validado por SMS (Firebase Phone Auth)
   onboarding_completed?: boolean; // já preencheu os dados pessoais (Info: altura/peso/etc.)
 }
 

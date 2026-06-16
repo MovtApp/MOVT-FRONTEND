@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import { withPremiumGate } from "@components/withPremiumGate";
 import {
   View,
   Text,
@@ -741,4 +742,10 @@ const styles = StyleSheet.create({
   heatmapCell: { borderRadius: 10 },
 });
 
-export default SleepScreen;
+export default withPremiumGate(
+  SleepScreen,
+  "dadosAvancados",
+  "Sono",
+  "O monitoramento avançado de sono é exclusivo dos planos Premium e Família.",
+  { name: "DataScreen" }
+);
