@@ -12,6 +12,8 @@ buildscript {
     classpath('com.android.tools.build:gradle')
     classpath('com.facebook.react:react-native-gradle-plugin')
     classpath('org.jetbrains.kotlin:kotlin-gradle-plugin')
+    // Firebase: processa o google-services.json (Phone Auth / validação de telefone)
+    classpath('com.google.gms:google-services:4.4.2')
   }
 }
 

@@ -1,0 +1,46 @@
+{
+  "project_info": {
+    "project_number": "729287466216",
+    "project_id": "project-90fe8125-2ee6-4141-a10",
+    "storage_bucket": "project-90fe8125-2ee6-4141-a10.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:729287466216:android:e323e5523b414cfeb83d5d",
+        "android_client_info": {
+          "package_name": "com.dsvmTechnology.movtapp"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "729287466216-s52iq902p1s5sincb0rr7cm97l1kdn21.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBjlwNLVhI28CLQws1qg9DoypKSlmpoj1g"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "729287466216-s52iq902p1s5sincb0rr7cm97l1kdn21.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "729287466216-pm4245f415fo73ksjl4m3vvvo6vlhdh8.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.dsvmTechnology.movtapp"
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

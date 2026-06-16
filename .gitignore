@@ -1,6 +1,11 @@
-# Firebase config (secrets) — baixar do Firebase Console, não commitar
-google-services.json
+# Firebase config — só o da RAIZ fica fora do git (usado pelo prebuild do Expo).
+# O de android/app/ é NECESSÁRIO no build EAS e é seguro versionar p/ Android.
+/google-services.json
 GoogleService-Info.plist
+
+# EAS / Android signing (secrets) — keystore e senha, NUNCA commitar
+credentials.json
+credentials/
 
 # Logs
 logs
