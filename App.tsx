@@ -9,6 +9,7 @@ import { KeyboardProvider } from "react-native-keyboard-controller";
 import { Routes } from "@routes/index";
 import { AuthProvider, useAuth } from "@contexts/AuthContext";
 import { usePreloadChat } from "@/hooks/useChat";
+import { usePushNotifications } from "@/hooks/usePushNotifications";
 import { LocationProvider } from "@contexts/LocationContext";
 import { NotificationProvider } from "@contexts/NotificationContext";
 import { BottomNavProvider } from "@contexts/BottomNavContext";
@@ -28,6 +29,7 @@ import GlobalErrorBoundary from "./src/components/GlobalErrorBoundary";
 import * as Sentry from "@sentry/react-native";
 import { preInitializeHC } from "@services/healthConnectService";
 import { preloadTodayHealth } from "@/hooks/useHealthTracking";
+import { PHONE_VERIFICATION_ENABLED } from "@/config/featureFlags";
 // Import por efeito colateral: registra a TaskManager task de rastreamento de
 // localização no boot, para o SO conseguir entregar fixes de GPS em background
 // (mesmo com a tela apagada / após restart do processo).
@@ -118,7 +120,9 @@ function AppContent() {
       const needsProfessionalVerification = !isAdmin && isTrainer && !user.cref_verified;
       // Telefone é etapa universal (todas as contas). Contas antigas já vêm com
       // phone_verified=true (grandfather no backend), então não são afetadas.
-      const needsPhoneVerification = !isAdmin && user.phone_verified === false;
+      // Desativada temporariamente via PHONE_VERIFICATION_ENABLED (ver featureFlags).
+      const needsPhoneVerification =
+        PHONE_VERIFICATION_ENABLED && !isAdmin && user.phone_verified === false;
       // Dados pessoais (onboarding Info) é o último gate universal, após todas as
       // verificações. Contas antigas já vêm com onboarding_completed=true.
       const needsOnboarding = !isAdmin && user.onboarding_completed === false;
@@ -146,11 +150,19 @@ function AppContent() {
     <BottomNavProvider>
       <LocationProvider>
         <NotificationProvider>
+          <PushNotificationsBridge />
           <Routes key={currentRoute} initialRouteName={currentRoute} />
         </NotificationProvider>
       </LocationProvider>
     </BottomNavProvider>
   );
+}
+
+// Ativa o registro de push + listeners de notificação. Vive dentro do
+// NotificationProvider para ler o chat ativo (supressão estilo WhatsApp).
+function PushNotificationsBridge() {
+  usePushNotifications();
+  return null;
 }
 
 function App() {

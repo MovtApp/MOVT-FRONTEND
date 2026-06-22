@@ -33,7 +33,6 @@ import { supabase } from "@/services/supabaseClient";
 import { api } from "@/services/api";
 import { searchService } from "@/services/searchService";
 import { followUser } from "@/services/followService";
-import Constants, { ExecutionEnvironment } from "expo-constants";
 
 type ChatScreenNavigationProp = NativeStackNavigationProp<AppStackParamList, "ChatScreen">;
 
@@ -49,71 +48,10 @@ interface Contact {
   followStatus?: FollowStatus;
 }
 
-// Configuração condicional de notificações (Evita erro no Expo Go Android)
-const Notifications = Platform.OS === "ios" ? require("expo-notifications") : null;
-
-// Configurar notificações (Apenas iOS)
-if (Platform.OS === "ios" && Notifications) {
-  Notifications.setNotificationHandler({
-    handleNotification: async () => ({
-      shouldShowAlert: true,
-      shouldPlaySound: true,
-      shouldSetBadge: true,
-      shouldShowBanner: true,
-      shouldShowList: true,
-    }),
-  });
-}
-
-// Função para solicitar permissão de notificação
-const registerForPushNotificationsAsync = async () => {
-  // Ignorar completamente no Android (Expo Go não suporta) ou se não houver o módulo
-  if (Platform.OS !== "ios" || !Notifications) {
-    return null;
-  }
-
-  try {
-    const { status: existingStatus } = await Notifications.getPermissionsAsync();
-    let finalStatus = existingStatus;
-    if (existingStatus !== "granted") {
-      const { status } = await Notifications.requestPermissionsAsync();
-      finalStatus = status;
-    }
-    if (finalStatus !== "granted") {
-      return null;
-    }
-    const tokenData = await Notifications.getExpoPushTokenAsync({
-      projectId: Constants?.expoConfig?.extra?.eas?.projectId,
-    });
-    if (__DEV__) console.log("Expo Push Token registrado.");
-    return tokenData.data;
-  } catch (error) {
-    console.error("Error registering for push notifications:", error);
-    return null;
-  }
-};
-
-// Função para exibir notificação local
-const scheduleNotification = async (title: string, body: string, data?: any) => {
-  if (Platform.OS !== "ios" || !Notifications) {
-    return;
-  }
-
-  try {
-    await Notifications.scheduleNotificationAsync({
-      content: {
-        title,
-        body,
-        data: data || {},
-      },
-      trigger: null,
-    });
-  } catch (error) {
-    console.log("Erro ao agendar notificação:", error);
-  }
-};
-
-// Os listeners serão configurados dentro do componente para acessar a navegação
+// Notificações de SO (push) são centralizadas em `usePushNotifications`
+// (handler + listeners + deep-link) e em `pushNotificationService` (permissão +
+// token), montados uma vez no App.tsx para Android e iOS. O código local
+// iOS-only que existia aqui foi removido para não duplicar/conflitar.
 
 const ChatScreen = () => {
   const [searchQuery, setSearchQuery] = useState("");
@@ -220,55 +158,14 @@ const ChatScreen = () => {
   // Referência para armazenar a inscrição do Supabase
   const messagesSubscriptionRef = useRef<any>(null);
 
-  // Referências para listeners de notificação
-  const notificationListener = useRef<any>(null);
-  const responseListener = useRef<any>(null);
+  // Listeners de notificação e o registro de push agora são globais
+  // (usePushNotifications, montado no App.tsx) — não duplicamos aqui.
 
-  useEffect(() => {
-    // Configurar listeners de notificação (Apenas se não for Android no Expo Go)
-    if (Platform.OS === "ios" && Notifications) {
-      notificationListener.current = Notifications.addNotificationReceivedListener(
-        (notification: any) => {
-          console.log("Notification received:", notification);
-        }
-      );
-
-      responseListener.current = Notifications.addNotificationResponseReceivedListener(
-        (response: any) => {
-          console.log("Notification response received:", response);
-          const { chatId, participantName, participantAvatar, participantId } =
-            response.notification.request.content.data || {};
-
-          if (chatId && participantName) {
-            navigation.navigate("Chat", {
-              chatId: String(chatId),
-              participantName: participantName as string,
-              participantAvatar: participantAvatar as string,
-              participantId: String(participantId),
-            } as any);
-          }
-        }
-      );
-    }
-
-    return () => {
-      if (notificationListener.current) {
-        notificationListener.current.remove();
-      }
-      if (responseListener.current) {
-        responseListener.current.remove();
-      }
-    };
-  }, [navigation]);
-
-  // Adiado para depois da transição: a lista de chats já vem do cache; contatos,
-  // refresh e registro de push rodam após a navegação assentar.
+  // Adiado para depois da transição: a lista de chats já vem do cache; contatos
+  // e refresh rodam após a navegação assentar.
   useDeferredFocusEffect(() => {
     fetchContacts();
     refreshChats();
-
-    // Registrar para notificações push quando o app estiver em primeiro plano
-    registerForPushNotificationsAsync();
 
     // Limpar ao sair da tela
     return () => {
@@ -276,7 +173,7 @@ const ChatScreen = () => {
         messagesSubscriptionRef.current.unsubscribe();
       }
     };
-  }, [supabaseUserId, refreshChats, fetchContacts, registerForPushNotificationsAsync]);
+  }, [supabaseUserId, refreshChats, fetchContacts]);
 
   const handleStartChat = async (contact: Contact) => {
     sheetRef.current?.dismiss();

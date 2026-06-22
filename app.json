@@ -69,6 +69,12 @@
       "expo-localization",
       "expo-web-browser",
       "expo-sensors",
+      [
+        "expo-notifications",
+        {
+          "color": "#192126"
+        }
+      ],
       "./plugins/withNdkVersion.js",
       "./plugins/withHealthConnectManifest.js",
       "react-native-health-connect",

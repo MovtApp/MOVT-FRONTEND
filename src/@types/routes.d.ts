@@ -54,6 +54,7 @@ export type AppStackParamList = {
         }[];
       }
     | undefined;
+  NotificationPreferencesScreen: undefined;
   CaloriesScreen: undefined;
   CyclingScreen: undefined;
   HeartbeatsScreen: undefined;
@@ -189,6 +190,8 @@ export type VerifyStackParamList = {
 };
 
 export type InfoStackParamList = {
+  ProfileMediaScreen: undefined;
+  ProfileDetailsScreen: undefined;
   AgeScreen: undefined;
   GenderScreen: undefined;
   HeightScreen: { age?: number } | undefined;

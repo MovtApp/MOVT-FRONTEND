@@ -21,7 +21,6 @@ import { FooterVersion } from "@components/FooterVersion";
 
 const ConfigScreen: React.FC = () => {
   const navigation = useNavigation<any>();
-  const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [privateAccount, setPrivateAccount] = useState(true);
 
   const SettingItem = ({
@@ -110,10 +109,8 @@ const ConfigScreen: React.FC = () => {
           <SectionTitle title="Notificações" />
           <SettingItem
             icon={Bell}
-            label="Notificações de aplicativos"
-            hasSwitch
-            switchValue={notificationsEnabled}
-            onSwitchChange={setNotificationsEnabled}
+            label="Preferências de notificação"
+            onPress={() => navigation.navigate("NotificationPreferencesScreen")}
           />
 
           <Separator />
