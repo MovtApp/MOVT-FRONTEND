@@ -1,5 +1,6 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { api } from "./api";
+import { enqueue, registerSyncHandler } from "./syncQueue";
 
 // ─── Tipos ─────────────────────────────────────────────────────────────────────
 
@@ -192,8 +193,17 @@ export async function carregarMissaoLocal(): Promise<UserMission | null> {
   }
 }
 
+// O POST /user/mission já é idempotente no backend (ON CONFLICT (id_us) DO
+// UPDATE — uma linha por usuário), então o reenvio offline-first é seguro sem
+// precisar de clientId.
+registerSyncHandler("mission", (payload) => api.post("/user/mission", payload).then(() => {}));
+
+/**
+ * Salva a missão de forma offline-first: grava local na hora e enfileira o envio
+ * ao backend. Offline → fica pendente e sincroniza quando a conexão voltar.
+ */
 export async function salvarMissaoBackend(missao: UserMission): Promise<void> {
-  await api.post("/user/mission", missao);
+  await enqueue("mission", missao);
 }
 
 export async function carregarMissaoBackend(): Promise<UserMission | null> {

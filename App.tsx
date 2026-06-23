@@ -16,6 +16,8 @@ import { BottomNavProvider } from "@contexts/BottomNavContext";
 import { BottomSheetModalProvider } from "@gorhom/bottom-sheet";
 import { UpgradeSheetProvider } from "@components/UpgradeSheetProvider";
 import { AppDataProvider } from "@contexts/AppDataContext";
+import { ConnectivityProvider } from "@contexts/ConnectivityContext";
+import OfflineBanner from "@components/OfflineBanner";
 import { StatusBar, ActivityIndicator, View, InteractionManager } from "react-native";
 import {
   useFonts,
@@ -34,6 +36,10 @@ import { PHONE_VERIFICATION_ENABLED } from "@/config/featureFlags";
 // localização no boot, para o SO conseguir entregar fixes de GPS em background
 // (mesmo com a tela apagada / após restart do processo).
 import "@services/locationTrackingService";
+// Registra os handlers de escrita offline-first (água, missão, …) ANTES de
+// ligar a fila, para o flush de boot já encontrar todos os despachantes.
+import "@services/registerSyncHandlers";
+import { initSyncQueue } from "@services/syncQueue";
 
 // Congela telas fora de foco: elas param de renderizar enquanto não estão
 // visíveis, reduzindo o trabalho concorrente na JS thread durante as transições.
@@ -96,6 +102,14 @@ function AppContent() {
 
   // Inicia o carregamento de chats em background
   usePreloadChat();
+
+  // Liga o motor de sincronização offline-first (fila de escrita) assim que há
+  // sessão: reenvia pendências de sessões anteriores e arma os gatilhos de
+  // reconexão/foreground. initSyncQueue é idempotente.
+  React.useEffect(() => {
+    if (!user?.sessionId || user?.isPendingSync) return;
+    initSyncQueue();
+  }, [user?.sessionId, user?.isPendingSync]);
 
   // Pré-carrega o resumo de saúde de hoje assim que a sessão está disponível,
   // para que a tela de Dados já abra com os números prontos (sem fetch no mount).
@@ -176,15 +190,18 @@ function App() {
         >
           <StatusBar barStyle={"dark-content"} />
           <KeyboardProvider>
-            <BottomSheetModalProvider>
-              <AuthProvider>
-                <AppDataProvider>
-                  <UpgradeSheetProvider>
-                    <AppContent />
-                  </UpgradeSheetProvider>
-                </AppDataProvider>
-              </AuthProvider>
-            </BottomSheetModalProvider>
+            <ConnectivityProvider>
+              <BottomSheetModalProvider>
+                <AuthProvider>
+                  <AppDataProvider>
+                    <UpgradeSheetProvider>
+                      <AppContent />
+                    </UpgradeSheetProvider>
+                  </AppDataProvider>
+                </AuthProvider>
+              </BottomSheetModalProvider>
+              <OfflineBanner />
+            </ConnectivityProvider>
             <FlashMessage position="top" />
           </KeyboardProvider>
         </GestureHandlerRootView>

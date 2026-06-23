@@ -1,5 +1,6 @@
 import { api } from "./api";
 import { secureGet } from "./secureStore";
+import { enqueue, registerSyncHandler } from "./syncQueue";
 
 export interface CalorieData {
   date: string;
@@ -78,47 +79,57 @@ export const getCaloriesData = (
   date?: string
 ): Promise<CalorieStats> => getHealthMetricData("calories", timeframe, date);
 
+/** Payload enfileirado para uma escrita de métrica de saúde. */
+interface HealthMetricJob {
+  metric: string;
+  value: number;
+  timestamp: string;
+  date: string; // YYYY-MM-DD local
+}
+
 /**
- * Salva qualquer métrica de saúde no backend
+ * Despacha de fato a métrica para o backend. Manda o `clientId` para o backend
+ * deduplicar (ON CONFLICT) — assim o reenvio offline-first nunca duplica linha.
+ * Registrado no syncQueue sob o kind "healthMetric".
+ */
+const postHealthMetric = async (job: HealthMetricJob, clientId: string): Promise<void> => {
+  await api.post(`/dados/${job.metric}`, {
+    value: job.value,
+    timestamp: job.timestamp,
+    date: job.date, // Garante que o backend usa a data local, não UTC
+    clientId, // idempotência
+  });
+};
+
+registerSyncHandler("healthMetric", (payload, clientId) =>
+  postHealthMetric(payload as HealthMetricJob, clientId)
+);
+
+/**
+ * Salva qualquer métrica de saúde de forma offline-first: enfileira a escrita
+ * (gravada no disco na hora) e tenta empurrar para o backend. Se estiver offline,
+ * fica pendente e sincroniza quando a conexão voltar — não lança erro de rede.
  */
 export const saveHealthMetricData = async (
   metric: string,
   value: number,
   targetDate?: Date
 ): Promise<void> => {
-  try {
-    const sessionId = await secureGet("userSessionId");
+  const now = targetDate || new Date();
+  if (isNaN(now.getTime())) return; // Proteção contra data inválida
 
-    if (!sessionId) {
-      throw new Error("Sessão não encontrada. Faça login novamente.");
-    }
+  // Gera a data local no formato YYYY-MM-DD de forma robusta
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, "0");
+  const day = String(now.getDate()).padStart(2, "0");
+  const localDateStr = `${year}-${month}-${day}`;
 
-    const now = targetDate || new Date();
-    if (isNaN(now.getTime())) return; // Proteção contra data inválida
-
-    // Gera a data local no formato YYYY-MM-DD de forma robusta
-    const year = now.getFullYear();
-    const month = String(now.getMonth() + 1).padStart(2, "0");
-    const day = String(now.getDate()).padStart(2, "0");
-    const localDateStr = `${year}-${month}-${day}`;
-
-    await api.post(
-      `/dados/${metric}`,
-      {
-        value,
-        timestamp: now.toISOString(),
-        date: localDateStr, // Garante que o backend usa a data local, não UTC
-      },
-      {
-        headers: {
-          Authorization: `Bearer ${sessionId}`,
-        },
-      }
-    );
-  } catch (error: any) {
-    console.error(`❌ Erro ao salvar dados de ${metric}:`, error);
-    throw error;
-  }
+  await enqueue("healthMetric", {
+    metric,
+    value,
+    timestamp: now.toISOString(),
+    date: localDateStr,
+  } as HealthMetricJob);
 };
 
 /**
