@@ -247,7 +247,7 @@ const EditProfileScreen = () => {
           </TouchableOpacity>
         </View>
 
-        <FooterVersion />
+        <FooterVersion style={styles.footer} />
       </ScrollView>
     </View>
   );
@@ -381,6 +381,9 @@ const styles = StyleSheet.create({
     fontSize: 15,
     color: "#3B82F6",
     fontWeight: "500",
+  },
+  footer: {
+    paddingHorizontal: 20,
   },
 });
 

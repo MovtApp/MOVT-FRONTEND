@@ -22,6 +22,8 @@ export type WorkoutType = "Corrida" | "Ciclismo";
 export interface RoutePoint {
   latitude: number;
   longitude: number;
+  timestamp?: number; // ms (Date.now do device) — opcional, p/ pós-processamento/replay
+  accuracy?: number; // metros — opcional, acurácia do fix que gerou o ponto
 }
 
 export interface WorkoutSplit {

@@ -12,6 +12,7 @@ import {
 } from "react-native";
 import { X } from "lucide-react-native";
 import { userService } from "@services/userService";
+import { notifyApiError } from "../utils/notify";
 import { useAuth } from "@contexts/AuthContext";
 
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -99,6 +100,7 @@ const FollowListModal: React.FC<FollowListModalProps> = ({
         ...prev,
         [user.id]: !prev[user.id],
       }));
+      notifyApiError(error, "Não foi possível atualizar. Tente novamente.");
     }
   };
 

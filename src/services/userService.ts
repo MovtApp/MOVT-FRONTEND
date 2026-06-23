@@ -142,6 +142,14 @@ export const userService = {
     const response = await api.put("/user/bio", { bio }, headers);
     return response.data;
   },
+  // Grava as especialidades do profissional (CNPJ). Reutiliza o endpoint de dados
+  // profissionais já usado para CNPJ/CREF. Envia como array; o backend pode aceitar
+  // array ou string — quando array, mantemos a forma canônica esperada pelo perfil.
+  updateSpecialty: async (especialidades: string[]) => {
+    const headers = await getAuthHeaders();
+    const response = await api.put("/user/professional-data", { especialidades }, headers);
+    return response.data;
+  },
   deletePost: async (postId: string) => {
     const headers = await getAuthHeaders();
     const response = await api.delete(`/user/posts/${postId}`, headers);

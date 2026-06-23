@@ -1,33 +1,35 @@
 // Fonte ÚNICA da verdade dos limites por plano. Mexer aqui muda o app inteiro.
 // Convenção por feature:
 //   - boolean  → false = bloqueado p/ free; true = liberado
-//   - number   → limite de registros (free); premium/família = null (ilimitado)
+//   - number   → limite de registros no período; null = ilimitado
 //
-// premium e familia têm acesso TOTAL (sem bloqueio). Só `free` é limitado.
+// `familia` tem acesso TOTAL. `premium` é quase total, mas tem TETO em dietas
+// (8/mês) — por isso premium não é mais idêntico a UNLIMITED. Ver ADR-0013.
 
 export type PlanType = "free" | "premium" | "familia";
 
 // Features booleanas (acesso ou bloqueio total)
-export type BooleanFeature = "dietas" | "desafios" | "dadosAvancados";
-// Features por contagem (limite de registros)
-export type CountFeature = "treinos" | "agendamentos" | "comunidades";
+export type BooleanFeature = "expectativaRealidade";
+// Features por contagem (limite de registros no período)
+export type CountFeature = "dietas" | "desafios" | "treinos" | "agendamentos" | "comunidades";
 export type GatedFeature = BooleanFeature | CountFeature;
 
 interface PlanRule {
   // booleanas
-  dietas: boolean;
-  desafios: boolean;
-  dadosAvancados: boolean; // Batimentos (ECG), Sono, Ciclismo (GPS)
+  // Só a tela Expectativa × Realidade é Premium. Batimentos/Sono/Ciclismo são livres.
+  expectativaRealidade: boolean;
   // contagem (null = ilimitado)
+  dietas: number | null; // criar por mês
+  desafios: number | null; // participar por mês
   treinos: number | null; // por semana
   agendamentos: number | null; // por mês
   comunidades: number | null; // por mês
 }
 
 const UNLIMITED: PlanRule = {
-  dietas: true,
-  desafios: true,
-  dadosAvancados: true,
+  expectativaRealidade: true,
+  dietas: null,
+  desafios: null,
   treinos: null,
   agendamentos: null,
   comunidades: null,
@@ -35,14 +37,21 @@ const UNLIMITED: PlanRule = {
 
 export const PLAN_LIMITS: Record<PlanType, PlanRule> = {
   free: {
-    dietas: false,
-    desafios: false,
-    dadosAvancados: false,
+    expectativaRealidade: false,
+    dietas: 2, // 2 dietas por mês
+    desafios: 2, // 2 desafios por mês
     treinos: 2, // 2 treinos por semana
     agendamentos: 2, // 2 agendamentos por mês
     comunidades: 2, // 2 comunidades por mês
   },
-  premium: UNLIMITED,
+  premium: {
+    expectativaRealidade: true,
+    dietas: 8, // 8 dietas por mês (teto do premium)
+    desafios: 8, // 8 desafios por mês (teto do premium)
+    treinos: null,
+    agendamentos: null,
+    comunidades: null,
+  },
   familia: UNLIMITED,
 };
 
@@ -50,7 +59,7 @@ export const PLAN_LIMITS: Record<PlanType, PlanRule> = {
 export const FEATURE_LABELS: Record<GatedFeature, string> = {
   dietas: "Planos de dieta",
   desafios: "Desafios",
-  dadosAvancados: "Dados avançados de saúde",
+  expectativaRealidade: "Expectativa × Realidade",
   treinos: "Treinos",
   agendamentos: "Agendamentos",
   comunidades: "Comunidades",

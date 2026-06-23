@@ -1,7 +1,9 @@
 import React, { useState, useRef, useEffect } from "react";
-import { View, StyleSheet, TouchableOpacity, Text, ScrollView, Dimensions } from "react-native";
+import { View, StyleSheet, TouchableOpacity, Text, ScrollView, Dimensions, Platform } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { notifyError } from "../../utils/notify";
 import BackButton from "@components/BackButton";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useNavigation } from "@react-navigation/native";
 import { RootStackParamList } from "@typings/routes"; // Corrigida a importação de RootStackParamList
@@ -11,6 +13,7 @@ const ITEM_WIDTH = 80; // Largura de cada item de peso
 
 const WeightScreen = () => {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  const insets = useSafeAreaInsets();
   const [selectedAge, setSelectedAge] = useState(75);
   const scrollViewRef = useRef<ScrollView>(null);
   const ages = Array.from({ length: 285 }, (_, i) => i + 16); // 16 a 300 kg
@@ -35,6 +38,7 @@ const WeightScreen = () => {
       navigation.navigate("Info", { screen: "ObjectivesScreen" });
     } catch (e) {
       console.error("Erro ao salvar peso:", e);
+      notifyError("Não foi possível salvar. Tente novamente.");
     }
   };
 
@@ -88,7 +92,13 @@ const WeightScreen = () => {
         </View>
       </View>
 
-      <TouchableOpacity style={styles.advanceButton} onPress={handleWeight}>
+      <TouchableOpacity
+        style={[
+          styles.advanceButton,
+          { marginBottom: Platform.OS === "android" ? insets.bottom + 16 : 50 },
+        ]}
+        onPress={handleWeight}
+      >
         <Text style={styles.advanceButtonText}>Avançar</Text>
       </TouchableOpacity>
     </View>
@@ -234,7 +244,6 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     alignItems: "center",
     marginTop: "auto", // empurra o botão para o fim da tela (igual à AgeScreen)
-    marginBottom: 50,
   },
   advanceButtonText: {
     color: "#fff",

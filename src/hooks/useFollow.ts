@@ -1,6 +1,7 @@
 import { useState, useCallback, useEffect } from "react";
 import { useAuth } from "../hooks/useAuth";
 import { followTrainer, unfollowTrainer } from "../services/followService";
+import { notifyApiError } from "../utils/notify";
 
 interface UseFollowReturn {
   isFollowing: boolean;
@@ -26,6 +27,7 @@ export const useFollow = (trainerId: string | number): UseFollowReturn => {
       setIsFollowing(true);
     } catch (error) {
       console.error("Erro ao seguir trainer:", error);
+      notifyApiError(error, "Não foi possível seguir o personal.");
     } finally {
       setIsLoading(false);
     }
@@ -40,6 +42,7 @@ export const useFollow = (trainerId: string | number): UseFollowReturn => {
       setIsFollowing(false);
     } catch (error) {
       console.error("Erro ao deixar de seguir trainer:", error);
+      notifyApiError(error, "Não foi possível deixar de seguir.");
     } finally {
       setIsLoading(false);
     }

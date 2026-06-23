@@ -8,6 +8,7 @@ import { RootStackParamList } from "@typings/routes"; // Já corrigido para @typ
 import { api } from "@/services/api";
 import { secureGet } from "@/services/secureStore";
 import { useAuth } from "@contexts/AuthContext";
+import { PHONE_VERIFICATION_ENABLED } from "@/config/featureFlags";
 
 type VerifyAccountScreenRouteProp = RouteProp<RootStackParamList, "Verify">;
 
@@ -99,7 +100,7 @@ const VerifyAccountScreen = () => {
       const isTrainer =
         user?.documentType === "CNPJ" || user?.role === "trainer" || user?.role === "personal";
 
-      if (user?.phone_verified === false) {
+      if (PHONE_VERIFICATION_ENABLED && user?.phone_verified === false) {
         navigation.navigate("Verify", { screen: "VerifyPhoneScreen" });
       } else if (isTrainer && !user?.cref_verified) {
         navigation.navigate("Verify", { screen: "VerifyCompanyScreen" });

@@ -28,15 +28,11 @@ export function usePlanAccess() {
     const hasFullAccess = plan === "premium" || plan === "familia";
     const rule = PLAN_LIMITS[plan];
 
-    const isBlocked = (feature: BooleanFeature) => {
-      if (hasFullAccess) return false;
-      return rule[feature] === false;
-    };
+    // Lê SEMPRE da regra do plano (sem atalho "premium = ilimitado em tudo"):
+    // o premium tem teto em dietas (8/mês), então o atalho daria o número errado.
+    const isBlocked = (feature: BooleanFeature) => rule[feature] === false;
 
-    const limitOf = (feature: CountFeature): number | null => {
-      if (hasFullAccess) return null;
-      return rule[feature];
-    };
+    const limitOf = (feature: CountFeature): number | null => rule[feature];
 
     const reachedLimit = (feature: CountFeature, used: number) => {
       const limit = limitOf(feature);
@@ -44,8 +40,12 @@ export function usePlanAccess() {
       return used >= limit;
     };
 
+    // Abre o sheet global de conversão (Premium/Família). O CTA "Ver planos" do
+    // próprio sheet faz a navegação via navigationRef — por isso o hook não
+    // precisa (nem tem) um objeto `navigation`. Sem parâmetro: pode ser ligado
+    // direto em `onPress` (que passaria o evento de gesto).
     const goPremium = () => {
-      navigation.navigate("PlanScreen");
+      openUpgrade();
     };
 
     return {
@@ -57,7 +57,7 @@ export function usePlanAccess() {
       reachedLimit,
       goPremium,
     };
-  }, [user?.plan, navigation]);
+  }, [user?.plan, openUpgrade]);
 }
 
 export type { GatedFeature, BooleanFeature, CountFeature };

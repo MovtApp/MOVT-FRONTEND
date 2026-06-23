@@ -1,6 +1,7 @@
 import { useState, useCallback, useEffect } from "react";
 import { useAuth } from "../contexts/AuthContext";
 import { api } from "../services/api";
+import { notifyApiError } from "../utils/notify";
 
 interface UseSaveReturn {
   isSaved: boolean;
@@ -31,6 +32,7 @@ export const useSave = (postId: string, initialIsSaved: boolean = false): UseSav
       }
     } catch (error) {
       console.error("Erro ao salvar/desalvar post:", error);
+      notifyApiError(error, "Não foi possível salvar o post.");
     } finally {
       setIsLoading(false);
     }

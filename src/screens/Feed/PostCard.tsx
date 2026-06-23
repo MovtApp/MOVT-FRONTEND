@@ -22,6 +22,7 @@ import { useLike } from "../../hooks/useLike";
 import { useFollow } from "../../hooks/useFollow";
 import { userService } from "../../services/userService";
 import { api } from "../../services/api";
+import { notifyApiError } from "../../utils/notify";
 import { getRelativeTime } from "../../utils/timeUtils";
 import { styles } from "./styles";
 import { COLORS } from "../../styles/colors";
@@ -74,6 +75,7 @@ const PostCard: React.FC<PostCardProps> = ({ post, onShare, onCommentPress }) =>
         Alert.alert("Compartilhado", "Post compartilhado com sucesso!");
       } catch (error) {
         console.error("Erro ao compartilhar:", error);
+        notifyApiError(error, "Não foi possível compartilhar o post.");
       }
     }
   };

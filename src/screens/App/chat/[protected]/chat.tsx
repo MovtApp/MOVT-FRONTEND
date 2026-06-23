@@ -30,6 +30,7 @@ import BackButton from "@/components/BackButton";
 import dayjs from "dayjs";
 import "dayjs/locale/pt-br";
 import { userService } from "@/services/userService";
+import { notifyApiError } from "@/utils/notify";
 import { useNotifications } from "@/contexts/NotificationContext";
 import { CommentsSheet, CommentsSheetHandle } from "@components/CommentsSheet";
 
@@ -113,6 +114,7 @@ const Chat = () => {
       await userService.toggleLike(String(selectedPost.id));
     } catch (error) {
       setSelectedPost(originalPost);
+      notifyApiError(error, "Não foi possível curtir o post.");
     } finally {
       setIsLiking(false);
     }

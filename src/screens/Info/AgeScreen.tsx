@@ -1,7 +1,9 @@
 import React, { useState, useRef, useEffect } from "react";
-import { View, StyleSheet, TouchableOpacity, Text, ScrollView, Dimensions } from "react-native";
+import { View, StyleSheet, TouchableOpacity, Text, ScrollView, Dimensions, Platform } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { notifyError } from "../../utils/notify";
 import BackButton from "@components/BackButton";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useNavigation } from "@react-navigation/native";
 import { RootStackParamList } from "@typings/routes"; // Corrigida a importação de RootStackParamList
@@ -11,6 +13,7 @@ const ITEM_WIDTH = 80; // Largura de cada item de peso
 
 const AgeScreen = () => {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  const insets = useSafeAreaInsets();
   const [selectedAge, setSelectedAge] = useState(75);
   const scrollViewRef = useRef<ScrollView>(null);
   const ages = Array.from({ length: 100 }, (_, i) => i + 1); // 1 a 100 anos
@@ -35,6 +38,7 @@ const AgeScreen = () => {
       navigation.navigate("Info", { screen: "HeightScreen" });
     } catch (e) {
       console.error("Erro ao salvar idade:", e);
+      notifyError("Não foi possível salvar. Tente novamente.");
     }
   };
 
@@ -89,7 +93,13 @@ const AgeScreen = () => {
         </View>
       </View>
 
-      <TouchableOpacity style={styles.advanceButton} onPress={handleAge}>
+      <TouchableOpacity
+        style={[
+          styles.advanceButton,
+          { marginBottom: Platform.OS === "android" ? insets.bottom + 16 : 50 },
+        ]}
+        onPress={handleAge}
+      >
         <Text style={styles.advanceButtonText}>Avançar</Text>
       </TouchableOpacity>
     </View>
@@ -230,7 +240,6 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     paddingVertical: 14,
     alignItems: "center",
-    marginBottom: 50,
   },
   advanceButtonText: {
     color: "#fff",

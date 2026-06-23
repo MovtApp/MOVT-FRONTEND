@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useMemo } from "react";
-import { withPremiumGate } from "@components/withPremiumGate";
 import {
   View,
   Text,
@@ -664,10 +663,6 @@ const styles = StyleSheet.create({
   },
 });
 
-export default withPremiumGate(
-  HeartbeatsScreen,
-  "dadosAvancados",
-  "Batimentos",
-  "O monitoramento avançado de batimentos é exclusivo dos planos Premium e Família.",
-  { name: "DataScreen" }
-);
+// Batimentos é livre para todos os planos (coleta + análise). Só Expectativa ×
+// Realidade permanece Premium — ver planLimits.ts / ADR-0013.
+export default HeartbeatsScreen;

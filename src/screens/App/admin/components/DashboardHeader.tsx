@@ -2,6 +2,7 @@ import React from "react";
 import { View, Text, StyleSheet, TouchableOpacity, Image } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { Bell, Search, Filter } from "lucide-react-native";
+import { getAvatarUri } from "../utils/avatar";
 
 interface DashboardHeaderProps {
   user: any;
@@ -24,9 +25,7 @@ const DashboardHeader: React.FC<DashboardHeaderProps> = ({
         <View style={styles.profileInfo}>
           <View style={styles.avatarContainer}>
             <Image
-              source={
-                user?.foto_url ? { uri: user.foto_url } : { uri: "https://via.placeholder.com/44" }
-              }
+              source={{ uri: getAvatarUri(user, "https://via.placeholder.com/44") }}
               style={styles.avatar}
             />
             <View style={styles.onlineBadge} />

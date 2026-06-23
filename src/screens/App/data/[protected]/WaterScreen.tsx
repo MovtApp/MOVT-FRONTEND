@@ -17,6 +17,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { getHealthMetricData, saveHealthMetricData } from "../../../../services/caloriesService";
+import { notifyApiError } from "../../../../utils/notify";
 
 import BackButton from "../../../../components/BackButton";
 import DataPillNavigator from "../../../../components/data/DataPillNavigator";
@@ -165,6 +166,7 @@ const WaterScreen: React.FC = () => {
       await saveHealthMetricData("water", nextConsumed, routeDate);
     } catch (error) {
       console.error("Erro ao salvar dados de água:", error);
+      notifyApiError(error, "Não foi possível salvar o consumo de água.");
     }
   };
 

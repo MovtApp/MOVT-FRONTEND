@@ -1,5 +1,4 @@
 import React, { useMemo, useRef, useState, useEffect, useCallback } from "react";
-import { withPremiumGate } from "@components/withPremiumGate";
 import {
   View,
   Text,
@@ -576,10 +575,7 @@ const styles = StyleSheet.create({
   },
 });
 
-export default withPremiumGate(
-  DietScreen,
-  "dietas",
-  "Dietas",
-  "Os planos de dieta são exclusivos dos planos Premium e Família.",
-  { name: "HomeScreen" }
-);
+// Dieta deixou de ser bloqueio de tela inteira: free entra e cria até 2/mês
+// (premium 8/mês), enforced no backend. O limite é tratado no DietFormSheet
+// (403 → sheet de upgrade). Ver ADR-0013.
+export default DietScreen;

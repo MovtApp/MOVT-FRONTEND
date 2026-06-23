@@ -1,5 +1,6 @@
-import { View, StyleSheet, TouchableOpacity, Text, Alert } from "react-native";
+import { View, StyleSheet, TouchableOpacity, Text, Alert, Platform } from "react-native";
 import React, { useState } from "react";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useAuth } from "../../contexts/AuthContext";
 import BackButton from "@components/BackButton";
@@ -10,6 +11,7 @@ import { RootStackParamList } from "@typings/routes";
 
 const LevelScreen = () => {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  const insets = useSafeAreaInsets();
   const { user, signIn } = useAuth();
   const [level, setLevel] = useState<string>("Iniciante");
   const [loading, setLoading] = useState(false);
@@ -100,7 +102,11 @@ const LevelScreen = () => {
       </View>
 
       <TouchableOpacity
-        style={[styles.advanceButton, loading && { opacity: 0.7 }]}
+        style={[
+          styles.advanceButton,
+          { marginBottom: Platform.OS === "android" ? insets.bottom + 16 : 50 },
+          loading && { opacity: 0.7 },
+        ]}
         onPress={handleLevel}
         disabled={loading}
       >
@@ -155,7 +161,6 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     paddingVertical: 14,
     alignItems: "center",
-    marginBottom: 50,
   },
   advanceButtonText: {
     color: "#fff",

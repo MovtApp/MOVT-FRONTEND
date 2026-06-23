@@ -14,6 +14,7 @@ import * as Google from "expo-auth-session/providers/google";
 import * as AuthSession from "expo-auth-session";
 import { api } from "../../services/api";
 import { API_CONFIG } from "../../config/api";
+import { PHONE_VERIFICATION_ENABLED } from "../../config/featureFlags";
 
 // URL da sua Edge Function que receberá os tokens dos provedores
 const SOCIAL_SIGN_IN_EDGE_FUNCTION_URL = `${
@@ -119,7 +120,9 @@ export const SignInScreen = () => {
       const needsProfessionalVerification =
         !isAdmin && isTrainer && !response.data.user.cref_verified;
       // Telefone é etapa universal; contas antigas vêm com phone_verified=true.
-      const needsPhoneVerification = !isAdmin && response.data.user.phone_verified === false;
+      // Desativada temporariamente via PHONE_VERIFICATION_ENABLED (ver featureFlags).
+      const needsPhoneVerification =
+        PHONE_VERIFICATION_ENABLED && !isAdmin && response.data.user.phone_verified === false;
       // Dados pessoais (onboarding) é o último gate; contas antigas vêm com true.
       const needsOnboarding = !isAdmin && response.data.user.onboarding_completed === false;
 

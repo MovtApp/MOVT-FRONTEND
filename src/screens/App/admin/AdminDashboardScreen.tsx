@@ -80,6 +80,7 @@ import BackButton from "../../../components/BackButton";
 import { api } from "../../../services/api";
 import * as ImagePicker from "expo-image-picker";
 import DecisionBI from "./components/DecisionBI";
+import { getAvatarUri } from "./utils/avatar";
 import DateTimePickerModal from "react-native-modal-datetime-picker";
 import CommunityManagementSheet, {
   CommunityManagementSheetRef,
@@ -2144,11 +2145,9 @@ const AdminDashboardScreen: React.FC = () => {
                       >
                         <View style={styles.pendingRow}>
                           <Image
-                            source={
-                              item?.avatar_url
-                                ? { uri: item.avatar_url }
-                                : { uri: "https://via.placeholder.com/40" }
-                            }
+                            source={{
+                              uri: getAvatarUri(item, "https://via.placeholder.com/40"),
+                            }}
                             style={styles.avatar}
                           />
                           <View style={{ flex: 1, marginLeft: 12 }}>
@@ -2912,9 +2911,10 @@ const AdminDashboardScreen: React.FC = () => {
                             <View style={styles.proAvatarContainer}>
                               <Image
                                 source={{
-                                  uri:
-                                    item?.foto_url ||
-                                    "https://images.unsplash.com/photo-1633332755192-727a05c4013d?w=100&h=100&fit=crop",
+                                  uri: getAvatarUri(
+                                    item,
+                                    "https://images.unsplash.com/photo-1633332755192-727a05c4013d?w=100&h=100&fit=crop"
+                                  ),
                                 }}
                                 style={styles.proAvatar}
                               />
@@ -3138,9 +3138,10 @@ const AdminDashboardScreen: React.FC = () => {
                           <View style={styles.proAvatarContainer}>
                             <Image
                               source={{
-                                uri:
-                                  item?.foto_url ||
-                                  "https://images.unsplash.com/photo-1633332755192-727a05c4013d?w=100&h=100&fit=crop",
+                                uri: getAvatarUri(
+                                  item,
+                                  "https://images.unsplash.com/photo-1633332755192-727a05c4013d?w=100&h=100&fit=crop"
+                                ),
                               }}
                               style={styles.proAvatar}
                             />
@@ -3751,10 +3752,10 @@ const AdminDashboardScreen: React.FC = () => {
                         <View style={styles.proUserMain}>
                           <Image
                             source={{
-                              uri:
-                                trainer.foto_url ||
-                                trainer.avatar_url ||
-                                "https://images.unsplash.com/photo-1594824476967-48c8b964273f?w=100",
+                              uri: getAvatarUri(
+                                trainer,
+                                "https://images.unsplash.com/photo-1594824476967-48c8b964273f?w=100"
+                              ),
                             }}
                             style={[styles.proAvatar, { width: 44, height: 44, borderRadius: 22 }]}
                           />
@@ -3868,10 +3869,10 @@ const AdminDashboardScreen: React.FC = () => {
                       <View style={styles.proUserMain}>
                         <Image
                           source={{
-                            uri:
-                              trainer.foto_url ||
-                              trainer.avatar_url ||
-                              "https://images.unsplash.com/photo-1594824476967-48c8b964273f?w=100",
+                            uri: getAvatarUri(
+                              trainer,
+                              "https://images.unsplash.com/photo-1594824476967-48c8b964273f?w=100"
+                            ),
                           }}
                           style={[styles.proAvatar, { width: 44, height: 44, borderRadius: 22 }]}
                         />
@@ -4044,10 +4045,10 @@ const AdminDashboardScreen: React.FC = () => {
                           <View style={styles.proAvatarContainer}>
                             <Image
                               source={{
-                                uri:
-                                  item.foto_url ||
-                                  item.avatar_url ||
-                                  "https://images.unsplash.com/photo-1594824476967-48c8b964273f?w=100&h=100&fit=crop",
+                                uri: getAvatarUri(
+                                  item,
+                                  "https://images.unsplash.com/photo-1594824476967-48c8b964273f?w=100&h=100&fit=crop"
+                                ),
                               }}
                               style={styles.proAvatar}
                             />
@@ -4290,10 +4291,10 @@ const AdminDashboardScreen: React.FC = () => {
                         <View style={styles.compactRowMain}>
                           <Image
                             source={{
-                              uri:
-                                item.foto_url ||
-                                item.avatar_url ||
-                                "https://images.unsplash.com/photo-1633332755192-727a05c4013d?w=100",
+                              uri: getAvatarUri(
+                                item,
+                                "https://images.unsplash.com/photo-1633332755192-727a05c4013d?w=100"
+                              ),
                             }}
                             style={[styles.compactAvatar, isExpired && { opacity: 0.6 }]}
                           />
@@ -4745,9 +4746,10 @@ const AdminDashboardScreen: React.FC = () => {
                         >
                           <Image
                             source={{
-                              uri:
-                                selectedUserDetail.foto_url ||
-                                "https://images.unsplash.com/photo-1633332755192-727a05c4013d?w=200&h=200&fit=crop",
+                              uri: getAvatarUri(
+                                selectedUserDetail,
+                                "https://images.unsplash.com/photo-1633332755192-727a05c4013d?w=200&h=200&fit=crop"
+                              ),
                             }}
                             style={{ width: 110, height: 110, borderRadius: 55 }}
                           />

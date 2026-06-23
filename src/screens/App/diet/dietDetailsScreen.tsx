@@ -24,6 +24,7 @@ import {
 import BottomSheet from "@gorhom/bottom-sheet";
 import { CommentsSheet } from "../../../components/CommentsSheet";
 import { api } from "../../../services/api";
+import { notifyApiError } from "../../../utils/notify";
 import { useAuth } from "../../../hooks/useAuth";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import SharePostSheet from "../../../components/SharePostSheet";
@@ -119,6 +120,7 @@ const DietDetailsScreen: React.FC<DietDetailsScreenProps> = ({ route, navigation
       }
     } catch (error) {
       console.error("Erro ao curtir dieta:", error);
+      notifyApiError(error, "Não foi possível curtir a dieta.");
     } finally {
       setLoading(false);
     }

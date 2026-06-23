@@ -16,6 +16,7 @@ import { DietFeedItem } from "../../hooks/useSelfDiets";
 import { COLORS } from "../../styles/colors";
 import { getRelativeTime } from "../../utils/timeUtils";
 import { api } from "../../services/api";
+import { notifyApiError } from "../../utils/notify";
 import { useAuth } from "../../hooks/useAuth";
 import { styles } from "./styles";
 
@@ -140,6 +141,7 @@ const DietCard: React.FC<DietCardProps> = ({ diet, onShare, onCommentPress }) =>
       }
     } catch (error) {
       console.error("Erro ao curtir dieta:", error);
+      notifyApiError(error, "Não foi possível curtir a dieta.");
     } finally {
       setLoading(false);
     }

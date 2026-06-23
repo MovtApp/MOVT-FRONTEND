@@ -10,6 +10,7 @@ import {
 } from "react-native";
 import BottomSheet, { BottomSheetView, BottomSheetFlatList } from "@gorhom/bottom-sheet";
 import { X, Search, Users, ChevronRight, Shield, CheckCircle, Bell } from "lucide-react-native";
+import { getAvatarUri } from "../utils/avatar";
 
 interface UserManagementSheetsProps {
   // Refs
@@ -166,7 +167,7 @@ const UserManagementSheets: React.FC<UserManagementSheetsProps> = (props) => {
                 <TouchableOpacity style={styles.proUserCard} onPress={() => openUserDetail(item)}>
                   <View style={styles.proUserMain}>
                     <Image
-                      source={{ uri: item.foto_url || "https://via.placeholder.com/100" }}
+                      source={{ uri: getAvatarUri(item, "https://via.placeholder.com/100") }}
                       style={styles.proAvatar}
                     />
                     <View style={{ flex: 1, marginLeft: 16 }}>

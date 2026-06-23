@@ -1,5 +1,4 @@
 import React, { useState, useMemo, useRef, useCallback, useEffect } from "react";
-import { withPremiumGate } from "@components/withPremiumGate";
 import {
   View,
   Text,
@@ -13,7 +12,7 @@ import {
 } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRoute } from "@react-navigation/native";
-import MapView, { Polyline, Marker, PROVIDER_GOOGLE } from "react-native-maps";
+import MapView, { Polyline, Marker, PROVIDER_GOOGLE, type Camera } from "react-native-maps";
 import * as Location from "expo-location";
 import * as Tracker from "../../../../services/locationTrackingService";
 import type { TrackingSnapshot } from "../../../../services/locationTrackingService";
@@ -53,6 +52,7 @@ import {
   formatDuration,
   estimateCalories,
 } from "../../../../utils/workout/performance";
+import { simplifyRoute } from "../../../../utils/workout/geo";
 import {
   WorkoutRecord,
   WorkoutType,
@@ -142,6 +142,22 @@ function regionForRoute(route: LatLng[], paddingRatio = 0.3) {
     latitudeDelta: Math.max((maxLat - minLat) * (1 + paddingRatio), 0.0025),
     longitudeDelta: Math.max((maxLng - minLng) * (1 + paddingRatio), 0.0025),
   };
+}
+
+// ─── Zoom adaptativo à velocidade (estilo Uber: afasta ao acelerar) ──────────────
+// Velocidade de referência onde a câmera fica no zoom mais "largo" (~16 m/s ≈ 58 km/h).
+const SPEED_FOR_WIDE_MS = 16;
+
+/** Zoom (nível Google/Android) em função da velocidade: perto parado, largo rápido. */
+function zoomForSpeed(speedMs: number): number {
+  const v = isFinite(speedMs) && speedMs > 0 ? speedMs : 0;
+  return 17 - (Math.min(v, SPEED_FOR_WIDE_MS) / SPEED_FOR_WIDE_MS) * 2; // 17 → 15
+}
+
+/** Altitude (metros, usada no iOS) em função da velocidade: baixa parado, alta rápido. */
+function altitudeForSpeed(speedMs: number): number {
+  const v = isFinite(speedMs) && speedMs > 0 ? speedMs : 0;
+  return 800 + (Math.min(v, SPEED_FOR_WIDE_MS) / SPEED_FOR_WIDE_MS) * 1700; // 800 → 2500
 }
 
 /** Marcadores de início (verde) e fim (escuro), estilo Strava. */
@@ -288,14 +304,19 @@ const WorkoutDetail: React.FC<WorkoutDetailProps> = ({
 }) => {
   const accent = workout.type === "Ciclismo" ? "#3B82F6" : "#10B981";
 
-  const safeRoute = workout.route.filter(
-    (p) =>
-      p &&
-      typeof p.latitude === "number" &&
-      isFinite(p.latitude) &&
-      typeof p.longitude === "number" &&
-      isFinite(p.longitude)
-  );
+  // Simplifica o traçado (Douglas-Peucker) para renderizar liso e leve, sem
+  // perder a forma — os pontos já vêm suavizados (Kalman) do rastreamento.
+  const safeRoute = useMemo(() => {
+    const cleaned = workout.route.filter(
+      (p) =>
+        p &&
+        typeof p.latitude === "number" &&
+        isFinite(p.latitude) &&
+        typeof p.longitude === "number" &&
+        isFinite(p.longitude)
+    );
+    return simplifyRoute(cleaned, 4);
+  }, [workout.route]);
 
   // Diferença vs. recorde da modalidade (para a comparação).
   const distDelta = workout.distanceKm - records.longestDistanceKm;
@@ -529,6 +550,10 @@ const CyclingScreen: React.FC = () => {
   // foreground service). A tela apenas reflete o snapshot e dispara ações.
   const [snap, setSnap] = useState<TrackingSnapshot>(() => Tracker.getSnapshot());
   const [initialCenter, setInitialCenter] = useState<LatLng | null>(null);
+  const liveMapRef = useRef<MapView>(null);
+  // Timestamp (relógio local) do último reposicionamento da câmera — usado para
+  // animar pela cadência real dos fixes (acompanhamento contínuo, sem gap morto).
+  const lastFollowTsRef = useRef<number>(0);
 
   const isTracking = snap.active;
   const isPaused = snap.isPaused;
@@ -588,6 +613,59 @@ const CyclingScreen: React.FC = () => {
       mounted = false;
     };
   }, []);
+
+  // Antes de iniciar o treino: centraliza na última posição conhecida assim que
+  // ela é carregada (o `initialRegion` só vale no primeiro paint).
+  useEffect(() => {
+    if (snap.lastLocation) return; // já há posição ao vivo; o efeito abaixo cuida
+    if (
+      initialCenter &&
+      typeof initialCenter.latitude === "number" &&
+      isFinite(initialCenter.latitude)
+    ) {
+      liveMapRef.current?.animateCamera(
+        { center: { latitude: initialCenter.latitude, longitude: initialCenter.longitude } },
+        { duration: 500 }
+      );
+    }
+  }, [initialCenter, snap.lastLocation]);
+
+  // Câmera "estilo Uber": segue a posição ao vivo SEM zerar o pan do usuário
+  // (animateCamera incremental, não a prop `region` controlada).
+  // - Acompanhamento contínuo: a animação dura ~o intervalo real entre fixes, então
+  //   a câmera ainda está em movimento quando o próximo fix chega → sem trepidação,
+  //   independentemente da velocidade.
+  // - Zoom adaptativo: durante o treino, afasta conforme a velocidade sobe.
+  useEffect(() => {
+    const t = snap.lastLocation;
+    if (
+      !t ||
+      typeof t.latitude !== "number" ||
+      !isFinite(t.latitude) ||
+      typeof t.longitude !== "number" ||
+      !isFinite(t.longitude)
+    ) {
+      return;
+    }
+
+    const now = Date.now();
+    const dt = lastFollowTsRef.current ? now - lastFollowTsRef.current : 1000;
+    lastFollowTsRef.current = now;
+    // Anima pela cadência observada (clampada), para não ficar nem brusco nem lento.
+    const duration = Math.min(1200, Math.max(300, dt));
+
+    const camera: Partial<Camera> = {
+      center: { latitude: t.latitude, longitude: t.longitude },
+    };
+    // Só dirige o zoom durante o treino ativo; fora dele, respeita o zoom do usuário.
+    if (isTracking) {
+      const v = snap.currentSpeedMs || 0;
+      camera.zoom = zoomForSpeed(v); // Android
+      camera.altitude = altitudeForSpeed(v); // iOS
+    }
+
+    liveMapRef.current?.animateCamera(camera, { duration });
+  }, [snap.lastLocation]);
 
   const startTracking = async () => {
     const res = await Tracker.startTracking(activeTab === "Ciclismo" ? "Ciclismo" : "Corrida");
@@ -781,9 +859,13 @@ const CyclingScreen: React.FC = () => {
         >
           <View style={styles.mapContainer}>
             <MapView
+              ref={liveMapRef}
               provider={PROVIDER_GOOGLE}
               style={styles.map}
-              region={
+              showsUserLocation
+              showsMyLocationButton={false}
+              followsUserLocation={false}
+              initialRegion={
                 hasValidLocation && liveLatLng
                   ? {
                       latitude: liveLatLng.latitude,
@@ -807,21 +889,6 @@ const CyclingScreen: React.FC = () => {
                   lineCap="round"
                   lineJoin="round"
                 />
-              )}
-              {hasValidLocation && liveLatLng && (
-                <Marker
-                  coordinate={{
-                    latitude: liveLatLng.latitude,
-                    longitude: liveLatLng.longitude,
-                  }}
-                >
-                  <View
-                    style={[
-                      styles.currentLocationMarker,
-                      { backgroundColor: activeTab === "Ciclismo" ? "#3B82F6" : "#10B981" },
-                    ]}
-                  />
-                </Marker>
               )}
             </MapView>
 
@@ -1432,10 +1499,6 @@ const hs = StyleSheet.create({
   splitVal: { fontSize: 14, fontWeight: "700", color: "#475569", flex: 1, textAlign: "center" },
 });
 
-export default withPremiumGate(
-  CyclingScreen,
-  "dadosAvancados",
-  "Ciclismo",
-  "O rastreamento de ciclismo por GPS é exclusivo dos planos Premium e Família.",
-  { name: "DataScreen" }
-);
+// Ciclismo (GPS) é livre para todos os planos (coleta + análise). Só Expectativa
+// × Realidade permanece Premium — ver planLimits.ts / ADR-0013.
+export default CyclingScreen;

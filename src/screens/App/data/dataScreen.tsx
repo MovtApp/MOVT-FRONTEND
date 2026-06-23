@@ -363,7 +363,7 @@ interface DataContentProps {
 const DataContent: React.FC<DataContentProps> = ({ userId, targetDate, navigation }) => {
   // Expectativa x Realidade é recurso de dados avançados (premium/família).
   const { isBlocked, goPremium } = usePlanAccess();
-  const erBlocked = isBlocked("dadosAvancados");
+  const erBlocked = isBlocked("expectativaRealidade");
   const {
     heartRate,
     isWearOsConnected,

@@ -1,6 +1,7 @@
 import { useState, useCallback, useEffect, useRef } from "react";
 import { useAuth } from "../contexts/AuthContext";
 import { api } from "../services/api";
+import { notifyApiError } from "../utils/notify";
 
 interface UseLikeReturn {
   isLiked: boolean;
@@ -45,6 +46,7 @@ export const useLike = (postId: string, initialIsLiked: boolean = false): UseLik
       // Reverte em caso de erro
       setIsLiked(previousState);
       console.error("Erro ao curtir/descurtir post:", error);
+      notifyApiError(error, "Não foi possível curtir o post.");
     } finally {
       setIsLoading(false);
     }

@@ -1,14 +1,17 @@
 import React, { useState } from "react";
-import { View, StyleSheet, TouchableOpacity, Text } from "react-native";
+import { View, StyleSheet, TouchableOpacity, Text, Platform } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import BackButton from "../../components/BackButton";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { RootStackParamList } from "../../@types/routes";
 import { useNavigation } from "@react-navigation/native";
 import SelectInput from "../../components/SelectInput";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { notifyError } from "../../utils/notify";
 
 const GenderScreen = () => {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  const insets = useSafeAreaInsets();
 
   const [gender, setGender] = useState<string | null>(null);
 
@@ -18,6 +21,7 @@ const GenderScreen = () => {
       navigation.navigate("Info", { screen: "AgeScreen" });
     } catch (e) {
       console.error("Erro ao salvar gênero:", e);
+      notifyError("Não foi possível salvar. Tente novamente.");
     }
   };
 
@@ -46,7 +50,13 @@ const GenderScreen = () => {
         </View>
       </View>
 
-      <TouchableOpacity style={styles.verifyButton} onPress={handleAge}>
+      <TouchableOpacity
+        style={[
+          styles.verifyButton,
+          { marginBottom: Platform.OS === "android" ? insets.bottom + 16 : 50 },
+        ]}
+        onPress={handleAge}
+      >
         <Text style={styles.verifyButtonText}>Avançar</Text>
       </TouchableOpacity>
     </View>
@@ -83,7 +93,6 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     paddingVertical: 14,
     alignItems: "center",
-    marginBottom: 50,
   },
   verifyButtonText: {
     color: "#fff",

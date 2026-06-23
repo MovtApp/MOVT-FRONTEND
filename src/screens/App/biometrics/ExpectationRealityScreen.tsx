@@ -618,7 +618,7 @@ const styles = StyleSheet.create({
 
 export default withPremiumGate(
   ExpectationRealityScreen,
-  "dadosAvancados",
+  "expectativaRealidade",
   "Expectativa x Realidade",
   "O comparativo anatômico e as metas físicas são exclusivos dos planos Premium e Família.",
   { name: "DataScreen" }

@@ -36,6 +36,7 @@ export const SignUpScreen = ({ navigation }: Props) => {
   const {
     control,
     handleSubmit,
+    setError,
     formState: { errors, isSubmitting },
   } = useForm<RegisterFormData>({
     resolver: zodResolver(registerSchema),
@@ -120,6 +121,28 @@ export const SignUpScreen = ({ navigation }: Props) => {
       }
     } catch (error: any) {
       console.error("Erro ao registrar usuário:", error);
+
+      // Conflito (409): e-mail ou CPF/CNPJ já cadastrado. O backend devolve o
+      // campo em conflito para destacarmos o input correto em vez de um Alert genérico.
+      if (error.response?.status === 409) {
+        const conflictField = error.response?.data?.field as "email" | "cpf_cnpj" | undefined;
+        const message: string =
+          error.response?.data?.error ||
+          (conflictField === "email"
+            ? "E-mail já cadastrado"
+            : "Documento já cadastrado");
+
+        if (conflictField === "email" || conflictField === "cpf_cnpj") {
+          setError(conflictField, { type: "server", message });
+          return;
+        }
+
+        // Conflito sem campo identificado: marca os dois prováveis candidatos.
+        setError("email", { type: "server", message });
+        setError("cpf_cnpj", { type: "server", message });
+        return;
+      }
+
       Alert.alert(
         "Erro no Cadastro",
         error.response?.data?.error || "Não foi possível conectar ao servidor."

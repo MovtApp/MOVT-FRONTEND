@@ -10,6 +10,7 @@ import { useAuth } from "../hooks/useAuth";
 import SelectInput from "./SelectInput";
 import { uploadImageToSupabase } from "../services/services";
 import { api } from "../services/api";
+import { useUpgradeSheet } from "./UpgradeSheetProvider";
 
 interface DietMeal {
   id_dieta?: string;
@@ -64,6 +65,7 @@ const DietFormSheet: React.FC<DietFormSheetProps> = ({
   onSuccess,
 }) => {
   const { user } = useAuth();
+  const { openUpgrade } = useUpgradeSheet();
   const snapPoints = useMemo(() => ["90%", "100%"], []);
 
   const isAddingNewDiet = !initialData;
@@ -279,6 +281,17 @@ const DietFormSheet: React.FC<DietFormSheetProps> = ({
       reset();
     } catch (error: any) {
       console.error("❌ Erro ao salvar dieta:", error.message);
+      // Limite de dietas do plano atingido (free 2/mês, premium 8/mês) → em vez
+      // de um erro seco, fecha o form e abre o sheet de upgrade. Ver ADR-0013.
+      const limitCode = error.response?.data?.error;
+      if (
+        error.response?.status === 403 &&
+        (limitCode === "FREE_LIMIT_REACHED" || limitCode === "PREMIUM_ONLY")
+      ) {
+        onClose();
+        openUpgrade("dietas");
+        return;
+      }
       let errorMessage = "Ocorreu um erro ao salvar a dieta.";
       if (error.code === "ECONNABORTED") {
         errorMessage = "Tempo de conexão esgotado. Verifique sua internet.";

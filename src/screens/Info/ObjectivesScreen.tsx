@@ -1,6 +1,8 @@
-import { View, StyleSheet, TouchableOpacity, Text, Alert } from "react-native";
+import { View, StyleSheet, TouchableOpacity, Text, Alert, Platform } from "react-native";
 import React, { useState, useEffect } from "react";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { notifyError } from "../../utils/notify";
 import BackButton from "@components/BackButton";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useNavigation, useRoute } from "@react-navigation/native";
@@ -9,6 +11,7 @@ import { RootStackParamList } from "@typings/routes";
 
 const ObjectivesScreen = () => {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  const insets = useSafeAreaInsets();
   const route = useRoute<any>();
   const isEditing = route.params?.isEditing;
 
@@ -92,6 +95,7 @@ const ObjectivesScreen = () => {
       }
     } catch (e) {
       console.error("Erro ao salvar objetivos:", e);
+      notifyError("Não foi possível salvar. Tente novamente.");
     }
   };
 
@@ -117,7 +121,13 @@ const ObjectivesScreen = () => {
         ))}
       </View>
 
-      <TouchableOpacity style={styles.advanceButton} onPress={handleAdvance}>
+      <TouchableOpacity
+        style={[
+          styles.advanceButton,
+          { marginBottom: Platform.OS === "android" ? insets.bottom + 16 : 50 },
+        ]}
+        onPress={handleAdvance}
+      >
         <Text style={styles.advanceButtonText}>{isEditing ? "Salvar Alterações" : "Avançar"}</Text>
       </TouchableOpacity>
     </View>
@@ -169,7 +179,6 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     paddingVertical: 14,
     alignItems: "center",
-    marginBottom: 50,
   },
   advanceButtonText: {
     color: "#fff",

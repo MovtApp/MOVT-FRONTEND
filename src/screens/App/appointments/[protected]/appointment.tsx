@@ -84,6 +84,12 @@ export function Appointment() {
       // Verificar se a resposta tem a estrutura esperada
       const rawAppointments = response?.data || response || [];
 
+      // Resposta vazia ([]) é estado normal (usuário sem agendamentos), não um erro.
+      // Só logamos quando a resposta vem realmente malformada (data não é array).
+      if (!Array.isArray(rawAppointments)) {
+        console.warn("Resposta de agendamentos em formato inesperado:", response);
+      }
+
       // Filtro de Unicidade: Garante que agendamentos duplicados do backend não quebrem a UI
       const appointments = Array.isArray(rawAppointments)
         ? rawAppointments.filter(
@@ -96,48 +102,44 @@ export function Appointment() {
       const upcomingAppointments: AppointmentData[] = [];
       const completedAppointments: AppointmentData[] = [];
 
-      if (appointments.length > 0) {
-        appointments.forEach((apt: any) => {
-          // Safe date parsing to avoid timezone issues
-          // Assuming data_agendamento is "YYYY-MM-DD" or ISO string
-          const rawDate = apt.data_agendamento || "";
-          const [y, m, d] = rawDate.split("T")[0].split("-").map(Number);
-          // Create date object using local time constructor: new Date(year, monthIndex, day)
-          const appointmentDate = new Date(y, m - 1, d);
+      appointments.forEach((apt: any) => {
+        // Safe date parsing to avoid timezone issues
+        // Assuming data_agendamento is "YYYY-MM-DD" or ISO string
+        const rawDate = apt.data_agendamento || "";
+        const [y, m, d] = rawDate.split("T")[0].split("-").map(Number);
+        // Create date object using local time constructor: new Date(year, monthIndex, day)
+        const appointmentDate = new Date(y, m - 1, d);
 
-          const today = new Date();
-          today.setHours(0, 0, 0, 0);
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
 
-          const appointment: AppointmentData = {
-            id: apt.id_agendamento.toString(),
-            time: formatTime(apt.hora_inicio),
-            title: role === "trainer" ? "Musculação" : apt.trainer_name || "Treinador",
-            subtitle:
-              role === "trainer"
-                ? `${apt.client_name || "Cliente"}, 25 anos`
-                : getStatusSubtitle(apt.status),
-            value: `Ø 0,00`,
-            status: apt.status,
-            appointment_date: apt.data_agendamento,
-            type: "Musculação",
-            userWhoBooked:
-              role === "trainer" ? apt.client_name || "Cliente" : apt.trainer_name || "Treinador",
-            statusText: getStatusSubtitle(apt.status),
-            weekday: getWeekday(appointmentDate),
-            absoluteDate: getAbsoluteDate(appointmentDate),
-            id_trainer: apt.id_trainer?.toString(),
-            id_usuario: apt.id_usuario?.toString(),
-            avaliado: apt.avaliado,
-          };
-          if (appointmentDate >= today) {
-            upcomingAppointments.push(appointment);
-          } else {
-            completedAppointments.push(appointment);
-          }
-        });
-      } else {
-        console.error("A resposta não contém um array de agendamentos:", response);
-      }
+        const appointment: AppointmentData = {
+          id: apt.id_agendamento.toString(),
+          time: formatTime(apt.hora_inicio),
+          title: role === "trainer" ? "Musculação" : apt.trainer_name || "Treinador",
+          subtitle:
+            role === "trainer"
+              ? `${apt.client_name || "Cliente"}, 25 anos`
+              : getStatusSubtitle(apt.status),
+          value: `Ø 0,00`,
+          status: apt.status,
+          appointment_date: apt.data_agendamento,
+          type: "Musculação",
+          userWhoBooked:
+            role === "trainer" ? apt.client_name || "Cliente" : apt.trainer_name || "Treinador",
+          statusText: getStatusSubtitle(apt.status),
+          weekday: getWeekday(appointmentDate),
+          absoluteDate: getAbsoluteDate(appointmentDate),
+          id_trainer: apt.id_trainer?.toString(),
+          id_usuario: apt.id_usuario?.toString(),
+          avaliado: apt.avaliado,
+        };
+        if (appointmentDate >= today) {
+          upcomingAppointments.push(appointment);
+        } else {
+          completedAppointments.push(appointment);
+        }
+      });
       setNewAppointments(upcomingAppointments);
       setPastTrainings(completedAppointments);
     } catch (err: any) {

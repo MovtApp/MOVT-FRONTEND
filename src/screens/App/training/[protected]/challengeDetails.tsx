@@ -1,5 +1,7 @@
-import React from "react";
-import { withPremiumGate } from "@components/withPremiumGate";
+import React, { useState } from "react";
+import { api } from "../../../../services/api";
+import { useUpgradeSheet } from "@components/UpgradeSheetProvider";
+import { notifyApiError } from "../../../../utils/notify";
 import {
   View,
   Text,
@@ -35,6 +37,8 @@ const ChallengeDetails: React.FC = () => {
   const route = useRoute<ChallengeDetailsRouteProp>();
   const navigation = useNavigation<NavigationProp>();
   const insets = useSafeAreaInsets();
+  const { openUpgrade } = useUpgradeSheet();
+  const [accepting, setAccepting] = useState(false);
   const { challenge } = route.params || {};
 
   if (!challenge) {
@@ -49,6 +53,29 @@ const ChallengeDetails: React.FC = () => {
   }
 
   const exercicios = challenge.exercicios || [];
+
+  // "Aceitar desafio" = registrar participação (limite mensal por plano: free 2,
+  // premium 8) e iniciar o treino. 403 do limite → sheet de upgrade. O backend é
+  // idempotente: reaceitar um desafio que já participa não consome novo slot.
+  const handleAccept = async () => {
+    if (accepting) return;
+    setAccepting(true);
+    try {
+      await api.post(`/desafios/${challenge.id_treino}/participar`);
+      navigation.navigate("ActiveWorkout", { training: challenge });
+    } catch (error: any) {
+      if (
+        error?.response?.status === 403 &&
+        error?.response?.data?.error === "FREE_LIMIT_REACHED"
+      ) {
+        openUpgrade("desafios");
+      } else {
+        notifyApiError(error, "Não foi possível aceitar o desafio.");
+      }
+    } finally {
+      setAccepting(false);
+    }
+  };
 
   return (
     <View style={styles.container}>
@@ -226,7 +253,8 @@ const ChallengeDetails: React.FC = () => {
       <View style={[styles.bottomNav, { paddingBottom: (insets.bottom || 24) + 12 }]}>
         <TouchableOpacity
           style={styles.startBtn}
-          onPress={() => navigation.navigate("ActiveWorkout", { training: challenge })}
+          onPress={handleAccept}
+          disabled={accepting}
           activeOpacity={0.9}
         >
           <LinearGradient
@@ -235,7 +263,9 @@ const ChallengeDetails: React.FC = () => {
             end={{ x: 1, y: 0 }}
             style={styles.startBtnGradient}
           >
-            <Text style={styles.startBtnText}>ACEITAR DESAFIO</Text>
+            <Text style={styles.startBtnText}>
+              {accepting ? "ACEITANDO..." : "ACEITAR DESAFIO"}
+            </Text>
             <View style={styles.startBtnArrow}>
               <Trophy size={12} fill="#1E293B" color="#1E293B" />
             </View>
@@ -609,9 +639,7 @@ const styles = StyleSheet.create({
   },
 });
 
-export default withPremiumGate(
-  ChallengeDetails,
-  "desafios",
-  "Desafios",
-  "Os desafios são exclusivos dos planos Premium e Família."
-);
+// Desafio não é mais bloqueio de tela inteira: free participa de até 2/mês
+// (premium 8), enforced no backend. O limite é tratado no "ACEITAR DESAFIO"
+// (403 → sheet de upgrade). Ver ADR-0013.
+export default ChallengeDetails;
