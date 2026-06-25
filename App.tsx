@@ -17,7 +17,7 @@ import { BottomSheetModalProvider } from "@gorhom/bottom-sheet";
 import { UpgradeSheetProvider } from "@components/UpgradeSheetProvider";
 import { AppDataProvider } from "@contexts/AppDataContext";
 import { ConnectivityProvider } from "@contexts/ConnectivityContext";
-import OfflineBanner from "@components/OfflineBanner";
+import NoConnectionGate from "@components/NoConnectionGate";
 import { StatusBar, ActivityIndicator, View, InteractionManager } from "react-native";
 import {
   useFonts,
@@ -200,7 +200,7 @@ function App() {
                   </AppDataProvider>
                 </AuthProvider>
               </BottomSheetModalProvider>
-              <OfflineBanner />
+              <NoConnectionGate />
             </ConnectivityProvider>
             <FlashMessage position="top" />
           </KeyboardProvider>
