@@ -68,10 +68,23 @@ export const ConnectivityProvider: React.FC<{ children: React.ReactNode }> = ({
   }, []);
 
   useEffect(() => {
-    // Estado inicial + assinatura contínua.
-    NetInfo.fetch().then(handleState).catch(() => {});
-    const unsubscribe = NetInfo.addEventListener(handleState);
-    return () => unsubscribe();
+    // Blindagem: se o módulo nativo RNCNetInfo não estiver no binário (build
+    // gerado antes de adicionar a lib), `NetInfo.*` lança. Nesse caso degradamos
+    // para "assume online" e a feature fica inerte — nunca derruba o app. O fix
+    // de verdade é rebuildar o nativo (autolinking inclui o RNCNetInfo).
+    let unsubscribe: (() => void) | undefined;
+    try {
+      NetInfo.fetch().then(handleState).catch(() => {});
+      unsubscribe = NetInfo.addEventListener(handleState);
+    } catch (err) {
+      if (__DEV__) {
+        console.warn(
+          "[Connectivity] NetInfo indisponível (módulo nativo ausente? rebuild necessário):",
+          err
+        );
+      }
+    }
+    return () => unsubscribe?.();
   }, [handleState]);
 
   const isOffline = deriveOffline(raw);
