@@ -42,6 +42,9 @@ export interface WorkoutRecord {
   avgSpeedKmh: number;
   kcal: number;
   route: RoutePoint[];
+  // Rota encaixada nas ruas (map-matching). Só para exibição; pode estar vazia
+  // (offline no save / confiança baixa) → a UI cai na `route` crua.
+  routeSnapped?: RoutePoint[];
   splits: WorkoutSplit[];
   serverId?: number | null; // id no banco (user_workouts.id); null enquanto não sincronizado
   synced?: boolean; // true quando já confirmado no backend
@@ -108,6 +111,7 @@ function mapRowToRecord(row: any): WorkoutRecord {
     avgSpeedKmh: Number(row.velocidade_media_kmh) || 0,
     kcal: Number(row.kcal) || 0,
     route: Array.isArray(row.rota) ? row.rota : [],
+    routeSnapped: Array.isArray(row.rota_snapped) ? row.rota_snapped : [],
     splits: Array.isArray(row.splits) ? row.splits : [],
   };
 }
@@ -126,6 +130,7 @@ async function saveWorkoutBackend(record: WorkoutRecord): Promise<number | null>
     velocidadeMediaKmh: record.avgSpeedKmh,
     kcal: record.kcal,
     rota: record.route,
+    rotaSnapped: record.routeSnapped || [],
     splits: record.splits,
   });
   const w = res.data?.workout;
@@ -155,9 +160,10 @@ export async function saveWorkout(input: {
   distanceKm: number;
   kcal: number;
   route: RoutePoint[];
+  routeSnapped?: RoutePoint[];
   splits: WorkoutSplit[];
 }): Promise<WorkoutRecord> {
-  const { type, durationSec, distanceKm, kcal, route, splits } = input;
+  const { type, durationSec, distanceKm, kcal, route, routeSnapped, splits } = input;
 
   const secPerKm = paceSecPerKm(distanceKm, durationSec);
   const avgPace = secPerKm ? speedToPace(1000 / secPerKm) : "--:--";
@@ -174,6 +180,7 @@ export async function saveWorkout(input: {
     avgSpeedKmh,
     kcal: Math.round(kcal),
     route: Array.isArray(route) ? route : [],
+    routeSnapped: Array.isArray(routeSnapped) ? routeSnapped : [],
     splits: Array.isArray(splits) ? splits : [],
     serverId: null,
     synced: false,

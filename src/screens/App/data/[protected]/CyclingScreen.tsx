@@ -9,6 +9,8 @@ import {
   Platform,
   Alert,
   Modal,
+  Animated,
+  Share,
 } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRoute } from "@react-navigation/native";
@@ -38,8 +40,11 @@ import {
   ChevronLeft,
   Maximize2,
   X,
+  Crosshair,
 } from "lucide-react-native";
 import { LinearGradient } from "expo-linear-gradient";
+import Reanimated, { Easing as REasing, withTiming } from "react-native-reanimated";
+import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import BottomSheet, {
   BottomSheetView,
   BottomSheetScrollView,
@@ -53,6 +58,7 @@ import {
   estimateCalories,
 } from "../../../../utils/workout/performance";
 import { simplifyRoute } from "../../../../utils/workout/geo";
+import { snapRoute } from "../../../../services/mapMatchingService";
 import {
   WorkoutRecord,
   WorkoutType,
@@ -304,10 +310,41 @@ const WorkoutDetail: React.FC<WorkoutDetailProps> = ({
 }) => {
   const accent = workout.type === "Ciclismo" ? "#3B82F6" : "#10B981";
 
-  // Simplifica o traçado (Douglas-Peucker) para renderizar liso e leve, sem
-  // perder a forma — os pontos já vêm suavizados (Kalman) do rastreamento.
+  // Re-snap do histórico: treinos salvos com `routeSnapped` vazio (ex.: o snap
+  // falhava por falta de token) tentam o map-matching de novo ao abrir o detalhe.
+  // Apenas para exibição (não persiste); se falhar, mantém a rota crua.
+  const [snappedOverride, setSnappedOverride] = useState<LatLng[] | null>(null);
+  useEffect(() => {
+    setSnappedOverride(null);
+    if (Array.isArray(workout.routeSnapped) && workout.routeSnapped.length > 1) return;
+    const raw = (Array.isArray(workout.route) ? workout.route : []).filter(
+      (p) =>
+        p &&
+        typeof p.latitude === "number" &&
+        isFinite(p.latitude) &&
+        typeof p.longitude === "number" &&
+        isFinite(p.longitude)
+    );
+    if (raw.length < 2) return;
+    let alive = true;
+    snapRoute(raw, workout.type).then((r) => {
+      if (alive && r && r.snapped.length > 1) setSnappedOverride(r.snapped);
+    });
+    return () => {
+      alive = false;
+    };
+  }, [workout.id, workout.routeSnapped, workout.route, workout.type]);
+
+  // Prefere a rota encaixada nas ruas (map-matching salvo → re-snap → crua).
+  // Simplifica (Douglas-Peucker) para renderizar liso e leve, sem perder a forma.
   const safeRoute = useMemo(() => {
-    const cleaned = workout.route.filter(
+    const source =
+      Array.isArray(workout.routeSnapped) && workout.routeSnapped.length > 1
+        ? workout.routeSnapped
+        : snappedOverride && snappedOverride.length > 1
+          ? snappedOverride
+          : workout.route;
+    const cleaned = source.filter(
       (p) =>
         p &&
         typeof p.latitude === "number" &&
@@ -316,7 +353,7 @@ const WorkoutDetail: React.FC<WorkoutDetailProps> = ({
         isFinite(p.longitude)
     );
     return simplifyRoute(cleaned, 4);
-  }, [workout.route]);
+  }, [workout.routeSnapped, workout.route, snappedOverride]);
 
   // Diferença vs. recorde da modalidade (para a comparação).
   const distDelta = workout.distanceKm - records.longestDistanceKm;
@@ -520,6 +557,385 @@ const WorkoutDetail: React.FC<WorkoutDetailProps> = ({
   );
 };
 
+// ─── Tela de pausa: estatísticas da corrida em andamento ─────────────────────
+
+// Transições "subir + fade" da tela de espera (reanimated, controle exato do
+// deslocamento). Entrada: sobe 40px + fade-in; saída: desce 30px + fade-out.
+const pausedEntering = () => {
+  "worklet";
+  return {
+    initialValues: { opacity: 0, transform: [{ translateY: 40 }] },
+    animations: {
+      opacity: withTiming(1, { duration: 320, easing: REasing.out(REasing.cubic) }),
+      transform: [{ translateY: withTiming(0, { duration: 320, easing: REasing.out(REasing.cubic) }) }],
+    },
+  };
+};
+const pausedExiting = () => {
+  "worklet";
+  return {
+    initialValues: { opacity: 1, transform: [{ translateY: 0 }] },
+    animations: {
+      opacity: withTiming(0, { duration: 220, easing: REasing.in(REasing.cubic) }),
+      transform: [{ translateY: withTiming(30, { duration: 220, easing: REasing.in(REasing.cubic) }) }],
+    },
+  };
+};
+// Fade rápido ao trocar de categoria de métrica (swipe ou botão).
+const fadeRows = () => {
+  "worklet";
+  return {
+    initialValues: { opacity: 0 },
+    animations: { opacity: withTiming(1, { duration: 180 }) },
+  };
+};
+
+interface PausedStatsProps {
+  type: WorkoutType;
+  distanceKm: number;
+  seconds: number;
+  currentSpeedMs: number;
+  maxSpeedMs: number;
+  elevationGainM: number;
+  splits: TrackingSnapshot["splits"];
+  route: LatLng[];
+  mapRef: React.RefObject<MapView | null>;
+  onResume: () => void;
+  onStop: () => void;
+  onClose: () => void;
+}
+
+const PausedStats: React.FC<PausedStatsProps> = ({
+  type,
+  distanceKm,
+  seconds,
+  currentSpeedMs,
+  maxSpeedMs,
+  elevationGainM,
+  splits,
+  route,
+  mapRef,
+  onResume,
+  onStop,
+  onClose,
+}) => {
+  const insets = useSafeAreaInsets();
+  const isCycling = type === "Ciclismo";
+  // Verde padrão do projeto (lime de marca) — fundo sólido vivo da tela de espera.
+  const GREEN = "#BBF246";
+  const GREEN_TEXT = "#365314"; // verde escuro, legível como texto sobre o lime vivo
+
+  // Médias derivadas de distância ÷ tempo (m/s).
+  const avgMs = seconds > 0 ? (distanceKm * 1000) / seconds : 0;
+  const avgValue = isCycling ? (avgMs * 3.6).toFixed(1) : speedToPace(avgMs);
+  const curValue = isCycling
+    ? (currentSpeedMs * 3.6).toFixed(1)
+    : speedToPace(currentSpeedMs);
+  const unitLabel = isCycling ? "km/h" : "pace";
+  const kcalNum = estimateCalories(distanceKm);
+  const kcal = kcalNum.toFixed(0);
+
+  // ─── Métricas da lista (por categoria/aba) ──────────────────────────────────
+  const [statTab, setStatTab] = useState<"ritmo" | "velocidade" | "tempo" | "esforco">("ritmo");
+
+  // Helpers de formatação.
+  const fmtPace = (sec: number) =>
+    sec > 0 ? `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, "0")} /km` : "--";
+  const kmhFromPace = (sec: number) => (sec > 0 ? `${((1000 / sec) * 3.6).toFixed(1)} km/h` : "--");
+
+  // Pace (segundos) de cada parcial.
+  const splitSecs = splits
+    .map((s) => {
+      const [m, ss] = String(s.pace).split(":").map((n) => parseInt(n, 10));
+      return (m || 0) * 60 + (ss || 0);
+    })
+    .filter((n) => isFinite(n) && n > 0);
+  const bestSec = splitSecs.length ? Math.min(...splitSecs) : 0;
+  const worstSec = splitSecs.length ? Math.max(...splitSecs) : 0;
+  const lastSec = splitSecs.length ? splitSecs[splitSecs.length - 1] : 0;
+
+  // Configuração das abas e suas linhas (ícone · rótulo · valor).
+  const STAT_TABS: { key: typeof statTab; label: string }[] = [
+    { key: "ritmo", label: "Ritmo" },
+    { key: "velocidade", label: "Velocidade" },
+    { key: "tempo", label: "Tempo & Distância" },
+    { key: "esforco", label: "Esforço" },
+  ];
+  const statRows: Record<typeof statTab, { icon: any; label: string; value: string }[]> = {
+    ritmo: [
+      { icon: TrendingUp, label: "Ritmo médio", value: speedToPace(avgMs) === "--:--" ? "--" : `${speedToPace(avgMs)} /km` },
+      { icon: Zap, label: "Ritmo atual", value: speedToPace(currentSpeedMs) === "--:--" ? "--" : `${speedToPace(currentSpeedMs)} /km` },
+      { icon: Trophy, label: "Melhor km", value: fmtPace(bestSec) },
+      { icon: Timer, label: "Km mais lento", value: fmtPace(worstSec) },
+      { icon: Navigation, label: "Último km", value: fmtPace(lastSec) },
+    ],
+    velocidade: [
+      { icon: TrendingUp, label: "Vel. média", value: avgMs > 0 ? `${(avgMs * 3.6).toFixed(1)} km/h` : "--" },
+      { icon: Zap, label: "Vel. atual", value: `${(currentSpeedMs * 3.6).toFixed(1)} km/h` },
+      { icon: Mountain, label: "Pico de velocidade", value: maxSpeedMs > 0 ? `${(maxSpeedMs * 3.6).toFixed(1)} km/h` : "--" },
+      { icon: Navigation, label: "Vel. último km", value: kmhFromPace(lastSec) },
+    ],
+    tempo: [
+      { icon: Navigation, label: "Distância total", value: `${distanceKm.toFixed(2).replace(".", ",")} km` },
+      { icon: Timer, label: "Tempo", value: formatDuration(seconds) },
+      { icon: TrendingUp, label: "Tempo médio/km", value: distanceKm > 0 ? `${formatDuration(Math.round(seconds / distanceKm))} /km` : "--" },
+      { icon: Trophy, label: "Parciais completas", value: `${splits.length}` },
+    ],
+    esforco: [
+      { icon: Flame, label: "Calorias", value: `${kcal} kcal` },
+      { icon: TrendingUp, label: "Calorias / km", value: distanceKm > 0 ? `${(kcalNum / distanceKm).toFixed(0)} kcal` : "--" },
+      { icon: Timer, label: "Calorias / min", value: seconds > 0 ? `${(kcalNum / (seconds / 60)).toFixed(1)} kcal` : "--" },
+      { icon: Mountain, label: "Ganho de elevação", value: `${Math.round(elevationGainM)} m` },
+    ],
+  };
+
+  // Arrastar para o lado troca de categoria (esquerda = próxima, direita = anterior).
+  // Circular: do último volta para o primeiro e do primeiro para o último.
+  const changeTab = (dir: number) => {
+    setStatTab((cur) => {
+      const order = STAT_TABS.map((t) => t.key);
+      const i = order.indexOf(cur);
+      const next = (i + dir + order.length) % order.length;
+      return order[next];
+    });
+  };
+  const swipeTabs = Gesture.Pan()
+    .activeOffsetX([-20, 20]) // só ativa no movimento horizontal
+    .failOffsetY([-15, 15]) // deixa o scroll vertical ganhar nos arrastes verticais
+    .runOnJS(true)
+    .onEnd((e) => {
+      if (e.translationX <= -40) changeTab(1);
+      else if (e.translationX >= 40) changeTab(-1);
+    });
+
+  // Barras do mini-gráfico de "ritmo por km": parcial mais rápida = barra mais alta.
+  const paceBars = (() => {
+    const secs = splits
+      .map((s) => {
+        const [m, ss] = String(s.pace).split(":").map((n) => parseInt(n, 10));
+        return (m || 0) * 60 + (ss || 0);
+      })
+      .filter((n) => isFinite(n) && n > 0)
+      .slice(-7);
+    if (secs.length < 2) return [] as number[];
+    const max = Math.max(...secs);
+    const min = Math.min(...secs);
+    return secs.map((s) => (max === min ? 0.6 : ((max - s) / (max - min)) * 0.7 + 0.3));
+  })();
+
+  const hasRoute = route.length > 1;
+  const fitRegion = hasRoute ? regionForRoute(route) : null;
+  const fitMap = () => {
+    if (route.length < 2) return;
+    mapRef.current?.fitToCoordinates(route, {
+      edgePadding: { top: 40, right: 40, bottom: 40, left: 40 },
+      animated: false,
+    });
+  };
+
+  // Compartilha um resumo da corrida pelo menu nativo do sistema.
+  const shareSummary = async () => {
+    const emoji = isCycling ? "🚴" : "🏃";
+    const avgLine = isCycling ? `${avgValue} km/h méd` : `${avgValue} /km méd`;
+    try {
+      await Share.share({
+        message:
+          `${emoji} ${type} no MOVT\n` +
+          `📍 ${distanceKm.toFixed(2).replace(".", ",")} km\n` +
+          `⏱️ ${formatDuration(seconds)}\n` +
+          `⚡ ${avgLine}\n` +
+          `🔥 ${kcal} kcal`,
+      });
+    } catch {
+      // usuário cancelou ou compartilhamento indisponível — silencioso
+    }
+  };
+
+  return (
+    <Reanimated.View style={ps.overlay} entering={pausedEntering} exiting={pausedExiting}>
+      {/* Fundo verde sólido (lime de marca) sobre o mapa — cor viva 100%. */}
+      <View style={ps.scrim} pointerEvents="none" />
+
+      {/* Header */}
+      <View style={[ps.header, { paddingTop: insets.top + 8 }]}>
+        <TouchableOpacity style={ps.closeBtn} onPress={onClose} activeOpacity={0.8}>
+          <X size={22} color="#1E293B" />
+        </TouchableOpacity>
+        <View style={ps.headerCenter}>
+          <Text style={ps.headerTitle}>PAUSADO</Text>
+          <Text style={[ps.headerSub, { color: GREEN_TEXT }]}>{type.toUpperCase()}</Text>
+        </View>
+        <TouchableOpacity style={ps.closeBtn} onPress={shareSummary} activeOpacity={0.8}>
+          <Share2 size={20} color="#1A2E05" />
+        </TouchableOpacity>
+      </View>
+
+      <ScrollView
+        style={{ flex: 1 }}
+        contentContainerStyle={ps.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* Bento grid — mosaico assimétrico */}
+        <View style={ps.bentoRow}>
+          <View style={[ps.tile, ps.tileFlex]}>
+            <Text style={ps.tileHeroValue}>{distanceKm.toFixed(2)}</Text>
+            <Text style={ps.tileLabel}>quilômetros</Text>
+          </View>
+          <View style={[ps.tile, ps.tileFlex]}>
+            <Text style={ps.tileValue}>{formatDuration(seconds)}</Text>
+            <Text style={ps.tileLabel}>tempo</Text>
+          </View>
+        </View>
+
+        <View style={ps.bentoRow}>
+          <View style={[ps.tile, ps.tilePace]}>
+            <Text style={ps.tileValue}>{avgValue}</Text>
+            <Text style={ps.tileLabel}>{unitLabel} méd</Text>
+            <View style={ps.tileDivider} />
+            <Text style={ps.tileSubValue}>
+              {curValue}
+              <Text style={ps.tileSubUnit}> atual</Text>
+            </Text>
+          </View>
+          <View style={[ps.tile, ps.tileWide]}>
+            <View style={ps.tileWideTop}>
+              <Text style={ps.tileValue}>{kcal}</Text>
+              <Text style={ps.tileLabel}>kcal</Text>
+            </View>
+            <View style={ps.chart}>
+              {paceBars.length > 0
+                ? paceBars.map((h, i) => (
+                    <View
+                      key={i}
+                      style={[
+                        ps.bar,
+                        {
+                          height: `${Math.round(h * 100)}%`,
+                          backgroundColor: i === paceBars.length - 1 ? GREEN : "#1A2E05",
+                        },
+                      ]}
+                    />
+                  ))
+                : [0.4, 0.6, 0.5, 0.7, 0.55].map((h, i) => (
+                    <View key={i} style={[ps.bar, ps.barEmpty, { height: `${h * 100}%` }]} />
+                  ))}
+            </View>
+            <Text style={ps.chartLabel}>ritmo por km</Text>
+          </View>
+        </View>
+
+        {/* Mini-mapa da rota até agora */}
+        {hasRoute && fitRegion ? (
+          <View style={ps.mapBox}>
+            <MapView
+              ref={mapRef}
+              provider={PROVIDER_GOOGLE}
+              style={StyleSheet.absoluteFillObject}
+              scrollEnabled={false}
+              zoomEnabled={false}
+              rotateEnabled={false}
+              pitchEnabled={false}
+              pointerEvents="none"
+              initialRegion={fitRegion}
+              onMapReady={fitMap}
+            >
+              <Polyline
+                coordinates={route}
+                strokeColor={GREEN}
+                strokeWidth={5}
+                lineCap="round"
+                lineJoin="round"
+              />
+              <RouteEndpoints route={route} />
+            </MapView>
+          </View>
+        ) : (
+          <View style={ps.noRouteBox}>
+            <Navigation size={22} color="#94A3B8" />
+            <Text style={ps.noRouteText}>Ainda sem rota suficiente para o mapa</Text>
+          </View>
+        )}
+
+        {/* Lista de estatísticas com abas por categoria de métrica */}
+        <View style={ps.statList}>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={ps.tabBar}
+          >
+            {STAT_TABS.map((t) => {
+              const active = statTab === t.key;
+              return (
+                <TouchableOpacity
+                  key={t.key}
+                  onPress={() => setStatTab(t.key)}
+                  style={[ps.tabBtn, active && ps.tabBtnActive]}
+                  activeOpacity={0.8}
+                >
+                  <Text style={[ps.tabBtnText, active && ps.tabBtnTextActive]}>{t.label}</Text>
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
+
+          <GestureDetector gesture={swipeTabs}>
+            <View>
+              <Reanimated.View key={statTab} entering={fadeRows}>
+                {statRows[statTab].map((r, i) => {
+                  const Icon = r.icon;
+                  return (
+                    <View key={r.label}>
+                      {i > 0 && <View style={ps.statRowDivider} />}
+                      <View style={ps.statRow}>
+                        <View style={ps.statRowLeft}>
+                          <Icon size={18} color="#65A30D" />
+                          <Text style={ps.statRowLabel}>{r.label}</Text>
+                        </View>
+                        <Text style={ps.statRowValue}>{r.value}</Text>
+                      </View>
+                    </View>
+                  );
+                })}
+              </Reanimated.View>
+            </View>
+          </GestureDetector>
+        </View>
+
+        {/* Parciais por km */}
+        {splits.length > 0 && (
+          <View style={ps.splitsBox}>
+            <Text style={ps.splitsTitle}>Parciais (por km)</Text>
+            <View style={ps.splitHead}>
+              <Text style={ps.splitHeadText}>KM</Text>
+              <Text style={ps.splitHeadText}>TEMPO</Text>
+              <Text style={ps.splitHeadText}>PACE</Text>
+            </View>
+            {splits.map((s) => (
+              <View key={s.km} style={ps.splitRow}>
+                <Text style={ps.splitNum}>{s.km}</Text>
+                <Text style={ps.splitVal}>{s.time}</Text>
+                <Text style={ps.splitVal}>{s.pace}</Text>
+              </View>
+            ))}
+          </View>
+        )}
+      </ScrollView>
+
+      {/* Footer fixo: Retomar + Encerrar */}
+      <View style={[ps.footer, { paddingBottom: (insets.bottom || 16) + 10 }]}>
+        <TouchableOpacity style={ps.resumeBtn} onPress={onResume} activeOpacity={0.85}>
+          <Play size={22} color="#fff" fill="#fff" />
+          <Text style={ps.resumeText}>RETOMAR</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={ps.stopBtn} onPress={onStop} activeOpacity={0.85}>
+          <Square size={20} color="#EF4444" fill="#EF4444" />
+          <Text style={ps.stopText}>ENCERRAR</Text>
+        </TouchableOpacity>
+      </View>
+    </Reanimated.View>
+  );
+};
+
 const CyclingScreen: React.FC = () => {
   const navRoute = useRoute<any>();
   const routeDate = (() => {
@@ -554,6 +970,7 @@ const CyclingScreen: React.FC = () => {
   // Timestamp (relógio local) do último reposicionamento da câmera — usado para
   // animar pela cadência real dos fixes (acompanhamento contínuo, sem gap morto).
   const lastFollowTsRef = useRef<number>(0);
+  const insets = useSafeAreaInsets();
 
   const isTracking = snap.active;
   const isPaused = snap.isPaused;
@@ -694,6 +1111,7 @@ const CyclingScreen: React.FC = () => {
         distanceKm: finalDistance,
         kcal: estimateCalories(finalDistance),
         route: final.route,
+        routeSnapped: final.snappedRoute,
         splits: final.splits,
       });
 
@@ -793,18 +1211,24 @@ const CyclingScreen: React.FC = () => {
   const safeDistance = isFinite(distance) && !isNaN(distance) ? distance : 0;
   const estimatedKcal = estimateCalories(safeDistance).toFixed(0);
 
-  const safeRoute = useMemo(() => {
-    return route.filter(
-      (p: { latitude: number; longitude: number }) =>
-        p &&
-        typeof p.latitude === "number" &&
-        !isNaN(p.latitude) &&
-        isFinite(p.latitude) &&
-        typeof p.longitude === "number" &&
-        !isNaN(p.longitude) &&
-        isFinite(p.longitude)
-    );
-  }, [route]);
+  const isValidLatLng = (p: { latitude: number; longitude: number }) =>
+    p &&
+    typeof p.latitude === "number" &&
+    !isNaN(p.latitude) &&
+    isFinite(p.latitude) &&
+    typeof p.longitude === "number" &&
+    !isNaN(p.longitude) &&
+    isFinite(p.longitude);
+
+  const safeRoute = useMemo(() => route.filter(isValidLatLng), [route]);
+
+  // Traçado encaixado nas ruas (map-matching ao vivo). Quando existe, é o que
+  // desenhamos no mapa; senão, cai na rota crua suavizada.
+  const safeSnappedRoute = useMemo(
+    () => (snap.snappedRoute || []).filter(isValidLatLng),
+    [snap.snappedRoute]
+  );
+  const displayRoute = safeSnappedRoute.length > 1 ? safeSnappedRoute : safeRoute;
 
   // Posição "ao vivo": último fix do treino em andamento, ou a posição conhecida
   // ao abrir a tela (antes de iniciar).
@@ -821,8 +1245,202 @@ const CyclingScreen: React.FC = () => {
     );
   }, [liveLatLng]);
 
+  // ─── Modo imersivo (treino ativo): contagem 3-2-1, pulso "Pausado", recentrar ──
+  const [countdown, setCountdown] = useState<number | null>(null);
+  const pausePulse = useRef(new Animated.Value(1)).current;
+
+  // INICIAR dispara uma contagem 3-2-1 antes de começar o rastreamento de fato.
+  const beginCountdown = () => setCountdown(3);
+
+  useEffect(() => {
+    if (countdown === null) return;
+    if (countdown <= 0) {
+      setCountdown(null);
+      startTracking();
+      return;
+    }
+    const t = setTimeout(() => setCountdown((c) => (c === null ? null : c - 1)), 1000);
+    return () => clearTimeout(t);
+  }, [countdown]);
+
+  // Pulso do badge "Pausado" (opacidade indo e voltando enquanto pausado).
+  useEffect(() => {
+    if (isTracking && isPaused) {
+      const loop = Animated.loop(
+        Animated.sequence([
+          Animated.timing(pausePulse, { toValue: 0.35, duration: 600, useNativeDriver: true }),
+          Animated.timing(pausePulse, { toValue: 1, duration: 600, useNativeDriver: true }),
+        ])
+      );
+      loop.start();
+      return () => loop.stop();
+    }
+    pausePulse.setValue(1);
+  }, [isTracking, isPaused, pausePulse]);
+
+  // ─── Tela de pausa (modal full-screen com estatísticas da corrida) ──────────
+  const [pausedStatsOpen, setPausedStatsOpen] = useState(false);
+  const pausedMapRef = useRef<MapView>(null);
+
+  // PAUSAR (no painel imersivo): pausa o tracking e abre a tela de estatísticas.
+  // Quando já está pausado, o botão vira RETOMAR e só retoma (sem reabrir o modal).
+  const handleImmPause = () => {
+    Tracker.togglePause();
+    if (!isPaused) setPausedStatsOpen(true);
+  };
+  const resumeFromStats = () => {
+    Tracker.togglePause();
+    setPausedStatsOpen(false);
+  };
+
+  // Recentraliza a câmera na posição atual do usuário.
+  const recenter = () => {
+    if (hasValidLocation && liveLatLng) {
+      liveMapRef.current?.animateCamera(
+        { center: { latitude: liveLatLng.latitude, longitude: liveLatLng.longitude } },
+        { duration: 500 }
+      );
+    }
+  };
+
   return (
     <DataErrorBoundary>
+      {isTracking && isToday ? (
+        // ─── Tela cheia de treino ativo (estilo Strava) ───────────────────────
+        <View style={styles.immersive}>
+          <MapView
+            ref={liveMapRef}
+            provider={PROVIDER_GOOGLE}
+            style={StyleSheet.absoluteFillObject}
+            showsUserLocation
+            showsMyLocationButton={false}
+            initialRegion={
+              hasValidLocation && liveLatLng
+                ? {
+                    latitude: liveLatLng.latitude,
+                    longitude: liveLatLng.longitude,
+                    latitudeDelta: 0.005,
+                    longitudeDelta: 0.005,
+                  }
+                : {
+                    latitude: -23.5555,
+                    longitude: -46.6383,
+                    latitudeDelta: 0.02,
+                    longitudeDelta: 0.02,
+                  }
+            }
+          >
+            {displayRoute.length > 1 && (
+              <Polyline
+                coordinates={displayRoute}
+                strokeColor={activeTab === "Ciclismo" ? "#3B82F6" : "#10B981"}
+                strokeWidth={5}
+                lineCap="round"
+                lineJoin="round"
+              />
+            )}
+          </MapView>
+
+          {/* Topo: minimizar (treino segue) + modalidade + badge Pausado */}
+          <SafeAreaView edges={["top"]} style={styles.immTopSafe} pointerEvents="box-none">
+            <View style={styles.immTopRow}>
+              <BackButton to={{ name: "DataScreen" }} />
+              <View style={styles.immModalityPill}>
+                <Text style={styles.immModalityText}>{activeTab.toUpperCase()}</Text>
+              </View>
+              {isPaused ? (
+                <Animated.View style={[styles.immPausedBadge, { opacity: pausePulse }]}>
+                  <Pause size={12} color="#fff" fill="#fff" />
+                  <Text style={styles.immPausedText}>PAUSADO</Text>
+                </Animated.View>
+              ) : (
+                <View style={{ width: 92 }} />
+              )}
+            </View>
+          </SafeAreaView>
+
+          {/* Painel inferior: recentralizar + cartão flutuante (stats + controles) */}
+          <View
+            style={[styles.immBottom, { paddingBottom: (insets.bottom || 16) + 12 }]}
+            pointerEvents="box-none"
+          >
+            {/* Recentralizar (acima do cartão, à direita) */}
+            <TouchableOpacity style={styles.immRecenter} onPress={recenter} activeOpacity={0.85}>
+              <Crosshair size={22} color="#fff" />
+            </TouchableOpacity>
+
+            <View style={styles.immCard}>
+              <View style={styles.immStats}>
+                <View style={styles.immStat}>
+                  <Text style={styles.immStatValue}>{distance.toFixed(2)}</Text>
+                  <Text style={styles.immStatLabel}>km</Text>
+                </View>
+                <View style={styles.immStatDivider} />
+                <View style={styles.immStat}>
+                  <Text style={styles.immStatValue}>{formatDuration(seconds)}</Text>
+                  <Text style={styles.immStatLabel}>tempo</Text>
+                </View>
+                <View style={styles.immStatDivider} />
+                <View style={styles.immStat}>
+                  <Text style={styles.immStatValue}>
+                    {activeTab === "Ciclismo" ? currentSpeedKmh : currentPace}
+                  </Text>
+                  <Text style={styles.immStatLabel}>
+                    {activeTab === "Ciclismo" ? "km/h" : "pace"}
+                  </Text>
+                </View>
+                <View style={styles.immStatDivider} />
+                <View style={styles.immStat}>
+                  <Text style={styles.immStatValue}>{estimatedKcal}</Text>
+                  <Text style={styles.immStatLabel}>kcal</Text>
+                </View>
+              </View>
+
+              <View style={styles.immControls}>
+                <TouchableOpacity
+                  style={styles.immPauseBtn}
+                  onPress={handleImmPause}
+                  activeOpacity={0.85}
+                >
+                  {isPaused ? (
+                    <Play size={22} color="#fff" fill="#fff" />
+                  ) : (
+                    <Pause size={22} color="#fff" fill="#fff" />
+                  )}
+                  <Text style={styles.immPauseText}>{isPaused ? "RETOMAR" : "PAUSAR"}</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.immStopBtn}
+                  onPress={stopTracking}
+                  activeOpacity={0.85}
+                >
+                  <Square size={20} color="#fff" fill="#fff" />
+                  <Text style={styles.immStopText}>ENCERRAR</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+
+          {/* ─── Tela de pausa: estatísticas da corrida (overlay de vidro sobre
+              o mapa, na mesma árvore para o mapa aparecer desfocado por trás) ─── */}
+          {pausedStatsOpen && (
+            <PausedStats
+              type={activeTab === "Ciclismo" ? "Ciclismo" : "Corrida"}
+              distanceKm={safeDistance}
+              seconds={seconds}
+              currentSpeedMs={safeCurrentSpeedMs}
+              maxSpeedMs={snap.maxSpeedMs || 0}
+              elevationGainM={snap.elevationGainM || 0}
+              splits={snap.splits}
+              route={displayRoute}
+              mapRef={pausedMapRef}
+              onResume={resumeFromStats}
+              onStop={stopTracking}
+              onClose={() => setPausedStatsOpen(false)}
+            />
+          )}
+        </View>
+      ) : (
       <SafeAreaView style={styles.safeArea} edges={["top"]}>
         <View style={styles.header}>
           <BackButton to={{ name: "DataScreen" }} />
@@ -881,9 +1499,9 @@ const CyclingScreen: React.FC = () => {
                     }
               }
             >
-              {safeRoute.length > 1 && (
+              {displayRoute.length > 1 && (
                 <Polyline
-                  coordinates={safeRoute}
+                  coordinates={displayRoute}
                   strokeColor={activeTab === "Ciclismo" ? "#3B82F6" : "#10B981"}
                   strokeWidth={4}
                   lineCap="round"
@@ -935,7 +1553,7 @@ const CyclingScreen: React.FC = () => {
               !isTracking ? (
                 <TouchableOpacity
                   style={[styles.mainButton, { backgroundColor: "#BBF246" }]}
-                  onPress={startTracking}
+                  onPress={beginCountdown}
                   activeOpacity={0.8}
                 >
                   <Play size={24} color="#000" fill="#000" />
@@ -1075,12 +1693,172 @@ const CyclingScreen: React.FC = () => {
           </BottomSheet>
         )}
       </SafeAreaView>
+      )}
+
+      {/* Contagem regressiva 3-2-1 ao iniciar (overlay sobre a tela normal). */}
+      {countdown !== null && (
+        <View style={styles.countdownOverlay} pointerEvents="none">
+          <Text style={styles.countdownLabel}>PREPARAR</Text>
+          <Text style={styles.countdownNum}>{countdown}</Text>
+        </View>
+      )}
     </DataErrorBoundary>
   );
 };
 
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: "#FFFFFF" },
+
+  // ─── Modo imersivo (treino ativo): mapa full + overlays em vidro escuro ────────
+  immersive: { flex: 1, backgroundColor: "#0B0F12" },
+
+  // Topo flutuante (safe area): voltar · modalidade · badge pausado
+  immTopSafe: { position: "absolute", top: 0, left: 0, right: 0 },
+  immTopRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 16,
+    paddingTop: 6,
+    gap: 8,
+  },
+  immModalityPill: {
+    backgroundColor: "rgba(25,33,38,0.85)",
+    paddingHorizontal: 16,
+    paddingVertical: 9,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.12)",
+  },
+  immModalityText: {
+    color: "#FFFFFF",
+    fontWeight: "800",
+    fontSize: 13,
+    letterSpacing: 1,
+  },
+  immPausedBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    minWidth: 92,
+    backgroundColor: "rgba(239,68,68,0.95)",
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+    borderRadius: 999,
+  },
+  immPausedText: {
+    color: "#FFFFFF",
+    fontWeight: "800",
+    fontSize: 11,
+    letterSpacing: 0.5,
+  },
+
+  // Botão recentralizar (acima do cartão, à direita)
+  immRecenter: {
+    alignSelf: "flex-end",
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: "rgba(25,33,38,0.9)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.12)",
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 12,
+    marginRight: 2,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 6,
+  },
+
+  // Base: container posicionado por safe area + cartão flutuante
+  immBottom: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    bottom: 0,
+    paddingHorizontal: 16,
+  },
+  immCard: {
+    backgroundColor: "#BBF246",
+    borderRadius: 28,
+    paddingVertical: 16,
+    paddingHorizontal: 16,
+    shadowColor: "#1A2E05",
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.35,
+    shadowRadius: 14,
+    elevation: 10,
+  },
+  immStats: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-around",
+  },
+  immStat: { alignItems: "center", flex: 1 },
+  immStatValue: {
+    color: "#1A2E05",
+    fontSize: 22,
+    fontWeight: "900",
+    letterSpacing: -0.5,
+  },
+  immStatLabel: {
+    color: "#3F6212",
+    fontSize: 10,
+    fontWeight: "800",
+    textTransform: "uppercase",
+    marginTop: 2,
+  },
+  immStatDivider: { width: 1, height: 28, backgroundColor: "rgba(26,46,5,0.18)" },
+  immControls: { flexDirection: "row", gap: 12, marginTop: 16 },
+  immPauseBtn: {
+    flex: 1,
+    height: 56,
+    borderRadius: 18,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    backgroundColor: "#192126",
+  },
+  immPauseText: { color: "#FFFFFF", fontWeight: "800", fontSize: 15 },
+  immStopBtn: {
+    flex: 1,
+    height: 56,
+    borderRadius: 18,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    backgroundColor: "#EF4444",
+  },
+  immStopText: { color: "#FFFFFF", fontWeight: "800", fontSize: 15 },
+
+  // Contagem regressiva 3-2-1 ao iniciar (overlay full-screen)
+  countdownOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(11,15,18,0.92)",
+    alignItems: "center",
+    justifyContent: "center",
+    zIndex: 50,
+  },
+  countdownLabel: {
+    color: "rgba(255,255,255,0.7)",
+    fontSize: 16,
+    fontWeight: "800",
+    letterSpacing: 4,
+    marginBottom: 12,
+  },
+  countdownNum: {
+    color: "#FFFFFF",
+    fontSize: 120,
+    fontWeight: "900",
+    letterSpacing: -2,
+  },
+
   header: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -1497,6 +2275,191 @@ const hs = StyleSheet.create({
   },
   splitNum: { fontSize: 14, fontWeight: "900", color: "#1E293B", flex: 1, textAlign: "center" },
   splitVal: { fontSize: 14, fontWeight: "700", color: "#475569", flex: 1, textAlign: "center" },
+});
+
+// Estilos da tela de pausa — vidro simulado (frosted claro) sobre o mapa, com as
+// informações centralizadas sobre fundo verde sólido (lime de marca), cor viva 100%.
+const ps = StyleSheet.create({
+  overlay: { ...StyleSheet.absoluteFillObject, zIndex: 30, backgroundColor: "#BBF246" },
+  // Fundo verde sólido (lime de marca), cobre o mapa por completo — cor viva 100%.
+  scrim: { ...StyleSheet.absoluteFillObject, backgroundColor: "#BBF246" },
+
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 16,
+    paddingBottom: 8,
+  },
+  closeBtn: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: "#FFFFFF",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  headerCenter: { alignItems: "center" },
+  headerTitle: { color: "#1A2E05", fontSize: 15, fontWeight: "900", letterSpacing: 3 },
+  headerSub: { fontSize: 12, fontWeight: "800", letterSpacing: 1, marginTop: 2 },
+
+  scrollContent: { paddingHorizontal: 16, paddingTop: 8, paddingBottom: 24, alignItems: "stretch" },
+
+  // ─── Bento grid ──────────────────────────────────────────────────────────
+  bentoRow: { flexDirection: "row", gap: 12, marginBottom: 12 },
+  tile: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 28,
+    padding: 18,
+    shadowColor: "#1A2E05",
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.14,
+    shadowRadius: 14,
+    elevation: 4,
+  },
+  tileFlex: { flex: 1, justifyContent: "center" },
+  tilePace: { flex: 1 },
+  tileWide: { flex: 1.4 },
+  tileHeroValue: { color: "#1A2E05", fontSize: 44, fontWeight: "900", letterSpacing: -2, lineHeight: 48 },
+  tileValue: { color: "#1A2E05", fontSize: 26, fontWeight: "900", letterSpacing: -0.5 },
+  tileLabel: {
+    color: "#65A30D",
+    fontSize: 11,
+    fontWeight: "800",
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+    marginTop: 4,
+  },
+  tileDivider: { height: 1, backgroundColor: "#E2E8F0", marginVertical: 10 },
+  tileSubValue: { color: "#475569", fontSize: 15, fontWeight: "800" },
+  tileSubUnit: { color: "#94A3B8", fontSize: 11, fontWeight: "700" },
+  tileWideTop: { marginBottom: 10 },
+  chart: { flexDirection: "row", alignItems: "flex-end", gap: 5, height: 40 },
+  bar: { flex: 1, borderRadius: 4, minHeight: 4 },
+  barEmpty: { backgroundColor: "#E2E8F0" },
+  chartLabel: {
+    color: "#94A3B8",
+    fontSize: 10,
+    fontWeight: "800",
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+    marginTop: 8,
+  },
+
+  mapBox: {
+    height: 200,
+    borderRadius: 24,
+    overflow: "hidden",
+    marginBottom: 14,
+    borderWidth: 4,
+    borderColor: "#FFFFFF",
+  },
+  noRouteBox: {
+    height: 110,
+    borderRadius: 24,
+    marginBottom: 14,
+    backgroundColor: "#FFFFFF",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+  },
+  noRouteText: { color: "#94A3B8", fontSize: 13, fontWeight: "600" },
+
+  statList: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 24,
+    paddingHorizontal: 18,
+    paddingTop: 12,
+    paddingBottom: 6,
+    marginBottom: 14,
+    shadowColor: "#1A2E05",
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.14,
+    shadowRadius: 14,
+    elevation: 4,
+  },
+  tabBar: { gap: 8, paddingBottom: 12, paddingRight: 4 },
+  tabBtn: {
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    borderRadius: 999,
+    backgroundColor: "#F1F5F9",
+  },
+  tabBtnActive: { backgroundColor: "#BBF246" },
+  tabBtnText: { fontSize: 12, fontWeight: "800", color: "#64748B", letterSpacing: 0.3 },
+  tabBtnTextActive: { color: "#1A2E05" },
+  statRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingVertical: 14,
+  },
+  statRowLeft: { flexDirection: "row", alignItems: "center", gap: 12 },
+  statRowLabel: { color: "#475569", fontSize: 14, fontWeight: "700" },
+  statRowValue: { color: "#1A2E05", fontSize: 16, fontWeight: "900", letterSpacing: -0.3 },
+  statRowDivider: { height: 1, backgroundColor: "#EEF2F6" },
+
+  splitsBox: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 24,
+    padding: 16,
+  },
+  splitsTitle: { color: "#1E293B", fontSize: 14, fontWeight: "900", marginBottom: 12 },
+  splitHead: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    paddingBottom: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: "rgba(100,116,139,0.2)",
+  },
+  splitHeadText: {
+    color: "#94A3B8",
+    fontSize: 10,
+    fontWeight: "900",
+    flex: 1,
+    textAlign: "center",
+  },
+  splitRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: "rgba(100,116,139,0.12)",
+  },
+  splitNum: { color: "#1E293B", fontSize: 14, fontWeight: "900", flex: 1, textAlign: "center" },
+  splitVal: { color: "#475569", fontSize: 14, fontWeight: "700", flex: 1, textAlign: "center" },
+
+  footer: {
+    flexDirection: "row",
+    gap: 12,
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    backgroundColor: "#BBF246",
+  },
+  resumeBtn: {
+    flex: 1,
+    height: 56,
+    borderRadius: 18,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    backgroundColor: "#192126",
+  },
+  resumeText: { color: "#FFFFFF", fontWeight: "800", fontSize: 15 },
+  stopBtn: {
+    flex: 1,
+    height: 56,
+    borderRadius: 18,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    backgroundColor: "#FFFFFF",
+    borderWidth: 1.5,
+    borderColor: "#EF4444",
+  },
+  stopText: { color: "#EF4444", fontWeight: "800", fontSize: 15 },
 });
 
 // Ciclismo (GPS) é livre para todos os planos (coleta + análise). Só Expectativa

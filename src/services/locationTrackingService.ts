@@ -32,15 +32,17 @@ import {
   MAX_SPEED_MS,
   type KalmanState,
 } from "../utils/workout/geo";
+import { snapRoute } from "./mapMatchingService";
 
 export const LOCATION_TASK = "movt-location-tracking";
 const STORAGE_KEY = "@MOVT:active_tracking_session";
 
 // ─── Parâmetros de rastreamento (qualidade Strava/Uber) ─────────────────────────
-// Acurácia máxima aceita (m) para um fix ENTRAR na rota. Antes o corte era 15 m e
-// descartava metade dos fixes em ambiente urbano → buracos no traçado. Agora
-// aceitamos até 50 m e deixamos o Kalman ponderar os ruidosos pela acurácia.
-const MAX_ACCURACY_M = 50;
+// Acurácia máxima aceita (m) para um fix ENTRAR na rota. 15 m descartava metade dos
+// fixes urbanos (buracos); 50 m deixava jitter demais entrar (zig-zag). 35 m é o
+// meio-termo: o Kalman pondera os ruidosos pela acurácia, e o filtro de "ré"
+// (processFix) remove os vai-e-volta restantes. Tunável.
+const MAX_ACCURACY_M = 35;
 // Acurácia assumida quando o device não reporta (m).
 const DEFAULT_ACCURACY_M = 20;
 // Deslocamento mínimo (m) entre pontos JÁ filtrados para contar distância/registrar.
@@ -50,6 +52,13 @@ const MIN_SEGMENT_M = 2;
 const SEGMENT_ACCURACY_FACTOR = 0.5;
 // Acima de MAX_SPEED_MS·este fator entre fixes = salto impossível → descarta.
 const OUTLIER_SPEED_FACTOR = 1.5;
+
+// ─── Map-matching ao vivo (snap-to-roads via backend/Mapbox) ────────────────────
+// Encaixa o traçado nas ruas reais durante o treino. Throttled: roda no máximo a
+// cada SNAP_INTERVAL_MS e só quando há pelo menos SNAP_MIN_NEW_POINTS pontos novos
+// desde o último snap — para não estourar requisições nem latência.
+const SNAP_INTERVAL_MS = 12000;
+const SNAP_MIN_NEW_POINTS = 8;
 
 export type WorkoutKind = "Ciclismo" | "Corrida";
 export type LatLng = { latitude: number; longitude: number; timestamp?: number; accuracy?: number };
@@ -62,8 +71,15 @@ export interface TrackingSnapshot {
   elapsedSec: number;
   distanceKm: number;
   route: LatLng[];
+  // Rota encaixada nas ruas (map-matching). Vazia até o 1º snap bem-sucedido; a
+  // UI desenha esta quando existir e cai na `route` crua como fallback.
+  snappedRoute: LatLng[];
   splits: Split[];
   currentSpeedMs: number;
+  /** Maior velocidade instantânea registrada na sessão (m/s). */
+  maxSpeedMs: number;
+  /** Ganho de elevação acumulado na sessão (metros de subida). */
+  elevationGainM: number;
   isPaused: boolean;
   lastLocation: LatLng | null;
 }
@@ -80,8 +96,16 @@ interface Session {
   // Acumulação geográfica.
   distanceKm: number;
   route: LatLng[];
+  // Traçado encaixado nas ruas (preenchido pelo snap ao vivo).
+  snappedRoute: LatLng[];
+  // Controle de throttle do snap ao vivo.
+  lastSnapTs: number;
+  lastSnapAtLen: number;
   splits: Split[];
   currentSpeedMs: number;
+  maxSpeedMs: number; // pico de velocidade instantânea (m/s)
+  elevationGainM: number; // ganho de elevação acumulado (m)
+  lastAltitude: number | null; // referência de altitude p/ acumular subida (histerese)
   lastPoint: LatLng | null; // último fix aceito (âncora por-fix, p/ velocidade)
   lastRegPoint: LatLng | null; // último ponto REGISTRADO na rota (âncora de distância)
   lastFixTs: number; // domínio location.timestamp (p/ deltaSeconds)
@@ -95,6 +119,8 @@ interface Session {
 let session: Session | null = null;
 let hydrated = false;
 let lastPersistTs = 0;
+// Garante UM snap em voo por vez (a task de localização dispara em cada lote).
+let snapInProgress = false;
 
 // ─── Tempo decorrido (relógio de parede menos pausas) ───────────────────────────
 function currentElapsedMs(): number {
@@ -190,6 +216,27 @@ function processFix(loc: Location.LocationObject) {
     deltaSeconds = (ts - prevFixTs) / 1000;
   }
   session.currentSpeedMs = deriveSpeedMs(speed, fixSegmentM, deltaSeconds);
+  // Pico de velocidade: maior instantânea válida (não pausado, dentro do teto da
+  // modalidade — o gate de outlier por velocidade já rodou acima).
+  if (!session.isPaused && session.currentSpeedMs <= MAX_SPEED_MS[session.type]) {
+    session.maxSpeedMs = Math.max(session.maxSpeedMs, session.currentSpeedMs);
+  }
+  // Ganho de elevação: acumula subida com histerese de 1 m (filtra ruído de
+  // altitude do GPS). Altitude pode vir null em alguns devices.
+  const alt = loc.coords.altitude;
+  if (!session.isPaused && typeof alt === "number" && isFinite(alt)) {
+    if (session.lastAltitude === null) {
+      session.lastAltitude = alt;
+    } else {
+      const d = alt - session.lastAltitude;
+      if (d > 1) {
+        session.elevationGainM += d;
+        session.lastAltitude = alt;
+      } else if (d < -1) {
+        session.lastAltitude = alt;
+      }
+    }
+  }
   session.lastPoint = { latitude: fLat, longitude: fLng };
   session.lastFixTs = ts;
 
@@ -214,6 +261,28 @@ function processFix(loc: Location.LocationObject) {
   );
   const distThreshold = Math.max(MIN_SEGMENT_M, acc * SEGMENT_ACCURACY_FACTOR);
   if (regSegmentM > distThreshold) {
+    // Filtro de "ré"/spike: descarta o ponto se ele inverte bruscamente a direção
+    // do último segmento (cosseno < -0.5, ~>120°) com avanço curto (< 8 m) — padrão
+    // típico do jitter de GPS parado/lento (vai-e-volta). U-turns reais (segmento
+    // longo) passam. Não move a âncora nem soma distância.
+    const r = session.route;
+    if (r.length >= 2) {
+      const prev = r[r.length - 2];
+      const last = r[r.length - 1];
+      const mPerDegLat = 111320;
+      const mPerDegLng = 111320 * Math.cos((last.latitude * Math.PI) / 180);
+      const v1x = (last.longitude - prev.longitude) * mPerDegLng;
+      const v1y = (last.latitude - prev.latitude) * mPerDegLat;
+      const v2x = (fLng - last.longitude) * mPerDegLng;
+      const v2y = (fLat - last.latitude) * mPerDegLat;
+      const m1 = Math.hypot(v1x, v1y);
+      const m2 = Math.hypot(v2x, v2y);
+      if (m1 > 0 && m2 > 0) {
+        const cos = (v1x * v2x + v1y * v2y) / (m1 * m2);
+        if (cos < -0.5 && m2 < 8) return;
+      }
+    }
+
     session.distanceKm += regSegmentM / 1000;
     session.route.push({ latitude: fLat, longitude: fLng, timestamp: ts, accuracy: acc });
     session.lastRegPoint = { latitude: fLat, longitude: fLng };
@@ -229,6 +298,41 @@ function processFix(loc: Location.LocationObject) {
         pace: elapsed > 0 ? speedToPace((totalKm * 1000) / elapsed) : "--:--",
       });
     }
+  }
+}
+
+// ─── Map-matching ao vivo ────────────────────────────────────────────────────────
+// Encaixa a rota crua atual nas ruas (via backend/Mapbox) e atualiza snappedRoute.
+// Throttled e não-bloqueante: a task de localização chama a cada lote, mas só
+// dispara de fato a cada SNAP_INTERVAL_MS / SNAP_MIN_NEW_POINTS. Em falha/offline
+// o snapRoute devolve null e mantemos o último traçado encaixado (não regride).
+async function maybeSnapLive() {
+  if (!session?.active || session.isPaused) return;
+  if (snapInProgress) return;
+
+  const routeLen = session.route.length;
+  if (routeLen < 4) return;
+
+  const now = Date.now();
+  const newPoints = routeLen - session.lastSnapAtLen;
+  // Já temos um traçado e ainda há poucos pontos novos: espera acumular.
+  if (session.snappedRoute.length > 0 && newPoints < SNAP_MIN_NEW_POINTS) return;
+  if (now - session.lastSnapTs < SNAP_INTERVAL_MS) return;
+
+  snapInProgress = true;
+  session.lastSnapTs = now;
+  session.lastSnapAtLen = routeLen;
+  try {
+    const snapshot = session.route.slice(); // congela a entrada deste snap
+    const result = await snapRoute(snapshot, session.type);
+    if (session?.active && result && result.snapped.length >= 2) {
+      session.snappedRoute = result.snapped;
+      notify();
+    }
+  } catch {
+    // mantém o snappedRoute anterior
+  } finally {
+    snapInProgress = false;
   }
 }
 
@@ -252,7 +356,16 @@ async function ensureHydrated() {
     const raw = await AsyncStorage.getItem(STORAGE_KEY);
     if (raw) {
       const parsed = JSON.parse(raw) as Session;
-      if (parsed?.active) session = parsed;
+      if (parsed?.active) {
+        // Backfill de campos novos para sessões persistidas antes do map-matching.
+        if (!Array.isArray(parsed.snappedRoute)) parsed.snappedRoute = [];
+        if (typeof parsed.lastSnapTs !== "number") parsed.lastSnapTs = 0;
+        if (typeof parsed.lastSnapAtLen !== "number") parsed.lastSnapAtLen = 0;
+        if (typeof parsed.maxSpeedMs !== "number") parsed.maxSpeedMs = 0;
+        if (typeof parsed.elevationGainM !== "number") parsed.elevationGainM = 0;
+        if (typeof parsed.lastAltitude !== "number") parsed.lastAltitude = null;
+        session = parsed;
+      }
     }
   } catch {
     // ignora
@@ -270,8 +383,11 @@ function emptySnapshot(): TrackingSnapshot {
     elapsedSec: 0,
     distanceKm: 0,
     route: [],
+    snappedRoute: [],
     splits: [],
     currentSpeedMs: 0,
+    maxSpeedMs: 0,
+    elevationGainM: 0,
     isPaused: false,
     lastLocation: null,
   };
@@ -285,8 +401,11 @@ export function getSnapshot(): TrackingSnapshot {
     elapsedSec: Math.floor(currentElapsedMs() / 1000),
     distanceKm: session.distanceKm,
     route: session.route.slice(),
+    snappedRoute: session.snappedRoute.slice(),
     splits: session.splits.slice(),
     currentSpeedMs: session.currentSpeedMs,
+    maxSpeedMs: session.maxSpeedMs,
+    elevationGainM: session.elevationGainM,
     isPaused: session.isPaused,
     lastLocation: session.lastLocation,
   };
@@ -364,8 +483,14 @@ export async function startTracking(type: WorkoutKind): Promise<StartResult> {
     isPaused: false,
     distanceKm: 0,
     route: [],
+    snappedRoute: [],
+    lastSnapTs: 0,
+    lastSnapAtLen: 0,
     splits: [],
     currentSpeedMs: 0,
+    maxSpeedMs: 0,
+    elevationGainM: 0,
+    lastAltitude: null,
     lastPoint: null,
     lastRegPoint: null,
     lastFixTs: 0,
@@ -412,6 +537,18 @@ export function tick() {
 /** Encerra a sessão e retorna o snapshot final (para salvar o treino). */
 export async function stopTracking(): Promise<TrackingSnapshot> {
   const finalSnap = getSnapshot();
+
+  // Passe final de alta qualidade: snap da rota inteira (best-effort). Se a rede
+  // falhar, mantém o traçado encaixado que já tínhamos do snap ao vivo.
+  if (session && session.route.length >= 2) {
+    try {
+      const result = await snapRoute(session.route.slice(), session.type);
+      if (result && result.snapped.length >= 2) finalSnap.snappedRoute = result.snapped;
+    } catch {
+      // mantém finalSnap.snappedRoute (snap ao vivo)
+    }
+  }
+
   if (session) session.active = false;
   try {
     const started = await Location.hasStartedLocationUpdatesAsync(LOCATION_TASK).catch(() => false);
@@ -472,4 +609,6 @@ TaskManager.defineTask(LOCATION_TASK, async ({ data, error }) => {
   for (const loc of locations) processFix(loc);
   await persist();
   notify();
+  // Map-matching ao vivo (não-bloqueante, throttled internamente).
+  maybeSnapLive();
 });
