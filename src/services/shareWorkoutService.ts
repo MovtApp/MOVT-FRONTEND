@@ -12,6 +12,8 @@
  */
 import * as FileSystem from "expo-file-system/legacy";
 import * as Sharing from "expo-sharing";
+import Share from "react-native-share";
+import Constants from "expo-constants";
 import { api } from "./api";
 import type { WorkoutType } from "./workoutHistoryService";
 
@@ -21,6 +23,7 @@ export interface ShareStat {
 }
 
 export type CardLayout = "classic" | "overlay" | "minimal";
+export type CardFormat = "feed" | "stories";
 
 export interface ShareWorkoutInput {
   route: { latitude: number; longitude: number }[];
@@ -30,6 +33,8 @@ export interface ShareWorkoutInput {
   stats: ShareStat[];
   /** Modelo de como as stats ficam sobre o mapa (default: classic). */
   layout?: CardLayout;
+  /** Formato da imagem (default: feed 4:5; stories = 9:16). */
+  format?: CardFormat;
 }
 
 /** Uma variante do card (layout + as 3 stats daquele card). */
@@ -105,4 +110,36 @@ export async function shareImageFile(uri: string): Promise<void> {
 export async function shareWorkoutCard(input: ShareWorkoutInput): Promise<void> {
   const uri = await generateWorkoutCard(input);
   await shareImageFile(uri);
+}
+
+/** Facebook/Meta App ID (de app.json → extra.facebookAppId). Exigido pelo IG Stories. */
+export function getFacebookAppId(): string {
+  const id = (Constants.expoConfig?.extra as any)?.facebookAppId;
+  return typeof id === "string" ? id : "";
+}
+
+/** True se o App ID está configurado (não é o placeholder). */
+export function isInstagramStoriesConfigured(): boolean {
+  const id = getFacebookAppId();
+  return !!id && id !== "SEU_FACEBOOK_APP_ID";
+}
+
+/**
+ * Abre o Instagram direto na tela de Stories com a imagem como fundo.
+ * Requer o Facebook/Meta App ID (source_application). Lança se não configurado
+ * ou se o Instagram não estiver instalado — o caller mostra o feedback.
+ */
+export async function shareWorkoutStory(uri: string): Promise<void> {
+  const appId = getFacebookAppId();
+  if (!appId || appId === "SEU_FACEBOOK_APP_ID") {
+    throw new Error("Instagram Stories não configurado (Facebook App ID ausente).");
+  }
+  await Share.shareSingle({
+    // @ts-ignore enum do react-native-share
+    social: Share.Social.INSTAGRAM_STORIES,
+    appId,
+    backgroundImage: uri,
+    backgroundBottomColor: "#020617",
+    backgroundTopColor: "#020617",
+  });
 }

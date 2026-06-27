@@ -43,6 +43,7 @@ import {
   Maximize2,
   X,
   Crosshair,
+  Instagram,
 } from "lucide-react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import Reanimated, { Easing as REasing, withTiming } from "react-native-reanimated";
@@ -62,8 +63,11 @@ import {
 import { simplifyRoute } from "../../../../utils/workout/geo";
 import { snapRoute } from "../../../../services/mapMatchingService";
 import {
+  generateWorkoutCard,
   generateWorkoutCards,
   shareImageFile,
+  shareWorkoutStory,
+  isInstagramStoriesConfigured,
   type ShareVariant,
 } from "../../../../services/shareWorkoutService";
 import { toastInfo, toastError, notifyApiError } from "../../../../utils/notify";
@@ -511,6 +515,39 @@ const WorkoutDetail: React.FC<WorkoutDetailProps> = ({
     }
   };
 
+  // Stories do Instagram: gera o card selecionado em 9:16 e abre o IG no Stories.
+  const [storyLoading, setStoryLoading] = useState(false);
+  const shareStory = async () => {
+    if (storyLoading || sharingNow) return;
+    if (!isInstagramStoriesConfigured()) {
+      toastError(
+        "Stories indisponível",
+        "O compartilhamento direto no Instagram Stories ainda não foi configurado."
+      );
+      return;
+    }
+    const variant = buildVariants()[pageIndex];
+    if (!variant) return;
+    setStoryLoading(true);
+    toastInfo("Preparando para o Stories…");
+    try {
+      const uri = await generateWorkoutCard({
+        route: safeRoute,
+        type: workout.type,
+        title: workout.type,
+        subtitle: formatDate(workout.date),
+        stats: variant.stats,
+        layout: variant.layout,
+        format: "stories",
+      });
+      await shareWorkoutStory(uri);
+    } catch (e) {
+      notifyApiError(e, "Não foi possível abrir o Instagram Stories.");
+    } finally {
+      setStoryLoading(false);
+    }
+  };
+
   const fitFullMap = () => {
     if (safeRoute.length < 2) return;
     fullMapRef.current?.fitToCoordinates(safeRoute, {
@@ -819,21 +856,45 @@ const WorkoutDetail: React.FC<WorkoutDetailProps> = ({
               ))}
             </View>
 
-            <TouchableOpacity
-              style={[hs.previewShareBtn, { backgroundColor: accent }]}
-              onPress={confirmShare}
-              disabled={sharingNow}
-              activeOpacity={0.85}
-            >
-              {sharingNow ? (
-                <ActivityIndicator size="small" color="#FFFFFF" />
-              ) : (
-                <>
-                  <Share2 size={20} color="#FFFFFF" />
-                  <Text style={hs.previewShareText}>Compartilhar</Text>
-                </>
-              )}
-            </TouchableOpacity>
+            <View style={hs.previewActions}>
+              <TouchableOpacity
+                style={hs.previewActionBtn}
+                onPress={shareStory}
+                disabled={storyLoading || sharingNow}
+                activeOpacity={0.85}
+              >
+                <LinearGradient
+                  colors={["#F58529", "#DD2A7B", "#8134AF"]}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={StyleSheet.absoluteFill}
+                />
+                {storyLoading ? (
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                ) : (
+                  <>
+                    <Instagram size={20} color="#FFFFFF" />
+                    <Text style={hs.previewShareText}>Stories</Text>
+                  </>
+                )}
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[hs.previewActionBtn, { backgroundColor: accent }]}
+                onPress={confirmShare}
+                disabled={sharingNow || storyLoading}
+                activeOpacity={0.85}
+              >
+                {sharingNow ? (
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                ) : (
+                  <>
+                    <Share2 size={20} color="#FFFFFF" />
+                    <Text style={hs.previewShareText}>Compartilhar</Text>
+                  </>
+                )}
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
       </Modal>
@@ -2500,13 +2561,16 @@ const hs = StyleSheet.create({
     marginBottom: 16,
   },
   dot: { width: 7, height: 7, borderRadius: 4, backgroundColor: "#CBD5E1" },
-  previewShareBtn: {
+  previewActions: { flexDirection: "row", gap: 10 },
+  previewActionBtn: {
+    flex: 1,
+    height: 54,
+    borderRadius: 16,
+    overflow: "hidden",
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
     gap: 10,
-    height: 54,
-    borderRadius: 16,
   },
   previewShareText: { fontSize: 16, fontWeight: "900", color: "#FFFFFF" },
   expandBadge: {
