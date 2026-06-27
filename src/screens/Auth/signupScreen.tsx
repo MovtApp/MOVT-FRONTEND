@@ -9,12 +9,14 @@ import CustomInput from "@/components/CustomInput";
 import DateTimePickerModal from "react-native-modal-datetime-picker";
 import { Calendar, Eye, EyeOff } from "lucide-react-native";
 import { useForm, Controller, ControllerRenderProps } from "react-hook-form";
-import { isValidCNPJ, onlyDigits } from "@/utils/cnpj";
+import { onlyDigits } from "@/utils/cnpj";
 
 const registerSchema = z.object({
   nome: z.string().min(2, { message: "Nome obrigatório" }),
   email: z.string().email({ message: "E-mail inválido" }),
-  cpf_cnpj: z.string().min(11, { message: "Documento obrigatório" }), // Para CPF ou CNPJ
+  cpf_cnpj: z.string().min(11, { message: "CPF obrigatório" }), // sempre CPF (PF e Personal)
+  // CREF: só exigido na aba Personal (validado de fato pela IA/admin depois).
+  cref: z.string().optional(),
   data_nascimento: z.string().min(8, { message: "Data de nascimento obrigatória" }),
   telefone: z.string().min(12, { message: "Telefone obrigatório" }),
   senha: z.string().min(6, { message: "Senha deve ter pelo menos 6 caracteres" }),
@@ -29,7 +31,7 @@ interface Props {
 }
 
 export const SignUpScreen = ({ navigation }: Props) => {
-  const [tab, setTab] = useState<"CPF" | "CNPJ">("CPF");
+  const [tab, setTab] = useState<"CPF" | "Personal">("CPF");
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
 
@@ -66,16 +68,13 @@ export const SignUpScreen = ({ navigation }: Props) => {
     return cleaned;
   }
 
-  // Função para formatar CNPJ
-  function formatCNPJ(value: string) {
-    let cleaned = value.replace(/\D/g, "").slice(0, 14);
-    let formatted = "";
-    if (cleaned.length > 0) formatted = cleaned.slice(0, 2);
-    if (cleaned.length >= 3) formatted += "." + cleaned.slice(2, 5);
-    if (cleaned.length >= 6) formatted += "." + cleaned.slice(5, 8);
-    if (cleaned.length >= 9) formatted += "/" + cleaned.slice(8, 12);
-    if (cleaned.length >= 13) formatted += "-" + cleaned.slice(12, 14);
-    return formatted;
+  // Função para normalizar o CREF (ex.: 000000-G/SP). Mantém dígitos, letras e os
+  // separadores - e / ; validação real é feita pela IA/admin (não aqui).
+  function formatCref(value: string) {
+    return (value || "")
+      .toUpperCase()
+      .replace(/[^0-9A-Z/-]/g, "")
+      .slice(0, 12);
   }
 
   // Função para formatar telefone
@@ -91,14 +90,16 @@ export const SignUpScreen = ({ navigation }: Props) => {
   }
 
   const onSubmit = async (data: RegisterFormData) => {
-    // Validação do documento conforme a aba (o schema só checa presença).
+    // Documento agora é sempre CPF (Pessoa Física e Personal). O schema só checa
+    // presença; aqui validamos os 11 dígitos e, no Personal, a presença do CREF.
     const docDigits = onlyDigits(data.cpf_cnpj);
-    if (tab === "CNPJ" && !isValidCNPJ(docDigits)) {
-      Alert.alert("CNPJ inválido", "Verifique os 14 dígitos do CNPJ informado.");
+    if (docDigits.length !== 11) {
+      setError("cpf_cnpj", { type: "manual", message: "Digite os 11 dígitos do CPF." });
       return;
     }
-    if (tab === "CPF" && docDigits.length !== 11) {
-      Alert.alert("CPF inválido", "Digite os 11 dígitos do CPF.");
+    const cref = (data.cref || "").trim();
+    if (tab === "Personal" && cref.length < 4) {
+      setError("cref", { type: "manual", message: "CREF obrigatório para Personal." });
       return;
     }
 
@@ -107,10 +108,11 @@ export const SignUpScreen = ({ navigation }: Props) => {
         nome: data.nome,
         email: data.email,
         senha: data.senha,
-        cpf_cnpj: docDigits, // envia só os 14/11 dígitos (sem máscara) para o backend
+        cpf_cnpj: docDigits, // envia só os 11 dígitos (sem máscara) para o backend
         data_nascimento: data.data_nascimento,
         telefone: data.telefone,
-        tipo_documento: tab,
+        tipo_documento: tab, // "CPF" (Pessoa Física) | "Personal"
+        ...(tab === "Personal" ? { cref } : {}),
       });
 
       if (response.status === 201) {
@@ -172,13 +174,17 @@ export const SignUpScreen = ({ navigation }: Props) => {
               style={[styles.tab, tab === "CPF" && styles.tabActive]}
               onPress={() => setTab("CPF")}
             >
-              <Text style={[styles.tabText, tab === "CPF" && styles.tabTextActive]}>CPF</Text>
+              <Text style={[styles.tabText, tab === "CPF" && styles.tabTextActive]}>
+                Pessoa Física
+              </Text>
             </TouchableOpacity>
             <TouchableOpacity
-              style={[styles.tab, tab === "CNPJ" && styles.tabActive]}
-              onPress={() => setTab("CNPJ")}
+              style={[styles.tab, tab === "Personal" && styles.tabActive]}
+              onPress={() => setTab("Personal")}
             >
-              <Text style={[styles.tabText, tab === "CNPJ" && styles.tabTextActive]}>CNPJ</Text>
+              <Text style={[styles.tabText, tab === "Personal" && styles.tabTextActive]}>
+                Personal
+              </Text>
             </TouchableOpacity>
           </View>
           <View style={{ marginTop: 10 }}>
@@ -214,7 +220,7 @@ export const SignUpScreen = ({ navigation }: Props) => {
             />
             {errors.email && <Text style={styles.error}>{errors.email.message}</Text>}
 
-            <Text style={styles.label}>{tab === "CPF" ? "CPF" : "CNPJ"}</Text>
+            <Text style={styles.label}>CPF</Text>
             <Controller
               control={control}
               name="cpf_cnpj"
@@ -225,15 +231,37 @@ export const SignUpScreen = ({ navigation }: Props) => {
               }) => (
                 <CustomInput
                   value={field.value}
-                  onChangeText={(text: string) =>
-                    field.onChange(tab === "CPF" ? formatCPF(text) : formatCNPJ(text))
-                  }
-                  placeholder={tab === "CPF" ? "000.000.000-00" : "00.000.000/0000-00"}
+                  onChangeText={(text: string) => field.onChange(formatCPF(text))}
+                  placeholder="000.000.000-00"
                   keyboardType="numeric"
                 />
               )}
             />
             {errors.cpf_cnpj && <Text style={styles.error}>{errors.cpf_cnpj.message}</Text>}
+
+            {/* CREF: registro profissional, exigido apenas para contas Personal. */}
+            {tab === "Personal" && (
+              <>
+                <Text style={styles.label}>CREF</Text>
+                <Controller
+                  control={control}
+                  name="cref"
+                  render={({
+                    field,
+                  }: {
+                    field: ControllerRenderProps<RegisterFormData, "cref">;
+                  }) => (
+                    <CustomInput
+                      value={field.value ?? ""}
+                      onChangeText={(text: string) => field.onChange(formatCref(text))}
+                      placeholder="000000-G/UF"
+                      autoCapitalize="characters"
+                    />
+                  )}
+                />
+                {errors.cref && <Text style={styles.error}>{errors.cref.message}</Text>}
+              </>
+            )}
 
             <Text style={styles.label}>Data de nascimento</Text>
             <Controller
