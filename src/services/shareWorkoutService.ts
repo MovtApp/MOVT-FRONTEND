@@ -3,8 +3,9 @@
  *
  * O servidor (movt-backend, POST /api/route/share-card) gera a imagem pronta:
  * o mapa real com a rota desenhada + os números do treino e a marca MOVT. Aqui
- * apenas baixamos o PNG (base64), gravamos num arquivo temporário e abrimos o
- * menu nativo de compartilhamento (Instagram, WhatsApp, Stories, etc.).
+ * baixamos o PNG (base64) e gravamos num arquivo temporário (generateWorkoutCard);
+ * a UI mostra esse arquivo numa tela de preview e, ao confirmar, abre o menu
+ * nativo de compartilhamento (shareImageFile) — Instagram, WhatsApp, Stories, etc.
  *
  * Mantemos a Mapbox e a composição da imagem 100% no backend — sem rebuild
  * nativo (nada de capturar o MapView, que sai preto no Android).
@@ -28,11 +29,11 @@ export interface ShareWorkoutInput {
 }
 
 /**
- * Gera o card no backend e dispara o menu nativo de compartilhamento.
- * Lança em caso de falha (rede/sem rota/sharing indisponível) — o caller mostra
- * o feedback via notify.
+ * Gera o card no backend e grava o PNG num arquivo temporário local.
+ * Retorna o URI do arquivo (para exibir no preview e depois compartilhar).
+ * Lança em caso de falha (rede/sem rota) — o caller mostra o feedback via notify.
  */
-export async function shareWorkoutCard(input: ShareWorkoutInput): Promise<void> {
+export async function generateWorkoutCard(input: ShareWorkoutInput): Promise<string> {
   const res = await api.post("/route/share-card", input);
   const base64: string | undefined = res.data?.image;
   if (!base64) throw new Error("Não foi possível gerar a imagem do treino.");
@@ -41,14 +42,26 @@ export async function shareWorkoutCard(input: ShareWorkoutInput): Promise<void> 
   await FileSystem.writeAsStringAsync(uri, base64, {
     encoding: FileSystem.EncodingType.Base64,
   });
+  return uri;
+}
 
+/** Abre o menu nativo de compartilhamento para um arquivo de imagem já gerado. */
+export async function shareImageFile(uri: string): Promise<void> {
   if (!(await Sharing.isAvailableAsync())) {
     throw new Error("Compartilhamento indisponível neste dispositivo.");
   }
-
   await Sharing.shareAsync(uri, {
     mimeType: "image/png",
     dialogTitle: "Compartilhar treino",
     UTI: "public.png",
   });
+}
+
+/**
+ * Conveniência: gera o card e abre o menu de compartilhamento direto (sem
+ * preview). Mantido para usos simples.
+ */
+export async function shareWorkoutCard(input: ShareWorkoutInput): Promise<void> {
+  const uri = await generateWorkoutCard(input);
+  await shareImageFile(uri);
 }

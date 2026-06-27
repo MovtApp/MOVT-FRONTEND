@@ -12,6 +12,7 @@ import {
   Animated,
   Share,
   ActivityIndicator,
+  Image,
 } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRoute } from "@react-navigation/native";
@@ -60,7 +61,7 @@ import {
 } from "../../../../utils/workout/performance";
 import { simplifyRoute } from "../../../../utils/workout/geo";
 import { snapRoute } from "../../../../services/mapMatchingService";
-import { shareWorkoutCard } from "../../../../services/shareWorkoutService";
+import { generateWorkoutCard, shareImageFile } from "../../../../services/shareWorkoutService";
 import { toastInfo, toastError, notifyApiError } from "../../../../utils/notify";
 import {
   WorkoutRecord,
@@ -365,13 +366,83 @@ const WorkoutDetail: React.FC<WorkoutDetailProps> = ({
   const fitRegion = regionForRoute(safeRoute);
   const hasRoute = safeRoute.length > 1 && fitRegion;
 
+  // Estatísticas derivadas (painel detalhado) a partir das parciais e dos totais.
+  const extraStats = useMemo(() => {
+    const splitSecs = workout.splits
+      .map((s) => {
+        const [m, ss] = String(s.pace).split(":").map((n) => parseInt(n, 10));
+        return (m || 0) * 60 + (ss || 0);
+      })
+      .filter((n) => isFinite(n) && n > 0);
+    const fmtPace = (sec: number) =>
+      sec > 0 ? `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, "0")}` : "--";
+    const best = splitSecs.length ? Math.min(...splitSecs) : 0;
+    const worst = splitSecs.length ? Math.max(...splitSecs) : 0;
+    return {
+      hasSplits: splitSecs.length > 0,
+      bestKm: fmtPace(best),
+      worstKm: fmtPace(worst),
+      timePerKm:
+        workout.distanceKm > 0
+          ? formatDuration(Math.round(workout.durationSec / workout.distanceKm))
+          : "--",
+      kcalPerKm:
+        workout.distanceKm > 0 ? `${Math.round(workout.kcal / workout.distanceKm)}` : "--",
+      kcalPerMin:
+        workout.durationSec > 0
+          ? (workout.kcal / (workout.durationSec / 60)).toFixed(1)
+          : "--",
+    };
+  }, [workout]);
+
+  // Linhas do painel "Estatísticas" (ícone · rótulo · valor).
+  const statRows = useMemo(() => {
+    const isCycling = workout.type === "Ciclismo";
+    const rows: { icon: any; label: string; value: string }[] = [
+      {
+        icon: TrendingUp,
+        label: isCycling ? "Vel. média" : "Ritmo médio",
+        value: isCycling ? `${workout.avgSpeedKmh} km/h` : `${workout.avgPace} /km`,
+      },
+      {
+        icon: Timer,
+        label: "Tempo médio / km",
+        value: extraStats.timePerKm !== "--" ? `${extraStats.timePerKm} /km` : "--",
+      },
+    ];
+    if (extraStats.hasSplits) {
+      rows.push(
+        { icon: Trophy, label: "Melhor km", value: `${extraStats.bestKm} /km` },
+        { icon: Navigation, label: "Km mais lento", value: `${extraStats.worstKm} /km` }
+      );
+    }
+    rows.push(
+      {
+        icon: Flame,
+        label: "Calorias / km",
+        value: extraStats.kcalPerKm !== "--" ? `${extraStats.kcalPerKm} kcal` : "--",
+      },
+      {
+        icon: Zap,
+        label: "Calorias / min",
+        value: extraStats.kcalPerMin !== "--" ? `${extraStats.kcalPerMin} kcal` : "--",
+      }
+    );
+    return rows;
+  }, [workout, extraStats]);
+
   // Tela cheia interativa do mapa.
   const [mapFull, setMapFull] = useState(false);
   const fullMapRef = useRef<MapView>(null);
   const insets = useSafeAreaInsets();
 
   // ─── Compartilhar (card estilo Strava gerado no backend) ─────────────────────
-  const [sharing, setSharing] = useState(false);
+  // Fluxo: gerar a imagem no backend → mostrar no preview → confirmar e abrir o
+  // menu nativo de compartilhamento.
+  const [sharing, setSharing] = useState(false); // gerando a imagem
+  const [previewUri, setPreviewUri] = useState<string | null>(null); // imagem no preview
+  const [sharingNow, setSharingNow] = useState(false); // abrindo o menu de compartilhar
+
   const handleShare = async () => {
     if (sharing) return;
     if (safeRoute.length < 2) {
@@ -381,7 +452,7 @@ const WorkoutDetail: React.FC<WorkoutDetailProps> = ({
     setSharing(true);
     toastInfo("Gerando imagem do treino…");
     try {
-      await shareWorkoutCard({
+      const uri = await generateWorkoutCard({
         route: safeRoute,
         type: workout.type,
         title: workout.type,
@@ -395,10 +466,23 @@ const WorkoutDetail: React.FC<WorkoutDetailProps> = ({
           { label: "kcal", value: String(workout.kcal) },
         ],
       });
+      setPreviewUri(uri);
     } catch (e) {
       notifyApiError(e, "Não foi possível gerar a imagem do treino.");
     } finally {
       setSharing(false);
+    }
+  };
+
+  const confirmShare = async () => {
+    if (!previewUri || sharingNow) return;
+    setSharingNow(true);
+    try {
+      await shareImageFile(previewUri);
+    } catch (e) {
+      notifyApiError(e, "Não foi possível compartilhar a imagem.");
+    } finally {
+      setSharingNow(false);
     }
   };
 
@@ -469,39 +553,99 @@ const WorkoutDetail: React.FC<WorkoutDetailProps> = ({
               />
               <RouteEndpoints route={safeRoute} />
             </MapView>
+
+            {/* Estatísticas principais sobre o mapa (estilo Strava) */}
+            <LinearGradient
+              colors={["transparent", "rgba(2,6,23,0.88)"]}
+              style={hs.mapStatsScrim}
+              pointerEvents="none"
+            >
+              <View style={hs.mapStatsRow}>
+                <View style={hs.mapStat}>
+                  <Text style={hs.mapStatValue}>
+                    {workout.distanceKm.toFixed(2).replace(".", ",")}
+                  </Text>
+                  <Text style={hs.mapStatLabel}>km</Text>
+                </View>
+                <View style={hs.mapStatDivider} />
+                <View style={hs.mapStat}>
+                  <Text style={hs.mapStatValue}>{formatDuration(workout.durationSec)}</Text>
+                  <Text style={hs.mapStatLabel}>tempo</Text>
+                </View>
+                <View style={hs.mapStatDivider} />
+                <View style={hs.mapStat}>
+                  <Text style={hs.mapStatValue}>
+                    {workout.type === "Ciclismo" ? workout.avgSpeedKmh : workout.avgPace}
+                  </Text>
+                  <Text style={hs.mapStatLabel}>
+                    {workout.type === "Ciclismo" ? "km/h" : "pace"}
+                  </Text>
+                </View>
+                <View style={hs.mapStatDivider} />
+                <View style={hs.mapStat}>
+                  <Text style={hs.mapStatValue}>{workout.kcal}</Text>
+                  <Text style={hs.mapStatLabel}>kcal</Text>
+                </View>
+              </View>
+            </LinearGradient>
+
             {/* Botão de expandir (estilo Strava) */}
             <View style={hs.expandBadge}>
               <Maximize2 size={16} color="#1E293B" />
             </View>
           </TouchableOpacity>
         ) : (
-          <View style={hs.noRouteBox}>
-            <Navigation size={22} color="#94A3B8" />
-            <Text style={hs.noRouteText}>Sem rota registrada para este treino</Text>
-          </View>
+          <>
+            <View style={hs.noRouteBox}>
+              <Navigation size={22} color="#94A3B8" />
+              <Text style={hs.noRouteText}>Sem rota registrada para este treino</Text>
+            </View>
+            {/* Sem mapa para sobrepor: mostra os números principais aqui. */}
+            <View style={hs.detailGrid}>
+              <View style={hs.detailCard}>
+                <Text style={hs.detailValue}>
+                  {workout.distanceKm.toFixed(2).replace(".", ",")}
+                </Text>
+                <Text style={hs.detailLabel}>km</Text>
+              </View>
+              <View style={hs.detailCard}>
+                <Text style={hs.detailValue}>{formatDuration(workout.durationSec)}</Text>
+                <Text style={hs.detailLabel}>tempo</Text>
+              </View>
+              <View style={hs.detailCard}>
+                <Text style={hs.detailValue}>
+                  {workout.type === "Ciclismo" ? workout.avgSpeedKmh : workout.avgPace}
+                </Text>
+                <Text style={hs.detailLabel}>
+                  {workout.type === "Ciclismo" ? "km/h méd" : "pace méd"}
+                </Text>
+              </View>
+              <View style={hs.detailCard}>
+                <Text style={hs.detailValue}>{workout.kcal}</Text>
+                <Text style={hs.detailLabel}>kcal</Text>
+              </View>
+            </View>
+          </>
         )}
 
-        <View style={hs.detailGrid}>
-          <View style={hs.detailCard}>
-            <Text style={hs.detailValue}>{workout.distanceKm.toFixed(2).replace(".", ",")}</Text>
-            <Text style={hs.detailLabel}>km</Text>
-          </View>
-          <View style={hs.detailCard}>
-            <Text style={hs.detailValue}>{formatDuration(workout.durationSec)}</Text>
-            <Text style={hs.detailLabel}>tempo</Text>
-          </View>
-          <View style={hs.detailCard}>
-            <Text style={hs.detailValue}>
-              {workout.type === "Ciclismo" ? workout.avgSpeedKmh : workout.avgPace}
-            </Text>
-            <Text style={hs.detailLabel}>
-              {workout.type === "Ciclismo" ? "km/h méd" : "pace méd"}
-            </Text>
-          </View>
-          <View style={hs.detailCard}>
-            <Text style={hs.detailValue}>{workout.kcal}</Text>
-            <Text style={hs.detailLabel}>kcal</Text>
-          </View>
+        {/* Painel de estatísticas detalhadas */}
+        <View style={hs.statsBox}>
+          <Text style={hs.statsTitle}>Estatísticas</Text>
+          {statRows.map((r, i) => {
+            const Icon = r.icon;
+            return (
+              <View key={r.label}>
+                {i > 0 && <View style={hs.statRowDivider} />}
+                <View style={hs.statRow}>
+                  <View style={hs.statRowLeft}>
+                    <Icon size={18} color={accent} />
+                    <Text style={hs.statRowLabel}>{r.label}</Text>
+                  </View>
+                  <Text style={hs.statRowValue}>{r.value}</Text>
+                </View>
+              </View>
+            );
+          })}
         </View>
 
         {/* Comparação com o recorde */}
@@ -599,6 +743,50 @@ const WorkoutDetail: React.FC<WorkoutDetailProps> = ({
               <Text style={hs.fullStatValue}>{workout.kcal}</Text>
               <Text style={hs.fullStatLabel}>kcal</Text>
             </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* ─── Preview da imagem antes de compartilhar ───────────────────────── */}
+      <Modal
+        visible={!!previewUri}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setPreviewUri(null)}
+        statusBarTranslucent
+      >
+        <View style={hs.previewBackdrop}>
+          <View style={[hs.previewSheet, { paddingBottom: Math.max(insets.bottom, 16) + 8 }]}>
+            <View style={hs.previewHeader}>
+              <Text style={hs.previewTitle}>Pré-visualização</Text>
+              <TouchableOpacity onPress={() => setPreviewUri(null)} style={hs.previewClose}>
+                <X size={22} color="#1E293B" />
+              </TouchableOpacity>
+            </View>
+
+            {previewUri && (
+              <Image
+                source={{ uri: previewUri }}
+                style={hs.previewImage}
+                resizeMode="contain"
+              />
+            )}
+
+            <TouchableOpacity
+              style={[hs.previewShareBtn, { backgroundColor: accent }]}
+              onPress={confirmShare}
+              disabled={sharingNow}
+              activeOpacity={0.85}
+            >
+              {sharingNow ? (
+                <ActivityIndicator size="small" color="#FFFFFF" />
+              ) : (
+                <>
+                  <Share2 size={20} color="#FFFFFF" />
+                  <Text style={hs.previewShareText}>Compartilhar</Text>
+                </>
+              )}
+            </TouchableOpacity>
           </View>
         </View>
       </Modal>
@@ -2186,6 +2374,86 @@ const hs = StyleSheet.create({
     overflow: "hidden",
     marginBottom: 18,
   },
+  mapStatsScrim: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    bottom: 0,
+    paddingTop: 40,
+    paddingBottom: 16,
+    paddingHorizontal: 14,
+    justifyContent: "flex-end",
+  },
+  mapStatsRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-around",
+  },
+  mapStat: { alignItems: "center", flex: 1 },
+  mapStatValue: { fontSize: 19, fontWeight: "900", color: "#FFFFFF" },
+  mapStatLabel: {
+    fontSize: 10,
+    fontWeight: "800",
+    color: "rgba(255,255,255,0.75)",
+    textTransform: "uppercase",
+    marginTop: 2,
+  },
+  mapStatDivider: { width: 1, height: 26, backgroundColor: "rgba(255,255,255,0.25)" },
+  statsBox: {
+    backgroundColor: "#F8FAFC",
+    borderRadius: 20,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: "#F1F5F9",
+    marginBottom: 18,
+  },
+  statsTitle: { fontSize: 14, fontWeight: "900", color: "#1E293B", marginBottom: 4 },
+  statRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingVertical: 12,
+  },
+  statRowLeft: { flexDirection: "row", alignItems: "center", gap: 10 },
+  statRowLabel: { fontSize: 14, fontWeight: "600", color: "#475569" },
+  statRowValue: { fontSize: 15, fontWeight: "800", color: "#1E293B" },
+  statRowDivider: { height: 1, backgroundColor: "#EEF2F6" },
+  previewBackdrop: {
+    flex: 1,
+    backgroundColor: "rgba(2,6,23,0.75)",
+    justifyContent: "flex-end",
+  },
+  previewSheet: {
+    backgroundColor: "#FFFFFF",
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    paddingHorizontal: 20,
+    paddingTop: 16,
+  },
+  previewHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 14,
+  },
+  previewTitle: { fontSize: 18, fontWeight: "900", color: "#1E293B" },
+  previewClose: { padding: 4 },
+  previewImage: {
+    width: "100%",
+    aspectRatio: 4 / 5,
+    borderRadius: 20,
+    backgroundColor: "#0B1220",
+    marginBottom: 16,
+  },
+  previewShareBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 10,
+    height: 54,
+    borderRadius: 16,
+  },
+  previewShareText: { fontSize: 16, fontWeight: "900", color: "#FFFFFF" },
   expandBadge: {
     position: "absolute",
     top: 12,
