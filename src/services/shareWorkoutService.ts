@@ -93,6 +93,19 @@ export async function generateWorkoutCards(input: ShareWorkoutCardsInput): Promi
   return uris;
 }
 
+/**
+ * Gera o card e o SOBE pelo backend (service_role), devolvendo a URL pública —
+ * usado para PUBLICAR no feed do MOVT. O upload é server-side de propósito: a
+ * RLS do Storage barra uploads client-side de usuários sem sessão Supabase
+ * (login por e-mail/senha). O caller passa a URL direto pro POST /user/posts.
+ */
+export async function uploadWorkoutPostImage(input: ShareWorkoutInput): Promise<string> {
+  const res = await api.post("/route/share-card", { ...input, upload: true });
+  const url: string | undefined = res.data?.url;
+  if (!url) throw new Error("Não foi possível preparar a imagem do treino.");
+  return url;
+}
+
 /** Abre o menu nativo de compartilhamento para um arquivo de imagem já gerado. */
 export async function shareImageFile(uri: string): Promise<void> {
   if (!(await Sharing.isAvailableAsync())) {

@@ -67,6 +67,7 @@ import { snapRoute } from "../../../../services/mapMatchingService";
 import {
   generateWorkoutCard,
   generateWorkoutCards,
+  uploadWorkoutPostImage,
   shareImageFile,
   shareWorkoutStory,
   isInstagramStoriesConfigured,
@@ -574,7 +575,10 @@ const WorkoutDetail: React.FC<WorkoutDetailProps> = ({
     setPublishing(true);
     toastInfo("Gerando imagem para publicar…");
     try {
-      const uri = await generateWorkoutCard({
+      // Sobe pelo backend (service_role) e recebe a URL pública. O PostFormSheet
+      // recebe uma URL https — então NÃO tenta o upload client-side (barrado pela
+      // RLS do Storage), só cria o post.
+      const url = await uploadWorkoutPostImage({
         route: safeRoute,
         type: workout.type,
         title: workout.type,
@@ -586,7 +590,7 @@ const WorkoutDetail: React.FC<WorkoutDetailProps> = ({
       // Fecha o Modal (RN) do preview ANTES de abrir o bottom-sheet, senão o
       // editor abriria por trás do Modal nativo.
       closePreview();
-      setPublishData({ url: uri, legenda: buildSuggestedCaption() });
+      setPublishData({ url, legenda: buildSuggestedCaption() });
       setTimeout(() => postSheetRef.current?.present(), 350);
     } catch (e) {
       notifyApiError(e, "Não foi possível gerar a imagem para publicar.");
@@ -968,6 +972,7 @@ const WorkoutDetail: React.FC<WorkoutDetailProps> = ({
         bottomSheetRef={postSheetRef}
         initialData={publishData ? { url: publishData.url, legenda: publishData.legenda } : undefined}
         onClose={() => setPublishData(null)}
+        lockImage
       />
     </View>
   );

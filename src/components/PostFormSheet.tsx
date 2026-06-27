@@ -36,6 +36,8 @@ interface PostFormSheetProps {
   initialData?: PostItem;
   bottomSheetRef: React.RefObject<BottomSheetModal | null>;
   onSuccess?: () => void;
+  /** Trava a troca de imagem (ex.: publicar um card de treino já pronto). */
+  lockImage?: boolean;
 }
 
 const PostFormSheet: React.FC<PostFormSheetProps> = ({
@@ -43,8 +45,11 @@ const PostFormSheet: React.FC<PostFormSheetProps> = ({
   initialData,
   bottomSheetRef,
   onSuccess,
+  lockImage = false,
 }) => {
   const { user } = useAuth();
+  // Imagem travada: ao editar um post existente ou ao publicar um card pronto.
+  const imageLocked = !!initialData?.id || lockImage;
   const snapPoints = useMemo(() => ["70%", "95%"], []);
 
   const {
@@ -84,7 +89,7 @@ const PostFormSheet: React.FC<PostFormSheetProps> = ({
   );
 
   const handleImageSelection = () => {
-    if (initialData?.id) return; // Impede seleção se estiver editando
+    if (imageLocked) return; // Impede seleção ao editar ou publicar card pronto
 
     Alert.alert("Selecionar Imagem", "Escolha a origem da imagem:", [
       { text: "Cancelar", style: "cancel" },
@@ -225,9 +230,9 @@ const PostFormSheet: React.FC<PostFormSheetProps> = ({
 
         <Text style={styles.label}>Imagem:</Text>
         <TouchableOpacity
-          style={[styles.imagePicker, initialData?.id && styles.imagePickerDisabled]}
+          style={[styles.imagePicker, imageLocked && styles.imagePickerDisabled]}
           onPress={handleImageSelection}
-          activeOpacity={initialData?.id ? 1 : 0.7}
+          activeOpacity={imageLocked ? 1 : 0.7}
         >
           {imageUri ? (
             <Image source={{ uri: imageUri }} style={styles.previewImage} />
