@@ -61,7 +61,11 @@ import {
 } from "../../../../utils/workout/performance";
 import { simplifyRoute } from "../../../../utils/workout/geo";
 import { snapRoute } from "../../../../services/mapMatchingService";
-import { generateWorkoutCard, shareImageFile } from "../../../../services/shareWorkoutService";
+import {
+  generateWorkoutCard,
+  shareImageFile,
+  type CardLayout,
+} from "../../../../services/shareWorkoutService";
 import { toastInfo, toastError, notifyApiError } from "../../../../utils/notify";
 import {
   WorkoutRecord,
@@ -297,6 +301,13 @@ const HistoryList: React.FC<HistoryListProps> = ({
 
 // ─── Sheet: Detalhe do treino ───────────────────────────────────────────────
 
+// Opções de layout do card de compartilhamento (preview).
+const CARD_LAYOUTS: { key: CardLayout; label: string }[] = [
+  { key: "classic", label: "Faixa" },
+  { key: "overlay", label: "Cartão" },
+  { key: "minimal", label: "Minimal" },
+];
+
 interface WorkoutDetailProps {
   workout: WorkoutRecord;
   records: PersonalRecords;
@@ -437,11 +448,32 @@ const WorkoutDetail: React.FC<WorkoutDetailProps> = ({
   const insets = useSafeAreaInsets();
 
   // ─── Compartilhar (card estilo Strava gerado no backend) ─────────────────────
-  // Fluxo: gerar a imagem no backend → mostrar no preview → confirmar e abrir o
-  // menu nativo de compartilhamento.
-  const [sharing, setSharing] = useState(false); // gerando a imagem
+  // Fluxo: gerar a imagem no backend → mostrar no preview (com escolha de layout)
+  // → confirmar e abrir o menu nativo de compartilhamento.
+  const [sharing, setSharing] = useState(false); // gerando a 1ª imagem (abre o preview)
   const [previewUri, setPreviewUri] = useState<string | null>(null); // imagem no preview
   const [sharingNow, setSharingNow] = useState(false); // abrindo o menu de compartilhar
+  const [layout, setLayout] = useState<CardLayout>("classic"); // layout selecionado
+  const [previewLoading, setPreviewLoading] = useState(false); // trocando de layout
+  // Cache de URIs por layout (evita re-gerar ao alternar entre os já vistos).
+  const cardCacheRef = useRef<Record<string, string>>({});
+
+  // Monta o payload do card para um dado layout (stats iguais; muda só o layout).
+  const buildCardInput = (l: CardLayout) => ({
+    route: safeRoute,
+    type: workout.type,
+    title: workout.type,
+    subtitle: formatDate(workout.date),
+    layout: l,
+    stats: [
+      { label: "km", value: workout.distanceKm.toFixed(2).replace(".", ",") },
+      { label: "tempo", value: formatDuration(workout.durationSec) },
+      workout.type === "Ciclismo"
+        ? { label: "km/h", value: String(workout.avgSpeedKmh) }
+        : { label: "pace", value: workout.avgPace },
+      { label: "kcal", value: String(workout.kcal) },
+    ],
+  });
 
   const handleShare = async () => {
     if (sharing) return;
@@ -452,26 +484,43 @@ const WorkoutDetail: React.FC<WorkoutDetailProps> = ({
     setSharing(true);
     toastInfo("Gerando imagem do treino…");
     try {
-      const uri = await generateWorkoutCard({
-        route: safeRoute,
-        type: workout.type,
-        title: workout.type,
-        subtitle: formatDate(workout.date),
-        stats: [
-          { label: "km", value: workout.distanceKm.toFixed(2).replace(".", ",") },
-          { label: "tempo", value: formatDuration(workout.durationSec) },
-          workout.type === "Ciclismo"
-            ? { label: "km/h", value: String(workout.avgSpeedKmh) }
-            : { label: "pace", value: workout.avgPace },
-          { label: "kcal", value: String(workout.kcal) },
-        ],
-      });
+      const l: CardLayout = "classic";
+      const uri = await generateWorkoutCard(buildCardInput(l));
+      cardCacheRef.current = { [l]: uri };
+      setLayout(l);
       setPreviewUri(uri);
     } catch (e) {
       notifyApiError(e, "Não foi possível gerar a imagem do treino.");
     } finally {
       setSharing(false);
     }
+  };
+
+  // Troca o layout no preview: usa o cache se já gerou, senão pede ao backend.
+  const selectLayout = async (l: CardLayout) => {
+    if (l === layout || previewLoading) return;
+    setLayout(l);
+    const cached = cardCacheRef.current[l];
+    if (cached) {
+      setPreviewUri(cached);
+      return;
+    }
+    setPreviewLoading(true);
+    try {
+      const uri = await generateWorkoutCard(buildCardInput(l));
+      cardCacheRef.current[l] = uri;
+      setPreviewUri(uri);
+    } catch (e) {
+      notifyApiError(e, "Não foi possível gerar este layout.");
+    } finally {
+      setPreviewLoading(false);
+    }
+  };
+
+  const closePreview = () => {
+    setPreviewUri(null);
+    setLayout("classic");
+    cardCacheRef.current = {};
   };
 
   const confirmShare = async () => {
@@ -752,30 +801,60 @@ const WorkoutDetail: React.FC<WorkoutDetailProps> = ({
         visible={!!previewUri}
         animationType="slide"
         transparent
-        onRequestClose={() => setPreviewUri(null)}
+        onRequestClose={closePreview}
         statusBarTranslucent
       >
         <View style={hs.previewBackdrop}>
           <View style={[hs.previewSheet, { paddingBottom: Math.max(insets.bottom, 16) + 8 }]}>
             <View style={hs.previewHeader}>
               <Text style={hs.previewTitle}>Pré-visualização</Text>
-              <TouchableOpacity onPress={() => setPreviewUri(null)} style={hs.previewClose}>
+              <TouchableOpacity onPress={closePreview} style={hs.previewClose}>
                 <X size={22} color="#1E293B" />
               </TouchableOpacity>
             </View>
 
-            {previewUri && (
-              <Image
-                source={{ uri: previewUri }}
-                style={hs.previewImage}
-                resizeMode="contain"
-              />
-            )}
+            {/* Escolha do layout do card */}
+            <View style={hs.layoutChips}>
+              {CARD_LAYOUTS.map((opt) => {
+                const active = layout === opt.key;
+                return (
+                  <TouchableOpacity
+                    key={opt.key}
+                    onPress={() => selectLayout(opt.key)}
+                    disabled={previewLoading}
+                    activeOpacity={0.85}
+                    style={[
+                      hs.layoutChip,
+                      active && { backgroundColor: accent, borderColor: accent },
+                    ]}
+                  >
+                    <Text style={[hs.layoutChipText, active && { color: "#FFFFFF" }]}>
+                      {opt.label}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+
+            <View style={hs.previewImageWrap}>
+              {previewUri && (
+                <Image
+                  source={{ uri: previewUri }}
+                  style={hs.previewImage}
+                  resizeMode="contain"
+                />
+              )}
+              {previewLoading && (
+                <View style={hs.previewImageLoading}>
+                  <ActivityIndicator size="large" color="#FFFFFF" />
+                </View>
+              )}
+            </View>
 
             <TouchableOpacity
               style={[hs.previewShareBtn, { backgroundColor: accent }]}
               onPress={confirmShare}
-              disabled={sharingNow}
+              disabled={sharingNow || previewLoading}
               activeOpacity={0.85}
             >
               {sharingNow ? (
@@ -2438,12 +2517,34 @@ const hs = StyleSheet.create({
   },
   previewTitle: { fontSize: 18, fontWeight: "900", color: "#1E293B" },
   previewClose: { padding: 4 },
-  previewImage: {
+  layoutChips: { flexDirection: "row", gap: 8, marginBottom: 14 },
+  layoutChip: {
+    flex: 1,
+    paddingVertical: 9,
+    borderRadius: 12,
+    alignItems: "center",
+    backgroundColor: "#F1F5F9",
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+  },
+  layoutChipText: { fontSize: 13, fontWeight: "800", color: "#475569" },
+  previewImageWrap: {
     width: "100%",
     aspectRatio: 4 / 5,
     borderRadius: 20,
+    overflow: "hidden",
     backgroundColor: "#0B1220",
     marginBottom: 16,
+  },
+  previewImage: {
+    width: "100%",
+    height: "100%",
+  },
+  previewImageLoading: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(2,6,23,0.35)",
   },
   previewShareBtn: {
     flexDirection: "row",

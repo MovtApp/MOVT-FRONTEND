@@ -20,12 +20,16 @@ export interface ShareStat {
   value: string;
 }
 
+export type CardLayout = "classic" | "overlay" | "minimal";
+
 export interface ShareWorkoutInput {
   route: { latitude: number; longitude: number }[];
   type: WorkoutType;
   title: string;
   subtitle: string;
   stats: ShareStat[];
+  /** Modelo de como as stats ficam sobre o mapa (default: classic). */
+  layout?: CardLayout;
 }
 
 /**
