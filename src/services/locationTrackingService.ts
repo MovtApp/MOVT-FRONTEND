@@ -433,6 +433,21 @@ export function isActive(): boolean {
   return !!session?.active;
 }
 
+/**
+ * Hidrata (se preciso) e informa se há uma sessão de treino ativa persistida,
+ * devolvendo o tipo para a UI restaurar a aba/tela certa. Diferente de
+ * `isActive` (síncrono, devolve false antes da rehidratação), este aguarda o
+ * AsyncStorage — usado no relaunch para decidir se navegamos de volta ao treino
+ * (ex.: o SO matou o processo durante uma corrida com a tela apagada).
+ */
+export async function hasActiveSession(): Promise<{ active: boolean; type?: WorkoutKind }> {
+  if (session?.active) return { active: true, type: session.type };
+  await ensureHydrated();
+  const s = session as Session | null;
+  if (s?.active) return { active: true, type: s.type };
+  return { active: false };
+}
+
 // ─── Opções de location updates (compartilhadas start/resume) ───────────────────
 function buildOptions(type: WorkoutKind): Location.LocationTaskOptions {
   return {

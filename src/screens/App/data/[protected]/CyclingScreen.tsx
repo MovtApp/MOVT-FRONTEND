@@ -52,8 +52,10 @@ import BottomSheet, {
   BottomSheetView,
   BottomSheetScrollView,
   BottomSheetBackdrop,
+  type BottomSheetModal,
 } from "@gorhom/bottom-sheet";
 import BackButton from "../../../../components/BackButton";
+import PostFormSheet from "../../../../components/PostFormSheet";
 import DataPillNavigator from "../../../../components/data/DataPillNavigator";
 import {
   speedToPace,
@@ -548,6 +550,51 @@ const WorkoutDetail: React.FC<WorkoutDetailProps> = ({
     }
   };
 
+  // ─── Publicar no feed do MOVT ────────────────────────────────────────────────
+  // Gera o card em QUADRADO (1:1, encaixa no feed sem cortar) e abre o editor de
+  // post (PostFormSheet) já com a imagem + uma legenda sugerida. O próprio
+  // PostFormSheet sobe o arquivo pro Supabase e chama POST /user/posts.
+  const postSheetRef = useRef<BottomSheetModal>(null);
+  const [publishData, setPublishData] = useState<{ url: string; legenda: string } | null>(null);
+  const [publishing, setPublishing] = useState(false);
+
+  const buildSuggestedCaption = (): string => {
+    const dist = workout.distanceKm.toFixed(2).replace(".", ",");
+    const dur = formatDuration(workout.durationSec);
+    const isCycling = workout.type === "Ciclismo";
+    const verb = isCycling ? "Pedal" : "Corrida";
+    const emoji = isCycling ? "🚴" : "🏃";
+    return `${verb} de ${dist} km em ${dur} ${emoji}`;
+  };
+
+  const publishToFeed = async () => {
+    if (publishing || sharingNow || storyLoading) return;
+    const variant = buildVariants()[pageIndex];
+    if (!variant) return;
+    setPublishing(true);
+    toastInfo("Gerando imagem para publicar…");
+    try {
+      const uri = await generateWorkoutCard({
+        route: safeRoute,
+        type: workout.type,
+        title: workout.type,
+        subtitle: formatDate(workout.date),
+        stats: variant.stats,
+        layout: variant.layout,
+        format: "square",
+      });
+      // Fecha o Modal (RN) do preview ANTES de abrir o bottom-sheet, senão o
+      // editor abriria por trás do Modal nativo.
+      closePreview();
+      setPublishData({ url: uri, legenda: buildSuggestedCaption() });
+      setTimeout(() => postSheetRef.current?.present(), 350);
+    } catch (e) {
+      notifyApiError(e, "Não foi possível gerar a imagem para publicar.");
+    } finally {
+      setPublishing(false);
+    }
+  };
+
   const fitFullMap = () => {
     if (safeRoute.length < 2) return;
     fullMapRef.current?.fitToCoordinates(safeRoute, {
@@ -856,6 +903,23 @@ const WorkoutDetail: React.FC<WorkoutDetailProps> = ({
               ))}
             </View>
 
+            {/* Publicar no feed do MOVT (card quadrado) — ação principal interna */}
+            <TouchableOpacity
+              style={[hs.previewPublishBtn, { backgroundColor: accent }]}
+              onPress={publishToFeed}
+              disabled={publishing || sharingNow || storyLoading}
+              activeOpacity={0.85}
+            >
+              {publishing ? (
+                <ActivityIndicator size="small" color="#FFFFFF" />
+              ) : (
+                <>
+                  <Trophy size={20} color="#FFFFFF" />
+                  <Text style={hs.previewShareText}>Publicar no MOVT</Text>
+                </>
+              )}
+            </TouchableOpacity>
+
             <View style={hs.previewActions}>
               <TouchableOpacity
                 style={hs.previewActionBtn}
@@ -898,6 +962,13 @@ const WorkoutDetail: React.FC<WorkoutDetailProps> = ({
           </View>
         </View>
       </Modal>
+
+      {/* Editor de post pré-preenchido com o card do treino (publicar no feed) */}
+      <PostFormSheet
+        bottomSheetRef={postSheetRef}
+        initialData={publishData ? { url: publishData.url, legenda: publishData.legenda } : undefined}
+        onClose={() => setPublishData(null)}
+      />
     </View>
   );
 };
@@ -1561,7 +1632,20 @@ const CyclingScreen: React.FC = () => {
   const safeCurrentSpeedMs =
     isFinite(currentSpeedMs) && !isNaN(currentSpeedMs) ? currentSpeedMs : 0;
   const currentSpeedKmh = (safeCurrentSpeedMs * 3.6).toFixed(1);
-  const currentPace = speedToPace(safeCurrentSpeedMs);
+
+  // ── Pace exibido (corrida) ──────────────────────────────────────────────────
+  // Correndo → pace instantâneo ao vivo. Parado/pausado → o pace instantâneo
+  // dispararia (tempo/distância com velocidade ~0 = número inflado), então em vez
+  // disso mostramos o RECORDE de menor pace desta sessão (derivado do pico de
+  // velocidade já rastreado), com o rótulo virando "recorde" para não confundir.
+  const safeMaxSpeedMs =
+    isFinite(snap.maxSpeedMs) && snap.maxSpeedMs > 0 ? snap.maxSpeedMs : 0;
+  const MOVING_MS = 0.7; // ~2,5 km/h: abaixo disso consideramos "parado"
+  const livePace = speedToPace(safeCurrentSpeedMs);
+  const sessionBestPace = safeMaxSpeedMs > 0 ? speedToPace(safeMaxSpeedMs) : "--:--";
+  const isMovingForPace = !isPaused && safeCurrentSpeedMs >= MOVING_MS;
+  const showingBestPace = !isMovingForPace && sessionBestPace !== "--:--";
+  const currentPace = showingBestPace ? sessionBestPace : livePace;
   const safeDistance = isFinite(distance) && !isNaN(distance) ? distance : 0;
   const estimatedKcal = estimateCalories(safeDistance).toFixed(0);
 
@@ -1740,7 +1824,7 @@ const CyclingScreen: React.FC = () => {
                     {activeTab === "Ciclismo" ? currentSpeedKmh : currentPace}
                   </Text>
                   <Text style={styles.immStatLabel}>
-                    {activeTab === "Ciclismo" ? "km/h" : "pace"}
+                    {activeTab === "Ciclismo" ? "km/h" : showingBestPace ? "recorde" : "pace"}
                   </Text>
                 </View>
                 <View style={styles.immStatDivider} />
@@ -1887,7 +1971,7 @@ const CyclingScreen: React.FC = () => {
                       {activeTab === "Ciclismo" ? currentSpeedKmh : currentPace}
                     </Text>
                     <Text style={styles.hudCardUnit}>
-                      {activeTab === "Ciclismo" ? "km/h" : "pace/km"}
+                      {activeTab === "Ciclismo" ? "km/h" : showingBestPace ? "recorde" : "pace/km"}
                     </Text>
                   </View>
                 </View>
@@ -2562,6 +2646,15 @@ const hs = StyleSheet.create({
   },
   dot: { width: 7, height: 7, borderRadius: 4, backgroundColor: "#CBD5E1" },
   previewActions: { flexDirection: "row", gap: 10 },
+  previewPublishBtn: {
+    height: 54,
+    borderRadius: 16,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 10,
+    marginBottom: 10,
+  },
   previewActionBtn: {
     flex: 1,
     height: 54,

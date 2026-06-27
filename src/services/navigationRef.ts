@@ -30,6 +30,16 @@ function navigateInHomeStack(screen: string, params?: Record<string, unknown>) {
 }
 
 /**
+ * Navega de volta à tela de treino (Corrida/Ciclismo) quando o app relança com
+ * uma sessão de rastreamento ainda ativa. A `CyclingScreen` vive no HomeStack
+ * (App → AppDrawer → HomeStack → CyclingScreen) e alinha a aba à modalidade real
+ * a partir do snapshot do serviço. No-op se a navegação ainda não estiver pronta.
+ */
+export function navigateToActiveWorkout() {
+  navigateInHomeStack("CyclingScreen");
+}
+
+/**
  * Roteia a partir do payload `data` de uma notificação tocada (push de SO ou
  * banner in-app). Mapeia o `type` para a tela de destino. Tolerante a payload
  * incompleto: se não souber rotear, simplesmente não faz nada.
