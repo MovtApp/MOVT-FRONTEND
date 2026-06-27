@@ -23,7 +23,9 @@ export interface ShareStat {
 }
 
 export type CardLayout = "classic" | "overlay" | "minimal";
-export type CardFormat = "feed" | "stories";
+// "square" (1:1) é usado para publicar no feed interno do MOVT, que exibe o post
+// em quadrado (sem cortar as stats como aconteceria com "feed" 4:5 ou "stories").
+export type CardFormat = "feed" | "stories" | "square";
 
 export interface ShareWorkoutInput {
   route: { latitude: number; longitude: number }[];

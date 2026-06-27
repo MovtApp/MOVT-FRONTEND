@@ -2,6 +2,7 @@ import React, { createContext, useState, useEffect, useCallback, useMemo } from 
 import { secureGet, secureSet, secureRemove } from "../services/secureStore";
 import { DeviceEventEmitter, Alert } from "react-native";
 import { api, resetForceLogoutGuard } from "../services/api";
+import { clearNavState } from "../services/navStatePersistence";
 
 // Mensagem exibida quando a sessão deixa de ser válida. A mensagem "neutra"
 // cobre tanto conta removida quanto sessão encerrada, já que o backend ainda
@@ -102,6 +103,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setUser(null);
     await secureRemove("userSessionId"); // Remove o sessionId
     await secureRemove("@Auth:user"); // Remove os dados do usuário
+    await clearNavState(); // Não restaurar a última tela da sessão de outro usuário
     resetForceLogoutGuard(); // Permite novo alerta caso o próximo login volte a falhar
   }, []);
 
