@@ -32,6 +32,20 @@ export interface ShareWorkoutInput {
   layout?: CardLayout;
 }
 
+/** Uma variante do card (layout + as 3 stats daquele card). */
+export interface ShareVariant {
+  layout?: CardLayout;
+  stats: ShareStat[];
+}
+
+export interface ShareWorkoutCardsInput {
+  route: { latitude: number; longitude: number }[];
+  type: WorkoutType;
+  title: string;
+  subtitle: string;
+  variants: ShareVariant[];
+}
+
 /**
  * Gera o card no backend e grava o PNG num arquivo temporário local.
  * Retorna o URI do arquivo (para exibir no preview e depois compartilhar).
@@ -47,6 +61,29 @@ export async function generateWorkoutCard(input: ShareWorkoutInput): Promise<str
     encoding: FileSystem.EncodingType.Base64,
   });
   return uri;
+}
+
+/**
+ * Gera VÁRIOS cards de uma vez (carrossel) num único request — o backend baixa o
+ * mapa só uma vez e compõe todas as variantes. Grava cada PNG num arquivo e
+ * retorna os URIs na mesma ordem das variantes.
+ */
+export async function generateWorkoutCards(input: ShareWorkoutCardsInput): Promise<string[]> {
+  const res = await api.post("/route/share-card", input);
+  const images: string[] | undefined = res.data?.images;
+  if (!Array.isArray(images) || images.length === 0) {
+    throw new Error("Não foi possível gerar as imagens do treino.");
+  }
+  const stamp = Date.now();
+  const uris: string[] = [];
+  for (let i = 0; i < images.length; i++) {
+    const uri = `${FileSystem.cacheDirectory}movt-treino-${stamp}-${i}.png`;
+    await FileSystem.writeAsStringAsync(uri, images[i], {
+      encoding: FileSystem.EncodingType.Base64,
+    });
+    uris.push(uri);
+  }
+  return uris;
 }
 
 /** Abre o menu nativo de compartilhamento para um arquivo de imagem já gerado. */
