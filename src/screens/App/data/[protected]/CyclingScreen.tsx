@@ -11,6 +11,7 @@ import {
   Modal,
   Animated,
   Share,
+  ActivityIndicator,
 } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRoute } from "@react-navigation/native";
@@ -59,6 +60,8 @@ import {
 } from "../../../../utils/workout/performance";
 import { simplifyRoute } from "../../../../utils/workout/geo";
 import { snapRoute } from "../../../../services/mapMatchingService";
+import { shareWorkoutCard } from "../../../../services/shareWorkoutService";
+import { toastInfo, toastError, notifyApiError } from "../../../../utils/notify";
 import {
   WorkoutRecord,
   WorkoutType,
@@ -367,6 +370,38 @@ const WorkoutDetail: React.FC<WorkoutDetailProps> = ({
   const fullMapRef = useRef<MapView>(null);
   const insets = useSafeAreaInsets();
 
+  // ─── Compartilhar (card estilo Strava gerado no backend) ─────────────────────
+  const [sharing, setSharing] = useState(false);
+  const handleShare = async () => {
+    if (sharing) return;
+    if (safeRoute.length < 2) {
+      toastError("Sem rota para compartilhar", "Este treino não tem trajeto registrado.");
+      return;
+    }
+    setSharing(true);
+    toastInfo("Gerando imagem do treino…");
+    try {
+      await shareWorkoutCard({
+        route: safeRoute,
+        type: workout.type,
+        title: workout.type,
+        subtitle: formatDate(workout.date),
+        stats: [
+          { label: "km", value: workout.distanceKm.toFixed(2).replace(".", ",") },
+          { label: "tempo", value: formatDuration(workout.durationSec) },
+          workout.type === "Ciclismo"
+            ? { label: "km/h", value: String(workout.avgSpeedKmh) }
+            : { label: "pace", value: workout.avgPace },
+          { label: "kcal", value: String(workout.kcal) },
+        ],
+      });
+    } catch (e) {
+      notifyApiError(e, "Não foi possível gerar a imagem do treino.");
+    } finally {
+      setSharing(false);
+    }
+  };
+
   const fitFullMap = () => {
     if (safeRoute.length < 2) return;
     fullMapRef.current?.fitToCoordinates(safeRoute, {
@@ -382,9 +417,23 @@ const WorkoutDetail: React.FC<WorkoutDetailProps> = ({
           <ChevronLeft size={20} color="#1E293B" />
           <Text style={hs.backBtnText}>Histórico</Text>
         </TouchableOpacity>
-        <TouchableOpacity onPress={onDelete} style={hs.deleteBtn}>
-          <Trash2 size={18} color="#EF4444" />
-        </TouchableOpacity>
+        <View style={hs.headerActions}>
+          <TouchableOpacity
+            onPress={handleShare}
+            style={hs.shareBtn}
+            disabled={sharing}
+            activeOpacity={0.8}
+          >
+            {sharing ? (
+              <ActivityIndicator size="small" color={accent} />
+            ) : (
+              <Share2 size={18} color={accent} />
+            )}
+          </TouchableOpacity>
+          <TouchableOpacity onPress={onDelete} style={hs.deleteBtn}>
+            <Trash2 size={18} color="#EF4444" />
+          </TouchableOpacity>
+        </View>
       </View>
 
       <BottomSheetScrollView
@@ -999,6 +1048,15 @@ const CyclingScreen: React.FC = () => {
     Tracker.resumeIfActive();
     return unsub;
   }, []);
+
+  // Quando uma sessão ativa é restaurada (relaunch após o SO matar o processo, ou
+  // ao voltar pra tela), alinha a aba à modalidade real do treino em andamento —
+  // para a UI abrir na corrida/ciclismo correto, não no default.
+  useEffect(() => {
+    if (snap.active && (snap.type === "Ciclismo" || snap.type === "Corrida")) {
+      setActiveTab((prev) => (prev === snap.type ? prev : snap.type));
+    }
+  }, [snap.active, snap.type]);
 
   // Enquanto o treino está ativo e a tela focada, um "tick" de 1s mantém o
   // relógio na tela em dia. NÃO é a fonte da verdade do tempo (isso é o relógio
@@ -2071,6 +2129,8 @@ const hs = StyleSheet.create({
   backBtn: { flexDirection: "row", alignItems: "center", gap: 2 },
   backBtnText: { fontSize: 15, fontWeight: "800", color: "#1E293B" },
   deleteBtn: { padding: 8 },
+  headerActions: { flexDirection: "row", alignItems: "center", gap: 4 },
+  shareBtn: { padding: 8, minWidth: 34, alignItems: "center", justifyContent: "center" },
 
   recordsRow: { flexDirection: "row", gap: 10, marginBottom: 18 },
   recordCard: {
