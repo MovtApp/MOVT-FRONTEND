@@ -82,7 +82,7 @@ const VerifyPhoneScreen = () => {
     const isTrainer =
       user?.documentType === "CNPJ" || user?.role === "trainer" || user?.role === "personal";
     if (isTrainer && !user?.cref_verified) {
-      navigation.navigate("Verify", { screen: "VerifyCompanyScreen" });
+      navigation.navigate("Verify", { screen: "VerifyCrefScreen" });
     } else if (user?.onboarding_completed === false) {
       // CPF (ou trainer já com CREF) sem dados pessoais → onboarding Info
       navigation.reset({ index: 0, routes: [{ name: "Info" as never }] });

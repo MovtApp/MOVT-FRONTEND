@@ -153,13 +153,14 @@ export const SignInScreen = () => {
           ],
         });
       } else if (needsProfessionalVerification) {
-        // E-mail ok, mas falta validar empresa/CREF → fluxo profissional
+        // E-mail ok, mas falta validar o CREF → fluxo profissional (etapa de
+        // empresa desativada; vai direto para o CREF).
         navigation.reset({
           index: 0,
           routes: [
             {
               name: "Verify" as never,
-              params: { screen: "VerifyCompanyScreen" } as never,
+              params: { screen: "VerifyCrefScreen" } as never,
             },
           ],
         });

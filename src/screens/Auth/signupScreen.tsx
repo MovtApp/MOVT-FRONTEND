@@ -68,13 +68,17 @@ export const SignUpScreen = ({ navigation }: Props) => {
     return cleaned;
   }
 
-  // Função para normalizar o CREF (ex.: 000000-G/SP). Mantém dígitos, letras e os
-  // separadores - e / ; validação real é feita pela IA/admin (não aqui).
+  // Aplica a máscara do CREF (000000-G/UF) enquanto o usuário digita: 6 dígitos de
+  // registro, 1 letra de categoria e a UF com 2 letras. Os separadores - e / entram
+  // sozinhos; validação real é feita pela IA/admin (não aqui).
   function formatCref(value: string) {
-    return (value || "")
-      .toUpperCase()
-      .replace(/[^0-9A-Z/-]/g, "")
-      .slice(0, 12);
+    const raw = (value || "").toUpperCase().replace(/[^0-9A-Z]/g, "");
+    const digits = raw.replace(/[^0-9]/g, "").slice(0, 6);
+    const letters = raw.replace(/[^A-Z]/g, "").slice(0, 3); // categoria (1) + UF (2)
+    let out = digits;
+    if (letters.length >= 1) out += "-" + letters.slice(0, 1);
+    if (letters.length >= 2) out += "/" + letters.slice(1, 3);
+    return out;
   }
 
   // Função para formatar telefone
