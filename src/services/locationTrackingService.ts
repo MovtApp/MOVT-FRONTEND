@@ -20,8 +20,15 @@
  * (caso o SO mate e religue o app para entregar uma localização headless).
  */
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import * as Sentry from "@sentry/react-native";
 import * as Location from "expo-location";
 import * as TaskManager from "expo-task-manager";
+import {
+  isIgnoringBatteryOptimizations,
+  requestIgnoreBatteryOptimizations,
+  acquireWorkoutWakeLock,
+  releaseWorkoutWakeLock,
+} from "./movtService";
 import { deriveSpeedMs, speedToPace, formatDuration } from "../utils/workout/performance";
 import {
   haversineMeters,
@@ -36,6 +43,14 @@ import { snapRoute } from "./mapMatchingService";
 
 export const LOCATION_TASK = "movt-location-tracking";
 const STORAGE_KEY = "@MOVT:active_tracking_session";
+
+// ─── Diagnóstico (camada 4) ─────────────────────────────────────────────────────
+// Contador de fixes processados na sessão + timestamp do último lote, para
+// detectar em campo (Sentry) se o GPS para de entregar com a tela apagada.
+let fixCount = 0;
+let lastBatchTs = 0;
+// Breadcrumb de lote no máximo a cada 30 s para não inundar o Sentry.
+const BATCH_BREADCRUMB_MS = 30000;
 
 // ─── Parâmetros de rastreamento (qualidade Strava/Uber) ─────────────────────────
 // Acurácia máxima aceita (m) para um fix ENTRAR na rota. 15 m descartava metade dos
@@ -52,6 +67,14 @@ const MIN_SEGMENT_M = 2;
 const SEGMENT_ACCURACY_FACTOR = 0.5;
 // Acima de MAX_SPEED_MS·este fator entre fixes = salto impossível → descarta.
 const OUTLIER_SPEED_FACTOR = 1.5;
+// Silêncio máximo (s) tolerado entre dois fixes ACEITOS. Acima disso, assumimos
+// que o GPS ficou mudo (processo congelado pelo SO com a tela apagada, túnel,
+// cânion urbano) e NÃO ligamos os dois pontos: um segmento reto cego inflaria a
+// distância (vira a "linha reta fantasma" do início ao fim) e mentiria a rota.
+// Em vez disso, recomeçamos um trecho novo a partir do fix pós-silêncio (a rota
+// ganha um ponto marcado com `gap:true` para a polyline quebrar). 30 s é folgado:
+// fixes saudáveis chegam a cada ~0,5–2 s; um túnel curto (<30 s) ainda é ligado.
+const MAX_FIX_GAP_S = 30;
 
 // ─── Map-matching ao vivo (snap-to-roads via backend/Mapbox) ────────────────────
 // Encaixa o traçado nas ruas reais durante o treino. Throttled: roda no máximo a
@@ -61,7 +84,16 @@ const SNAP_INTERVAL_MS = 12000;
 const SNAP_MIN_NEW_POINTS = 8;
 
 export type WorkoutKind = "Ciclismo" | "Corrida";
-export type LatLng = { latitude: number; longitude: number; timestamp?: number; accuracy?: number };
+export type LatLng = {
+  latitude: number;
+  longitude: number;
+  timestamp?: number;
+  accuracy?: number;
+  // Marca o PRIMEIRO ponto de um trecho novo após um silêncio do GPS (gap break).
+  // A UI usa isso para quebrar a polyline (não desenha a reta cega que ligaria
+  // este ponto ao anterior). Pontos normais não têm o campo.
+  gap?: boolean;
+};
 export type Split = { km: number; time: string; pace: string };
 
 /** Vista serializável do estado de rastreamento para a UI. */
@@ -178,6 +210,15 @@ function processFix(loc: Location.LocationObject) {
   // Fix ruidoso demais: não entra no traçado (mas já moveu o marcador acima).
   if (acc > MAX_ACCURACY_M) return;
 
+  // Gap break: o GPS ficou mudo tempo demais desde o último fix aceito (processo
+  // congelado com a tela apagada, túnel longo…). Zera o Kalman para que ele
+  // RE-INICIE neste fix (sem suavizar por cima do vazio) e sinaliza para, mais
+  // abaixo, recomeçar um trecho novo em vez de ligar uma reta cega.
+  const gapSinceLastFixS =
+    session.lastFixTs > 0 ? (ts - session.lastFixTs) / 1000 : 0;
+  const isGapBreak = gapSinceLastFixS > MAX_FIX_GAP_S;
+  if (isGapBreak) session.kf = null;
+
   // Velocidade medida deste fix (m/s), usada para a rejeição de outlier E para o
   // Q adaptativo do Kalman. Começa da última conhecida; refina com o salto cru.
   let measuredSpeedMs = session.currentSpeedMs;
@@ -204,6 +245,19 @@ function processFix(loc: Location.LocationObject) {
     : kalmanInit(latitude, longitude, acc, ts);
   const fLat = session.kf.lat;
   const fLng = session.kf.lng;
+
+  // Gap break (só quando já havia um trecho em andamento): recomeça aqui. Não soma
+  // distância nem velocidade do salto, marca o ponto com `gap:true` para a polyline
+  // quebrar, e reancora tudo neste fix. O tempo decorrido NÃO é afetado (relógio de
+  // parede). Sem isso, um congelamento viraria uma reta de vários km com pace falso.
+  if (isGapBreak && session.lastRegPoint) {
+    session.currentSpeedMs = 0;
+    session.lastPoint = { latitude: fLat, longitude: fLng };
+    session.lastFixTs = ts;
+    session.lastRegPoint = { latitude: fLat, longitude: fLng };
+    session.route.push({ latitude: fLat, longitude: fLng, timestamp: ts, accuracy: acc, gap: true });
+    return;
+  }
 
   // Velocidade ao vivo: medida fix-a-fix (âncora lastPoint, sempre atualizada),
   // para responder na hora mesmo entre pontos registrados.
@@ -312,6 +366,10 @@ async function maybeSnapLive() {
 
   const routeLen = session.route.length;
   if (routeLen < 4) return;
+
+  // Rota com gap: o map-matching encaixaria a reta cega de volta nas ruas
+  // (mentindo o traçado). Enquanto houver quebra, mantém a rota crua já dividida.
+  if (session.route.some((p) => p.gap)) return;
 
   const now = Date.now();
   const newPoints = routeLen - session.lastSnapAtLen;
@@ -434,6 +492,22 @@ export function isActive(): boolean {
 }
 
 /**
+ * Quebra uma rota em trechos contíguos nos pontos marcados com `gap:true`. Cada
+ * `gap` (silêncio do GPS) inicia um novo sub-traçado, para a UI desenhar uma
+ * polyline por trecho em vez de uma reta cega cruzando a quebra. Sem gaps,
+ * devolve um único trecho com a rota inteira.
+ */
+export function splitRouteOnGaps(route: LatLng[]): LatLng[][] {
+  if (route.length === 0) return [];
+  const segments: LatLng[][] = [[]];
+  for (const p of route) {
+    if (p.gap && segments[segments.length - 1].length > 0) segments.push([]);
+    segments[segments.length - 1].push(p);
+  }
+  return segments.filter((s) => s.length > 0);
+}
+
+/**
  * Hidrata (se preciso) e informa se há uma sessão de treino ativa persistida,
  * devolvendo o tipo para a UI restaurar a aba/tela certa. Diferente de
  * `isActive` (síncrono, devolve false antes da rehidratação), este aguarda o
@@ -474,19 +548,49 @@ function buildOptions(type: WorkoutKind): Location.LocationTaskOptions {
 export interface StartResult {
   ok: boolean;
   error?: "foreground-denied";
+  /**
+   * "Permitir o tempo todo" concedido? Se false, o rastreio com a tela apagada
+   * degrada — a UI avisa, mas o treino inicia mesmo assim (best-effort).
+   */
+  backgroundGranted?: boolean;
 }
 
 /** Inicia uma nova sessão de rastreamento. */
 export async function startTracking(type: WorkoutKind): Promise<StartResult> {
   const fg = await Location.requestForegroundPermissionsAsync();
   if (fg.status !== "granted") return { ok: false, error: "foreground-denied" };
-  // Background é best-effort: se negado, o foreground service ainda rastreia com
-  // a tela ligada; pedimos mesmo assim para cobrir o caso de tela apagada.
+  // Background ("Permitir o tempo todo"): essencial para a tela apagada. Best-effort
+  // — se negado, seguimos com o foreground service, mas devolvemos o status para a
+  // UI orientar o usuário a habilitar nos Ajustes.
+  let backgroundGranted = false;
   try {
-    await Location.requestBackgroundPermissionsAsync();
+    const bg = await Location.requestBackgroundPermissionsAsync();
+    backgroundGranted = bg.status === "granted";
   } catch {
     // alguns devices/ROMs lançam aqui; seguimos com o que houver
   }
+
+  // Isenção de otimização de bateria: SEM ela, o SO congela o processo com a tela
+  // apagada (causa #1 do treino "parar" no meio). Mostra o diálogo do sistema
+  // (1 toque) enquanto o app não estiver isento. O nativo já checa antes de abrir.
+  try {
+    const ignoring = await isIgnoringBatteryOptimizations();
+    if (!ignoring) requestIgnoreBatteryOptimizations();
+  } catch {
+    // não bloqueia o início do treino
+  }
+
+  // WakeLock parcial: mantém a CPU viva (Doze) para a task processar os fixes.
+  acquireWorkoutWakeLock();
+
+  fixCount = 0;
+  lastBatchTs = Date.now();
+  Sentry.addBreadcrumb({
+    category: "workout",
+    level: "info",
+    message: "tracking:start",
+    data: { type, backgroundGranted },
+  });
 
   const now = Date.now();
   session = {
@@ -524,7 +628,7 @@ export async function startTracking(type: WorkoutKind): Promise<StartResult> {
 
   await Location.startLocationUpdatesAsync(LOCATION_TASK, buildOptions(type));
   notify();
-  return { ok: true };
+  return { ok: true, backgroundGranted };
 }
 
 /** Alterna pausa manual / retomada. */
@@ -554,8 +658,9 @@ export async function stopTracking(): Promise<TrackingSnapshot> {
   const finalSnap = getSnapshot();
 
   // Passe final de alta qualidade: snap da rota inteira (best-effort). Se a rede
-  // falhar, mantém o traçado encaixado que já tínhamos do snap ao vivo.
-  if (session && session.route.length >= 2) {
+  // falhar, mantém o traçado encaixado que já tínhamos do snap ao vivo. Pula se a
+  // rota tem gap — encaixar ligaria a reta cega da quebra de volta nas ruas.
+  if (session && session.route.length >= 2 && !session.route.some((p) => p.gap)) {
     try {
       const result = await snapRoute(session.route.slice(), session.type);
       if (result && result.snapped.length >= 2) finalSnap.snappedRoute = result.snapped;
@@ -565,6 +670,13 @@ export async function stopTracking(): Promise<TrackingSnapshot> {
   }
 
   if (session) session.active = false;
+  releaseWorkoutWakeLock();
+  Sentry.addBreadcrumb({
+    category: "workout",
+    level: "info",
+    message: "tracking:stop",
+    data: { fixCount, distanceKm: finalSnap.distanceKm, elapsedSec: finalSnap.elapsedSec },
+  });
   try {
     const started = await Location.hasStartedLocationUpdatesAsync(LOCATION_TASK).catch(() => false);
     if (started) await Location.stopLocationUpdatesAsync(LOCATION_TASK);
@@ -596,6 +708,9 @@ export async function resumeIfActive() {
   // que ensureHydrated() pode tê-lo populado de forma assíncrona.
   const s = session as Session | null;
   if (s?.active) {
+    // Processo religado pelo SO durante um treino: rearma o WakeLock (foi solto
+    // quando o processo morreu) para a CPU não suspender de novo.
+    acquireWorkoutWakeLock();
     const started = await Location.hasStartedLocationUpdatesAsync(LOCATION_TASK).catch(() => false);
     if (!started) {
       try {
@@ -622,6 +737,21 @@ TaskManager.defineTask(LOCATION_TASK, async ({ data, error }) => {
   if (!session?.active) return;
 
   for (const loc of locations) processFix(loc);
+  fixCount += locations.length;
+
+  // Diagnóstico: registra um lote no Sentry (throttled) com o gap desde o último —
+  // um gap grande com a tela apagada denuncia o SO congelando o processo.
+  const now = Date.now();
+  if (now - lastBatchTs >= BATCH_BREADCRUMB_MS) {
+    Sentry.addBreadcrumb({
+      category: "workout",
+      level: "info",
+      message: "tracking:batch",
+      data: { batch: locations.length, fixCount, gapMs: now - lastBatchTs, routeLen: session.route.length },
+    });
+    lastBatchTs = now;
+  }
+
   await persist();
   notify();
   // Map-matching ao vivo (não-bloqueante, throttled internamente).

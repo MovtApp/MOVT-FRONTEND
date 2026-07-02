@@ -13,6 +13,7 @@ import {
   Share,
   ActivityIndicator,
   Image,
+  Linking,
 } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRoute } from "@react-navigation/native";
@@ -352,7 +353,10 @@ const WorkoutDetail: React.FC<WorkoutDetailProps> = ({
 
   // Prefere a rota encaixada nas ruas (map-matching salvo → re-snap → crua).
   // Simplifica (Douglas-Peucker) para renderizar liso e leve, sem perder a forma.
-  const safeRoute = useMemo(() => {
+  // Trechos contíguos da rota (um por sub-traçado entre gaps). Divide ANTES de
+  // simplificar para o Douglas-Peucker não engolir o ponto de quebra — assim cada
+  // segmento é simplificado isolado e o gap vira de fato uma polyline separada.
+  const routeSegments = useMemo(() => {
     const source =
       Array.isArray(workout.routeSnapped) && workout.routeSnapped.length > 1
         ? workout.routeSnapped
@@ -367,8 +371,12 @@ const WorkoutDetail: React.FC<WorkoutDetailProps> = ({
         typeof p.longitude === "number" &&
         isFinite(p.longitude)
     );
-    return simplifyRoute(cleaned, 4);
+    return Tracker.splitRouteOnGaps(cleaned)
+      .map((seg) => simplifyRoute(seg, 4))
+      .filter((seg) => seg.length > 0);
   }, [workout.routeSnapped, workout.route, snappedOverride]);
+  // Rota achatada (p/ enquadrar a câmera e posicionar início/fim globais).
+  const safeRoute = useMemo(() => routeSegments.flat(), [routeSegments]);
 
   // Diferença vs. recorde da modalidade (para a comparação).
   const distDelta = workout.distanceKm - records.longestDistanceKm;
@@ -657,13 +665,18 @@ const WorkoutDetail: React.FC<WorkoutDetailProps> = ({
               pointerEvents="none"
               initialRegion={fitRegion!}
             >
-              <Polyline
-                coordinates={safeRoute}
-                strokeColor={accent}
-                strokeWidth={4}
-                lineCap="round"
-                lineJoin="round"
-              />
+              {routeSegments.map((seg, i) =>
+                seg.length > 1 ? (
+                  <Polyline
+                    key={i}
+                    coordinates={seg}
+                    strokeColor={accent}
+                    strokeWidth={4}
+                    lineCap="round"
+                    lineJoin="round"
+                  />
+                ) : null
+              )}
               <RouteEndpoints route={safeRoute} />
             </MapView>
 
@@ -811,13 +824,18 @@ const WorkoutDetail: React.FC<WorkoutDetailProps> = ({
               showsCompass={false}
               toolbarEnabled={false}
             >
-              <Polyline
-                coordinates={safeRoute}
-                strokeColor={accent}
-                strokeWidth={5}
-                lineCap="round"
-                lineJoin="round"
-              />
+              {routeSegments.map((seg, i) =>
+                seg.length > 1 ? (
+                  <Polyline
+                    key={i}
+                    coordinates={seg}
+                    strokeColor={accent}
+                    strokeWidth={5}
+                    lineCap="round"
+                    lineJoin="round"
+                  />
+                ) : null
+              )}
               <RouteEndpoints route={safeRoute} />
             </MapView>
           )}
@@ -1042,6 +1060,8 @@ const PausedStats: React.FC<PausedStatsProps> = ({
 }) => {
   const insets = useSafeAreaInsets();
   const isCycling = type === "Ciclismo";
+  // Trechos contíguos da rota (uma polyline por sub-traçado entre gaps).
+  const routeSegments = useMemo(() => Tracker.splitRouteOnGaps(route), [route]);
   // Verde padrão do projeto (lime de marca) — fundo sólido vivo da tela de espera.
   const GREEN = "#BBF246";
   const GREEN_TEXT = "#365314"; // verde escuro, legível como texto sobre o lime vivo
@@ -1260,13 +1280,18 @@ const PausedStats: React.FC<PausedStatsProps> = ({
               initialRegion={fitRegion}
               onMapReady={fitMap}
             >
-              <Polyline
-                coordinates={route}
-                strokeColor={GREEN}
-                strokeWidth={5}
-                lineCap="round"
-                lineJoin="round"
-              />
+              {routeSegments.map((seg, i) =>
+                seg.length > 1 ? (
+                  <Polyline
+                    key={i}
+                    coordinates={seg}
+                    strokeColor={GREEN}
+                    strokeWidth={5}
+                    lineCap="round"
+                    lineJoin="round"
+                  />
+                ) : null
+              )}
               <RouteEndpoints route={route} />
             </MapView>
           </View>
@@ -1518,6 +1543,19 @@ const CyclingScreen: React.FC = () => {
     const res = await Tracker.startTracking(activeTab === "Ciclismo" ? "Ciclismo" : "Corrida");
     if (!res.ok) {
       Alert.alert("Permissão negada", "Precisamos de acesso ao GPS para o MOVT Performance.");
+      return;
+    }
+    // Treino inicia mesmo sem "Permitir o tempo todo", mas com a tela apagada o
+    // rastreio pode falhar — orienta o usuário a liberar o acesso em segundo plano.
+    if (res.backgroundGranted === false && Platform.OS === "android") {
+      Alert.alert(
+        "Ative a localização em segundo plano",
+        "Para o treino não parar com a tela bloqueada, defina a localização do MOVT como \"Permitir o tempo todo\" nos ajustes do app.",
+        [
+          { text: "Agora não", style: "cancel" },
+          { text: "Abrir ajustes", onPress: () => Linking.openSettings() },
+        ]
+      );
     }
   };
 
@@ -1671,7 +1709,13 @@ const CyclingScreen: React.FC = () => {
     () => (snap.snappedRoute || []).filter(isValidLatLng),
     [snap.snappedRoute]
   );
-  const displayRoute = safeSnappedRoute.length > 1 ? safeSnappedRoute : safeRoute;
+  // Rota com gap (silêncio do GPS): prefere a crua, já quebrada — o snapped não
+  // carrega o flag de quebra e ligaria a reta cega de volta nas ruas.
+  const routeHasGap = useMemo(() => safeRoute.some((p) => p.gap), [safeRoute]);
+  const displayRoute =
+    !routeHasGap && safeSnappedRoute.length > 1 ? safeSnappedRoute : safeRoute;
+  // Trechos contíguos p/ desenhar uma polyline por sub-traçado (não cruza o gap).
+  const displaySegments = useMemo(() => Tracker.splitRouteOnGaps(displayRoute), [displayRoute]);
 
   // Posição "ao vivo": último fix do treino em andamento, ou a posição conhecida
   // ao abrir a tela (antes de iniciar).
@@ -1773,14 +1817,17 @@ const CyclingScreen: React.FC = () => {
                   }
             }
           >
-            {displayRoute.length > 1 && (
-              <Polyline
-                coordinates={displayRoute}
-                strokeColor={activeTab === "Ciclismo" ? "#3B82F6" : "#10B981"}
-                strokeWidth={5}
-                lineCap="round"
-                lineJoin="round"
-              />
+            {displaySegments.map((seg, i) =>
+              seg.length > 1 ? (
+                <Polyline
+                  key={i}
+                  coordinates={seg}
+                  strokeColor={activeTab === "Ciclismo" ? "#3B82F6" : "#10B981"}
+                  strokeWidth={5}
+                  lineCap="round"
+                  lineJoin="round"
+                />
+              ) : null
             )}
           </MapView>
 
@@ -1942,14 +1989,17 @@ const CyclingScreen: React.FC = () => {
                     }
               }
             >
-              {displayRoute.length > 1 && (
-                <Polyline
-                  coordinates={displayRoute}
-                  strokeColor={activeTab === "Ciclismo" ? "#3B82F6" : "#10B981"}
-                  strokeWidth={4}
-                  lineCap="round"
-                  lineJoin="round"
-                />
+              {displaySegments.map((seg, i) =>
+                seg.length > 1 ? (
+                  <Polyline
+                    key={i}
+                    coordinates={seg}
+                    strokeColor={activeTab === "Ciclismo" ? "#3B82F6" : "#10B981"}
+                    strokeWidth={4}
+                    lineCap="round"
+                    lineJoin="round"
+                  />
+                ) : null
               )}
             </MapView>
 

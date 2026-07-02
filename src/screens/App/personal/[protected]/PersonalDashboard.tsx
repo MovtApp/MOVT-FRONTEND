@@ -15,7 +15,11 @@ import {
 } from "react-native";
 import DateTimePickerModal from "react-native-modal-datetime-picker";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
-import BottomSheet, { BottomSheetView, BottomSheetBackdrop } from "@gorhom/bottom-sheet";
+import BottomSheet, {
+  BottomSheetView,
+  BottomSheetBackdrop,
+  BottomSheetScrollView,
+} from "@gorhom/bottom-sheet";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
 import { useNavigation } from "@react-navigation/native";
@@ -131,15 +135,7 @@ interface DashboardData {
 
 // ─── Disponibilidade (horários de atendimento) ──────────────────────────────────
 
-const DAY_LABELS = [
-  "Domingo",
-  "Segunda",
-  "Terça",
-  "Quarta",
-  "Quinta",
-  "Sexta",
-  "Sábado",
-];
+const DAY_LABELS = ["Domingo", "Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado"];
 const DURATION_OPTIONS = [30, 45, 60];
 
 const fmtTime = (d: Date) =>
@@ -975,7 +971,6 @@ const PersonalDashboard: React.FC = () => {
                   <Text style={styles.statusLabel}>Horários de Atendimento</Text>
                 </View>
                 <View style={styles.statusValueRow}>
-                  <Clock size={16} color="#94A3B8" />
                   <ChevronRight size={16} color="#94A3B8" />
                 </View>
               </TouchableOpacity>
@@ -1047,6 +1042,9 @@ const PersonalDashboard: React.FC = () => {
             key={`filter-${sheetVersion}`}
             index={0}
             snapPoints={["40%"]}
+            // gorhom v5 liga dynamic sizing por padrão → o sheet cresce com o
+            // conteúdo e o scroll interno não engata; fixamos no snapPoint.
+            enableDynamicSizing={false}
             enablePanDownToClose
             backdropComponent={renderBackdrop}
             backgroundStyle={{ borderRadius: 32 }}
@@ -1111,6 +1109,9 @@ const PersonalDashboard: React.FC = () => {
             key={`appointments-${sheetVersion}`}
             index={0}
             snapPoints={["85%"]}
+            // gorhom v5 liga dynamic sizing por padrão → o sheet cresce com o
+            // conteúdo e o scroll interno não engata; fixamos no snapPoint.
+            enableDynamicSizing={false}
             enablePanDownToClose
             backdropComponent={renderBackdrop}
             backgroundStyle={{ borderRadius: 32 }}
@@ -1123,7 +1124,11 @@ const PersonalDashboard: React.FC = () => {
                   <X size={24} color="#64748B" />
                 </TouchableOpacity>
               </View>
-              <ScrollView style={{ marginTop: 10 }}>
+              <BottomSheetScrollView
+                style={{ flex: 1, marginTop: 10 }}
+                showsVerticalScrollIndicator={false}
+                contentContainerStyle={{ paddingBottom: 40 }}
+              >
                 {data?.appointments.map((item) => (
                   <View key={item.id_agendamento} style={styles.pendingCard}>
                     <View style={styles.pendingRow}>
@@ -1176,7 +1181,7 @@ const PersonalDashboard: React.FC = () => {
                 {data?.appointments.length === 0 && (
                   <Text style={styles.emptyTxt}>Nenhum agendamento encontrado.</Text>
                 )}
-              </ScrollView>
+              </BottomSheetScrollView>
             </BottomSheetView>
           </BottomSheet>
         )}
@@ -1188,6 +1193,9 @@ const PersonalDashboard: React.FC = () => {
             key={`revenue-${sheetVersion}`}
             index={0}
             snapPoints={["85%"]}
+            // gorhom v5 liga dynamic sizing por padrão → o sheet cresce com o
+            // conteúdo e o scroll interno não engata; fixamos no snapPoint.
+            enableDynamicSizing={false}
             enablePanDownToClose
             backdropComponent={renderBackdrop}
             backgroundStyle={{ borderRadius: 32 }}
@@ -1200,7 +1208,11 @@ const PersonalDashboard: React.FC = () => {
                   <X size={24} color="#64748B" />
                 </TouchableOpacity>
               </View>
-              <ScrollView style={{ marginTop: 10 }}>
+              <BottomSheetScrollView
+                style={{ flex: 1, marginTop: 10 }}
+                showsVerticalScrollIndicator={false}
+                contentContainerStyle={{ paddingBottom: 40 }}
+              >
                 <View style={styles.revenueTotalCard}>
                   <Text style={styles.revenueTotalLabel}>Total no Período</Text>
                   <Text style={styles.revenueTotalValue}>
@@ -1218,7 +1230,7 @@ const PersonalDashboard: React.FC = () => {
                       <Text style={styles.revenueItemValue}>+ {formatCurrency(100)}</Text>
                     </View>
                   ))}
-              </ScrollView>
+              </BottomSheetScrollView>
             </BottomSheetView>
           </BottomSheet>
         )}
@@ -1230,6 +1242,9 @@ const PersonalDashboard: React.FC = () => {
             key={`approvals-${sheetVersion}`}
             index={0}
             snapPoints={["85%"]}
+            // gorhom v5 liga dynamic sizing por padrão → o sheet cresce com o
+            // conteúdo e o scroll interno não engata; fixamos no snapPoint.
+            enableDynamicSizing={false}
             enablePanDownToClose
             backdropComponent={renderBackdrop}
             backgroundStyle={{ borderRadius: 32 }}
@@ -1242,7 +1257,11 @@ const PersonalDashboard: React.FC = () => {
                   <X size={24} color="#64748B" />
                 </TouchableOpacity>
               </View>
-              <ScrollView style={{ marginTop: 20 }}>
+              <BottomSheetScrollView
+                style={{ flex: 1, marginTop: 20 }}
+                showsVerticalScrollIndicator={false}
+                contentContainerStyle={{ paddingBottom: 40 }}
+              >
                 {data?.pending.map((item) => (
                   <View key={item.id_agendamento} style={styles.pendingCard}>
                     <View style={styles.pendingRow}>
@@ -1310,7 +1329,7 @@ const PersonalDashboard: React.FC = () => {
                 {data?.pending.length === 0 && (
                   <Text style={styles.emptyTxt}>Nenhuma aprovação pendente.</Text>
                 )}
-              </ScrollView>
+              </BottomSheetScrollView>
             </BottomSheetView>
           </BottomSheet>
         )}
@@ -1322,6 +1341,9 @@ const PersonalDashboard: React.FC = () => {
             key={`clients-${sheetVersion}`}
             index={0}
             snapPoints={["85%"]}
+            // gorhom v5 liga dynamic sizing por padrão → o sheet cresce com o
+            // conteúdo e o scroll interno não engata; fixamos no snapPoint.
+            enableDynamicSizing={false}
             enablePanDownToClose
             backdropComponent={renderBackdrop}
             backgroundStyle={{ borderRadius: 32 }}
@@ -1334,7 +1356,11 @@ const PersonalDashboard: React.FC = () => {
                   <X size={24} color="#64748B" />
                 </TouchableOpacity>
               </View>
-              <ScrollView style={{ marginTop: 20 }}>
+              <BottomSheetScrollView
+                style={{ flex: 1, marginTop: 20 }}
+                showsVerticalScrollIndicator={false}
+                contentContainerStyle={{ paddingBottom: 40 }}
+              >
                 {data?.clients.map((item) => (
                   <TouchableOpacity
                     key={item.id_us}
@@ -1364,7 +1390,7 @@ const PersonalDashboard: React.FC = () => {
                 {data?.clients.length === 0 && (
                   <Text style={styles.emptyTxt}>Nenhum cliente cadastrado.</Text>
                 )}
-              </ScrollView>
+              </BottomSheetScrollView>
             </BottomSheetView>
           </BottomSheet>
         )}
@@ -1376,6 +1402,9 @@ const PersonalDashboard: React.FC = () => {
             key={`performance-${sheetVersion}`}
             index={0}
             snapPoints={["60%"]}
+            // gorhom v5 liga dynamic sizing por padrão → o sheet cresce com o
+            // conteúdo e o scroll interno não engata; fixamos no snapPoint.
+            enableDynamicSizing={false}
             enablePanDownToClose
             backdropComponent={renderBackdrop}
             backgroundStyle={{ borderRadius: 32 }}
@@ -1497,6 +1526,9 @@ const PersonalDashboard: React.FC = () => {
             key={`history-${sheetVersion}`}
             index={0}
             snapPoints={["85%"]}
+            // gorhom v5 liga dynamic sizing por padrão → o sheet cresce com o
+            // conteúdo e o scroll interno não engata; fixamos no snapPoint.
+            enableDynamicSizing={false}
             enablePanDownToClose
             backdropComponent={renderBackdrop}
             backgroundStyle={{ borderRadius: 32 }}
@@ -1515,7 +1547,11 @@ const PersonalDashboard: React.FC = () => {
               {fetchingHistory ? (
                 <ActivityIndicator color="#10B981" style={{ marginTop: 40 }} />
               ) : (
-                <ScrollView style={{ marginTop: 20 }}>
+                <BottomSheetScrollView
+                  style={{ flex: 1, marginTop: 20 }}
+                  showsVerticalScrollIndicator={false}
+                  contentContainerStyle={{ paddingBottom: 40 }}
+                >
                   {clientHistory.map((appt) => (
                     <View key={appt.id_agendamento} style={styles.pendingCard}>
                       <View
@@ -1584,7 +1620,7 @@ const PersonalDashboard: React.FC = () => {
                   {clientHistory.length === 0 && (
                     <Text style={styles.emptyTxt}>Nenhum registro encontrado.</Text>
                   )}
-                </ScrollView>
+                </BottomSheetScrollView>
               )}
             </BottomSheetView>
           </BottomSheet>
@@ -1597,6 +1633,9 @@ const PersonalDashboard: React.FC = () => {
             key={`evaluation-${sheetVersion}`}
             index={0}
             snapPoints={["75%"]}
+            // gorhom v5 liga dynamic sizing por padrão → o sheet cresce com o
+            // conteúdo e o scroll interno não engata; fixamos no snapPoint.
+            enableDynamicSizing={false}
             enablePanDownToClose
             backdropComponent={renderBackdrop}
             backgroundStyle={{ borderRadius: 32 }}
@@ -1610,7 +1649,11 @@ const PersonalDashboard: React.FC = () => {
                 </TouchableOpacity>
               </View>
 
-              <ScrollView style={{ marginTop: 10 }}>
+              <BottomSheetScrollView
+                style={{ flex: 1, marginTop: 10 }}
+                showsVerticalScrollIndicator={false}
+                contentContainerStyle={{ paddingBottom: 40 }}
+              >
                 <View style={styles.filterSection}>
                   <Text style={styles.filterSectionTitle}>Intensidade do Treino (1-5)</Text>
                   <View style={{ flexDirection: "row", gap: 10, marginTop: 4 }}>
@@ -1716,7 +1759,7 @@ const PersonalDashboard: React.FC = () => {
                   />
                   <Text style={styles.applyBtnText}>Salvar Avaliação</Text>
                 </TouchableOpacity>
-              </ScrollView>
+              </BottomSheetScrollView>
             </BottomSheetView>
           </BottomSheet>
         )}
@@ -1728,6 +1771,9 @@ const PersonalDashboard: React.FC = () => {
             key={`reviews-${sheetVersion}`}
             index={0}
             snapPoints={["85%"]}
+            // gorhom v5 liga dynamic sizing por padrão → o sheet cresce com o
+            // conteúdo e o scroll interno não engata; fixamos no snapPoint.
+            enableDynamicSizing={false}
             enablePanDownToClose
             backdropComponent={renderBackdrop}
             backgroundStyle={{ borderRadius: 32 }}
@@ -1740,7 +1786,11 @@ const PersonalDashboard: React.FC = () => {
                   <X size={24} color="#64748B" />
                 </TouchableOpacity>
               </View>
-              <ScrollView style={{ marginTop: 20 }}>
+              <BottomSheetScrollView
+                style={{ flex: 1, marginTop: 20 }}
+                showsVerticalScrollIndicator={false}
+                contentContainerStyle={{ paddingBottom: 40 }}
+              >
                 {data?.reviews?.map((item) => {
                   const isPositive = (item.ratingProfessional + item.ratingTraining) / 2 >= 4;
                   return (
@@ -1828,7 +1878,7 @@ const PersonalDashboard: React.FC = () => {
                 {(!data?.reviews || data.reviews.length === 0) && (
                   <Text style={styles.emptyTxt}>Nenhuma avaliação encontrada.</Text>
                 )}
-              </ScrollView>
+              </BottomSheetScrollView>
             </BottomSheetView>
           </BottomSheet>
         )}
@@ -1840,6 +1890,9 @@ const PersonalDashboard: React.FC = () => {
             key={`payments-${sheetVersion}`}
             index={0}
             snapPoints={["85%"]}
+            // gorhom v5 liga dynamic sizing por padrão → o sheet cresce com o
+            // conteúdo e o scroll interno não engata; fixamos no snapPoint.
+            enableDynamicSizing={false}
             enablePanDownToClose
             backdropComponent={renderBackdrop}
             backgroundStyle={{ borderRadius: 32 }}
@@ -1852,7 +1905,11 @@ const PersonalDashboard: React.FC = () => {
                   <X size={24} color="#64748B" />
                 </TouchableOpacity>
               </View>
-              <ScrollView style={{ marginTop: 20 }}>
+              <BottomSheetScrollView
+                style={{ flex: 1, marginTop: 20 }}
+                showsVerticalScrollIndicator={false}
+                contentContainerStyle={{ paddingBottom: 40 }}
+              >
                 {data?.receiptHistory?.map((item) => (
                   <View key={item.id_agendamento} style={styles.pendingCard}>
                     <View style={styles.pendingRow}>
@@ -1890,7 +1947,7 @@ const PersonalDashboard: React.FC = () => {
                 {(!data?.receiptHistory || data.receiptHistory.length === 0) && (
                   <Text style={styles.emptyTxt}>Nenhum comprovante enviado ainda.</Text>
                 )}
-              </ScrollView>
+              </BottomSheetScrollView>
             </BottomSheetView>
           </BottomSheet>
         )}
@@ -1902,6 +1959,9 @@ const PersonalDashboard: React.FC = () => {
             key={`availability-${sheetVersion}`}
             index={0}
             snapPoints={["90%"]}
+            // gorhom v5 liga dynamic sizing por padrão → o sheet cresce com o
+            // conteúdo e o scroll interno não engata; fixamos no snapPoint.
+            enableDynamicSizing={false}
             enablePanDownToClose
             backdropComponent={renderBackdrop}
             backgroundStyle={{ borderRadius: 32 }}
@@ -1923,7 +1983,11 @@ const PersonalDashboard: React.FC = () => {
               {loadingAvailability ? (
                 <ActivityIndicator color="#10B981" style={{ marginTop: 40 }} />
               ) : (
-                <ScrollView style={{ marginTop: 4 }} showsVerticalScrollIndicator={false}>
+                <BottomSheetScrollView
+                  style={{ flex: 1, marginTop: 4 }}
+                  showsVerticalScrollIndicator={false}
+                  contentContainerStyle={{ paddingBottom: 40 }}
+                >
                   {availabilityWeek.map((day, dayIdx) => (
                     <View key={day.dia_semana} style={styles.availDayCard}>
                       <View style={styles.availDayHeader}>
@@ -2026,8 +2090,7 @@ const PersonalDashboard: React.FC = () => {
                       <Text style={styles.applyBtnText}>Salvar disponibilidade</Text>
                     )}
                   </TouchableOpacity>
-                  <View style={{ height: 40 }} />
-                </ScrollView>
+                </BottomSheetScrollView>
               )}
             </BottomSheetView>
           </BottomSheet>
