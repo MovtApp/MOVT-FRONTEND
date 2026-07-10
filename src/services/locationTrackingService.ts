@@ -20,6 +20,7 @@
  * (caso o SO mate e religue o app para entregar uma localização headless).
  */
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { AppState, type AppStateStatus } from "react-native";
 import * as Sentry from "@sentry/react-native";
 import * as Location from "expo-location";
 import * as TaskManager from "expo-task-manager";
@@ -51,6 +52,34 @@ let fixCount = 0;
 let lastBatchTs = 0;
 // Breadcrumb de lote no máximo a cada 30 s para não inundar o Sentry.
 const BATCH_BREADCRUMB_MS = 30000;
+
+// ─── Watchdog de silêncio do GPS (camada 5: recuperação, estilo Strava) ──────────
+// PROBLEMA: em ROMs agressivas (MIUI/Xiaomi, Huawei, Oppo…), o SO mata/congela o
+// foreground service da localização com a tela apagada. Ao voltar, a `task` do
+// expo-location foi DESMONTADA e não volta a receber fixes sozinha — o percurso
+// "para no meio e não volta mais" (exatamente o sintoma reportado). O watchdog
+// mede o tempo desde o último fix REALMENTE processado (relógio de parede) e,
+// se ficar mudo por tempo demais enquanto deveria estar rastreando, RE-ARMA as
+// location updates (stop → start), religando o pipeline. É o que mantém o Strava
+// gravando depois que o SO derruba o serviço.
+let lastFixWallTs = 0; // Date.now() do último fix processado (não o do device)
+let watchdogTimer: ReturnType<typeof setInterval> | null = null;
+let rearmInProgress = false;
+// Cadência de verificação do watchdog.
+const WATCHDOG_INTERVAL_MS = 10000;
+// Silêncio (ms) tolerado antes de re-armar. Fixes saudáveis chegam a cada ~0,5–2 s;
+// 25 s cobre um túnel/cânion urbano sem re-armar à toa, mas religa rápido quando o
+// SO derrubou o serviço. NÃO afeta o tempo do treino (relógio de parede).
+const WATCHDOG_SILENCE_MS = 25000;
+// Evita re-armar em rajada: intervalo mínimo entre dois re-armes.
+const REARM_MIN_INTERVAL_MS = 20000;
+let lastRearmTs = 0;
+
+// AppState atual (foreground/background). O watchdog só re-arma quando o app está
+// ATIVO — em background o SO pode legitimamente estar entregando em lote e um
+// stop/start cego poderia atrapalhar; o re-arme forte acontece no retorno ao
+// foreground (onde o usuário desbloqueia e a UI reaparece).
+let appActive = AppState.currentState === "active";
 
 // ─── Parâmetros de rastreamento (qualidade Strava/Uber) ─────────────────────────
 // Acurácia máxima aceita (m) para um fix ENTRAR na rota. 15 m descartava metade dos
@@ -112,6 +141,18 @@ export interface TrackingSnapshot {
   maxSpeedMs: number;
   /** Ganho de elevação acumulado na sessão (metros de subida). */
   elevationGainM: number;
+  /** Última FC lida do relógio (bpm). 0 = sem leitura/sem relógio. */
+  currentHr: number;
+  /** FC média da sessão (bpm), arredondada. 0 = sem dados. */
+  avgHr: number;
+  /** FC máxima registrada na sessão (bpm). 0 = sem dados. */
+  maxHr: number;
+  /**
+   * Métrica de adoção: o relógio entregou ao menos uma FC válida durante o
+   * treino? É o sinal que valida (ou descarta) investimento maior em wearable
+   * — quantos treinos de fato têm um relógio alimentando dados.
+   */
+  watchPresent: boolean;
   isPaused: boolean;
   lastLocation: LatLng | null;
 }
@@ -137,6 +178,16 @@ interface Session {
   currentSpeedMs: number;
   maxSpeedMs: number; // pico de velocidade instantânea (m/s)
   elevationGainM: number; // ganho de elevação acumulado (m)
+  // ── Frequência cardíaca do relógio (Health Connect / HealthKit) ──────────────
+  // Série temporal + agregados. Coletado por um poller de leitura (nunca pede
+  // permissão — só lê o que o app já tem autorizado, p/ não disparar o crash
+  // conhecido do Health Connect). Serializável → sobrevive à persistência.
+  hrSeries: { t: number; bpm: number }[]; // amostras (timestamp ms + bpm)
+  hrSum: number; // soma p/ média incremental
+  hrCount: number; // nº de amostras válidas
+  currentHr: number; // última FC lida (bpm)
+  maxHr: number; // pico de FC (bpm)
+  watchPresent: boolean; // recebeu ao menos uma FC do relógio nesta sessão
   lastAltitude: number | null; // referência de altitude p/ acumular subida (histerese)
   lastPoint: LatLng | null; // último fix aceito (âncora por-fix, p/ velocidade)
   lastRegPoint: LatLng | null; // último ponto REGISTRADO na rota (âncora de distância)
@@ -153,6 +204,71 @@ let hydrated = false;
 let lastPersistTs = 0;
 // Garante UM snap em voo por vez (a task de localização dispara em cada lote).
 let snapInProgress = false;
+
+// ─── Poller de frequência cardíaca (relógio via Health Connect / HealthKit) ──────
+// Cadência de leitura da FC. 8 s é folgado: durante um treino o relógio grava FC
+// no agregador com regularidade; ler mais rápido só gastaria bateria/IO sem ganho.
+const HR_POLL_MS = 8000;
+// FC plausível (bpm). Fora disso é ruído/erro de leitura e não entra na série.
+const HR_MIN_BPM = 30;
+const HR_MAX_BPM = 240;
+let hrTimer: ReturnType<typeof setInterval> | null = null;
+let hrFetchInFlight = false;
+
+// Registra uma leitura de FC na sessão ativa (agregados incrementais + série).
+function recordHeartRate(bpm: number) {
+  if (!session?.active) return;
+  if (!isFinite(bpm) || bpm < HR_MIN_BPM || bpm > HR_MAX_BPM) return;
+  session.currentHr = Math.round(bpm);
+  session.maxHr = Math.max(session.maxHr, session.currentHr);
+  session.hrSum += session.currentHr;
+  session.hrCount += 1;
+  session.watchPresent = true;
+  // Série amostrada (bounded por duração real de treino; ~450 pts/h a 8 s).
+  session.hrSeries.push({ t: Date.now(), bpm: session.currentHr });
+}
+
+// Uma leitura de FC (best-effort). SÓ LÊ — nunca chama authorize()/requestPermission,
+// para não disparar o crash conhecido do Health Connect (lateinit). Se a permissão
+// não estiver concedida, `fetchHeartRate` devolve 0 e a métrica watchPresent fica
+// false — que é exatamente o sinal correto ("sem relógio alimentando este treino").
+async function pollHeartRateOnce() {
+  if (hrFetchInFlight || !session?.active) return;
+  // Só lê a FC com o app em FOREGROUND. Além de poupar bateria, isto evita tocar
+  // no módulo do Health Connect logo no retorno do background — momento em que o
+  // crash conhecido do HC (lateinit) é mais provável. Em background a FC é
+  // enriquecimento dispensável; o GPS/tempo seguem pela via resiliente.
+  if (!appActive) return;
+  hrFetchInFlight = true;
+  try {
+    // Lazy-require evita puxar o módulo nativo de saúde para o caminho de registro
+    // da task headless de localização (mesmo padrão das telas de dados).
+    const { NativeHealthManager } = require("./nativeHealthManager");
+    const bpm = await NativeHealthManager.fetchHeartRate();
+    recordHeartRate(bpm);
+  } catch {
+    // best-effort: uma leitura falha não afeta o treino
+  } finally {
+    hrFetchInFlight = false;
+  }
+}
+
+function startHrPolling() {
+  if (hrTimer) return; // idempotente
+  // Leitura imediata + a cada HR_POLL_MS. Enquanto o app está em foreground o
+  // timer roda normal; em background profundo o SO pode pausá-lo — aceitável,
+  // pois FC do relógio é enriquecimento best-effort (o GPS/tempo seguem por
+  // outra via resiliente). Não bloqueia nada do rastreio.
+  pollHeartRateOnce();
+  hrTimer = setInterval(pollHeartRateOnce, HR_POLL_MS);
+}
+
+function stopHrPolling() {
+  if (hrTimer) {
+    clearInterval(hrTimer);
+    hrTimer = null;
+  }
+}
 
 // ─── Tempo decorrido (relógio de parede menos pausas) ───────────────────────────
 function currentElapsedMs(): number {
@@ -194,6 +310,11 @@ function resumeAll() {
 //       → ponto filtrado → [gate de distância proporcional à acurácia] → rota.
 function processFix(loc: Location.LocationObject) {
   if (!session || !session.active) return;
+
+  // Sinal de vida do pipeline (relógio de parede): o watchdog usa isto para saber
+  // que a task AINDA está entregando fixes. Atualiza em TODO fix bruto — mesmo o
+  // impreciso — porque o que importa aqui é "o GPS está chegando", não a qualidade.
+  lastFixWallTs = Date.now();
 
   const { latitude, longitude, speed, accuracy } = loc.coords;
   const ts = loc.timestamp || Date.now(); // domínio do device (p/ deltaSeconds)
@@ -421,6 +542,12 @@ async function ensureHydrated() {
         if (typeof parsed.lastSnapAtLen !== "number") parsed.lastSnapAtLen = 0;
         if (typeof parsed.maxSpeedMs !== "number") parsed.maxSpeedMs = 0;
         if (typeof parsed.elevationGainM !== "number") parsed.elevationGainM = 0;
+        if (!Array.isArray(parsed.hrSeries)) parsed.hrSeries = [];
+        if (typeof parsed.hrSum !== "number") parsed.hrSum = 0;
+        if (typeof parsed.hrCount !== "number") parsed.hrCount = 0;
+        if (typeof parsed.currentHr !== "number") parsed.currentHr = 0;
+        if (typeof parsed.maxHr !== "number") parsed.maxHr = 0;
+        if (typeof parsed.watchPresent !== "boolean") parsed.watchPresent = false;
         if (typeof parsed.lastAltitude !== "number") parsed.lastAltitude = null;
         session = parsed;
       }
@@ -446,6 +573,10 @@ function emptySnapshot(): TrackingSnapshot {
     currentSpeedMs: 0,
     maxSpeedMs: 0,
     elevationGainM: 0,
+    currentHr: 0,
+    avgHr: 0,
+    maxHr: 0,
+    watchPresent: false,
     isPaused: false,
     lastLocation: null,
   };
@@ -464,6 +595,10 @@ export function getSnapshot(): TrackingSnapshot {
     currentSpeedMs: session.currentSpeedMs,
     maxSpeedMs: session.maxSpeedMs,
     elevationGainM: session.elevationGainM,
+    currentHr: session.currentHr,
+    avgHr: session.hrCount > 0 ? Math.round(session.hrSum / session.hrCount) : 0,
+    maxHr: session.maxHr,
+    watchPresent: session.watchPresent,
     isPaused: session.isPaused,
     lastLocation: session.lastLocation,
   };
@@ -543,6 +678,87 @@ function buildOptions(type: WorkoutKind): Location.LocationTaskOptions {
   };
 }
 
+// ─── Re-arme das location updates (recuperação de serviço morto) ─────────────────
+// Para e reinicia o pipeline de localização. Usado pelo watchdog e no retorno ao
+// foreground quando o SO derrubou o foreground service com a tela apagada. É
+// idempotente e protegido contra reentrância.
+async function rearmLocationUpdates(reason: string) {
+  if (rearmInProgress || !session?.active) return;
+  const now = Date.now();
+  if (now - lastRearmTs < REARM_MIN_INTERVAL_MS) return;
+  rearmInProgress = true;
+  lastRearmTs = now;
+  try {
+    Sentry.addBreadcrumb({
+      category: "workout",
+      level: "warning",
+      message: "tracking:rearm",
+      data: { reason, silenceMs: lastFixWallTs ? now - lastFixWallTs : -1, fixCount },
+    });
+    // O WakeLock pode ter sido solto quando o processo/serviço morreu — rearma.
+    acquireWorkoutWakeLock();
+    const started = await Location.hasStartedLocationUpdatesAsync(LOCATION_TASK).catch(() => false);
+    if (started) {
+      await Location.stopLocationUpdatesAsync(LOCATION_TASK).catch(() => {});
+    }
+    if (session?.active) {
+      await Location.startLocationUpdatesAsync(LOCATION_TASK, buildOptions(session.type));
+      // Zera a janela de silêncio para o watchdog dar um respiro ao GPS re-adquirir.
+      lastFixWallTs = Date.now();
+    }
+  } catch (e) {
+    // best-effort: se falhar, o próximo tick do watchdog tenta de novo
+  } finally {
+    rearmInProgress = false;
+  }
+}
+
+// ─── Watchdog: detecta GPS mudo e religa o pipeline ──────────────────────────────
+function startWatchdog() {
+  if (watchdogTimer) return; // idempotente
+  lastFixWallTs = Date.now();
+  watchdogTimer = setInterval(() => {
+    if (!session?.active || session.isPaused) return;
+    // Só age em foreground (ver nota em `appActive`). Em background, o SO pode
+    // estar entregando em lote; o re-arme forte acontece ao voltar ao foreground.
+    if (!appActive) return;
+    const silence = lastFixWallTs ? Date.now() - lastFixWallTs : 0;
+    if (silence > WATCHDOG_SILENCE_MS) {
+      rearmLocationUpdates("watchdog-silence");
+    }
+  }, WATCHDOG_INTERVAL_MS);
+}
+
+function stopWatchdog() {
+  if (watchdogTimer) {
+    clearInterval(watchdogTimer);
+    watchdogTimer = null;
+  }
+}
+
+// ─── Reação ao ciclo de vida do app (foreground/background) ──────────────────────
+// No retorno ao FOREGROUND (usuário desbloqueia a tela): garante que a sessão
+// esteja rehidratada e o pipeline vivo. É o momento em que o "parou no meio e não
+// voltou" é corrigido — se ficou mudo enquanto apagado, re-arma imediatamente.
+function handleAppStateChange(next: AppStateStatus) {
+  const wasActive = appActive;
+  appActive = next === "active";
+  if (appActive && !wasActive && session?.active) {
+    // Se ficou mudo além do limite enquanto em background, religa já (sem esperar
+    // o próximo tick do watchdog). Caso contrário, apenas segue.
+    const silence = lastFixWallTs ? Date.now() - lastFixWallTs : 0;
+    if (silence > WATCHDOG_SILENCE_MS) {
+      rearmLocationUpdates("foreground-return");
+    } else {
+      // Confirma que as updates ainda estão armadas (idempotente).
+      resumeIfActive();
+    }
+    // Retoma a leitura de FC (foi ignorada em background).
+    startHrPolling();
+  }
+}
+AppState.addEventListener("change", handleAppStateChange);
+
 // ─── API pública ────────────────────────────────────────────────────────────────
 
 export interface StartResult {
@@ -609,6 +825,12 @@ export async function startTracking(type: WorkoutKind): Promise<StartResult> {
     currentSpeedMs: 0,
     maxSpeedMs: 0,
     elevationGainM: 0,
+    hrSeries: [],
+    hrSum: 0,
+    hrCount: 0,
+    currentHr: 0,
+    maxHr: 0,
+    watchPresent: false,
     lastAltitude: null,
     lastPoint: null,
     lastRegPoint: null,
@@ -620,6 +842,9 @@ export async function startTracking(type: WorkoutKind): Promise<StartResult> {
   hydrated = true; // sessão fresca; não rehidratar por cima
   await persist(true);
 
+  // Começa a ler a FC do relógio (best-effort, só leitura — ver startHrPolling).
+  startHrPolling();
+
   // Evita task duplicada de uma sessão anterior mal encerrada.
   const already = await Location.hasStartedLocationUpdatesAsync(LOCATION_TASK).catch(() => false);
   if (already) {
@@ -627,6 +852,8 @@ export async function startTracking(type: WorkoutKind): Promise<StartResult> {
   }
 
   await Location.startLocationUpdatesAsync(LOCATION_TASK, buildOptions(type));
+  // Watchdog: religa o pipeline se o SO derrubar o serviço no meio do treino.
+  startWatchdog();
   notify();
   return { ok: true, backgroundGranted };
 }
@@ -655,6 +882,11 @@ export function tick() {
 
 /** Encerra a sessão e retorna o snapshot final (para salvar o treino). */
 export async function stopTracking(): Promise<TrackingSnapshot> {
+  // Uma leitura final de FC (best-effort) antes de fechar, para o resumo refletir
+  // o batimento mais recente; depois desliga o poller.
+  await pollHeartRateOnce();
+  stopHrPolling();
+  stopWatchdog();
   const finalSnap = getSnapshot();
 
   // Passe final de alta qualidade: snap da rota inteira (best-effort). Se a rede
@@ -711,6 +943,8 @@ export async function resumeIfActive() {
     // Processo religado pelo SO durante um treino: rearma o WakeLock (foi solto
     // quando o processo morreu) para a CPU não suspender de novo.
     acquireWorkoutWakeLock();
+    // Rearma também o poller de FC (o timer não sobrevive ao restart do JS).
+    startHrPolling();
     const started = await Location.hasStartedLocationUpdatesAsync(LOCATION_TASK).catch(() => false);
     if (!started) {
       try {
@@ -719,6 +953,8 @@ export async function resumeIfActive() {
         // ignora
       }
     }
+    // Rearma o watchdog (o timer não sobrevive ao restart do JS).
+    startWatchdog();
     notify();
   }
 }

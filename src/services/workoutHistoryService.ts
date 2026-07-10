@@ -32,6 +32,12 @@ export interface WorkoutSplit {
   pace: string; // formatado (min/km)
 }
 
+/** Amostra de frequência cardíaca do relógio (timestamp ms + bpm). */
+export interface HeartRateSample {
+  t: number;
+  bpm: number;
+}
+
 export interface WorkoutRecord {
   id: string; // id local (client_id) — também usado como chave de idempotência
   type: WorkoutType;
@@ -46,6 +52,12 @@ export interface WorkoutRecord {
   // (offline no save / confiança baixa) → a UI cai na `route` crua.
   routeSnapped?: RoutePoint[];
   splits: WorkoutSplit[];
+  // ── Frequência cardíaca do relógio (Fase 1 wearable) ─────────────────────────
+  // Opcionais: só presentes quando um relógio alimentou FC durante o treino.
+  avgHr?: number; // bpm médio
+  maxHr?: number; // bpm máximo
+  hrSeries?: HeartRateSample[]; // série temporal amostrada
+  watchPresent?: boolean; // métrica: houve relógio entregando FC neste treino
   serverId?: number | null; // id no banco (user_workouts.id); null enquanto não sincronizado
   synced?: boolean; // true quando já confirmado no backend
 }
@@ -113,6 +125,12 @@ function mapRowToRecord(row: any): WorkoutRecord {
     route: Array.isArray(row.rota) ? row.rota : [],
     routeSnapped: Array.isArray(row.rota_snapped) ? row.rota_snapped : [],
     splits: Array.isArray(row.splits) ? row.splits : [],
+    // FC do relógio (só round-trips quando o backend já tiver as colunas; até lá
+    // vêm undefined e a UI simplesmente não mostra o bloco de FC).
+    avgHr: row.hr_medio != null ? Number(row.hr_medio) : undefined,
+    maxHr: row.hr_max != null ? Number(row.hr_max) : undefined,
+    hrSeries: Array.isArray(row.hr_serie) ? row.hr_serie : undefined,
+    watchPresent: typeof row.watch_present === "boolean" ? row.watch_present : undefined,
   };
 }
 
@@ -132,6 +150,12 @@ async function saveWorkoutBackend(record: WorkoutRecord): Promise<number | null>
     rota: record.route,
     rotaSnapped: record.routeSnapped || [],
     splits: record.splits,
+    // FC do relógio (Fase 1). O backend ignora chaves desconhecidas até ganhar as
+    // colunas hr_medio/hr_max/hr_serie/watch_present + migration em user_workouts.
+    hrMedio: record.avgHr ?? null,
+    hrMax: record.maxHr ?? null,
+    hrSerie: record.hrSeries ?? [],
+    watchPresent: record.watchPresent ?? false,
   });
   const w = res.data?.workout;
   return w && (typeof w.id === "number" || w.id) ? Number(w.id) : null;
@@ -162,8 +186,14 @@ export async function saveWorkout(input: {
   route: RoutePoint[];
   routeSnapped?: RoutePoint[];
   splits: WorkoutSplit[];
+  avgHr?: number;
+  maxHr?: number;
+  hrSeries?: HeartRateSample[];
+  watchPresent?: boolean;
 }): Promise<WorkoutRecord> {
   const { type, durationSec, distanceKm, kcal, route, routeSnapped, splits } = input;
+  const avgHr = input.avgHr && input.avgHr > 0 ? Math.round(input.avgHr) : undefined;
+  const maxHr = input.maxHr && input.maxHr > 0 ? Math.round(input.maxHr) : undefined;
 
   const secPerKm = paceSecPerKm(distanceKm, durationSec);
   const avgPace = secPerKm ? speedToPace(1000 / secPerKm) : "--:--";
@@ -182,6 +212,10 @@ export async function saveWorkout(input: {
     route: Array.isArray(route) ? route : [],
     routeSnapped: Array.isArray(routeSnapped) ? routeSnapped : [],
     splits: Array.isArray(splits) ? splits : [],
+    avgHr,
+    maxHr,
+    hrSeries: Array.isArray(input.hrSeries) ? input.hrSeries : undefined,
+    watchPresent: input.watchPresent ?? false,
     serverId: null,
     synced: false,
   };
