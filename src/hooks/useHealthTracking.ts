@@ -75,7 +75,9 @@ export async function preloadTodayHealth(): Promise<void> {
 
 export const useHealthTracking = (targetDate?: Date) => {
   const { user } = useAuth();
-  const userId = user?.id ? Number(user.id) : null;
+  // user.id é um UUID (string). O `Number(user.id)` anterior virava NaN — e como
+  // NaN é falsy, o polling do Wear OS nunca rodava e o backend recebia NaN.
+  const userId = user?.id ?? null;
 
   const isToday = !targetDate || targetDate.toDateString() === new Date().toDateString();
   const dateKey = targetDate ? targetDate.toDateString() : new Date().toDateString();

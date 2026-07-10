@@ -18,7 +18,7 @@ const auth_login = async (unidade: string, login: string, senha: string) => {
       status: 200,
       statusText: "OK",
     };
-    await new Promise((resolve) => setTimeout(resolve, timeout));
+    await new Promise<void>((resolve) => setTimeout(() => resolve(), timeout));
 
     return response as unknown as AxiosResponse<LoginResponse>;
   }

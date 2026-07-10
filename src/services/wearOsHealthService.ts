@@ -31,7 +31,7 @@ export interface WearOsDeviceData {
  * @returns Promise com os dados de saúde mais recentes
  */
 export const getLatestWearOsHealthData = async (
-  userId: number
+  userId: string
 ): Promise<{
   heartRate: number | null;
   pressure: number | null;
@@ -109,7 +109,7 @@ export const getLatestWearOsHealthData = async (
  * @returns Função para cancelar a inscrição
  */
 export const subscribeToWearOsHealthRealtime = (
-  userId: number,
+  userId: string,
   callback: (data: {
     heartRate: number | null;
     pressure: number | null;
@@ -171,7 +171,7 @@ export const subscribeToWearOsHealthRealtime = (
  * @returns Função para cancelar o polling
  */
 export const pollWearOsHealthData = (
-  userId: number,
+  userId: string,
   interval: number = 5000,
   callback: (data: {
     heartRate: number | null;
@@ -214,7 +214,7 @@ export const pollWearOsHealthData = (
  * @returns Promise com informações do dispositivo ou null se não encontrado
  */
 export const checkWearOsDeviceRegistered = async (
-  userId: number
+  userId: string
 ): Promise<WearOsDeviceData | null> => {
   try {
     const { data: devices, error } = await supabase
@@ -243,7 +243,7 @@ export const checkWearOsDeviceRegistered = async (
  * @param userId ID do usuário
  * @returns Promise com array de dispositivos Wear OS
  */
-export const getAllWearOsDevices = async (userId: number): Promise<WearOsDeviceData[]> => {
+export const getAllWearOsDevices = async (userId: string): Promise<WearOsDeviceData[]> => {
   try {
     const { data: devices, error } = await supabase
       .from("dispositivos")
@@ -270,7 +270,7 @@ export const getAllWearOsDevices = async (userId: number): Promise<WearOsDeviceD
  * @returns Promise com os dados de saúde combinados
  */
 export const getLatestWearOsHealthDataFromAllDevices = async (
-  userId: number
+  userId: string
 ): Promise<{
   heartRate: number | null;
   pressure: number | null;
@@ -394,7 +394,7 @@ export const getLatestWearOsHealthDataFromAllDevices = async (
  * @returns Função para parar de monitorar
  */
 export const monitorWearOsDeviceConnection = (
-  userId: number,
+  userId: string,
   onDeviceConnected: (device: WearOsDeviceData) => void,
   onDeviceDisconnected: () => void
 ): (() => void) => {

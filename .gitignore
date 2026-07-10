@@ -175,3 +175,7 @@ settings*.yml
 !.env.example
 # Saida transpilada do teste de historico (descartavel)
 scripts/.tmp-wh/
+
+# Artefatos de desenvolvimento soltos (screenshots/refs) — não são assets do app
+/frames/
+**/WhatsApp Image*

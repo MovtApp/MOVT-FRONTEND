@@ -37,10 +37,12 @@ const WaterWave: React.FC<WaterWaveProps> = React.memo(function WaterWave({
 
   useEffect(() => {
     let rafId: number;
-    let last = performance.now();
+    // `now` vem do requestAnimationFrame (mesmo domínio de tempo); iniciamos
+    // `last` nulo para o primeiro frame não gerar um dt gigante.
+    let last: number | null = null;
     const speed = 1.4; // rad/s
     const loop = (now: number) => {
-      const dt = Math.min(32, now - last) / 1000;
+      const dt = last === null ? 0 : Math.min(32, now - last) / 1000;
       last = now;
       setPhase((prev) => (prev + speed * dt) % (Math.PI * 2));
       rafId = requestAnimationFrame(loop);

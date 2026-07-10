@@ -184,7 +184,7 @@ interface PersonalClient {
   total_appointments: number;
 }
 
-interface DashboardData {
+export interface DashboardData {
   trainer: { nome: string; avatar_url: string | null; plan: string };
   kpis: {
     totalMonth: number;
@@ -239,6 +239,25 @@ interface DashboardData {
     totalWorkouts: number;
     totalCommunities: number;
     totalStripePlans: number;
+  };
+  // Campos produzidos pelo sanitizeDashboardData (BI); opcionais para não
+  // quebrar construções parciais de DashboardData.
+  globalStats?: {
+    appointments: number;
+    posts: number;
+    communities: number;
+    workouts: number;
+    admins: number;
+  };
+  financeKpis?: any[];
+  strategic?: {
+    mrr: number;
+    arr: number;
+    growthRate: string;
+    projectedRevenue: any[];
+    topUnits: any[];
+    engagementScore: number;
+    activeUsersTrend: any[];
   };
 }
 

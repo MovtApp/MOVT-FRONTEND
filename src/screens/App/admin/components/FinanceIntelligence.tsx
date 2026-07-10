@@ -27,9 +27,12 @@ const FinanceIntelligence: React.FC<FinanceIntelligenceProps> = ({
   isActive,
   formatCurrency,
 }) => {
-  const chartData = (
+  // Tipagem explícita: o CartesianChart infere xKey/yKeys a partir da forma dos
+  // itens; sem isso o spread `...item` (any) apagava os tipos e o gráfico não
+  // reconhecia as chaves "label"/"total".
+  const chartData: { label: string; total: number }[] = (
     (data?.chartData?.length ?? 0) > 0 ? data!.chartData : [{ label: "N/A", total: 0 }]
-  ).map((item: any) => ({ ...item, label: String(item.label || "") }));
+  ).map((item: any) => ({ label: String(item.label || ""), total: Number(item.total) || 0 }));
 
   return (
     <View style={styles.container}>
@@ -66,7 +69,7 @@ const FinanceIntelligence: React.FC<FinanceIntelligenceProps> = ({
                   points={points.total}
                   y0={chartBounds.bottom}
                   animate={{ type: "timing", duration: 500 }}
-                  curve="monotoneX"
+                  curveType="monotoneX"
                 >
                   <SkiaGradient
                     start={vec(chartBounds.left, chartBounds.top)}
@@ -79,7 +82,7 @@ const FinanceIntelligence: React.FC<FinanceIntelligenceProps> = ({
                   color="#BBF246"
                   strokeWidth={3}
                   animate={{ type: "timing", duration: 500 }}
-                  curve="monotoneX"
+                  curveType="monotoneX"
                 />
                 {isActive && (
                   <Circle
