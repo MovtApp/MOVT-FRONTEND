@@ -42,10 +42,24 @@ import { navigationRef, navigateToActiveWorkout } from "@services/navigationRef"
 // ligar a fila, para o flush de boot já encontrar todos os despachantes.
 import "@services/registerSyncHandlers";
 import { initSyncQueue } from "@services/syncQueue";
+import * as SplashScreen from "expo-splash-screen";
 
 // Congela telas fora de foco: elas param de renderizar enquanto não estão
 // visíveis, reduzindo o trabalho concorrente na JS thread durante as transições.
 enableFreeze(true);
+
+// Mantém a splash NATIVA no ar até a árvore de navegação montar (o hide fica no
+// onReady do NavigationContainer, em routes/index.tsx). Quando o SO recria o
+// processo ao voltar do bloqueio, o usuário passa da splash direto para a tela
+// onde parou — sem flash branco nem o spinner intermediário. O cold start
+// inevitável passa a PARECER um resume.
+SplashScreen.preventAutoHideAsync().catch(() => {});
+
+// Rede de segurança: se a navegação nunca montar (auth travada, erro de fonte),
+// não deixa a splash presa para sempre — esconde após um teto de tempo.
+setTimeout(() => {
+  SplashScreen.hideAsync().catch(() => {});
+}, 8000);
 
 Sentry.init({
   dsn: "https://63a1a4145497ba9b5cf511732a408323@o4511396537106432.ingest.us.sentry.io/4511396541825024",

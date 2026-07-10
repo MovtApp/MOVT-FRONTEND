@@ -88,6 +88,7 @@
       "./plugins/withNdkVersion.js",
       "./plugins/withHealthConnectManifest.js",
       "./plugins/withInstagramStories.js",
+      "./plugins/withConfigChanges.js",
       "react-native-health-connect",
       "react-native-health",
       [
