@@ -1834,18 +1834,23 @@ const CyclingScreen: React.FC = () => {
           {/* Topo: minimizar (treino segue) + modalidade + badge Pausado */}
           <SafeAreaView edges={["top"]} style={styles.immTopSafe} pointerEvents="box-none">
             <View style={styles.immTopRow}>
-              <BackButton to={{ name: "DataScreen" }} />
+              {/* Zonas laterais de largura igual (flex:1) mantêm a pílula de
+                  modalidade travada no centro exato da tela, independente da
+                  largura do botão voltar (esq) e da badge Pausado (dir). */}
+              <View style={styles.immTopSide}>
+                <BackButton to={{ name: "DataScreen" }} />
+              </View>
               <View style={styles.immModalityPill}>
                 <Text style={styles.immModalityText}>{activeTab.toUpperCase()}</Text>
               </View>
-              {isPaused ? (
-                <Animated.View style={[styles.immPausedBadge, { opacity: pausePulse }]}>
-                  <Pause size={12} color="#fff" fill="#fff" />
-                  <Text style={styles.immPausedText}>PAUSADO</Text>
-                </Animated.View>
-              ) : (
-                <View style={{ width: 92 }} />
-              )}
+              <View style={[styles.immTopSide, { justifyContent: "flex-end" }]}>
+                {isPaused ? (
+                  <Animated.View style={[styles.immPausedBadge, { opacity: pausePulse }]}>
+                    <Pause size={12} color="#fff" fill="#fff" />
+                    <Text style={styles.immPausedText}>PAUSADO</Text>
+                  </Animated.View>
+                ) : null}
+              </View>
             </View>
           </SafeAreaView>
 
@@ -2214,6 +2219,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingTop: 6,
     gap: 8,
+  },
+  // Zona lateral flexível: as duas (esq/dir) crescem igual, centralizando o
+  // filho do meio (pílula de modalidade).
+  immTopSide: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
   },
   immModalityPill: {
     backgroundColor: "rgba(25,33,38,0.85)",
