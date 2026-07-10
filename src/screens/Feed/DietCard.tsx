@@ -369,4 +369,6 @@ const stylesLocal = StyleSheet.create({
   },
 });
 
-export default DietCard;
+// Memoizado: mesmo racional do PostCard — handlers estáveis + `diet` de
+// identidade estável no feed, evitando re-render a cada render da FlatList.
+export default React.memo(DietCard);
