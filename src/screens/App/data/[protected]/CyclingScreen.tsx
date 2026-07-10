@@ -1834,23 +1834,24 @@ const CyclingScreen: React.FC = () => {
           {/* Topo: minimizar (treino segue) + modalidade + badge Pausado */}
           <SafeAreaView edges={["top"]} style={styles.immTopSafe} pointerEvents="box-none">
             <View style={styles.immTopRow}>
-              {/* Zonas laterais de largura igual (flex:1) mantêm a pílula de
-                  modalidade travada no centro exato da tela, independente da
-                  largura do botão voltar (esq) e da badge Pausado (dir). */}
-              <View style={styles.immTopSide}>
-                <BackButton to={{ name: "DataScreen" }} />
+              {/* Back button (esq) e badge Pausado (dir) ficam no fluxo, nas
+                  bordas. A pílula de modalidade é uma camada ABSOLUTA centrada
+                  sobre a linha inteira: fica no centro EXATO da tela, sem
+                  depender da largura do que houver nas laterais. */}
+              <BackButton to={{ name: "DataScreen" }} />
+              <View style={styles.immModalityCenter} pointerEvents="none">
+                <View style={styles.immModalityPill}>
+                  <Text style={styles.immModalityText}>{activeTab.toUpperCase()}</Text>
+                </View>
               </View>
-              <View style={styles.immModalityPill}>
-                <Text style={styles.immModalityText}>{activeTab.toUpperCase()}</Text>
-              </View>
-              <View style={[styles.immTopSide, { justifyContent: "flex-end" }]}>
-                {isPaused ? (
-                  <Animated.View style={[styles.immPausedBadge, { opacity: pausePulse }]}>
-                    <Pause size={12} color="#fff" fill="#fff" />
-                    <Text style={styles.immPausedText}>PAUSADO</Text>
-                  </Animated.View>
-                ) : null}
-              </View>
+              {isPaused ? (
+                <Animated.View style={[styles.immPausedBadge, { opacity: pausePulse }]}>
+                  <Pause size={12} color="#fff" fill="#fff" />
+                  <Text style={styles.immPausedText}>PAUSADO</Text>
+                </Animated.View>
+              ) : (
+                <View style={styles.immTopRightSpacer} />
+              )}
             </View>
           </SafeAreaView>
 
@@ -2220,12 +2221,21 @@ const styles = StyleSheet.create({
     paddingTop: 6,
     gap: 8,
   },
-  // Zona lateral flexível: as duas (esq/dir) crescem igual, centralizando o
-  // filho do meio (pílula de modalidade).
-  immTopSide: {
-    flex: 1,
-    flexDirection: "row",
+  // Camada absoluta que cobre a linha inteira e centraliza a pílula no meio da
+  // tela, independente da largura do back button (esq) e da badge Pausado (dir).
+  immModalityCenter: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    top: 0,
+    bottom: 0,
     alignItems: "center",
+    justifyContent: "center",
+  },
+  // Ocupa o mesmo "lugar" da badge Pausado quando ela não aparece, mantendo o
+  // back button colado na borda esquerda (a pílula central é absoluta).
+  immTopRightSpacer: {
+    minWidth: 40,
   },
   immModalityPill: {
     backgroundColor: "rgba(25,33,38,0.85)",
