@@ -38,6 +38,80 @@ export const getAvailability = async (trainerId: string, date?: string, sessionT
   }
 };
 
+export interface AvailabilitySlotRange {
+  hora_inicio: string; // "HH:MM"
+  hora_fim: string; // "HH:MM"
+}
+
+export interface AvailabilityDay {
+  dia_semana: number; // 0=Dom ... 6=Sáb
+  ativo: boolean;
+  faixas: AvailabilitySlotRange[];
+  duracao_min?: number; // duração de cada sessão em minutos (ex: 30/45/60); o backend fatia as faixas em slots dessa duração
+}
+
+/**
+ * Buscar a disponibilidade semanal do personal logado (gerenciamento)
+ * @param sessionToken - Token de autenticação
+ */
+export const getMyAvailability = async (sessionToken: string): Promise<AvailabilityDay[]> => {
+  try {
+    if (!sessionToken) {
+      throw new Error("Token de autenticação é obrigatório");
+    }
+
+    const response = await fetch(`${API_BASE_URL}/personal/availability`, {
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${sessionToken}`,
+      },
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error || `Erro ao buscar disponibilidade: ${response.status}`);
+    }
+
+    const data = await response.json();
+    return data.week || [];
+  } catch (error) {
+    console.error("[getMyAvailability] Erro:", error);
+    throw error;
+  }
+};
+
+/**
+ * Substituir a disponibilidade semanal do personal logado
+ * @param week - Estrutura dos 7 dias com faixas de horário
+ * @param sessionToken - Token de autenticação
+ */
+export const updateMyAvailability = async (week: AvailabilityDay[], sessionToken: string) => {
+  try {
+    if (!sessionToken) {
+      throw new Error("Token de autenticação é obrigatório");
+    }
+
+    const response = await fetch(`${API_BASE_URL}/personal/availability`, {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${sessionToken}`,
+      },
+      body: JSON.stringify({ week }),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error || `Erro ao salvar disponibilidade: ${response.status}`);
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error("[updateMyAvailability] Erro:", error);
+    throw error;
+  }
+};
+
 /**
  * Criar um novo agendamento
  * @param trainerId - ID do trainer

@@ -1,9 +1,15 @@
 import React from "react";
+import { View, ActivityIndicator } from "react-native";
 import { NavigationContainer } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 // import { SplashScreen } from "../screens/splashScreen"; // Removida importação não utilizada
 import { RootStackParamList } from "../@types/routes"; // Corrigida a importação de RootStackParamList
 import { navigationRef } from "../services/navigationRef";
+import {
+  loadNavState,
+  saveNavState,
+  markRestoreSettled,
+} from "../services/navStatePersistence";
 
 // Import routes
 import { AuthRoutes } from "./Auth.routes";
@@ -18,8 +24,53 @@ interface RoutesProps {
 }
 
 export function Routes({ initialRouteName }: RoutesProps) {
+  // Só a área autenticada "App" restaura a última tela (com os params). As demais
+  // áreas (Auth/Verify/Info) renderizam de imediato, sem esperar o AsyncStorage.
+  const needsRestore = initialRouteName === "App";
+  const [isReady, setIsReady] = React.useState(!needsRestore);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- estado serializado do React Navigation
+  const [initialState, setInitialState] = React.useState<any>(undefined);
+
+  React.useEffect(() => {
+    if (!needsRestore) return;
+    let mounted = true;
+    (async () => {
+      try {
+        const state = await loadNavState();
+        if (mounted && state) setInitialState(state);
+      } finally {
+        if (mounted) setIsReady(true);
+      }
+    })();
+    return () => {
+      mounted = false;
+    };
+  }, [needsRestore]);
+
+  if (!isReady) {
+    return (
+      <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
+        <ActivityIndicator size="large" color="#000" />
+      </View>
+    );
+  }
+
   return (
-    <NavigationContainer ref={navigationRef}>
+    <NavigationContainer
+      ref={navigationRef}
+      initialState={initialState}
+      onReady={() => {
+        // Restauração assentou: libera o crash-guard depois de um respiro,
+        // tempo suficiente p/ a tela montar (se fosse quebrar, já teria quebrado
+        // e o GlobalErrorBoundary teria assumido, mantendo a flag p/ abrir limpo).
+        if (initialState) {
+          setTimeout(() => {
+            markRestoreSettled();
+          }, 4000);
+        }
+      }}
+      onStateChange={(state) => saveNavState(state)}
+    >
       <Stack.Navigator
         initialRouteName={initialRouteName || "Auth"} // Usa a prop, ou 'Auth' como padrão
         screenOptions={{

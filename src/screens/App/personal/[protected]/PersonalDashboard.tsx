@@ -11,9 +11,15 @@ import {
   ActivityIndicator,
   Alert,
   Image,
+  Switch,
 } from "react-native";
+import DateTimePickerModal from "react-native-modal-datetime-picker";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
-import BottomSheet, { BottomSheetView, BottomSheetBackdrop } from "@gorhom/bottom-sheet";
+import BottomSheet, {
+  BottomSheetView,
+  BottomSheetBackdrop,
+  BottomSheetScrollView,
+} from "@gorhom/bottom-sheet";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
 import { useNavigation } from "@react-navigation/native";
@@ -38,12 +44,16 @@ import {
   CreditCard,
   Target,
   Activity,
+  Plus,
+  Trash2,
 } from "lucide-react-native";
 import { CartesianChart, Line, Area, useChartPressState, PolarChart, Pie } from "victory-native";
 import { LinearGradient as SkiaGradient, vec, Circle } from "@shopify/react-native-skia";
 import BackButton from "../../../../components/BackButton";
 import { api } from "../../../../services/api";
 import * as ImagePicker from "expo-image-picker";
+import { notifyError, notifyApiError, toastSuccess, toastError } from "../../../../utils/notify";
+import type { AvailabilityDay } from "../../../../services/appointmentService";
 
 const PolarChartAny = PolarChart as any;
 
@@ -123,6 +133,29 @@ interface DashboardData {
   }[];
 }
 
+// ─── Disponibilidade (horários de atendimento) ──────────────────────────────────
+
+const DAY_LABELS = ["Domingo", "Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado"];
+const DURATION_OPTIONS = [30, 45, 60];
+
+const fmtTime = (d: Date) =>
+  `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+
+const parseTime = (s?: string | null) => {
+  const [h, m] = (s || "08:00").split(":").map((n) => parseInt(n, 10));
+  const d = new Date();
+  d.setHours(h || 0, m || 0, 0, 0);
+  return d;
+};
+
+const buildEmptyWeek = (): AvailabilityDay[] =>
+  Array.from({ length: 7 }, (_, i) => ({
+    dia_semana: i,
+    ativo: false,
+    faixas: [],
+    duracao_min: 60,
+  }));
+
 // ─── Component ────────────────────────────────────────────────────────────────
 
 const PersonalDashboard: React.FC = () => {
@@ -150,6 +183,7 @@ const PersonalDashboard: React.FC = () => {
   const evaluationSheetRef = React.useRef<BottomSheet>(null);
   const reviewsSheetRef = React.useRef<BottomSheet>(null);
   const paymentsSheetRef = React.useRef<BottomSheet>(null);
+  const availabilitySheetRef = React.useRef<BottomSheet>(null);
 
   const [selectedClient, setSelectedClient] = useState<PersonalClient | null>(null);
   const [clientHistory, setClientHistory] = useState<any[]>([]);
@@ -161,6 +195,16 @@ const PersonalDashboard: React.FC = () => {
   const [notaIntensidade, setNotaIntensidade] = useState(3);
   const [comentarioTecnico, setComentarioTecnico] = useState("");
   const [notaAluno, setNotaAluno] = useState(5);
+
+  // Disponibilidade (horários de atendimento)
+  const [availabilityWeek, setAvailabilityWeek] = useState<AvailabilityDay[]>(buildEmptyWeek());
+  const [loadingAvailability, setLoadingAvailability] = useState(false);
+  const [savingAvailability, setSavingAvailability] = useState(false);
+  const [timePicker, setTimePicker] = useState<{
+    dayIdx: number;
+    rangeIdx: number;
+    field: "hora_inicio" | "hora_fim";
+  } | null>(null);
 
   const [renderedSheets, setRenderedSheets] = useState<Set<string>>(new Set());
   const [sheetVersion, setSheetVersion] = useState(0);
@@ -260,6 +304,131 @@ const PersonalDashboard: React.FC = () => {
     setFilterStatus(tempStatus);
     fetchData(activeTab, tempStatus);
     filterSheetRef.current?.close();
+  };
+
+  // ── Disponibilidade (horários de atendimento) ──────────────────────────────
+  const openAvailability = async () => {
+    markSheetAsRendered("availability");
+    setLoadingAvailability(true);
+    try {
+      const resp = await api.get(`/personal/availability`);
+      const week: AvailabilityDay[] = resp.data?.week || [];
+      // Normaliza para os 7 dias, preservando o que veio do backend.
+      const normalized = buildEmptyWeek().map((base) => {
+        const found = week.find((w) => w.dia_semana === base.dia_semana);
+        if (!found) return base;
+        return {
+          ...base,
+          ativo: !!found.ativo,
+          faixas: Array.isArray(found.faixas) ? found.faixas : [],
+          duracao_min: found.duracao_min ?? 60,
+        };
+      });
+      setAvailabilityWeek(normalized);
+    } catch (err) {
+      // 404/sem backend: começa do zero para o personal poder configurar.
+      setAvailabilityWeek(buildEmptyWeek());
+      toastError("Não foi possível carregar sua disponibilidade.");
+    } finally {
+      setLoadingAvailability(false);
+    }
+  };
+
+  const toggleDayActive = (dayIdx: number) => {
+    setAvailabilityWeek((prev) =>
+      prev.map((d, i) => {
+        if (i !== dayIdx) return d;
+        const willActivate = !d.ativo;
+        return {
+          ...d,
+          ativo: willActivate,
+          // Ao ativar um dia sem faixas, semeia uma faixa padrão.
+          faixas:
+            willActivate && d.faixas.length === 0
+              ? [{ hora_inicio: "08:00", hora_fim: "12:00" }]
+              : d.faixas,
+        };
+      })
+    );
+  };
+
+  const addRange = (dayIdx: number) => {
+    setAvailabilityWeek((prev) =>
+      prev.map((d, i) =>
+        i === dayIdx
+          ? { ...d, faixas: [...d.faixas, { hora_inicio: "08:00", hora_fim: "12:00" }] }
+          : d
+      )
+    );
+  };
+
+  const removeRange = (dayIdx: number, rangeIdx: number) => {
+    setAvailabilityWeek((prev) =>
+      prev.map((d, i) =>
+        i === dayIdx ? { ...d, faixas: d.faixas.filter((_, r) => r !== rangeIdx) } : d
+      )
+    );
+  };
+
+  const setDuration = (dayIdx: number, min: number) => {
+    setAvailabilityWeek((prev) =>
+      prev.map((d, i) => (i === dayIdx ? { ...d, duracao_min: min } : d))
+    );
+  };
+
+  const onConfirmTime = (date: Date) => {
+    if (!timePicker) return;
+    const value = fmtTime(date);
+    const { dayIdx, rangeIdx, field } = timePicker;
+    setAvailabilityWeek((prev) =>
+      prev.map((d, i) =>
+        i === dayIdx
+          ? {
+              ...d,
+              faixas: d.faixas.map((f, r) => (r === rangeIdx ? { ...f, [field]: value } : f)),
+            }
+          : d
+      )
+    );
+    setTimePicker(null);
+  };
+
+  const validateWeek = (): string | null => {
+    for (const d of availabilityWeek) {
+      if (!d.ativo) continue;
+      if (d.faixas.length === 0) {
+        return `${DAY_LABELS[d.dia_semana]}: adicione uma faixa de horário ou desative o dia.`;
+      }
+      // Comparação por string "HH:MM" funciona por ser 24h zero-padded.
+      const sorted = [...d.faixas].sort((a, b) => a.hora_inicio.localeCompare(b.hora_inicio));
+      for (let i = 0; i < sorted.length; i++) {
+        if (sorted[i].hora_fim <= sorted[i].hora_inicio) {
+          return `${DAY_LABELS[d.dia_semana]}: o horário de fim deve ser maior que o de início.`;
+        }
+        if (i > 0 && sorted[i].hora_inicio < sorted[i - 1].hora_fim) {
+          return `${DAY_LABELS[d.dia_semana]}: as faixas de horário não podem se sobrepor.`;
+        }
+      }
+    }
+    return null;
+  };
+
+  const saveAvailability = async () => {
+    const err = validateWeek();
+    if (err) {
+      notifyError(err);
+      return;
+    }
+    setSavingAvailability(true);
+    try {
+      await api.put(`/personal/availability`, { week: availabilityWeek });
+      toastSuccess("Disponibilidade atualizada!");
+      availabilitySheetRef.current?.close();
+    } catch (e) {
+      notifyApiError(e, "Não foi possível salvar sua disponibilidade.");
+    } finally {
+      setSavingAvailability(false);
+    }
   };
 
   const handleUploadReceipt = async (apptId: number) => {
@@ -796,6 +965,16 @@ const PersonalDashboard: React.FC = () => {
           <View style={styles.operationSection}>
             <Text style={styles.sectionTitle}>Operações</Text>
             <View style={styles.statusList}>
+              <TouchableOpacity style={styles.statusItem} onPress={openAvailability}>
+                <View style={styles.statusIndicator}>
+                  <View style={[styles.statusDot, { backgroundColor: "#0EA5E9" }]} />
+                  <Text style={styles.statusLabel}>Horários de Atendimento</Text>
+                </View>
+                <View style={styles.statusValueRow}>
+                  <ChevronRight size={16} color="#94A3B8" />
+                </View>
+              </TouchableOpacity>
+
               <TouchableOpacity
                 style={styles.statusItem}
                 onPress={() => markSheetAsRendered("approvals")}
@@ -863,6 +1042,9 @@ const PersonalDashboard: React.FC = () => {
             key={`filter-${sheetVersion}`}
             index={0}
             snapPoints={["40%"]}
+            // gorhom v5 liga dynamic sizing por padrão → o sheet cresce com o
+            // conteúdo e o scroll interno não engata; fixamos no snapPoint.
+            enableDynamicSizing={false}
             enablePanDownToClose
             backdropComponent={renderBackdrop}
             backgroundStyle={{ borderRadius: 32 }}
@@ -927,6 +1109,9 @@ const PersonalDashboard: React.FC = () => {
             key={`appointments-${sheetVersion}`}
             index={0}
             snapPoints={["85%"]}
+            // gorhom v5 liga dynamic sizing por padrão → o sheet cresce com o
+            // conteúdo e o scroll interno não engata; fixamos no snapPoint.
+            enableDynamicSizing={false}
             enablePanDownToClose
             backdropComponent={renderBackdrop}
             backgroundStyle={{ borderRadius: 32 }}
@@ -939,7 +1124,11 @@ const PersonalDashboard: React.FC = () => {
                   <X size={24} color="#64748B" />
                 </TouchableOpacity>
               </View>
-              <ScrollView style={{ marginTop: 10 }}>
+              <BottomSheetScrollView
+                style={{ flex: 1, marginTop: 10 }}
+                showsVerticalScrollIndicator={false}
+                contentContainerStyle={{ paddingBottom: 40 }}
+              >
                 {data?.appointments.map((item) => (
                   <View key={item.id_agendamento} style={styles.pendingCard}>
                     <View style={styles.pendingRow}>
@@ -992,7 +1181,7 @@ const PersonalDashboard: React.FC = () => {
                 {data?.appointments.length === 0 && (
                   <Text style={styles.emptyTxt}>Nenhum agendamento encontrado.</Text>
                 )}
-              </ScrollView>
+              </BottomSheetScrollView>
             </BottomSheetView>
           </BottomSheet>
         )}
@@ -1004,6 +1193,9 @@ const PersonalDashboard: React.FC = () => {
             key={`revenue-${sheetVersion}`}
             index={0}
             snapPoints={["85%"]}
+            // gorhom v5 liga dynamic sizing por padrão → o sheet cresce com o
+            // conteúdo e o scroll interno não engata; fixamos no snapPoint.
+            enableDynamicSizing={false}
             enablePanDownToClose
             backdropComponent={renderBackdrop}
             backgroundStyle={{ borderRadius: 32 }}
@@ -1016,7 +1208,11 @@ const PersonalDashboard: React.FC = () => {
                   <X size={24} color="#64748B" />
                 </TouchableOpacity>
               </View>
-              <ScrollView style={{ marginTop: 10 }}>
+              <BottomSheetScrollView
+                style={{ flex: 1, marginTop: 10 }}
+                showsVerticalScrollIndicator={false}
+                contentContainerStyle={{ paddingBottom: 40 }}
+              >
                 <View style={styles.revenueTotalCard}>
                   <Text style={styles.revenueTotalLabel}>Total no Período</Text>
                   <Text style={styles.revenueTotalValue}>
@@ -1034,7 +1230,7 @@ const PersonalDashboard: React.FC = () => {
                       <Text style={styles.revenueItemValue}>+ {formatCurrency(100)}</Text>
                     </View>
                   ))}
-              </ScrollView>
+              </BottomSheetScrollView>
             </BottomSheetView>
           </BottomSheet>
         )}
@@ -1046,6 +1242,9 @@ const PersonalDashboard: React.FC = () => {
             key={`approvals-${sheetVersion}`}
             index={0}
             snapPoints={["85%"]}
+            // gorhom v5 liga dynamic sizing por padrão → o sheet cresce com o
+            // conteúdo e o scroll interno não engata; fixamos no snapPoint.
+            enableDynamicSizing={false}
             enablePanDownToClose
             backdropComponent={renderBackdrop}
             backgroundStyle={{ borderRadius: 32 }}
@@ -1058,7 +1257,11 @@ const PersonalDashboard: React.FC = () => {
                   <X size={24} color="#64748B" />
                 </TouchableOpacity>
               </View>
-              <ScrollView style={{ marginTop: 20 }}>
+              <BottomSheetScrollView
+                style={{ flex: 1, marginTop: 20 }}
+                showsVerticalScrollIndicator={false}
+                contentContainerStyle={{ paddingBottom: 40 }}
+              >
                 {data?.pending.map((item) => (
                   <View key={item.id_agendamento} style={styles.pendingCard}>
                     <View style={styles.pendingRow}>
@@ -1126,7 +1329,7 @@ const PersonalDashboard: React.FC = () => {
                 {data?.pending.length === 0 && (
                   <Text style={styles.emptyTxt}>Nenhuma aprovação pendente.</Text>
                 )}
-              </ScrollView>
+              </BottomSheetScrollView>
             </BottomSheetView>
           </BottomSheet>
         )}
@@ -1138,6 +1341,9 @@ const PersonalDashboard: React.FC = () => {
             key={`clients-${sheetVersion}`}
             index={0}
             snapPoints={["85%"]}
+            // gorhom v5 liga dynamic sizing por padrão → o sheet cresce com o
+            // conteúdo e o scroll interno não engata; fixamos no snapPoint.
+            enableDynamicSizing={false}
             enablePanDownToClose
             backdropComponent={renderBackdrop}
             backgroundStyle={{ borderRadius: 32 }}
@@ -1150,7 +1356,11 @@ const PersonalDashboard: React.FC = () => {
                   <X size={24} color="#64748B" />
                 </TouchableOpacity>
               </View>
-              <ScrollView style={{ marginTop: 20 }}>
+              <BottomSheetScrollView
+                style={{ flex: 1, marginTop: 20 }}
+                showsVerticalScrollIndicator={false}
+                contentContainerStyle={{ paddingBottom: 40 }}
+              >
                 {data?.clients.map((item) => (
                   <TouchableOpacity
                     key={item.id_us}
@@ -1180,7 +1390,7 @@ const PersonalDashboard: React.FC = () => {
                 {data?.clients.length === 0 && (
                   <Text style={styles.emptyTxt}>Nenhum cliente cadastrado.</Text>
                 )}
-              </ScrollView>
+              </BottomSheetScrollView>
             </BottomSheetView>
           </BottomSheet>
         )}
@@ -1192,6 +1402,9 @@ const PersonalDashboard: React.FC = () => {
             key={`performance-${sheetVersion}`}
             index={0}
             snapPoints={["60%"]}
+            // gorhom v5 liga dynamic sizing por padrão → o sheet cresce com o
+            // conteúdo e o scroll interno não engata; fixamos no snapPoint.
+            enableDynamicSizing={false}
             enablePanDownToClose
             backdropComponent={renderBackdrop}
             backgroundStyle={{ borderRadius: 32 }}
@@ -1313,6 +1526,9 @@ const PersonalDashboard: React.FC = () => {
             key={`history-${sheetVersion}`}
             index={0}
             snapPoints={["85%"]}
+            // gorhom v5 liga dynamic sizing por padrão → o sheet cresce com o
+            // conteúdo e o scroll interno não engata; fixamos no snapPoint.
+            enableDynamicSizing={false}
             enablePanDownToClose
             backdropComponent={renderBackdrop}
             backgroundStyle={{ borderRadius: 32 }}
@@ -1331,7 +1547,11 @@ const PersonalDashboard: React.FC = () => {
               {fetchingHistory ? (
                 <ActivityIndicator color="#10B981" style={{ marginTop: 40 }} />
               ) : (
-                <ScrollView style={{ marginTop: 20 }}>
+                <BottomSheetScrollView
+                  style={{ flex: 1, marginTop: 20 }}
+                  showsVerticalScrollIndicator={false}
+                  contentContainerStyle={{ paddingBottom: 40 }}
+                >
                   {clientHistory.map((appt) => (
                     <View key={appt.id_agendamento} style={styles.pendingCard}>
                       <View
@@ -1400,7 +1620,7 @@ const PersonalDashboard: React.FC = () => {
                   {clientHistory.length === 0 && (
                     <Text style={styles.emptyTxt}>Nenhum registro encontrado.</Text>
                   )}
-                </ScrollView>
+                </BottomSheetScrollView>
               )}
             </BottomSheetView>
           </BottomSheet>
@@ -1413,6 +1633,9 @@ const PersonalDashboard: React.FC = () => {
             key={`evaluation-${sheetVersion}`}
             index={0}
             snapPoints={["75%"]}
+            // gorhom v5 liga dynamic sizing por padrão → o sheet cresce com o
+            // conteúdo e o scroll interno não engata; fixamos no snapPoint.
+            enableDynamicSizing={false}
             enablePanDownToClose
             backdropComponent={renderBackdrop}
             backgroundStyle={{ borderRadius: 32 }}
@@ -1426,7 +1649,11 @@ const PersonalDashboard: React.FC = () => {
                 </TouchableOpacity>
               </View>
 
-              <ScrollView style={{ marginTop: 10 }}>
+              <BottomSheetScrollView
+                style={{ flex: 1, marginTop: 10 }}
+                showsVerticalScrollIndicator={false}
+                contentContainerStyle={{ paddingBottom: 40 }}
+              >
                 <View style={styles.filterSection}>
                   <Text style={styles.filterSectionTitle}>Intensidade do Treino (1-5)</Text>
                   <View style={{ flexDirection: "row", gap: 10, marginTop: 4 }}>
@@ -1532,7 +1759,7 @@ const PersonalDashboard: React.FC = () => {
                   />
                   <Text style={styles.applyBtnText}>Salvar Avaliação</Text>
                 </TouchableOpacity>
-              </ScrollView>
+              </BottomSheetScrollView>
             </BottomSheetView>
           </BottomSheet>
         )}
@@ -1544,6 +1771,9 @@ const PersonalDashboard: React.FC = () => {
             key={`reviews-${sheetVersion}`}
             index={0}
             snapPoints={["85%"]}
+            // gorhom v5 liga dynamic sizing por padrão → o sheet cresce com o
+            // conteúdo e o scroll interno não engata; fixamos no snapPoint.
+            enableDynamicSizing={false}
             enablePanDownToClose
             backdropComponent={renderBackdrop}
             backgroundStyle={{ borderRadius: 32 }}
@@ -1556,7 +1786,11 @@ const PersonalDashboard: React.FC = () => {
                   <X size={24} color="#64748B" />
                 </TouchableOpacity>
               </View>
-              <ScrollView style={{ marginTop: 20 }}>
+              <BottomSheetScrollView
+                style={{ flex: 1, marginTop: 20 }}
+                showsVerticalScrollIndicator={false}
+                contentContainerStyle={{ paddingBottom: 40 }}
+              >
                 {data?.reviews?.map((item) => {
                   const isPositive = (item.ratingProfessional + item.ratingTraining) / 2 >= 4;
                   return (
@@ -1644,7 +1878,7 @@ const PersonalDashboard: React.FC = () => {
                 {(!data?.reviews || data.reviews.length === 0) && (
                   <Text style={styles.emptyTxt}>Nenhuma avaliação encontrada.</Text>
                 )}
-              </ScrollView>
+              </BottomSheetScrollView>
             </BottomSheetView>
           </BottomSheet>
         )}
@@ -1656,6 +1890,9 @@ const PersonalDashboard: React.FC = () => {
             key={`payments-${sheetVersion}`}
             index={0}
             snapPoints={["85%"]}
+            // gorhom v5 liga dynamic sizing por padrão → o sheet cresce com o
+            // conteúdo e o scroll interno não engata; fixamos no snapPoint.
+            enableDynamicSizing={false}
             enablePanDownToClose
             backdropComponent={renderBackdrop}
             backgroundStyle={{ borderRadius: 32 }}
@@ -1668,7 +1905,11 @@ const PersonalDashboard: React.FC = () => {
                   <X size={24} color="#64748B" />
                 </TouchableOpacity>
               </View>
-              <ScrollView style={{ marginTop: 20 }}>
+              <BottomSheetScrollView
+                style={{ flex: 1, marginTop: 20 }}
+                showsVerticalScrollIndicator={false}
+                contentContainerStyle={{ paddingBottom: 40 }}
+              >
                 {data?.receiptHistory?.map((item) => (
                   <View key={item.id_agendamento} style={styles.pendingCard}>
                     <View style={styles.pendingRow}>
@@ -1706,10 +1947,171 @@ const PersonalDashboard: React.FC = () => {
                 {(!data?.receiptHistory || data.receiptHistory.length === 0) && (
                   <Text style={styles.emptyTxt}>Nenhum comprovante enviado ainda.</Text>
                 )}
-              </ScrollView>
+              </BottomSheetScrollView>
             </BottomSheetView>
           </BottomSheet>
         )}
+
+        {/* ── SHEET: HORÁRIOS DE ATENDIMENTO ── */}
+        {renderedSheets.has("availability") && (
+          <BottomSheet
+            ref={availabilitySheetRef}
+            key={`availability-${sheetVersion}`}
+            index={0}
+            snapPoints={["90%"]}
+            // gorhom v5 liga dynamic sizing por padrão → o sheet cresce com o
+            // conteúdo e o scroll interno não engata; fixamos no snapPoint.
+            enableDynamicSizing={false}
+            enablePanDownToClose
+            backdropComponent={renderBackdrop}
+            backgroundStyle={{ borderRadius: 32 }}
+            onClose={() => setRenderedSheets(new Set())}
+          >
+            <BottomSheetView style={styles.sheetContent}>
+              <View style={styles.sheetHeader}>
+                <View>
+                  <Text style={styles.sheetTitle}>Horários de Atendimento</Text>
+                  <Text style={styles.cardSubtitle}>
+                    Dias e faixas que aparecem no calendário dos clientes
+                  </Text>
+                </View>
+                <TouchableOpacity onPress={() => availabilitySheetRef.current?.close()}>
+                  <X size={24} color="#64748B" />
+                </TouchableOpacity>
+              </View>
+
+              {loadingAvailability ? (
+                <ActivityIndicator color="#10B981" style={{ marginTop: 40 }} />
+              ) : (
+                <BottomSheetScrollView
+                  style={{ flex: 1, marginTop: 4 }}
+                  showsVerticalScrollIndicator={false}
+                  contentContainerStyle={{ paddingBottom: 40 }}
+                >
+                  {availabilityWeek.map((day, dayIdx) => (
+                    <View key={day.dia_semana} style={styles.availDayCard}>
+                      <View style={styles.availDayHeader}>
+                        <Text style={styles.availDayTitle}>{DAY_LABELS[day.dia_semana]}</Text>
+                        <Switch
+                          value={day.ativo}
+                          onValueChange={() => toggleDayActive(dayIdx)}
+                          trackColor={{ false: "#E2E8F0", true: "#10B981" }}
+                          thumbColor="#fff"
+                        />
+                      </View>
+
+                      {day.ativo && (
+                        <>
+                          {/* Duração da sessão */}
+                          <Text style={styles.availSubLabel}>Duração da sessão</Text>
+                          <View style={styles.availDurationRow}>
+                            {DURATION_OPTIONS.map((min) => {
+                              const selected = (day.duracao_min ?? 60) === min;
+                              return (
+                                <TouchableOpacity
+                                  key={min}
+                                  style={[
+                                    styles.availDurationChip,
+                                    selected && styles.availDurationChipActive,
+                                  ]}
+                                  onPress={() => setDuration(dayIdx, min)}
+                                >
+                                  <Text
+                                    style={[
+                                      styles.availDurationText,
+                                      selected && styles.availDurationTextActive,
+                                    ]}
+                                  >
+                                    {min} min
+                                  </Text>
+                                </TouchableOpacity>
+                              );
+                            })}
+                          </View>
+
+                          {/* Faixas de horário */}
+                          <Text style={styles.availSubLabel}>Faixas de horário</Text>
+                          {day.faixas.map((faixa, rangeIdx) => (
+                            <View key={rangeIdx} style={styles.availRangeRow}>
+                              <TouchableOpacity
+                                style={styles.availTimeBtn}
+                                onPress={() =>
+                                  setTimePicker({ dayIdx, rangeIdx, field: "hora_inicio" })
+                                }
+                              >
+                                <Clock size={14} color="#0EA5E9" />
+                                <Text style={styles.availTimeText}>{faixa.hora_inicio}</Text>
+                              </TouchableOpacity>
+                              <Text style={styles.availRangeSep}>até</Text>
+                              <TouchableOpacity
+                                style={styles.availTimeBtn}
+                                onPress={() =>
+                                  setTimePicker({ dayIdx, rangeIdx, field: "hora_fim" })
+                                }
+                              >
+                                <Clock size={14} color="#0EA5E9" />
+                                <Text style={styles.availTimeText}>{faixa.hora_fim}</Text>
+                              </TouchableOpacity>
+                              <TouchableOpacity
+                                style={styles.availRemoveBtn}
+                                onPress={() => removeRange(dayIdx, rangeIdx)}
+                              >
+                                <Trash2 size={16} color="#EF4444" />
+                              </TouchableOpacity>
+                            </View>
+                          ))}
+
+                          <TouchableOpacity
+                            style={styles.availAddBtn}
+                            onPress={() => addRange(dayIdx)}
+                          >
+                            <Plus size={16} color="#10B981" />
+                            <Text style={styles.availAddText}>Adicionar faixa</Text>
+                          </TouchableOpacity>
+                        </>
+                      )}
+                    </View>
+                  ))}
+
+                  <TouchableOpacity
+                    style={[styles.applyBtn, { marginTop: 12, alignSelf: "stretch", flex: 0 }]}
+                    onPress={saveAvailability}
+                    disabled={savingAvailability}
+                  >
+                    <LinearGradient
+                      colors={["#10B981", "#059669"]}
+                      style={StyleSheet.absoluteFill}
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 1, y: 0 }}
+                    />
+                    {savingAvailability ? (
+                      <ActivityIndicator color="#fff" size="small" />
+                    ) : (
+                      <Text style={styles.applyBtnText}>Salvar disponibilidade</Text>
+                    )}
+                  </TouchableOpacity>
+                </BottomSheetScrollView>
+              )}
+            </BottomSheetView>
+          </BottomSheet>
+        )}
+
+        <DateTimePickerModal
+          isVisible={timePicker !== null}
+          mode="time"
+          locale="pt-BR"
+          date={
+            timePicker
+              ? parseTime(
+                  availabilityWeek[timePicker.dayIdx]?.faixas[timePicker.rangeIdx]?.[
+                    timePicker.field
+                  ]
+                )
+              : new Date()
+          }
+          onConfirm={onConfirmTime}
+          onCancel={() => setTimePicker(null)}
+        />
       </SafeAreaView>
     </GestureHandlerRootView>
   );
@@ -2062,6 +2464,82 @@ const styles = StyleSheet.create({
   filterOptionActive: { backgroundColor: "#10B98110", borderColor: "#10B981" },
   filterOptionText: { fontSize: 13, fontWeight: "600", color: "#64748B" },
   filterOptionTextActive: { color: "#10B981" },
+
+  // Disponibilidade (horários de atendimento)
+  availDayCard: {
+    backgroundColor: "#F8FAFC",
+    borderRadius: 20,
+    padding: 16,
+    marginBottom: 12,
+  },
+  availDayHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  availDayTitle: { fontSize: 15, fontWeight: "800", color: "#1E293B" },
+  availSubLabel: {
+    fontSize: 11,
+    fontWeight: "700",
+    color: "#94A3B8",
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+    marginTop: 14,
+    marginBottom: 8,
+  },
+  availDurationRow: { flexDirection: "row", gap: 8 },
+  availDurationChip: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    backgroundColor: "#fff",
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+  },
+  availDurationChipActive: { backgroundColor: "#10B98110", borderColor: "#10B981" },
+  availDurationText: { fontSize: 13, fontWeight: "700", color: "#64748B" },
+  availDurationTextActive: { color: "#10B981" },
+  availRangeRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    marginBottom: 10,
+  },
+  availTimeBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    backgroundColor: "#fff",
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+  },
+  availTimeText: { fontSize: 14, fontWeight: "800", color: "#1E293B" },
+  availRangeSep: { fontSize: 12, color: "#94A3B8", fontWeight: "600" },
+  availRemoveBtn: {
+    marginLeft: "auto",
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    backgroundColor: "#FEF2F2",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  availAddBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    paddingVertical: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderStyle: "dashed",
+    borderColor: "#10B981",
+    marginTop: 4,
+  },
+  availAddText: { fontSize: 13, fontWeight: "700", color: "#10B981" },
 });
 
 export default PersonalDashboard;

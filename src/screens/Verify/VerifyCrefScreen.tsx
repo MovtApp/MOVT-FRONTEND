@@ -11,6 +11,7 @@ import {
 } from "react-native";
 import BackButton from "@components/BackButton";
 import CustomInput from "@components/CustomInput";
+import DateTimePickerModal from "react-native-modal-datetime-picker";
 import { useNavigation } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { RootStackParamList } from "@typings/routes";
@@ -29,6 +30,10 @@ const VerifyCrefScreen = () => {
   const [code, setCode] = useState("");
   const [frontUri, setFrontUri] = useState<string | null>(null);
   const [backUri, setBackUri] = useState<string | null>(null);
+  // Data de registro no CREF (impressa na carteira) — fonte dos "anos de experiência"
+  // exibidos no perfil. Autodeclarada pelo personal, sem IA/OCR. Formato YYYY-MM-DD.
+  const [crefRegDate, setCrefRegDate] = useState<string | null>(null);
+  const [showRegDatePicker, setShowRegDatePicker] = useState(false);
   const [loading, setLoading] = useState(false);
   // "status" = stepper do andamento (já enviou); "form" = enviar/reenviar documentos.
   // Abre no stepper quando o usuário já enviou o CREF (persistido via session-status).
@@ -119,8 +124,8 @@ const VerifyCrefScreen = () => {
   const uploadDocuments = async () => {
     setLoading(true);
     try {
-      // 1. Salva o número do CREF antes do upload (cruzado com o registro/curadoria)
-      await api.put("/user/professional-data", { cref: code });
+      // 1. Salva o número do CREF e a data de registro antes do upload
+      await api.put("/user/professional-data", { cref: code, cref_data_registro: crefRegDate });
 
       // 2. Envia as fotos dos dois lados (multipart) para análise
       const formData = new FormData();
@@ -231,6 +236,10 @@ const VerifyCrefScreen = () => {
       Alert.alert("Falta o verso", "Adicione a foto do verso da carteira.");
       return;
     }
+    if (!crefRegDate) {
+      Alert.alert("Falta a data de registro", "Informe a data de registro do seu CREF (consta na carteira).");
+      return;
+    }
     uploadDocuments();
   };
 
@@ -261,8 +270,15 @@ const VerifyCrefScreen = () => {
     setCode("");
     setFrontUri(null);
     setBackUri(null);
+    setCrefRegDate(null);
     setLastObservation(null);
     setMode("form");
+  };
+
+  // "YYYY-MM-DD" → "DD/MM/AAAA" para exibição.
+  const formatRegDate = (iso: string) => {
+    const [y, m, d] = iso.split("-");
+    return `${d}/${m}/${y}`;
   };
 
   // Um passo do stepper de andamento.
@@ -386,7 +402,7 @@ const VerifyCrefScreen = () => {
   );
 
   const canSubmit =
-    /^\d{4,6}-[A-Z]\/[A-Z]{2}$/.test(code) && !!frontUri && !!backUri && !loading;
+    /^\d{4,6}-[A-Z]\/[A-Z]{2}$/.test(code) && !!frontUri && !!backUri && !!crefRegDate && !loading;
 
   if (mode === "status") {
     return renderStatus();
@@ -412,12 +428,42 @@ const VerifyCrefScreen = () => {
           />
         </View>
 
+        <View style={{ marginTop: 20 }}>
+          <Text style={styles.subtitle}>Data de registro do CREF</Text>
+          <TouchableOpacity
+            style={styles.regDateField}
+            onPress={() => setShowRegDatePicker(true)}
+            disabled={loading}
+            activeOpacity={0.8}
+          >
+            <Text style={crefRegDate ? styles.regDateText : styles.regDatePlaceholder}>
+              {crefRegDate ? formatRegDate(crefRegDate) : "Selecione a data (consta na carteira)"}
+            </Text>
+          </TouchableOpacity>
+        </View>
+
         <Text style={[styles.subtitle, { marginTop: 20 }]}>Foto da carteira</Text>
         <View style={styles.slotsRow}>
           {renderSlot("front", "Frente", frontUri)}
           {renderSlot("back", "Verso", backUri)}
         </View>
       </View>
+
+      <DateTimePickerModal
+        isVisible={showRegDatePicker}
+        mode="date"
+        locale="pt-BR"
+        maximumDate={new Date()}
+        date={crefRegDate ? new Date(`${crefRegDate}T00:00:00`) : new Date()}
+        onConfirm={(date: Date) => {
+          setShowRegDatePicker(false);
+          const y = date.getFullYear();
+          const m = String(date.getMonth() + 1).padStart(2, "0");
+          const d = String(date.getDate()).padStart(2, "0");
+          setCrefRegDate(`${y}-${m}-${d}`);
+        }}
+        onCancel={() => setShowRegDatePicker(false)}
+      />
 
       <TouchableOpacity
         style={[styles.verifyButton, !canSubmit && { opacity: 0.6 }]}
@@ -460,6 +506,25 @@ const styles = StyleSheet.create({
     marginTop: 10,
     color: "#666",
     marginBottom: 8,
+  },
+  regDateField: {
+    borderWidth: 1.5,
+    borderColor: "#D5D5D5",
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 14,
+    backgroundColor: "#FAFAFA",
+    marginTop: 4,
+  },
+  regDateText: {
+    fontFamily: "Rubik_500Medium",
+    fontSize: 15,
+    color: "#111",
+  },
+  regDatePlaceholder: {
+    fontFamily: "Rubik_400Regular",
+    fontSize: 15,
+    color: "#999",
   },
   slotsRow: {
     flexDirection: "row",

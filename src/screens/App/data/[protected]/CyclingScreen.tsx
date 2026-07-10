@@ -13,7 +13,11 @@ import {
   Share,
   ActivityIndicator,
   Image,
+  Linking,
+  AppState,
+  type AppStateStatus,
 } from "react-native";
+import * as Sentry from "@sentry/react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRoute } from "@react-navigation/native";
 import MapView, { Polyline, Marker, PROVIDER_GOOGLE, type Camera } from "react-native-maps";
@@ -52,8 +56,10 @@ import BottomSheet, {
   BottomSheetView,
   BottomSheetScrollView,
   BottomSheetBackdrop,
+  type BottomSheetModal,
 } from "@gorhom/bottom-sheet";
 import BackButton from "../../../../components/BackButton";
+import PostFormSheet from "../../../../components/PostFormSheet";
 import DataPillNavigator from "../../../../components/data/DataPillNavigator";
 import {
   speedToPace,
@@ -65,6 +71,7 @@ import { snapRoute } from "../../../../services/mapMatchingService";
 import {
   generateWorkoutCard,
   generateWorkoutCards,
+  uploadWorkoutPostImage,
   shareImageFile,
   shareWorkoutStory,
   isInstagramStoriesConfigured,
@@ -81,6 +88,17 @@ import {
   deleteWorkout,
   computeRecords,
 } from "../../../../services/workoutHistoryService";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import WorkoutBackgroundGuide from "../../../../components/WorkoutBackgroundGuide";
+import {
+  isAggressiveOEM,
+  getDeviceManufacturer,
+  isIgnoringBatteryOptimizations,
+} from "../../../../services/movtService";
+
+// Flag: o usuário já viu o guia de permissões de segundo plano? Mostramos uma vez
+// (no 1º treino em ROM agressiva) para não incomodar a cada corrida.
+const BG_GUIDE_SEEN_KEY = "@MOVT:bg_guide_seen";
 
 // Os parâmetros de rastreamento (acurácia, segmento mínimo, etc.) e o cálculo
 // de distância agora vivem em locationTrackingService.ts, que processa os fixes
@@ -102,6 +120,17 @@ class DataErrorBoundary extends React.Component<{ children: React.ReactNode }, E
   }
   componentDidCatch(error: Error, info: any) {
     console.error("[CyclingScreen] Crash interceptado:", error, info);
+    // Reporta ao Sentry para termos o stack em campo (o boundary só pega erros de
+    // React/JS; crashes NATIVOS do mapa não passam por aqui e são tratados por
+    // prevenção — guarda de AppState na câmera).
+    try {
+      Sentry.captureException(error, {
+        tags: { area: "workout-tracking", surface: "CyclingScreen" },
+        extra: { componentStack: info?.componentStack },
+      });
+    } catch {
+      // não deixa o próprio report derrubar o boundary
+    }
   }
   render() {
     if (this.state.hasError) {
@@ -349,7 +378,10 @@ const WorkoutDetail: React.FC<WorkoutDetailProps> = ({
 
   // Prefere a rota encaixada nas ruas (map-matching salvo → re-snap → crua).
   // Simplifica (Douglas-Peucker) para renderizar liso e leve, sem perder a forma.
-  const safeRoute = useMemo(() => {
+  // Trechos contíguos da rota (um por sub-traçado entre gaps). Divide ANTES de
+  // simplificar para o Douglas-Peucker não engolir o ponto de quebra — assim cada
+  // segmento é simplificado isolado e o gap vira de fato uma polyline separada.
+  const routeSegments = useMemo(() => {
     const source =
       Array.isArray(workout.routeSnapped) && workout.routeSnapped.length > 1
         ? workout.routeSnapped
@@ -364,8 +396,12 @@ const WorkoutDetail: React.FC<WorkoutDetailProps> = ({
         typeof p.longitude === "number" &&
         isFinite(p.longitude)
     );
-    return simplifyRoute(cleaned, 4);
+    return Tracker.splitRouteOnGaps(cleaned)
+      .map((seg) => simplifyRoute(seg, 4))
+      .filter((seg) => seg.length > 0);
   }, [workout.routeSnapped, workout.route, snappedOverride]);
+  // Rota achatada (p/ enquadrar a câmera e posicionar início/fim globais).
+  const safeRoute = useMemo(() => routeSegments.flat(), [routeSegments]);
 
   // Diferença vs. recorde da modalidade (para a comparação).
   const distDelta = workout.distanceKm - records.longestDistanceKm;
@@ -418,6 +454,13 @@ const WorkoutDetail: React.FC<WorkoutDetailProps> = ({
         value: extraStats.timePerKm !== "--" ? `${extraStats.timePerKm} /km` : "--",
       },
     ];
+    // FC do relógio (só aparece quando um wearable alimentou dados neste treino).
+    if (workout.avgHr && workout.avgHr > 0) {
+      rows.push({ icon: Heart, label: "FC média", value: `${workout.avgHr} bpm` });
+      if (workout.maxHr && workout.maxHr > 0) {
+        rows.push({ icon: Heart, label: "FC máxima", value: `${workout.maxHr} bpm` });
+      }
+    }
     if (extraStats.hasSplits) {
       rows.push(
         { icon: Trophy, label: "Melhor km", value: `${extraStats.bestKm} /km` },
@@ -548,6 +591,54 @@ const WorkoutDetail: React.FC<WorkoutDetailProps> = ({
     }
   };
 
+  // ─── Publicar no feed do MOVT ────────────────────────────────────────────────
+  // Gera o card em QUADRADO (1:1, encaixa no feed sem cortar) e abre o editor de
+  // post (PostFormSheet) já com a imagem + uma legenda sugerida. O próprio
+  // PostFormSheet sobe o arquivo pro Supabase e chama POST /user/posts.
+  const postSheetRef = useRef<BottomSheetModal>(null);
+  const [publishData, setPublishData] = useState<{ url: string; legenda: string } | null>(null);
+  const [publishing, setPublishing] = useState(false);
+
+  const buildSuggestedCaption = (): string => {
+    const dist = workout.distanceKm.toFixed(2).replace(".", ",");
+    const dur = formatDuration(workout.durationSec);
+    const isCycling = workout.type === "Ciclismo";
+    const verb = isCycling ? "Pedal" : "Corrida";
+    const emoji = isCycling ? "🚴" : "🏃";
+    return `${verb} de ${dist} km em ${dur} ${emoji}`;
+  };
+
+  const publishToFeed = async () => {
+    if (publishing || sharingNow || storyLoading) return;
+    const variant = buildVariants()[pageIndex];
+    if (!variant) return;
+    setPublishing(true);
+    toastInfo("Gerando imagem para publicar…");
+    try {
+      // Sobe pelo backend (service_role) e recebe a URL pública. O PostFormSheet
+      // recebe uma URL https — então NÃO tenta o upload client-side (barrado pela
+      // RLS do Storage), só cria o post.
+      const url = await uploadWorkoutPostImage({
+        route: safeRoute,
+        type: workout.type,
+        title: workout.type,
+        subtitle: formatDate(workout.date),
+        stats: variant.stats,
+        layout: variant.layout,
+        format: "square",
+      });
+      // Fecha o Modal (RN) do preview ANTES de abrir o bottom-sheet, senão o
+      // editor abriria por trás do Modal nativo.
+      closePreview();
+      setPublishData({ url, legenda: buildSuggestedCaption() });
+      setTimeout(() => postSheetRef.current?.present(), 350);
+    } catch (e) {
+      notifyApiError(e, "Não foi possível gerar a imagem para publicar.");
+    } finally {
+      setPublishing(false);
+    }
+  };
+
   const fitFullMap = () => {
     if (safeRoute.length < 2) return;
     fullMapRef.current?.fitToCoordinates(safeRoute, {
@@ -606,13 +697,18 @@ const WorkoutDetail: React.FC<WorkoutDetailProps> = ({
               pointerEvents="none"
               initialRegion={fitRegion!}
             >
-              <Polyline
-                coordinates={safeRoute}
-                strokeColor={accent}
-                strokeWidth={4}
-                lineCap="round"
-                lineJoin="round"
-              />
+              {routeSegments.map((seg, i) =>
+                seg.length > 1 ? (
+                  <Polyline
+                    key={i}
+                    coordinates={seg}
+                    strokeColor={accent}
+                    strokeWidth={4}
+                    lineCap="round"
+                    lineJoin="round"
+                  />
+                ) : null
+              )}
               <RouteEndpoints route={safeRoute} />
             </MapView>
 
@@ -760,13 +856,18 @@ const WorkoutDetail: React.FC<WorkoutDetailProps> = ({
               showsCompass={false}
               toolbarEnabled={false}
             >
-              <Polyline
-                coordinates={safeRoute}
-                strokeColor={accent}
-                strokeWidth={5}
-                lineCap="round"
-                lineJoin="round"
-              />
+              {routeSegments.map((seg, i) =>
+                seg.length > 1 ? (
+                  <Polyline
+                    key={i}
+                    coordinates={seg}
+                    strokeColor={accent}
+                    strokeWidth={5}
+                    lineCap="round"
+                    lineJoin="round"
+                  />
+                ) : null
+              )}
               <RouteEndpoints route={safeRoute} />
             </MapView>
           )}
@@ -856,6 +957,23 @@ const WorkoutDetail: React.FC<WorkoutDetailProps> = ({
               ))}
             </View>
 
+            {/* Publicar no feed do MOVT (card quadrado) — ação principal interna */}
+            <TouchableOpacity
+              style={[hs.previewPublishBtn, { backgroundColor: accent }]}
+              onPress={publishToFeed}
+              disabled={publishing || sharingNow || storyLoading}
+              activeOpacity={0.85}
+            >
+              {publishing ? (
+                <ActivityIndicator size="small" color="#FFFFFF" />
+              ) : (
+                <>
+                  <Trophy size={20} color="#FFFFFF" />
+                  <Text style={hs.previewShareText}>Publicar no MOVT</Text>
+                </>
+              )}
+            </TouchableOpacity>
+
             <View style={hs.previewActions}>
               <TouchableOpacity
                 style={hs.previewActionBtn}
@@ -898,6 +1016,14 @@ const WorkoutDetail: React.FC<WorkoutDetailProps> = ({
           </View>
         </View>
       </Modal>
+
+      {/* Editor de post pré-preenchido com o card do treino (publicar no feed) */}
+      <PostFormSheet
+        bottomSheetRef={postSheetRef}
+        initialData={publishData ? { url: publishData.url, legenda: publishData.legenda } : undefined}
+        onClose={() => setPublishData(null)}
+        lockImage
+      />
     </View>
   );
 };
@@ -942,6 +1068,9 @@ interface PausedStatsProps {
   currentSpeedMs: number;
   maxSpeedMs: number;
   elevationGainM: number;
+  currentHr: number;
+  avgHr: number;
+  maxHr: number;
   splits: TrackingSnapshot["splits"];
   route: LatLng[];
   mapRef: React.RefObject<MapView | null>;
@@ -957,6 +1086,9 @@ const PausedStats: React.FC<PausedStatsProps> = ({
   currentSpeedMs,
   maxSpeedMs,
   elevationGainM,
+  currentHr,
+  avgHr,
+  maxHr,
   splits,
   route,
   mapRef,
@@ -966,6 +1098,8 @@ const PausedStats: React.FC<PausedStatsProps> = ({
 }) => {
   const insets = useSafeAreaInsets();
   const isCycling = type === "Ciclismo";
+  // Trechos contíguos da rota (uma polyline por sub-traçado entre gaps).
+  const routeSegments = useMemo(() => Tracker.splitRouteOnGaps(route), [route]);
   // Verde padrão do projeto (lime de marca) — fundo sólido vivo da tela de espera.
   const GREEN = "#BBF246";
   const GREEN_TEXT = "#365314"; // verde escuro, legível como texto sobre o lime vivo
@@ -1031,6 +1165,11 @@ const PausedStats: React.FC<PausedStatsProps> = ({
       { icon: TrendingUp, label: "Calorias / km", value: distanceKm > 0 ? `${(kcalNum / distanceKm).toFixed(0)} kcal` : "--" },
       { icon: Timer, label: "Calorias / min", value: seconds > 0 ? `${(kcalNum / (seconds / 60)).toFixed(1)} kcal` : "--" },
       { icon: Mountain, label: "Ganho de elevação", value: `${Math.round(elevationGainM)} m` },
+      // FC do relógio: "--" enquanto nenhum wearable entrega dados (sinal claro
+      // de que o relógio não está alimentando este treino).
+      { icon: Heart, label: "FC atual", value: currentHr > 0 ? `${currentHr} bpm` : "--" },
+      { icon: Heart, label: "FC média", value: avgHr > 0 ? `${avgHr} bpm` : "--" },
+      { icon: Heart, label: "FC máxima", value: maxHr > 0 ? `${maxHr} bpm` : "--" },
     ],
   };
 
@@ -1184,13 +1323,18 @@ const PausedStats: React.FC<PausedStatsProps> = ({
               initialRegion={fitRegion}
               onMapReady={fitMap}
             >
-              <Polyline
-                coordinates={route}
-                strokeColor={GREEN}
-                strokeWidth={5}
-                lineCap="round"
-                lineJoin="round"
-              />
+              {routeSegments.map((seg, i) =>
+                seg.length > 1 ? (
+                  <Polyline
+                    key={i}
+                    coordinates={seg}
+                    strokeColor={GREEN}
+                    strokeWidth={5}
+                    lineCap="round"
+                    lineJoin="round"
+                  />
+                ) : null
+              )}
               <RouteEndpoints route={route} />
             </MapView>
           </View>
@@ -1315,6 +1459,14 @@ const CyclingScreen: React.FC = () => {
   // Timestamp (relógio local) do último reposicionamento da câmera — usado para
   // animar pela cadência real dos fixes (acompanhamento contínuo, sem gap morto).
   const lastFollowTsRef = useRef<number>(0);
+  // App em foreground? A câmera do mapa (Google) SÓ pode ser animada com o app
+  // ativo. Chamar `animateCamera` sobre um mapa cuja superfície GL foi destruída
+  // pelo SO (tela bloqueada) é a causa do crash NATIVO ao desbloquear — e a task
+  // de GPS continua emitindo `lastLocation` em background, o que dispararia esse
+  // efeito repetidamente. Guardamos por esta ref.
+  const appActiveRef = useRef<boolean>(AppState.currentState === "active");
+  // O mapa ao vivo já terminou de montar (onMapReady)? Só animamos depois disso.
+  const liveMapReadyRef = useRef<boolean>(false);
   const insets = useSafeAreaInsets();
 
   const isTracking = snap.active;
@@ -1323,6 +1475,13 @@ const CyclingScreen: React.FC = () => {
   const distance = snap.distanceKm;
   const route = snap.route;
   const currentSpeedMs = snap.currentSpeedMs;
+
+  // Guia de permissões de segundo plano (ROMs agressivas: MIUI/Huawei/Oppo…).
+  const [bgGuideVisible, setBgGuideVisible] = useState(false);
+  const [deviceMfr, setDeviceMfr] = useState<string>("");
+  useEffect(() => {
+    getDeviceManufacturer().then(setDeviceMfr);
+  }, []);
 
   // Histórico de treinos
   const [history, setHistory] = useState<WorkoutRecord[]>([]);
@@ -1344,6 +1503,49 @@ const CyclingScreen: React.FC = () => {
     Tracker.resumeIfActive();
     return unsub;
   }, []);
+
+  // Ciclo de vida do app: mantém `appActiveRef` em dia e, ao VOLTAR ao foreground
+  // (desbloqueio da tela), faz UM reposicionamento coalescido da câmera em vez de
+  // deixar o efeito de follow disparar a fila de updates acumulados de uma vez —
+  // que é o que provocava o crash nativo do Google Maps ao desbloquear.
+  useEffect(() => {
+    const onChange = (state: AppStateStatus) => {
+      const nowActive = state === "active";
+      const wasActive = appActiveRef.current;
+      appActiveRef.current = nowActive;
+      if (nowActive && !wasActive) {
+        // Rehidrata/religa a sessão (idempotente) e recentra uma única vez, no
+        // frame seguinte (dá tempo do mapa reanexar a superfície nativa).
+        Tracker.resumeIfActive();
+        lastFollowTsRef.current = 0; // reinicia a cadência de animação
+        setTimeout(() => {
+          if (!appActiveRef.current || !liveMapReadyRef.current) return;
+          const t = Tracker.getSnapshot().lastLocation;
+          if (t && isFinite(t.latitude) && isFinite(t.longitude)) {
+            try {
+              liveMapRef.current?.animateCamera(
+                { center: { latitude: t.latitude, longitude: t.longitude } },
+                { duration: 400 }
+              );
+            } catch {
+              // mapa ainda reanexando — ignora (o follow normal reassume)
+            }
+          }
+        }, 350);
+      }
+    };
+    const sub = AppState.addEventListener("change", onChange);
+    return () => sub.remove();
+  }, []);
+
+  // A tela alterna entre o mapa imersivo (treino ativo) e o mapa normal — ambos
+  // usam `liveMapRef`. Ao trocar, o mapa antigo desmonta e o novo ainda não
+  // disparou `onMapReady`; marca "não pronto" até o novo confirmar, para o guarda
+  // da câmera não animar uma superfície que está reanexando.
+  const immersiveActive = isTracking && isToday;
+  useEffect(() => {
+    liveMapReadyRef.current = false;
+  }, [immersiveActive]);
 
   // Quando uma sessão ativa é restaurada (relaunch após o SO matar o processo, ou
   // ao voltar pra tela), alinha a aba à modalidade real do treino em andamento —
@@ -1389,15 +1591,20 @@ const CyclingScreen: React.FC = () => {
   // ela é carregada (o `initialRegion` só vale no primeiro paint).
   useEffect(() => {
     if (snap.lastLocation) return; // já há posição ao vivo; o efeito abaixo cuida
+    if (!appActiveRef.current || !liveMapReadyRef.current) return;
     if (
       initialCenter &&
       typeof initialCenter.latitude === "number" &&
       isFinite(initialCenter.latitude)
     ) {
-      liveMapRef.current?.animateCamera(
-        { center: { latitude: initialCenter.latitude, longitude: initialCenter.longitude } },
-        { duration: 500 }
-      );
+      try {
+        liveMapRef.current?.animateCamera(
+          { center: { latitude: initialCenter.latitude, longitude: initialCenter.longitude } },
+          { duration: 500 }
+        );
+      } catch {
+        // mapa reanexando — ignora
+      }
     }
   }, [initialCenter, snap.lastLocation]);
 
@@ -1419,6 +1626,13 @@ const CyclingScreen: React.FC = () => {
       return;
     }
 
+    // GUARDA CRÍTICA: nunca anima a câmera com o app em background nem antes do
+    // mapa terminar de montar. Sem isso, os `lastLocation` que chegam com a tela
+    // bloqueada disparam `animateCamera` sobre uma superfície GL destruída — o
+    // crash nativo do Google Maps ao desbloquear. O reposicionamento do retorno
+    // é feito, uma única vez, pelo listener de AppState.
+    if (!appActiveRef.current || !liveMapReadyRef.current) return;
+
     const now = Date.now();
     const dt = lastFollowTsRef.current ? now - lastFollowTsRef.current : 1000;
     lastFollowTsRef.current = now;
@@ -1435,14 +1649,59 @@ const CyclingScreen: React.FC = () => {
       camera.altitude = altitudeForSpeed(v); // iOS
     }
 
-    liveMapRef.current?.animateCamera(camera, { duration });
+    try {
+      liveMapRef.current?.animateCamera(camera, { duration });
+    } catch {
+      // mapa reanexando após resume — ignora este frame
+    }
   }, [snap.lastLocation]);
 
   const startTracking = async () => {
     const res = await Tracker.startTracking(activeTab === "Ciclismo" ? "Ciclismo" : "Corrida");
     if (!res.ok) {
       Alert.alert("Permissão negada", "Precisamos de acesso ao GPS para o MOVT Performance.");
+      return;
     }
+    // Treino inicia mesmo sem "Permitir o tempo todo", mas com a tela apagada o
+    // rastreio pode falhar — orienta o usuário a liberar o acesso em segundo plano.
+    if (Platform.OS === "android") {
+      // Em ROM agressiva (MIUI/Huawei/Oppo…), mostra UMA VEZ o guia completo de
+      // segundo plano (bateria + Autostart + localização) — é a causa #1 do
+      // "treino para no meio". Fora dessas ROMs, mantém o aviso leve só quando o
+      // acesso em segundo plano não foi concedido.
+      try {
+        const [aggressive, seen, batteryOk] = await Promise.all([
+          isAggressiveOEM(),
+          AsyncStorage.getItem(BG_GUIDE_SEEN_KEY),
+          isIgnoringBatteryOptimizations(),
+        ]);
+        const shouldGuide =
+          aggressive && (!seen || res.backgroundGranted === false || !batteryOk);
+        if (shouldGuide) {
+          setBgGuideVisible(true);
+          return;
+        }
+      } catch {
+        // se a checagem falhar, cai no aviso leve abaixo
+      }
+
+      if (res.backgroundGranted === false) {
+        Alert.alert(
+          "Ative a localização em segundo plano",
+          "Para o treino não parar com a tela bloqueada, defina a localização do MOVT como \"Permitir o tempo todo\" nos ajustes do app.",
+          [
+            { text: "Agora não", style: "cancel" },
+            { text: "Abrir ajustes", onPress: () => Linking.openSettings() },
+          ]
+        );
+      }
+    }
+  };
+
+  // Fecha o guia de segundo plano e marca como visto (não reaparece a cada treino).
+  const closeBgGuide = () => {
+    setBgGuideVisible(false);
+    AsyncStorage.setItem(BG_GUIDE_SEEN_KEY, "1").catch(() => {});
   };
 
   const togglePause = () => Tracker.togglePause();
@@ -1467,6 +1726,10 @@ const CyclingScreen: React.FC = () => {
         route: final.route,
         routeSnapped: final.snappedRoute,
         splits: final.splits,
+        // FC do relógio (Fase 1): só vem preenchida se um wearable alimentou FC.
+        avgHr: final.avgHr,
+        maxHr: final.maxHr,
+        watchPresent: final.watchPresent,
       });
 
       await loadHistory();
@@ -1561,7 +1824,20 @@ const CyclingScreen: React.FC = () => {
   const safeCurrentSpeedMs =
     isFinite(currentSpeedMs) && !isNaN(currentSpeedMs) ? currentSpeedMs : 0;
   const currentSpeedKmh = (safeCurrentSpeedMs * 3.6).toFixed(1);
-  const currentPace = speedToPace(safeCurrentSpeedMs);
+
+  // ── Pace exibido (corrida) ──────────────────────────────────────────────────
+  // Correndo → pace instantâneo ao vivo. Parado/pausado → o pace instantâneo
+  // dispararia (tempo/distância com velocidade ~0 = número inflado), então em vez
+  // disso mostramos o RECORDE de menor pace desta sessão (derivado do pico de
+  // velocidade já rastreado), com o rótulo virando "recorde" para não confundir.
+  const safeMaxSpeedMs =
+    isFinite(snap.maxSpeedMs) && snap.maxSpeedMs > 0 ? snap.maxSpeedMs : 0;
+  const MOVING_MS = 0.7; // ~2,5 km/h: abaixo disso consideramos "parado"
+  const livePace = speedToPace(safeCurrentSpeedMs);
+  const sessionBestPace = safeMaxSpeedMs > 0 ? speedToPace(safeMaxSpeedMs) : "--:--";
+  const isMovingForPace = !isPaused && safeCurrentSpeedMs >= MOVING_MS;
+  const showingBestPace = !isMovingForPace && sessionBestPace !== "--:--";
+  const currentPace = showingBestPace ? sessionBestPace : livePace;
   const safeDistance = isFinite(distance) && !isNaN(distance) ? distance : 0;
   const estimatedKcal = estimateCalories(safeDistance).toFixed(0);
 
@@ -1582,7 +1858,24 @@ const CyclingScreen: React.FC = () => {
     () => (snap.snappedRoute || []).filter(isValidLatLng),
     [snap.snappedRoute]
   );
-  const displayRoute = safeSnappedRoute.length > 1 ? safeSnappedRoute : safeRoute;
+  // Rota com gap (silêncio do GPS): prefere a crua, já quebrada — o snapped não
+  // carrega o flag de quebra e ligaria a reta cega de volta nas ruas.
+  const routeHasGap = useMemo(() => safeRoute.some((p) => p.gap), [safeRoute]);
+  const displayRoute =
+    !routeHasGap && safeSnappedRoute.length > 1 ? safeSnappedRoute : safeRoute;
+  // Trechos contíguos p/ desenhar uma polyline por sub-traçado (não cruza o gap).
+  // Simplifica cada trecho (Douglas-Peucker, tolerância baixa) para reduzir a
+  // contagem de pontos que o Google Maps precisa re-difar a cada frame. Numa
+  // corrida longa a rota crua chega a milhares de vértices; re-difar isso no
+  // retorno do background (mapa reanexando) pesa e aumenta o risco de crash
+  // nativo. 3 m preserva a forma sem custo perceptível.
+  const displaySegments = useMemo(
+    () =>
+      Tracker.splitRouteOnGaps(displayRoute)
+        .map((seg) => (seg.length > 2 ? simplifyRoute(seg, 3) : seg))
+        .filter((seg) => seg.length > 0),
+    [displayRoute]
+  );
 
   // Posição "ao vivo": último fix do treino em andamento, ou a posição conhecida
   // ao abrir a tela (antes de iniciar).
@@ -1649,11 +1942,15 @@ const CyclingScreen: React.FC = () => {
 
   // Recentraliza a câmera na posição atual do usuário.
   const recenter = () => {
-    if (hasValidLocation && liveLatLng) {
-      liveMapRef.current?.animateCamera(
-        { center: { latitude: liveLatLng.latitude, longitude: liveLatLng.longitude } },
-        { duration: 500 }
-      );
+    if (hasValidLocation && liveLatLng && liveMapReadyRef.current) {
+      try {
+        liveMapRef.current?.animateCamera(
+          { center: { latitude: liveLatLng.latitude, longitude: liveLatLng.longitude } },
+          { duration: 500 }
+        );
+      } catch {
+        // mapa reanexando — ignora
+      }
     }
   };
 
@@ -1668,6 +1965,9 @@ const CyclingScreen: React.FC = () => {
             style={StyleSheet.absoluteFillObject}
             showsUserLocation
             showsMyLocationButton={false}
+            onMapReady={() => {
+              liveMapReadyRef.current = true;
+            }}
             initialRegion={
               hasValidLocation && liveLatLng
                 ? {
@@ -1684,14 +1984,17 @@ const CyclingScreen: React.FC = () => {
                   }
             }
           >
-            {displayRoute.length > 1 && (
-              <Polyline
-                coordinates={displayRoute}
-                strokeColor={activeTab === "Ciclismo" ? "#3B82F6" : "#10B981"}
-                strokeWidth={5}
-                lineCap="round"
-                lineJoin="round"
-              />
+            {displaySegments.map((seg, i) =>
+              seg.length > 1 ? (
+                <Polyline
+                  key={i}
+                  coordinates={seg}
+                  strokeColor={activeTab === "Ciclismo" ? "#3B82F6" : "#10B981"}
+                  strokeWidth={5}
+                  lineCap="round"
+                  lineJoin="round"
+                />
+              ) : null
             )}
           </MapView>
 
@@ -1740,7 +2043,7 @@ const CyclingScreen: React.FC = () => {
                     {activeTab === "Ciclismo" ? currentSpeedKmh : currentPace}
                   </Text>
                   <Text style={styles.immStatLabel}>
-                    {activeTab === "Ciclismo" ? "km/h" : "pace"}
+                    {activeTab === "Ciclismo" ? "km/h" : showingBestPace ? "recorde" : "pace"}
                   </Text>
                 </View>
                 <View style={styles.immStatDivider} />
@@ -1785,6 +2088,9 @@ const CyclingScreen: React.FC = () => {
               currentSpeedMs={safeCurrentSpeedMs}
               maxSpeedMs={snap.maxSpeedMs || 0}
               elevationGainM={snap.elevationGainM || 0}
+              currentHr={snap.currentHr || 0}
+              avgHr={snap.avgHr || 0}
+              maxHr={snap.maxHr || 0}
               splits={snap.splits}
               route={displayRoute}
               mapRef={pausedMapRef}
@@ -1837,6 +2143,9 @@ const CyclingScreen: React.FC = () => {
               showsUserLocation
               showsMyLocationButton={false}
               followsUserLocation={false}
+              onMapReady={() => {
+                liveMapReadyRef.current = true;
+              }}
               initialRegion={
                 hasValidLocation && liveLatLng
                   ? {
@@ -1853,14 +2162,17 @@ const CyclingScreen: React.FC = () => {
                     }
               }
             >
-              {displayRoute.length > 1 && (
-                <Polyline
-                  coordinates={displayRoute}
-                  strokeColor={activeTab === "Ciclismo" ? "#3B82F6" : "#10B981"}
-                  strokeWidth={4}
-                  lineCap="round"
-                  lineJoin="round"
-                />
+              {displaySegments.map((seg, i) =>
+                seg.length > 1 ? (
+                  <Polyline
+                    key={i}
+                    coordinates={seg}
+                    strokeColor={activeTab === "Ciclismo" ? "#3B82F6" : "#10B981"}
+                    strokeWidth={4}
+                    lineCap="round"
+                    lineJoin="round"
+                  />
+                ) : null
               )}
             </MapView>
 
@@ -1887,7 +2199,7 @@ const CyclingScreen: React.FC = () => {
                       {activeTab === "Ciclismo" ? currentSpeedKmh : currentPace}
                     </Text>
                     <Text style={styles.hudCardUnit}>
-                      {activeTab === "Ciclismo" ? "km/h" : "pace/km"}
+                      {activeTab === "Ciclismo" ? "km/h" : showingBestPace ? "recorde" : "pace/km"}
                     </Text>
                   </View>
                 </View>
@@ -2056,6 +2368,13 @@ const CyclingScreen: React.FC = () => {
           <Text style={styles.countdownNum}>{countdown}</Text>
         </View>
       )}
+
+      {/* Guia de permissões de segundo plano (ROMs agressivas). */}
+      <WorkoutBackgroundGuide
+        visible={bgGuideVisible}
+        onClose={closeBgGuide}
+        manufacturer={deviceMfr}
+      />
     </DataErrorBoundary>
   );
 };
@@ -2562,6 +2881,15 @@ const hs = StyleSheet.create({
   },
   dot: { width: 7, height: 7, borderRadius: 4, backgroundColor: "#CBD5E1" },
   previewActions: { flexDirection: "row", gap: 10 },
+  previewPublishBtn: {
+    height: 54,
+    borderRadius: 16,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 10,
+    marginBottom: 10,
+  },
   previewActionBtn: {
     flex: 1,
     height: 54,

@@ -10,8 +10,13 @@
 export function speedToPace(speedMs: number): string {
   if (!speedMs || speedMs <= 0) return "--:--";
   const secondsPerKm = 1000 / speedMs;
-  const minutes = Math.floor(secondsPerKm / 60);
-  const seconds = Math.round(secondsPerKm % 60);
+
+  // Arredonda o TOTAL de segundos antes de separar em min:seg. Arredondar os
+  // segundos isoladamente (round(secPerKm % 60)) podia gerar "5:60" quando o
+  // resto caía em [59.5, 60) — agora rola corretamente para "6:00".
+  const totalSec = Math.round(secondsPerKm);
+  const minutes = Math.floor(totalSec / 60);
+  const seconds = totalSec % 60;
 
   // Trata casos de pace irrealisticamente alto (ex: parado)
   if (minutes > 30) return "--:--";

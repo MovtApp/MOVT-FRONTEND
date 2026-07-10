@@ -23,7 +23,9 @@ export interface ShareStat {
 }
 
 export type CardLayout = "classic" | "overlay" | "minimal";
-export type CardFormat = "feed" | "stories";
+// "square" (1:1) é usado para publicar no feed interno do MOVT, que exibe o post
+// em quadrado (sem cortar as stats como aconteceria com "feed" 4:5 ou "stories").
+export type CardFormat = "feed" | "stories" | "square";
 
 export interface ShareWorkoutInput {
   route: { latitude: number; longitude: number }[];
@@ -89,6 +91,19 @@ export async function generateWorkoutCards(input: ShareWorkoutCardsInput): Promi
     uris.push(uri);
   }
   return uris;
+}
+
+/**
+ * Gera o card e o SOBE pelo backend (service_role), devolvendo a URL pública —
+ * usado para PUBLICAR no feed do MOVT. O upload é server-side de propósito: a
+ * RLS do Storage barra uploads client-side de usuários sem sessão Supabase
+ * (login por e-mail/senha). O caller passa a URL direto pro POST /user/posts.
+ */
+export async function uploadWorkoutPostImage(input: ShareWorkoutInput): Promise<string> {
+  const res = await api.post("/route/share-card", { ...input, upload: true });
+  const url: string | undefined = res.data?.url;
+  if (!url) throw new Error("Não foi possível preparar a imagem do treino.");
+  return url;
 }
 
 /** Abre o menu nativo de compartilhamento para um arquivo de imagem já gerado. */

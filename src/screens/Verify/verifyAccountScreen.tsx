@@ -103,7 +103,7 @@ const VerifyAccountScreen = () => {
       if (PHONE_VERIFICATION_ENABLED && user?.phone_verified === false) {
         navigation.navigate("Verify", { screen: "VerifyPhoneScreen" });
       } else if (isTrainer && !user?.cref_verified) {
-        navigation.navigate("Verify", { screen: "VerifyCompanyScreen" });
+        navigation.navigate("Verify", { screen: "VerifyCrefScreen" });
       } else if (user?.onboarding_completed === false) {
         navigation.reset({ index: 0, routes: [{ name: "Info" as never }] });
       } else {

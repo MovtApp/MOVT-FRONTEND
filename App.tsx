@@ -36,6 +36,8 @@ import { PHONE_VERIFICATION_ENABLED } from "@/config/featureFlags";
 // localização no boot, para o SO conseguir entregar fixes de GPS em background
 // (mesmo com a tela apagada / após restart do processo).
 import "@services/locationTrackingService";
+import { hasActiveSession } from "@services/locationTrackingService";
+import { navigationRef, navigateToActiveWorkout } from "@services/navigationRef";
 // Registra os handlers de escrita offline-first (água, missão, …) ANTES de
 // ligar a fila, para o flush de boot já encontrar todos os despachantes.
 import "@services/registerSyncHandlers";
@@ -151,6 +153,32 @@ function AppContent() {
     }
     setCurrentRoute(initialRouteName);
   }, [user]);
+
+  // Restaura a tela de treino se houver uma sessão de rastreamento ativa quando o
+  // app abre/relança — ex.: o SO matou o processo durante uma corrida com a tela
+  // apagada. Sem isto o app cairia na Home e o treino seguiria invisível em
+  // background (os dados sobrevivem no AsyncStorage, mas a UI não voltava). Espera
+  // o NavigationContainer ficar pronto antes de despachar.
+  React.useEffect(() => {
+    if (currentRoute !== "App") return;
+    let cancelled = false;
+    (async () => {
+      const { active } = await hasActiveSession();
+      if (cancelled || !active) return;
+      const tryNav = (attempt = 0) => {
+        if (cancelled) return;
+        if (navigationRef.isReady()) {
+          navigateToActiveWorkout();
+        } else if (attempt < 20) {
+          setTimeout(() => tryNav(attempt + 1), 150);
+        }
+      };
+      tryNav();
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [currentRoute]);
 
   if (!fontsLoaded || isLoadingAuth) {
     return (
