@@ -4,6 +4,7 @@ import { NavigationContainer } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 // import { SplashScreen } from "../screens/splashScreen"; // Removida importação não utilizada
 import { RootStackParamList } from "../@types/routes"; // Corrigida a importação de RootStackParamList
+import * as SplashScreen from "expo-splash-screen";
 import { navigationRef } from "../services/navigationRef";
 import {
   loadNavState,
@@ -60,6 +61,11 @@ export function Routes({ initialRouteName }: RoutesProps) {
       ref={navigationRef}
       initialState={initialState}
       onReady={() => {
+        // A navegação montou e o initialState já foi aplicado: a tela restaurada
+        // está pronta. Esconde a splash nativa AGORA para o usuário cair direto
+        // nela, sem flash branco nem spinner — mesmo quando o SO recriou o
+        // processo ao voltar do bloqueio (o cold start vira um "resume").
+        SplashScreen.hideAsync().catch(() => {});
         // Restauração assentou: libera o crash-guard depois de um respiro,
         // tempo suficiente p/ a tela montar (se fosse quebrar, já teria quebrado
         // e o GlobalErrorBoundary teria assumido, mantendo a flag p/ abrir limpo).
