@@ -429,6 +429,13 @@ const WorkoutDetail: React.FC<WorkoutDetailProps> = ({
         value: extraStats.timePerKm !== "--" ? `${extraStats.timePerKm} /km` : "--",
       },
     ];
+    // FC do relógio (só aparece quando um wearable alimentou dados neste treino).
+    if (workout.avgHr && workout.avgHr > 0) {
+      rows.push({ icon: Heart, label: "FC média", value: `${workout.avgHr} bpm` });
+      if (workout.maxHr && workout.maxHr > 0) {
+        rows.push({ icon: Heart, label: "FC máxima", value: `${workout.maxHr} bpm` });
+      }
+    }
     if (extraStats.hasSplits) {
       rows.push(
         { icon: Trophy, label: "Melhor km", value: `${extraStats.bestKm} /km` },
@@ -1036,6 +1043,9 @@ interface PausedStatsProps {
   currentSpeedMs: number;
   maxSpeedMs: number;
   elevationGainM: number;
+  currentHr: number;
+  avgHr: number;
+  maxHr: number;
   splits: TrackingSnapshot["splits"];
   route: LatLng[];
   mapRef: React.RefObject<MapView | null>;
@@ -1051,6 +1061,9 @@ const PausedStats: React.FC<PausedStatsProps> = ({
   currentSpeedMs,
   maxSpeedMs,
   elevationGainM,
+  currentHr,
+  avgHr,
+  maxHr,
   splits,
   route,
   mapRef,
@@ -1127,6 +1140,11 @@ const PausedStats: React.FC<PausedStatsProps> = ({
       { icon: TrendingUp, label: "Calorias / km", value: distanceKm > 0 ? `${(kcalNum / distanceKm).toFixed(0)} kcal` : "--" },
       { icon: Timer, label: "Calorias / min", value: seconds > 0 ? `${(kcalNum / (seconds / 60)).toFixed(1)} kcal` : "--" },
       { icon: Mountain, label: "Ganho de elevação", value: `${Math.round(elevationGainM)} m` },
+      // FC do relógio: "--" enquanto nenhum wearable entrega dados (sinal claro
+      // de que o relógio não está alimentando este treino).
+      { icon: Heart, label: "FC atual", value: currentHr > 0 ? `${currentHr} bpm` : "--" },
+      { icon: Heart, label: "FC média", value: avgHr > 0 ? `${avgHr} bpm` : "--" },
+      { icon: Heart, label: "FC máxima", value: maxHr > 0 ? `${maxHr} bpm` : "--" },
     ],
   };
 
@@ -1581,6 +1599,10 @@ const CyclingScreen: React.FC = () => {
         route: final.route,
         routeSnapped: final.snappedRoute,
         splits: final.splits,
+        // FC do relógio (Fase 1): só vem preenchida se um wearable alimentou FC.
+        avgHr: final.avgHr,
+        maxHr: final.maxHr,
+        watchPresent: final.watchPresent,
       });
 
       await loadHistory();
@@ -1835,8 +1857,13 @@ const CyclingScreen: React.FC = () => {
           <SafeAreaView edges={["top"]} style={styles.immTopSafe} pointerEvents="box-none">
             <View style={styles.immTopRow}>
               <BackButton to={{ name: "DataScreen" }} />
-              <View style={styles.immModalityPill}>
-                <Text style={styles.immModalityText}>{activeTab.toUpperCase()}</Text>
+              {/* Pilula de modalidade numa camada ABSOLUTA centrada sobre a linha
+                  inteira: centro EXATO da tela, independente da largura do back
+                  button (esq) e da badge Pausado / espacador (dir). */}
+              <View style={styles.immModalityCenter} pointerEvents="none">
+                <View style={styles.immModalityPill}>
+                  <Text style={styles.immModalityText}>{activeTab.toUpperCase()}</Text>
+                </View>
               </View>
               {isPaused ? (
                 <Animated.View style={[styles.immPausedBadge, { opacity: pausePulse }]}>
@@ -1921,6 +1948,9 @@ const CyclingScreen: React.FC = () => {
               currentSpeedMs={safeCurrentSpeedMs}
               maxSpeedMs={snap.maxSpeedMs || 0}
               elevationGainM={snap.elevationGainM || 0}
+              currentHr={snap.currentHr || 0}
+              avgHr={snap.avgHr || 0}
+              maxHr={snap.maxHr || 0}
               splits={snap.splits}
               route={displayRoute}
               mapRef={pausedMapRef}
@@ -2214,6 +2244,15 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingTop: 6,
     gap: 8,
+  },
+  immModalityCenter: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    top: 0,
+    bottom: 0,
+    alignItems: "center",
+    justifyContent: "center",
   },
   immModalityPill: {
     backgroundColor: "rgba(25,33,38,0.85)",

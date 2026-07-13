@@ -20,7 +20,7 @@ import BottomSheet, {
   BottomSheetBackdrop,
   BottomSheetScrollView,
 } from "@gorhom/bottom-sheet";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
 import { useNavigation } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
@@ -51,6 +51,7 @@ import { CartesianChart, Line, Area, useChartPressState, PolarChart, Pie } from 
 import { LinearGradient as SkiaGradient, vec, Circle } from "@shopify/react-native-skia";
 import BackButton from "../../../../components/BackButton";
 import { api } from "../../../../services/api";
+import { userService } from "../../../../services/userService";
 import * as ImagePicker from "expo-image-picker";
 import { notifyError, notifyApiError, toastSuccess, toastError } from "../../../../utils/notify";
 import type { AvailabilityDay } from "../../../../services/appointmentService";
@@ -138,6 +139,21 @@ interface DashboardData {
 const DAY_LABELS = ["Domingo", "Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado"];
 const DURATION_OPTIONS = [30, 45, 60];
 
+// Mesma lista canônica coletada no onboarding (ProfileDetailsScreen). Mantida em
+// sincronia para o badge de especialidade e o filtro de busca de personais.
+const SPECIALTY_OPTIONS = [
+  "Educador Físico",
+  "Emagrecimento",
+  "Hipertrofia",
+  "Funcional",
+  "Crossfit",
+  "Pilates",
+  "Yoga",
+  "Corrida",
+  "Nutrição Esportiva",
+  "Reabilitação",
+];
+
 const fmtTime = (d: Date) =>
   `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
 
@@ -160,7 +176,8 @@ const buildEmptyWeek = (): AvailabilityDay[] =>
 
 const PersonalDashboard: React.FC = () => {
   const navigation = useNavigation<NativeStackNavigationProp<AppStackParamList>>();
-  const { user } = useAuth();
+  const { user, updateUser } = useAuth();
+  const insets = useSafeAreaInsets();
   const { state, isActive } = useChartPressState({ x: "", y: { total: 0 } });
 
   const [loading, setLoading] = useState(true);
@@ -184,6 +201,7 @@ const PersonalDashboard: React.FC = () => {
   const reviewsSheetRef = React.useRef<BottomSheet>(null);
   const paymentsSheetRef = React.useRef<BottomSheet>(null);
   const availabilitySheetRef = React.useRef<BottomSheet>(null);
+  const especialidadesSheetRef = React.useRef<BottomSheet>(null);
 
   const [selectedClient, setSelectedClient] = useState<PersonalClient | null>(null);
   const [clientHistory, setClientHistory] = useState<any[]>([]);
@@ -200,6 +218,10 @@ const PersonalDashboard: React.FC = () => {
   const [availabilityWeek, setAvailabilityWeek] = useState<AvailabilityDay[]>(buildEmptyWeek());
   const [loadingAvailability, setLoadingAvailability] = useState(false);
   const [savingAvailability, setSavingAvailability] = useState(false);
+
+  // Especialidades (áreas de atuação exibidas no perfil / filtro de busca)
+  const [especialidades, setEspecialidades] = useState<string[]>([]);
+  const [savingEspecialidades, setSavingEspecialidades] = useState(false);
   const [timePicker, setTimePicker] = useState<{
     dayIdx: number;
     rangeIdx: number;
@@ -428,6 +450,37 @@ const PersonalDashboard: React.FC = () => {
       notifyApiError(e, "Não foi possível salvar sua disponibilidade.");
     } finally {
       setSavingAvailability(false);
+    }
+  };
+
+  // ── Especialidades (áreas de atuação) ──────────────────────────────────────
+  const openEspecialidades = () => {
+    // Semeia com o que o personal já tem salvo (vem do contexto de auth).
+    setEspecialidades(((user as any)?.especialidades as string[]) || []);
+    markSheetAsRendered("especialidades");
+  };
+
+  const toggleEspecialidade = (item: string) => {
+    setEspecialidades((prev) =>
+      prev.includes(item) ? prev.filter((s) => s !== item) : [...prev, item]
+    );
+  };
+
+  const saveEspecialidades = async () => {
+    if (especialidades.length === 0) {
+      notifyError("Selecione ao menos uma especialidade ou feche sem salvar.");
+      return;
+    }
+    setSavingEspecialidades(true);
+    try {
+      await userService.updateSpecialty(especialidades);
+      updateUser({ especialidades } as any);
+      toastSuccess("Especialidades atualizadas!");
+      especialidadesSheetRef.current?.close();
+    } catch (e) {
+      notifyApiError(e, "Não foi possível salvar suas especialidades.");
+    } finally {
+      setSavingEspecialidades(false);
     }
   };
 
@@ -971,6 +1024,19 @@ const PersonalDashboard: React.FC = () => {
                   <Text style={styles.statusLabel}>Horários de Atendimento</Text>
                 </View>
                 <View style={styles.statusValueRow}>
+                  <ChevronRight size={16} color="#94A3B8" />
+                </View>
+              </TouchableOpacity>
+
+              <TouchableOpacity style={styles.statusItem} onPress={openEspecialidades}>
+                <View style={styles.statusIndicator}>
+                  <View style={[styles.statusDot, { backgroundColor: "#8B5CF6" }]} />
+                  <Text style={styles.statusLabel}>Especialidades</Text>
+                </View>
+                <View style={styles.statusValueRow}>
+                  <Text style={styles.statusValue}>
+                    {((user as any)?.especialidades?.length as number) || 0}
+                  </Text>
                   <ChevronRight size={16} color="#94A3B8" />
                 </View>
               </TouchableOpacity>
@@ -1958,37 +2024,65 @@ const PersonalDashboard: React.FC = () => {
             ref={availabilitySheetRef}
             key={`availability-${sheetVersion}`}
             index={0}
-            snapPoints={["90%"]}
+            // Abre em 65% e o usuário pode arrastar até 100%; a partir daí o
+            // conteúdo (7 dias + faixas) rola verticalmente dentro do sheet.
+            snapPoints={["65%", "100%"]}
             // gorhom v5 liga dynamic sizing por padrão → o sheet cresce com o
-            // conteúdo e o scroll interno não engata; fixamos no snapPoint.
+            // conteúdo e o scroll interno não engata; fixamos nos snapPoints.
             enableDynamicSizing={false}
+            // No snap de 100% o sheet vai até o topo; recuar a status bar evita
+            // que o header fique embaixo dela.
+            topInset={insets.top}
             enablePanDownToClose
             backdropComponent={renderBackdrop}
             backgroundStyle={{ borderRadius: 32 }}
             onClose={() => setRenderedSheets(new Set())}
           >
-            <BottomSheetView style={styles.sheetContent}>
-              <View style={styles.sheetHeader}>
-                <View>
-                  <Text style={styles.sheetTitle}>Horários de Atendimento</Text>
-                  <Text style={styles.cardSubtitle}>
-                    Dias e faixas que aparecem no calendário dos clientes
-                  </Text>
+            {loadingAvailability ? (
+              <BottomSheetView style={styles.sheetContent}>
+                <View style={styles.sheetHeader}>
+                  <View>
+                    <Text style={styles.sheetTitle}>Horários de Atendimento</Text>
+                    <Text style={styles.cardSubtitle}>
+                      Dias e faixas que aparecem no calendário dos clientes
+                    </Text>
+                  </View>
+                  <TouchableOpacity onPress={() => availabilitySheetRef.current?.close()}>
+                    <X size={24} color="#64748B" />
+                  </TouchableOpacity>
                 </View>
-                <TouchableOpacity onPress={() => availabilitySheetRef.current?.close()}>
-                  <X size={24} color="#64748B" />
-                </TouchableOpacity>
-              </View>
-
-              {loadingAvailability ? (
                 <ActivityIndicator color="#10B981" style={{ marginTop: 40 }} />
-              ) : (
-                <BottomSheetScrollView
-                  style={{ flex: 1, marginTop: 4 }}
-                  showsVerticalScrollIndicator={false}
-                  contentContainerStyle={{ paddingBottom: 40 }}
-                >
-                  {availabilityWeek.map((day, dayIdx) => (
+              </BottomSheetView>
+            ) : (
+              // O ScrollView precisa ser filho DIRETO do BottomSheet para o
+              // gorhom conectar o gesto de scroll; envolto num BottomSheetView a
+              // medição de altura quebra e a rolagem não engata. Header vira
+              // sticky (índice 0) para não sumir ao rolar os 7 dias.
+              <BottomSheetScrollView
+                style={{ flex: 1 }}
+                showsVerticalScrollIndicator={false}
+                // Mantém a rolagem engatada mesmo quando o toque começa sobre
+                // um controle (Switch, chips de duração, botões de hora).
+                keyboardShouldPersistTaps="handled"
+                stickyHeaderIndices={[0]}
+                contentContainerStyle={{
+                  paddingHorizontal: 24,
+                  paddingBottom: insets.bottom + 40,
+                }}
+              >
+                <View style={styles.availStickyHeader}>
+                  <View>
+                    <Text style={styles.sheetTitle}>Horários de Atendimento</Text>
+                    <Text style={styles.cardSubtitle}>
+                      Dias e faixas que aparecem no calendário dos clientes
+                    </Text>
+                  </View>
+                  <TouchableOpacity onPress={() => availabilitySheetRef.current?.close()}>
+                    <X size={24} color="#64748B" />
+                  </TouchableOpacity>
+                </View>
+
+                {availabilityWeek.map((day, dayIdx) => (
                     <View key={day.dia_semana} style={styles.availDayCard}>
                       <View style={styles.availDayHeader}>
                         <Text style={styles.availDayTitle}>{DAY_LABELS[day.dia_semana]}</Text>
@@ -2090,9 +2184,82 @@ const PersonalDashboard: React.FC = () => {
                       <Text style={styles.applyBtnText}>Salvar disponibilidade</Text>
                     )}
                   </TouchableOpacity>
-                </BottomSheetScrollView>
-              )}
-            </BottomSheetView>
+              </BottomSheetScrollView>
+            )}
+          </BottomSheet>
+        )}
+
+        {/* ── SHEET: ESPECIALIDADES ── */}
+        {renderedSheets.has("especialidades") && (
+          <BottomSheet
+            ref={especialidadesSheetRef}
+            key={`especialidades-${sheetVersion}`}
+            index={0}
+            snapPoints={["65%", "100%"]}
+            enableDynamicSizing={false}
+            topInset={insets.top}
+            enablePanDownToClose
+            backdropComponent={renderBackdrop}
+            backgroundStyle={{ borderRadius: 32 }}
+            onClose={() => setRenderedSheets(new Set())}
+          >
+            <BottomSheetScrollView
+              style={{ flex: 1 }}
+              showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+              stickyHeaderIndices={[0]}
+              contentContainerStyle={{
+                paddingHorizontal: 24,
+                paddingBottom: insets.bottom + 40,
+              }}
+            >
+              <View style={styles.availStickyHeader}>
+                <View>
+                  <Text style={styles.sheetTitle}>Especialidades</Text>
+                  <Text style={styles.cardSubtitle}>
+                    Áreas de atuação exibidas no seu perfil e na busca de alunos
+                  </Text>
+                </View>
+                <TouchableOpacity onPress={() => especialidadesSheetRef.current?.close()}>
+                  <X size={24} color="#64748B" />
+                </TouchableOpacity>
+              </View>
+
+              <View style={styles.espChipsWrap}>
+                {SPECIALTY_OPTIONS.map((item) => {
+                  const selected = especialidades.includes(item);
+                  return (
+                    <TouchableOpacity
+                      key={item}
+                      style={[styles.espChip, selected && styles.espChipActive]}
+                      onPress={() => toggleEspecialidade(item)}
+                    >
+                      <Text style={[styles.espChipText, selected && styles.espChipTextActive]}>
+                        {item}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+
+              <TouchableOpacity
+                style={[styles.applyBtn, { marginTop: 20, alignSelf: "stretch", flex: 0 }]}
+                onPress={saveEspecialidades}
+                disabled={savingEspecialidades}
+              >
+                <LinearGradient
+                  colors={["#8B5CF6", "#6D28D9"]}
+                  style={StyleSheet.absoluteFill}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 0 }}
+                />
+                {savingEspecialidades ? (
+                  <ActivityIndicator color="#fff" size="small" />
+                ) : (
+                  <Text style={styles.applyBtnText}>Salvar especialidades</Text>
+                )}
+              </TouchableOpacity>
+            </BottomSheetScrollView>
           </BottomSheet>
         )}
 
@@ -2325,6 +2492,16 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginBottom: 24,
   },
+  // Header fixo do sheet de disponibilidade: fundo branco opaco para o conteúdo
+  // rolar por baixo sem transparência ao usar stickyHeaderIndices.
+  availStickyHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    backgroundColor: "#fff",
+    paddingTop: 20,
+    paddingBottom: 16,
+  },
   sheetTitle: { fontSize: 20, fontWeight: "800", color: "#1E293B" },
 
   pendingCard: { backgroundColor: "#F8FAFC", borderRadius: 20, padding: 16, marginBottom: 12 },
@@ -2499,6 +2676,23 @@ const styles = StyleSheet.create({
   availDurationChipActive: { backgroundColor: "#10B98110", borderColor: "#10B981" },
   availDurationText: { fontSize: 13, fontWeight: "700", color: "#64748B" },
   availDurationTextActive: { color: "#10B981" },
+  espChipsWrap: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 10,
+    marginTop: 20,
+  },
+  espChip: {
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    backgroundColor: "#fff",
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+  },
+  espChipActive: { backgroundColor: "#8B5CF610", borderColor: "#8B5CF6" },
+  espChipText: { fontSize: 14, fontWeight: "600", color: "#64748B" },
+  espChipTextActive: { color: "#8B5CF6" },
   availRangeRow: {
     flexDirection: "row",
     alignItems: "center",

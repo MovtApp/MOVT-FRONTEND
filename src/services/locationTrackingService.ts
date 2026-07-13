@@ -112,6 +112,18 @@ export interface TrackingSnapshot {
   maxSpeedMs: number;
   /** Ganho de elevação acumulado na sessão (metros de subida). */
   elevationGainM: number;
+  /** Última FC lida do relógio (bpm). 0 = sem leitura/sem relógio. */
+  currentHr: number;
+  /** FC média da sessão (bpm), arredondada. 0 = sem dados. */
+  avgHr: number;
+  /** FC máxima registrada na sessão (bpm). 0 = sem dados. */
+  maxHr: number;
+  /**
+   * Métrica de adoção: o relógio entregou ao menos uma FC válida durante o
+   * treino? É o sinal que valida (ou descarta) investimento maior em wearable
+   * — quantos treinos de fato têm um relógio alimentando dados.
+   */
+  watchPresent: boolean;
   isPaused: boolean;
   lastLocation: LatLng | null;
 }
@@ -137,6 +149,16 @@ interface Session {
   currentSpeedMs: number;
   maxSpeedMs: number; // pico de velocidade instantânea (m/s)
   elevationGainM: number; // ganho de elevação acumulado (m)
+  // ── Frequência cardíaca do relógio (Health Connect / HealthKit) ──────────────
+  // Série temporal + agregados. Coletado por um poller de leitura (nunca pede
+  // permissão — só lê o que o app já tem autorizado, p/ não disparar o crash
+  // conhecido do Health Connect). Serializável → sobrevive à persistência.
+  hrSeries: { t: number; bpm: number }[]; // amostras (timestamp ms + bpm)
+  hrSum: number; // soma p/ média incremental
+  hrCount: number; // nº de amostras válidas
+  currentHr: number; // última FC lida (bpm)
+  maxHr: number; // pico de FC (bpm)
+  watchPresent: boolean; // recebeu ao menos uma FC do relógio nesta sessão
   lastAltitude: number | null; // referência de altitude p/ acumular subida (histerese)
   lastPoint: LatLng | null; // último fix aceito (âncora por-fix, p/ velocidade)
   lastRegPoint: LatLng | null; // último ponto REGISTRADO na rota (âncora de distância)
@@ -153,6 +175,66 @@ let hydrated = false;
 let lastPersistTs = 0;
 // Garante UM snap em voo por vez (a task de localização dispara em cada lote).
 let snapInProgress = false;
+
+// ─── Poller de frequência cardíaca (relógio via Health Connect / HealthKit) ──────
+// Cadência de leitura da FC. 8 s é folgado: durante um treino o relógio grava FC
+// no agregador com regularidade; ler mais rápido só gastaria bateria/IO sem ganho.
+const HR_POLL_MS = 8000;
+// FC plausível (bpm). Fora disso é ruído/erro de leitura e não entra na série.
+const HR_MIN_BPM = 30;
+const HR_MAX_BPM = 240;
+let hrTimer: ReturnType<typeof setInterval> | null = null;
+let hrFetchInFlight = false;
+
+// Registra uma leitura de FC na sessão ativa (agregados incrementais + série).
+function recordHeartRate(bpm: number) {
+  if (!session?.active) return;
+  if (!isFinite(bpm) || bpm < HR_MIN_BPM || bpm > HR_MAX_BPM) return;
+  session.currentHr = Math.round(bpm);
+  session.maxHr = Math.max(session.maxHr, session.currentHr);
+  session.hrSum += session.currentHr;
+  session.hrCount += 1;
+  session.watchPresent = true;
+  // Série amostrada (bounded por duração real de treino; ~450 pts/h a 8 s).
+  session.hrSeries.push({ t: Date.now(), bpm: session.currentHr });
+}
+
+// Uma leitura de FC (best-effort). SÓ LÊ — nunca chama authorize()/requestPermission,
+// para não disparar o crash conhecido do Health Connect (lateinit). Se a permissão
+// não estiver concedida, `fetchHeartRate` devolve 0 e a métrica watchPresent fica
+// false — que é exatamente o sinal correto ("sem relógio alimentando este treino").
+async function pollHeartRateOnce() {
+  if (hrFetchInFlight || !session?.active) return;
+  hrFetchInFlight = true;
+  try {
+    // Lazy-require evita puxar o módulo nativo de saúde para o caminho de registro
+    // da task headless de localização (mesmo padrão das telas de dados).
+    const { NativeHealthManager } = require("./nativeHealthManager");
+    const bpm = await NativeHealthManager.fetchHeartRate();
+    recordHeartRate(bpm);
+  } catch {
+    // best-effort: uma leitura falha não afeta o treino
+  } finally {
+    hrFetchInFlight = false;
+  }
+}
+
+function startHrPolling() {
+  if (hrTimer) return; // idempotente
+  // Leitura imediata + a cada HR_POLL_MS. Enquanto o app está em foreground o
+  // timer roda normal; em background profundo o SO pode pausá-lo — aceitável,
+  // pois FC do relógio é enriquecimento best-effort (o GPS/tempo seguem por
+  // outra via resiliente). Não bloqueia nada do rastreio.
+  pollHeartRateOnce();
+  hrTimer = setInterval(pollHeartRateOnce, HR_POLL_MS);
+}
+
+function stopHrPolling() {
+  if (hrTimer) {
+    clearInterval(hrTimer);
+    hrTimer = null;
+  }
+}
 
 // ─── Tempo decorrido (relógio de parede menos pausas) ───────────────────────────
 function currentElapsedMs(): number {
@@ -421,6 +503,12 @@ async function ensureHydrated() {
         if (typeof parsed.lastSnapAtLen !== "number") parsed.lastSnapAtLen = 0;
         if (typeof parsed.maxSpeedMs !== "number") parsed.maxSpeedMs = 0;
         if (typeof parsed.elevationGainM !== "number") parsed.elevationGainM = 0;
+        if (!Array.isArray(parsed.hrSeries)) parsed.hrSeries = [];
+        if (typeof parsed.hrSum !== "number") parsed.hrSum = 0;
+        if (typeof parsed.hrCount !== "number") parsed.hrCount = 0;
+        if (typeof parsed.currentHr !== "number") parsed.currentHr = 0;
+        if (typeof parsed.maxHr !== "number") parsed.maxHr = 0;
+        if (typeof parsed.watchPresent !== "boolean") parsed.watchPresent = false;
         if (typeof parsed.lastAltitude !== "number") parsed.lastAltitude = null;
         session = parsed;
       }
@@ -446,6 +534,10 @@ function emptySnapshot(): TrackingSnapshot {
     currentSpeedMs: 0,
     maxSpeedMs: 0,
     elevationGainM: 0,
+    currentHr: 0,
+    avgHr: 0,
+    maxHr: 0,
+    watchPresent: false,
     isPaused: false,
     lastLocation: null,
   };
@@ -464,6 +556,10 @@ export function getSnapshot(): TrackingSnapshot {
     currentSpeedMs: session.currentSpeedMs,
     maxSpeedMs: session.maxSpeedMs,
     elevationGainM: session.elevationGainM,
+    currentHr: session.currentHr,
+    avgHr: session.hrCount > 0 ? Math.round(session.hrSum / session.hrCount) : 0,
+    maxHr: session.maxHr,
+    watchPresent: session.watchPresent,
     isPaused: session.isPaused,
     lastLocation: session.lastLocation,
   };
@@ -609,6 +705,12 @@ export async function startTracking(type: WorkoutKind): Promise<StartResult> {
     currentSpeedMs: 0,
     maxSpeedMs: 0,
     elevationGainM: 0,
+    hrSeries: [],
+    hrSum: 0,
+    hrCount: 0,
+    currentHr: 0,
+    maxHr: 0,
+    watchPresent: false,
     lastAltitude: null,
     lastPoint: null,
     lastRegPoint: null,
@@ -619,6 +721,9 @@ export async function startTracking(type: WorkoutKind): Promise<StartResult> {
   };
   hydrated = true; // sessão fresca; não rehidratar por cima
   await persist(true);
+
+  // Começa a ler a FC do relógio (best-effort, só leitura — ver startHrPolling).
+  startHrPolling();
 
   // Evita task duplicada de uma sessão anterior mal encerrada.
   const already = await Location.hasStartedLocationUpdatesAsync(LOCATION_TASK).catch(() => false);
@@ -655,6 +760,10 @@ export function tick() {
 
 /** Encerra a sessão e retorna o snapshot final (para salvar o treino). */
 export async function stopTracking(): Promise<TrackingSnapshot> {
+  // Uma leitura final de FC (best-effort) antes de fechar, para o resumo refletir
+  // o batimento mais recente; depois desliga o poller.
+  await pollHeartRateOnce();
+  stopHrPolling();
   const finalSnap = getSnapshot();
 
   // Passe final de alta qualidade: snap da rota inteira (best-effort). Se a rede
@@ -711,6 +820,8 @@ export async function resumeIfActive() {
     // Processo religado pelo SO durante um treino: rearma o WakeLock (foi solto
     // quando o processo morreu) para a CPU não suspender de novo.
     acquireWorkoutWakeLock();
+    // Rearma também o poller de FC (o timer não sobrevive ao restart do JS).
+    startHrPolling();
     const started = await Location.hasStartedLocationUpdatesAsync(LOCATION_TASK).catch(() => false);
     if (!started) {
       try {

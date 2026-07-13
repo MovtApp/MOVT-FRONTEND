@@ -175,8 +175,11 @@ export function AppointmentScreen() {
 
   // Verificar se o personal NÃO atende neste dia da semana
   const isInactiveDay = (dateStr: string) => {
-    const date = new Date(dateStr);
-    const dayOfWeek = date.getDay();
+    // Parse em horário LOCAL. new Date("YYYY-MM-DD") é meia-noite UTC e, em
+    // fusos negativos (BR = UTC-3), getDay() retorna o dia da semana anterior,
+    // deslocando a config em 1 (desativar domingo desativava segunda, etc).
+    const [y, m, d] = dateStr.split("-").map(Number);
+    const dayOfWeek = new Date(y, m - 1, d).getDay();
     // Se não encontrar configuração para o dia ou estiver inativo
     const config = monthAvailability.find((a: any) => a.dia_semana === dayOfWeek);
     return !config || !config.ativo;

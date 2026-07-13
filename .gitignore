@@ -175,3 +175,4 @@ settings*.yml
 !.env.example
 # Saida transpilada do teste de historico (descartavel)
 scripts/.tmp-wh/
+frames

@@ -19,7 +19,7 @@ import { useAuth } from "@contexts/AuthContext";
 import { userService } from "@services/userService";
 import { RootStackParamList } from "@typings/routes";
 
-// Lista padronizada de especialidades (CNPJ). Alimenta o filtro de especialidade
+// Lista padronizada de especialidades do profissional. Alimenta o filtro de especialidade
 // do app (specialty), por isso mantemos um conjunto fixo em vez de texto livre.
 const SPECIALTIES = [
   "Educador Físico",
@@ -39,9 +39,13 @@ const ProfileDetailsScreen = () => {
   const insets = useSafeAreaInsets();
   const { user, updateUser } = useAuth();
 
-  const isCompany = user?.documentType === "CNPJ";
+  // Coleta de especialidades vale para todo profissional: personal CPF+CREF
+  // (role personal/trainer) e o legado CNPJ. Antes travava só em "CNPJ", então o
+  // personal atual caía no ramo de bio e nunca preenchia a especialidade.
+  const isTrainer =
+    user?.role === "personal" || user?.role === "trainer" || user?.documentType === "CNPJ";
 
-  const [specialties, setSpecialties] = useState<string[]>([]);
+  const [specialties, setSpecialties] = useState<string[]>((user as any)?.especialidades || []);
   const [description, setDescription] = useState<string>((user as any)?.bio || "");
   const [saving, setSaving] = useState(false);
 
@@ -56,14 +60,14 @@ const ProfileDetailsScreen = () => {
   };
 
   const handleAdvance = async () => {
-    if (isCompany && specialties.length === 0) {
+    if (isTrainer && specialties.length === 0) {
       Alert.alert("Selecione uma especialidade", "Escolha pelo menos uma área de atuação.");
       return;
     }
 
     setSaving(true);
     try {
-      if (isCompany) {
+      if (isTrainer) {
         await userService.updateSpecialty(specialties);
         updateUser({ especialidades: specialties } as any);
       } else if (description.trim()) {
@@ -89,7 +93,7 @@ const ProfileDetailsScreen = () => {
       >
         <BackButton autoTopInset />
 
-        {isCompany ? (
+        {isTrainer ? (
           <>
             <Text style={styles.title}>Especialidade</Text>
             <Text style={styles.question}>Quais são suas áreas de atuação?</Text>

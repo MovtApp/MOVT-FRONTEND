@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
+import { View, Text, StyleSheet, TouchableOpacity, Modal, Pressable } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 
 interface CalendarComponentProps {
@@ -35,6 +35,22 @@ const CalendarComponent: React.FC<CalendarComponentProps> = ({
 
   // Obter dias da semana
   const weekDays = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
+
+  // Nomes curtos dos meses (grade do seletor)
+  const monthNames = [
+    "Jan",
+    "Fev",
+    "Mar",
+    "Abr",
+    "Mai",
+    "Jun",
+    "Jul",
+    "Ago",
+    "Set",
+    "Out",
+    "Nov",
+    "Dez",
+  ];
 
   // Navegar para o mês anterior
   const goToPreviousMonth = () => {
@@ -176,51 +192,56 @@ const CalendarComponent: React.FC<CalendarComponentProps> = ({
       </View>
 
       {/* Modal de seleção de mês/ano */}
-      {showMonthSelector && (
-        <View style={styles.modalOverlay}>
-          <View style={styles.monthYearSelector}>
+      <Modal
+        visible={showMonthSelector}
+        transparent
+        animationType="fade"
+        statusBarTranslucent
+        onRequestClose={() => setShowMonthSelector(false)}
+      >
+        {/* Scrim: toque fora fecha o seletor */}
+        <Pressable style={styles.modalOverlay} onPress={() => setShowMonthSelector(false)}>
+          {/* Card: stopPropagation para o toque interno não fechar */}
+          <Pressable style={styles.monthYearSelector} onPress={(e) => e.stopPropagation()}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Selecione o mês e ano</Text>
-              <TouchableOpacity onPress={() => setShowMonthSelector(false)}>
-                <Ionicons name="close" size={24} color="#6B7280" />
+              <Text style={styles.modalTitle}>Período</Text>
+              <TouchableOpacity
+                onPress={() => setShowMonthSelector(false)}
+                hitSlop={8}
+                style={styles.closeBtn}
+              >
+                <Ionicons name="close" size={20} color="#6B7280" />
               </TouchableOpacity>
             </View>
 
             <View style={styles.yearSelector}>
-              <TouchableOpacity onPress={goToPreviousYear}>
-                <Ionicons name="chevron-back" size={20} color="#6B7280" />
+              <TouchableOpacity onPress={goToPreviousYear} hitSlop={8} style={styles.yearArrow}>
+                <Ionicons name="chevron-back" size={20} color="#192126" />
               </TouchableOpacity>
 
               <Text style={styles.yearText}>{currentMonth.getFullYear()}</Text>
 
-              <TouchableOpacity onPress={goToNextYear}>
-                <Ionicons name="chevron-forward" size={20} color="#6B7280" />
+              <TouchableOpacity onPress={goToNextYear} hitSlop={8} style={styles.yearArrow}>
+                <Ionicons name="chevron-forward" size={20} color="#192126" />
               </TouchableOpacity>
             </View>
 
             <View style={styles.monthGrid}>
-              {Array.from({ length: 12 }, (_, i) => {
-                const monthNames = [
-                  "Jan",
-                  "Fev",
-                  "Mar",
-                  "Abr",
-                  "Mai",
-                  "Jun",
-                  "Jul",
-                  "Ago",
-                  "Set",
-                  "Out",
-                  "Nov",
-                  "Dez",
-                ];
-
+              {monthNames.map((name, i) => {
                 const isSelected = i === currentMonth.getMonth();
+                const now = new Date();
+                const isCurrentRealMonth =
+                  i === now.getMonth() && currentMonth.getFullYear() === now.getFullYear();
 
                 return (
                   <TouchableOpacity
                     key={i}
-                    style={[styles.monthButton, isSelected && styles.selectedMonthButton]}
+                    style={[
+                      styles.monthButton,
+                      isCurrentRealMonth && !isSelected && styles.currentMonthButton,
+                      isSelected && styles.selectedMonthButton,
+                    ]}
+                    activeOpacity={0.8}
                     onPress={() => {
                       setCurrentMonth(new Date(currentMonth.getFullYear(), i, 1));
                       setShowMonthSelector(false);
@@ -229,15 +250,15 @@ const CalendarComponent: React.FC<CalendarComponentProps> = ({
                     <Text
                       style={[styles.monthButtonText, isSelected && styles.selectedMonthButtonText]}
                     >
-                      {monthNames[i]}
+                      {name}
                     </Text>
                   </TouchableOpacity>
                 );
               })}
             </View>
-          </View>
-        </View>
-      )}
+          </Pressable>
+        </Pressable>
+      </Modal>
     </>
   );
 };
@@ -345,70 +366,84 @@ const styles = StyleSheet.create({
     color: "#9CA3AF", // Gray color for past dates
   },
   modalOverlay: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: "transparent", // Removed background
+    flex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
     justifyContent: "center",
     alignItems: "center",
-    zIndex: 100,
+    padding: 24,
   },
   monthYearSelector: {
     backgroundColor: "#fff",
-    borderRadius: 12,
+    borderRadius: 20,
     padding: 20,
-    width: "80%",
-    maxWidth: 350,
-    alignItems: "center",
+    width: "100%",
+    maxWidth: 360,
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3, // Increased shadow opacity for better visibility
-    shadowRadius: 12, // Increased radius for more spread
-    elevation: 12, // Increased elevation for better shadow
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.25,
+    shadowRadius: 24,
+    elevation: 16,
   },
   modalHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
     width: "100%",
-    marginBottom: 20,
+    marginBottom: 16,
   },
   modalTitle: {
-    fontSize: 18,
-    fontWeight: "600",
+    fontSize: 17,
+    fontWeight: "700",
     color: "#111827",
+  },
+  closeBtn: {
+    padding: 4,
   },
   yearSelector: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
-    width: "100%",
+    alignSelf: "center",
+    gap: 20,
     marginBottom: 20,
-    paddingHorizontal: 20,
+    backgroundColor: "#F9FAFB",
+    borderRadius: 14,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+  },
+  yearArrow: {
+    padding: 4,
   },
   yearText: {
     fontSize: 16,
-    fontWeight: "600",
+    fontWeight: "700",
     color: "#111827",
-    marginHorizontal: 15,
+    minWidth: 56,
+    textAlign: "center",
   },
   monthGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
-    justifyContent: "space-around",
     width: "100%",
-    maxWidth: 300,
+    gap: 8,
   },
   monthButton: {
-    padding: 10,
-    margin: 5,
-    borderRadius: 8,
-    backgroundColor: "#f3f4f6",
+    flexBasis: "22%",
+    flexGrow: 1,
+    paddingVertical: 12,
+    borderRadius: 12,
+    backgroundColor: "#F3F4F6",
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1.5,
+    borderColor: "transparent",
+  },
+  currentMonthButton: {
+    borderColor: "#BBF246",
+    backgroundColor: "#FBFEF2",
   },
   selectedMonthButton: {
     backgroundColor: "#192126",
+    borderColor: "#192126",
   },
   monthButtonText: {
     fontSize: 14,

@@ -88,6 +88,16 @@ const ProfilePJScreen = () => {
   const trainerAddress =
     trainerData?.address || (trainer as any)?.location || "Endereço não informado";
 
+  // Especialidades chegam como array (novo endpoint) ou string CSV (legado). Normalizamos
+  // para uma lista limpa que passou a ser exibida em Credenciais (antes ficava só o
+  // primeiro item, como badge, abaixo do nome).
+  const trainerSpecialties: string[] = Array.isArray(trainerData?.especialidades)
+    ? trainerData.especialidades
+    : typeof trainerData?.especialidades === "string"
+      ? trainerData.especialidades.split(",")
+      : [];
+  const specialtiesList = trainerSpecialties.map((s) => s.trim()).filter(Boolean);
+
   // Standard padding calculation
   const paddingTop =
     Platform.OS === "android" ? (insets.top > 0 ? insets.top + 20 : 40) : Math.max(insets.top, 10);
@@ -168,15 +178,6 @@ const ProfilePJScreen = () => {
           <View style={styles.profileContentArea}>
             <View style={styles.identitySection}>
               <Text style={styles.nameText}>{trainerName}</Text>
-              <View style={styles.specialtyBadge}>
-                <Text style={styles.specialtyText}>
-                  {trainerData?.especialidades
-                    ? Array.isArray(trainerData.especialidades)
-                      ? trainerData.especialidades[0]
-                      : trainerData.especialidades.split(",")[0]
-                    : "Personal Trainer"}
-                </Text>
-              </View>
             </View>
 
             {/* KPI STRIP */}
@@ -212,12 +213,15 @@ const ProfilePJScreen = () => {
                   <Award size={18} color="#BBF246" />
                   <Text style={styles.credentialText}>CREF: {trainerData?.cref || "Pendente"}</Text>
                 </View>
-                <View style={styles.credentialRow}>
-                  <Award size={18} color="#BBF246" />
-                  <Text style={styles.credentialText}>
-                    {trainerData?.formacao || "Formação em Educação Física"}
-                  </Text>
-                </View>
+                {specialtiesList.length > 0 && (
+                  <View style={styles.credentialRow}>
+                    <Dumbbell size={18} color="#BBF246" />
+                    <Text style={styles.credentialText}>
+                      {specialtiesList.length > 1 ? "Especialidades: " : "Especialidade: "}
+                      {specialtiesList.join(", ")}
+                    </Text>
+                  </View>
+                )}
               </View>
             </View>
 
@@ -348,20 +352,6 @@ const styles = StyleSheet.create({
     fontWeight: "900",
     color: "#192126",
   },
-  specialtyBadge: {
-    alignSelf: "flex-start",
-    backgroundColor: "#F1F5F9",
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 8,
-    marginTop: 6,
-  },
-  specialtyText: {
-    fontSize: 12,
-    fontWeight: "700",
-    color: "#64748B",
-    textTransform: "uppercase",
-  },
   kpiStrip: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -429,6 +419,7 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   credentialText: {
+    flex: 1,
     fontSize: 14,
     fontWeight: "700",
     color: "#192126",

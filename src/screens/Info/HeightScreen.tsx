@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from "react";
-import { View, StyleSheet, TouchableOpacity, Text, ScrollView, Dimensions, Platform } from "react-native";
+import { View, StyleSheet, TouchableOpacity, Text, ScrollView, Platform } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { notifyError } from "../../utils/notify";
 import BackButton from "@components/BackButton";
@@ -8,29 +8,33 @@ import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useNavigation } from "@react-navigation/native";
 import { RootStackParamList } from "@typings/routes"; // Corrigida a importação de RootStackParamList
 
-const { height: screenHeight } = Dimensions.get("window");
 const ITEM_HEIGHT = 60; // Altura de cada item de altura
 
 const HeightScreen = () => {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const insets = useSafeAreaInsets();
   const [selectedHeight, setSelectedHeight] = useState(165);
+  // Altura real do track (medida via onLayout). O picker agora é flexível, então
+  // não dá para derivar a centralização de um valor fixo — medimos e calculamos.
+  const [trackHeight, setTrackHeight] = useState(0);
   const scrollViewRef = useRef<ScrollView>(null);
+  const didCenterRef = useRef(false);
   const heights = Array.from({ length: 151 }, (_, i) => i + 100); // 100 a 250 cm
 
-  // Centralizar a altura inicial quando o componente montar
+  // Centralizar a altura inicial assim que soubermos a altura do track (uma vez).
   useEffect(() => {
+    if (trackHeight <= 0 || didCenterRef.current) return;
     const initialIndex = heights.indexOf(selectedHeight);
     if (initialIndex !== -1) {
+      didCenterRef.current = true;
       setTimeout(() => {
-        const scrollPosition = initialIndex * ITEM_HEIGHT;
         scrollViewRef.current?.scrollTo({
-          y: scrollPosition,
+          y: initialIndex * ITEM_HEIGHT,
           animated: false,
         });
-      }, 100);
+      }, 50);
     }
-  }, [selectedHeight, heights]);
+  }, [trackHeight, selectedHeight, heights]);
 
   const handleHeight = async () => {
     try {
@@ -66,7 +70,10 @@ const HeightScreen = () => {
       </View>
 
       <View style={styles.pickerContainer}>
-        <View style={styles.pickerTrack}>
+        <View
+          style={styles.pickerTrack}
+          onLayout={(e) => setTrackHeight(e.nativeEvent.layout.height)}
+        >
           <ScrollView
             ref={scrollViewRef}
             showsVerticalScrollIndicator={false}
@@ -76,7 +83,11 @@ const HeightScreen = () => {
             decelerationRate="fast"
             onMomentumScrollEnd={handleScroll}
             onScrollEndDrag={handleScroll}
-            contentContainerStyle={styles.scrollContent}
+            contentContainerStyle={[
+              styles.scrollContent,
+              // Centraliza o item selecionado com base na altura medida do track.
+              { paddingVertical: Math.max(0, (trackHeight - ITEM_HEIGHT) / 2) },
+            ]}
             style={styles.scrollView}
           >
             {heights.map((height, index) => (
@@ -99,7 +110,9 @@ const HeightScreen = () => {
       <TouchableOpacity
         style={[
           styles.advanceButton,
-          { marginBottom: Platform.OS === "android" ? insets.bottom + 16 : 50 },
+          // No Android o insets.bottom pode voltar 0 (nav de 3 botões), então
+          // garantimos uma folga mínima para o botão nunca ficar sob a barra nativa.
+          { marginBottom: Platform.OS === "android" ? Math.max(insets.bottom, 24) : 50 },
         ]}
         onPress={handleHeight}
       >
@@ -138,8 +151,8 @@ const styles = StyleSheet.create({
   },
   heightDisplay: {
     alignItems: "center",
-    marginVertical: 30,
-    marginBottom: -20,
+    marginTop: 16,
+    marginBottom: 0,
     flexDirection: "column",
     justifyContent: "center",
   },
@@ -163,8 +176,11 @@ const styles = StyleSheet.create({
     alignSelf: "flex-start",
   },
   pickerContainer: {
+    // flex:1 faz o picker absorver o espaço vertical restante e encolher em
+    // telas baixas, garantindo que o botão Avançar sempre tenha lugar embaixo.
+    flex: 1,
     alignItems: "center",
-    marginVertical: 40,
+    marginVertical: 12,
     flexDirection: "row",
     justifyContent: "center",
     width: "100%",
@@ -175,7 +191,11 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     width: 120,
-    height: screenHeight * 0.4, // Altura responsiva
+    // Altura relativa ao espaço disponível (não mais fixa em 40% da tela), com
+    // teto para não esticar demais em telas altas / tablets.
+    height: "90%",
+    maxHeight: 420,
+    minHeight: 180,
     overflow: "hidden",
     position: "relative",
     borderRadius: 8,
@@ -186,7 +206,7 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     alignItems: "center",
-    paddingVertical: (screenHeight * 0.4 - 60) / 2, // Centralizar perfeitamente
+    // paddingVertical aplicado inline (depende da altura medida do track).
   },
   heightItem: {
     height: ITEM_HEIGHT,
@@ -210,7 +230,7 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     paddingVertical: 14,
     alignItems: "center",
-    marginTop: "auto", // empurra o botão para o fim da tela (igual à AgeScreen)
+    marginTop: 8, // o picker (flex:1) já ocupa o espaço; botão fica logo abaixo
   },
   advanceButtonText: {
     color: "#fff",
