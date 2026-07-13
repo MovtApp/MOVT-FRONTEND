@@ -1923,7 +1923,7 @@ const AdminDashboardScreen: React.FC = () => {
                     <X size={24} color="#64748B" />
                   </TouchableOpacity>
                 </View>
-                <ScrollView style={{ marginTop: 10 }}>
+                <BottomSheetScrollView style={{ flex: 1, marginTop: 10 }}>
                   {renderedSheets["appointments"] &&
                     data?.appointments?.map((item: PendingAppointment) => (
                       <View key={item.id_agendamento} style={styles.pendingCard}>
@@ -1977,7 +1977,7 @@ const AdminDashboardScreen: React.FC = () => {
                   {data?.appointments?.length === 0 && (
                     <Text style={styles.emptyTxt}>Nenhum agendamento encontrado.</Text>
                   )}
-                </ScrollView>
+                </BottomSheetScrollView>
               </BottomSheetView>
             </BottomSheet>
           )}
@@ -2000,7 +2000,7 @@ const AdminDashboardScreen: React.FC = () => {
                     <X size={24} color="#64748B" />
                   </TouchableOpacity>
                 </View>
-                <ScrollView style={{ marginTop: 10 }}>
+                <BottomSheetScrollView style={{ flex: 1, marginTop: 10 }}>
                   <View style={styles.revenueTotalCard}>
                     <Text style={styles.revenueTotalLabel}>Total no Período</Text>
                     <Text style={styles.revenueTotalValue}>
@@ -2021,7 +2021,7 @@ const AdminDashboardScreen: React.FC = () => {
                         <Text style={styles.revenueItemValue}>+ {formatCurrency(100)}</Text>
                       </View>
                     ))}
-                </ScrollView>
+                </BottomSheetScrollView>
               </BottomSheetView>
             </BottomSheet>
           )}
@@ -2044,7 +2044,7 @@ const AdminDashboardScreen: React.FC = () => {
                     <X size={24} color="#64748B" />
                   </TouchableOpacity>
                 </View>
-                <ScrollView style={{ marginTop: 20 }}>
+                <BottomSheetScrollView style={{ flex: 1, marginTop: 20 }}>
                   {data?.pending?.map((item: PendingAppointment) => (
                     <View key={item.id_agendamento} style={styles.pendingCard}>
                       <View style={styles.pendingRow}>
@@ -2112,7 +2112,7 @@ const AdminDashboardScreen: React.FC = () => {
                   {data?.pending?.length === 0 && (
                     <Text style={styles.emptyTxt}>Nenhuma aprovação pendente.</Text>
                   )}
-                </ScrollView>
+                </BottomSheetScrollView>
               </BottomSheetView>
             </BottomSheet>
           )}
@@ -2135,7 +2135,7 @@ const AdminDashboardScreen: React.FC = () => {
                     <X size={24} color="#64748B" />
                   </TouchableOpacity>
                 </View>
-                <ScrollView style={{ marginTop: 20 }}>
+                <BottomSheetScrollView style={{ flex: 1, marginTop: 20 }}>
                   {renderedSheets["clients"] &&
                     data?.clients?.map((item: PersonalClient) => (
                       <TouchableOpacity
@@ -2164,7 +2164,7 @@ const AdminDashboardScreen: React.FC = () => {
                   {data?.clients?.length === 0 && (
                     <Text style={styles.emptyTxt}>Nenhum cliente cadastrado.</Text>
                   )}
-                </ScrollView>
+                </BottomSheetScrollView>
               </BottomSheetView>
             </BottomSheet>
           )}
@@ -2313,7 +2313,7 @@ const AdminDashboardScreen: React.FC = () => {
                 {fetchingHistory ? (
                   <ActivityIndicator color="#10B981" style={{ marginTop: 40 }} />
                 ) : (
-                  <ScrollView style={{ marginTop: 20 }}>
+                  <BottomSheetScrollView style={{ flex: 1, marginTop: 20 }}>
                     {clientHistory.map((appt) => (
                       <View key={appt?.id_agendamento || Math.random()} style={styles.pendingCard}>
                         <View
@@ -2381,7 +2381,7 @@ const AdminDashboardScreen: React.FC = () => {
                     {clientHistory.length === 0 && (
                       <Text style={styles.emptyTxt}>Nenhum registro encontrado.</Text>
                     )}
-                  </ScrollView>
+                  </BottomSheetScrollView>
                 )}
               </BottomSheetView>
             </BottomSheet>
@@ -2406,7 +2406,7 @@ const AdminDashboardScreen: React.FC = () => {
                   </TouchableOpacity>
                 </View>
 
-                <ScrollView style={{ marginTop: 10 }}>
+                <BottomSheetScrollView style={{ flex: 1, marginTop: 10 }}>
                   <View style={styles.filterSection}>
                     <Text style={styles.filterSectionTitle}>Intensidade do Treino (1-5)</Text>
                     <View style={{ flexDirection: "row", gap: 10, marginTop: 4 }}>
@@ -2512,7 +2512,7 @@ const AdminDashboardScreen: React.FC = () => {
                     />
                     <Text style={styles.applyBtnText}>Salvar Avaliação</Text>
                   </TouchableOpacity>
-                </ScrollView>
+                </BottomSheetScrollView>
               </BottomSheetView>
             </BottomSheet>
           )}
@@ -2535,7 +2535,7 @@ const AdminDashboardScreen: React.FC = () => {
                     <X size={24} color="#64748B" />
                   </TouchableOpacity>
                 </View>
-                <ScrollView style={{ marginTop: 20 }}>
+                <BottomSheetScrollView style={{ flex: 1, marginTop: 20 }}>
                   {data?.reviews?.map((item: any) => {
                     const isPositive =
                       (Number(item?.ratingProfessional || 0) + Number(item?.ratingTraining || 0)) /
@@ -2647,7 +2647,7 @@ const AdminDashboardScreen: React.FC = () => {
                   {(!data?.reviews || data.reviews.length === 0) && (
                     <Text style={styles.emptyTxt}>Nenhuma avaliação encontrada.</Text>
                   )}
-                </ScrollView>
+                </BottomSheetScrollView>
               </BottomSheetView>
             </BottomSheet>
           )}
@@ -2670,7 +2670,7 @@ const AdminDashboardScreen: React.FC = () => {
                     <X size={24} color="#64748B" />
                   </TouchableOpacity>
                 </View>
-                <ScrollView style={{ marginTop: 20 }}>
+                <BottomSheetScrollView style={{ flex: 1, marginTop: 20 }}>
                   {data?.receiptHistory?.map((item: any) => (
                     <View key={item?.id_agendamento || Math.random()} style={styles.pendingCard}>
                       <View style={styles.pendingRow}>
@@ -2715,7 +2715,7 @@ const AdminDashboardScreen: React.FC = () => {
                   {(!data?.receiptHistory || data.receiptHistory.length === 0) && (
                     <Text style={styles.emptyTxt}>Nenhum comprovante enviado ainda.</Text>
                   )}
-                </ScrollView>
+                </BottomSheetScrollView>
               </BottomSheetView>
             </BottomSheet>
           )}
@@ -3453,7 +3453,7 @@ const AdminDashboardScreen: React.FC = () => {
                   )}
                 </View>
 
-                <ScrollView style={{ marginTop: 15 }}>
+                <BottomSheetScrollView style={{ flex: 1, marginTop: 15 }}>
                   {gymForm.nome ? (
                     <View style={styles.googleDetailCard}>
                       <View style={styles.googleHeader}>
@@ -3514,7 +3514,7 @@ const AdminDashboardScreen: React.FC = () => {
                       </TouchableOpacity>
                     ))
                   )}
-                </ScrollView>
+                </BottomSheetScrollView>
               </BottomSheetView>
             </BottomSheet>
           )}
@@ -3579,7 +3579,7 @@ const AdminDashboardScreen: React.FC = () => {
                   </TouchableOpacity>
                 </View>
 
-                <ScrollView showsVerticalScrollIndicator={false} style={{ flex: 1, marginTop: 20 }}>
+                <BottomSheetScrollView showsVerticalScrollIndicator={false} style={{ flex: 1, marginTop: 20 }}>
                   {/* Contact & Info Section */}
                   <View
                     style={{
@@ -3789,7 +3789,7 @@ const AdminDashboardScreen: React.FC = () => {
                       </Text>
                     </View>
                   )}
-                </ScrollView>
+                </BottomSheetScrollView>
               </BottomSheetView>
             </BottomSheet>
           )}
@@ -3854,7 +3854,7 @@ const AdminDashboardScreen: React.FC = () => {
                   </Text>
                 </View>
 
-                <ScrollView
+                <BottomSheetScrollView
                   showsVerticalScrollIndicator={false}
                   style={{ flex: 1, marginTop: 10 }}
                   contentContainerStyle={{ paddingBottom: 50 }}
@@ -3904,7 +3904,7 @@ const AdminDashboardScreen: React.FC = () => {
                       </Text>
                     </View>
                   )}
-                </ScrollView>
+                </BottomSheetScrollView>
               </BottomSheetView>
             </BottomSheet>
           )}
@@ -4578,8 +4578,8 @@ const AdminDashboardScreen: React.FC = () => {
                   </TouchableOpacity>
                 </View>
 
-                <ScrollView
-                  style={{ marginTop: 20 }}
+                <BottomSheetScrollView
+                  style={{ flex: 1, marginTop: 20 }}
                   showsVerticalScrollIndicator={false}
                   contentContainerStyle={{ paddingBottom: insets.bottom + 40 }}
                 >
@@ -4699,7 +4699,7 @@ const AdminDashboardScreen: React.FC = () => {
                       </Text>
                     )}
                   </TouchableOpacity>
-                </ScrollView>
+                </BottomSheetScrollView>
               </BottomSheetView>
             </BottomSheet>
           )}
@@ -4730,7 +4730,8 @@ const AdminDashboardScreen: React.FC = () => {
                       </TouchableOpacity>
                     </View>
 
-                    <ScrollView
+                    <BottomSheetScrollView
+                      style={{ flex: 1 }}
                       showsVerticalScrollIndicator={false}
                       contentContainerStyle={{ paddingBottom: 40 }}
                     >
@@ -5003,7 +5004,7 @@ const AdminDashboardScreen: React.FC = () => {
                           )}
                         </TouchableOpacity>
                       </View>
-                    </ScrollView>
+                    </BottomSheetScrollView>
                   </View>
                 )}
               </BottomSheetView>
@@ -5028,7 +5029,7 @@ const AdminDashboardScreen: React.FC = () => {
                     <X size={24} color="#64748B" />
                   </TouchableOpacity>
                 </View>
-                <ScrollView style={{ marginTop: 20 }}>
+                <BottomSheetScrollView style={{ flex: 1, marginTop: 20 }}>
                   <View style={styles.dbAuditBox}>
                     <Text
                       style={{
@@ -5069,7 +5070,7 @@ const AdminDashboardScreen: React.FC = () => {
                       {'retenção para o grupo "Preço / Renovação".'}
                     </Text>
                   </View>
-                </ScrollView>
+                </BottomSheetScrollView>
               </BottomSheetView>
             </BottomSheet>
           )}
@@ -5234,7 +5235,7 @@ const AdminDashboardScreen: React.FC = () => {
                     <X size={24} color="#64748B" />
                   </TouchableOpacity>
                 </View>
-                <ScrollView style={{ marginTop: 20 }}>
+                <BottomSheetScrollView style={{ flex: 1, marginTop: 20 }}>
                   <Text
                     style={{
                       fontSize: 12,
@@ -5298,7 +5299,7 @@ const AdminDashboardScreen: React.FC = () => {
                       Nenhuma unidade encontrada.
                     </Text>
                   )}
-                </ScrollView>
+                </BottomSheetScrollView>
               </BottomSheetView>
             </BottomSheet>
           )}
