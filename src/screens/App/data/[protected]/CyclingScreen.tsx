@@ -20,7 +20,8 @@ import {
 import * as Sentry from "@sentry/react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRoute } from "@react-navigation/native";
-import MapView, { Polyline, Marker, PROVIDER_GOOGLE, type Camera } from "react-native-maps";
+import MapView, { Polyline, Marker, type Camera } from "react-native-maps";
+import { MAP_PROVIDER } from "@components/MapComponent";
 import * as Location from "expo-location";
 import * as Tracker from "../../../../services/locationTrackingService";
 import type { TrackingSnapshot } from "../../../../services/locationTrackingService";
@@ -688,7 +689,7 @@ const WorkoutDetail: React.FC<WorkoutDetailProps> = ({
             onPress={() => setMapFull(true)}
           >
             <MapView
-              provider={PROVIDER_GOOGLE}
+              provider={MAP_PROVIDER}
               style={StyleSheet.absoluteFillObject}
               scrollEnabled={false}
               zoomEnabled={false}
@@ -849,7 +850,7 @@ const WorkoutDetail: React.FC<WorkoutDetailProps> = ({
           {hasRoute && (
             <MapView
               ref={fullMapRef}
-              provider={PROVIDER_GOOGLE}
+              provider={MAP_PROVIDER}
               style={StyleSheet.absoluteFillObject}
               initialRegion={fitRegion!}
               onMapReady={fitFullMap}
@@ -1313,7 +1314,7 @@ const PausedStats: React.FC<PausedStatsProps> = ({
           <View style={ps.mapBox}>
             <MapView
               ref={mapRef}
-              provider={PROVIDER_GOOGLE}
+              provider={MAP_PROVIDER}
               style={StyleSheet.absoluteFillObject}
               scrollEnabled={false}
               zoomEnabled={false}
@@ -1961,7 +1962,7 @@ const CyclingScreen: React.FC = () => {
         <View style={styles.immersive}>
           <MapView
             ref={liveMapRef}
-            provider={PROVIDER_GOOGLE}
+            provider={MAP_PROVIDER}
             style={StyleSheet.absoluteFillObject}
             showsUserLocation
             showsMyLocationButton={false}
@@ -2138,7 +2139,7 @@ const CyclingScreen: React.FC = () => {
           <View style={styles.mapContainer}>
             <MapView
               ref={liveMapRef}
-              provider={PROVIDER_GOOGLE}
+              provider={MAP_PROVIDER}
               style={styles.map}
               showsUserLocation
               showsMyLocationButton={false}
