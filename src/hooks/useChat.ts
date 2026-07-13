@@ -560,6 +560,121 @@ export const useMessages = (chatId: string, userId: string) => {
   };
 };
 
+/**
+ * Indicador "digitando" via Supabase Realtime **broadcast** (efêmero, sem gravar
+ * no banco). Canal dedicado por conversa (`chat_typing_${chatId}`), separado do
+ * canal de mensagens para não mexer no realtime delicado de `useMessages`.
+ *
+ * - `sendTyping(true)`: throttle de 2s no envio + agenda um "parou" após 2,5s sem
+ *   novas teclas. `sendTyping(false)`: envia na hora (usado no send / ao sair).
+ * - `otherTyping`: liga ao receber "typing:true" do OUTRO usuário, com auto-clear
+ *   defensivo de 4s (caso o "parou" se perca na rede).
+ *
+ * Mantém as blindagens de realtime do projeto (removeChannel no cleanup, try/catch,
+ * nunca deixa o erro subir para o GlobalErrorBoundary — ver chat-black-screen-freeze).
+ */
+export const useTyping = (chatId: string, myUserId: string) => {
+  const [otherTyping, setOtherTyping] = useState(false);
+  const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
+  const lastSentRef = useRef(0);
+  const stopTimerRef = useRef<any>(null);
+  const clearTimerRef = useRef<any>(null);
+
+  useEffect(() => {
+    if (!chatId) return;
+    const channelName = `chat_typing_${chatId}`;
+    let channel: ReturnType<typeof supabase.channel> | null = null;
+
+    try {
+      supabase
+        .getChannels()
+        .filter((c) => c.topic.includes(channelName))
+        .forEach((c) => supabase.removeChannel(c));
+
+      channel = supabase
+        .channel(channelName, { config: { broadcast: { self: false } } })
+        .on("broadcast", { event: "typing" }, ({ payload }: any) => {
+          if (!payload || String(payload.userId) === String(myUserId)) return;
+          if (payload.typing) {
+            setOtherTyping(true);
+            if (clearTimerRef.current) clearTimeout(clearTimerRef.current);
+            clearTimerRef.current = setTimeout(() => setOtherTyping(false), 4000);
+          } else {
+            if (clearTimerRef.current) clearTimeout(clearTimerRef.current);
+            setOtherTyping(false);
+          }
+        })
+        .subscribe();
+      channelRef.current = channel;
+    } catch (e) {
+      console.error("useTyping subscribe error:", e);
+    }
+
+    return () => {
+      if (stopTimerRef.current) clearTimeout(stopTimerRef.current);
+      if (clearTimerRef.current) clearTimeout(clearTimerRef.current);
+      try {
+        channelRef.current?.send({
+          type: "broadcast",
+          event: "typing",
+          payload: { userId: myUserId, typing: false },
+        });
+      } catch {}
+      if (channel) supabase.removeChannel(channel);
+      channelRef.current = null;
+      setOtherTyping(false);
+    };
+  }, [chatId, myUserId]);
+
+  const sendTyping = useCallback(
+    (typing: boolean) => {
+      const ch = channelRef.current;
+      if (!ch) return;
+
+      if (typing) {
+        const now = Date.now();
+        if (now - lastSentRef.current > 2000) {
+          lastSentRef.current = now;
+          try {
+            ch.send({
+              type: "broadcast",
+              event: "typing",
+              payload: { userId: myUserId, typing: true },
+            });
+          } catch {}
+        }
+        if (stopTimerRef.current) clearTimeout(stopTimerRef.current);
+        stopTimerRef.current = setTimeout(() => {
+          lastSentRef.current = 0;
+          try {
+            channelRef.current?.send({
+              type: "broadcast",
+              event: "typing",
+              payload: { userId: myUserId, typing: false },
+            });
+          } catch {}
+        }, 2500);
+      } else {
+        lastSentRef.current = 0;
+        if (stopTimerRef.current) {
+          clearTimeout(stopTimerRef.current);
+          stopTimerRef.current = null;
+        }
+        try {
+          ch.send({
+            type: "broadcast",
+            event: "typing",
+            payload: { userId: myUserId, typing: false },
+          });
+        } catch {}
+      }
+    },
+    [myUserId]
+  );
+
+  return { otherTyping, sendTyping };
+};
+
 // Hook para acessar/atualizar o cache de perfil
 export const useProfileCache = (userId: string) => {
   const [profile, setProfile] = useState<any>(globalChatCache.profiles[userId] || null);

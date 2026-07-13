@@ -20,7 +20,8 @@ import {
   useReanimatedKeyboardAnimation,
 } from "react-native-keyboard-controller";
 import { GiftedChat, Bubble, Message } from "react-native-gifted-chat";
-import { useMessages, useProfileCache } from "@/hooks/useChat";
+import { useMessages, useProfileCache, useTyping } from "@/hooks/useChat";
+import { TypingDots } from "@/components/TypingDots";
 import { useRoute, useNavigation } from "@react-navigation/native";
 import { Send as SendIcon, CheckCheck, Plus, Heart, MessageCircle, X } from "lucide-react-native";
 import { useAuth } from "@/contexts/AuthContext";
@@ -61,6 +62,8 @@ const Chat = () => {
     chatId,
     effectiveUserId
   );
+  // Indicador "digitando" (Supabase Realtime broadcast, efêmero).
+  const { otherTyping, sendTyping } = useTyping(chatId, effectiveUserId);
 
   const { profile: cachedProfile, updateProfileCache } = useProfileCache(participantId);
   // Estado do teclado vindo do react-native-keyboard-controller (lida com edge-to-edge
@@ -177,7 +180,14 @@ const Chat = () => {
         borderBottomColor: "#f0f0f0",
       },
       headerTitleAlign: "center",
-      headerTitle: () => <Text style={styles.headerTitleText}>{participantName || "Chat"}</Text>,
+      headerTitle: () => (
+        <View style={{ alignItems: "center" }}>
+          <Text style={styles.headerTitleText}>{participantName || "Chat"}</Text>
+          {otherTyping && (
+            <Text style={{ fontSize: 12, color: "#16A34A", marginTop: 1 }}>digitando…</Text>
+          )}
+        </View>
+      ),
       headerLeft: () => (
         <View
           style={{
@@ -208,16 +218,17 @@ const Chat = () => {
         </TouchableOpacity>
       ),
     });
-  }, [navigation, participantName, participantAvatar, participantId, participantProfile]);
+  }, [navigation, participantName, participantAvatar, participantId, participantProfile, otherTyping]);
 
   const onSend = useCallback(
     (newMessages: any[]) => {
       if (newMessages.length > 0) {
         sendMessage(newMessages);
         setInputText(""); // Limpa o estado manual de texto
+        sendTyping(false); // parou de digitar ao enviar
       }
     },
-    [sendMessage]
+    [sendMessage, sendTyping]
   );
 
   const handlePickImage = async () => {
@@ -640,6 +651,20 @@ const Chat = () => {
           backgroundColor: "#fff",
         }}
       >
+        {otherTyping && (
+          <View style={{ paddingHorizontal: 16, paddingBottom: 6, alignItems: "flex-start" }}>
+            <View
+              style={{
+                backgroundColor: "#f0f0f0",
+                borderRadius: 16,
+                paddingHorizontal: 14,
+                paddingVertical: 10,
+              }}
+            >
+              <TypingDots />
+            </View>
+          </View>
+        )}
         <Animated.View style={[styles.inputBar, inputBarStyle]}>
           <TouchableOpacity
             style={styles.plusButton}
@@ -657,7 +682,10 @@ const Chat = () => {
           <TextInput
             style={styles.composerInput}
             value={inputText}
-            onChangeText={setInputText}
+            onChangeText={(t) => {
+              setInputText(t);
+              sendTyping(true);
+            }}
             placeholder="Escreva sua mensagem"
             placeholderTextColor="#94A3B8"
             multiline
