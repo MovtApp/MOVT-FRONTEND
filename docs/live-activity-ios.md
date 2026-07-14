@@ -1,76 +1,67 @@
-# Fase 3 — Live Activity do treino no iOS (ActivityKit)
+# Fase 3 — Live Activity do treino no iOS (expo-live-activity)
 
-Card do treino na **tela de bloqueio** + **Dynamic Island** (iOS 16.1+), atualizado
+Card do treino na **tela de bloqueio** + **Dynamic Island** (iOS 16.2+), atualizado
 ao vivo durante corrida/ciclismo. Paridade com o card do Android (Fase 2).
 
-> **Status:** app-side PRONTO e cablado (`src/services/liveActivityService.ts` +
-> fiação no `locationTrackingService.ts`, tudo no-op até o módulo nativo existir).
-> A parte nativa abaixo **precisa de Mac + Xcode + conta Apple** e ainda NÃO foi
-> feita — está bloqueada pelo setup Apple pendente (ver memória `ios-parity-work`).
-> **Nada aqui afeta os builds atuais** (Android/iOS) enquanto o módulo não existe.
+Feito via **[`expo-live-activity`](https://github.com/software-mansion-labs/expo-live-activity)**
+(Software Mansion) — o config plugin da lib cria o Widget Extension no Xcode
+automaticamente durante o `prebuild`, então **não escrevemos SwiftUI**.
 
-## Contrato já definido pelo app (não mudar sem alinhar o JS)
+> **Dá para fechar tudo do Windows** (sem Mac): o build iOS roda nos Macs da nuvem
+> do **EAS Build**. O que ainda é obrigatório: **conta Apple Developer** (assinatura)
+> e um **iPhone físico (16.2+)** para testar Live Activity (não funciona confiável
+> no simulador).
 
-O JS chama `MOVTLiveActivity.{isSupported,start,update,end}` com este payload
-(`LiveActivityData` em `liveActivityService.ts`) — o `ContentState` do Swift deve
-casar 1:1:
+## O que já está no repo (este PR)
 
-| campo       | tipo    | ex.          |
-|-------------|---------|--------------|
-| `type`      | String  | "Corrida"    |
-| `distance`  | String  | "3,21"       |
-| `time`      | String  | "18:45"      |
-| `pace`      | String  | "5:50 /km"   |
-| `paceLabel` | String  | "pace"/"km/h"|
-| `paused`    | Bool    | false        |
+- `package.json` → dependência `expo-live-activity`.
+- `app.json` → plugin `"expo-live-activity"` na lista de `plugins`.
+- `src/services/liveActivityService.ts` → wrapper que mapeia o snapshot do treino
+  para o `LiveActivityState` (schema fixo: `title`/`subtitle` + `config` de cores).
+  Guardado por plataforma/try-catch → **no-op em Android e em iOS antes do build**.
+- `src/services/locationTrackingService.ts` → já dispara start/update/end no ciclo
+  do treino (update throttled a partir da task de GPS, roda mesmo bloqueado).
 
-Ciclo de vida (já disparado pelo tracker): `start` no início do treino, `update`
-throttled (~2 s) a partir da task de GPS — **inclusive com a tela bloqueada** — e
-`end` no Encerrar. `start` deve ser **idempotente** (se já houver Activity, dar
-update em vez de criar outra) para o caso de relaunch do processo.
+Mapeamento atual (schema fixo da lib 0.4.2 — `progressBar` só tem `date`/`progress`,
+sem timer de contagem; por isso o tempo vai como texto, atualizado a cada ~2 s):
+- `title`  = "🏃 3,21 km" (ícone + distância)
+- `subtitle` = "18:45 · 5:50 /km" (+ " · pausado" quando pausado)
+- cores de marca via `config` (fundo #192126, título branco, subtítulo #BBF246),
+  `deepLinkUrl: "movt://"` (toque no card abre o app).
 
-## Passos da implementação nativa
+## Passos para ativar (quem tiver a conta Apple)
 
-1. **Recomendado: avaliar `expo-live-activity`** (ou similar mantido) antes de
-   hand-roll. O pedaço frágil é o config plugin que injeta o Widget Extension no
-   Xcode — uma lib madura evita isso. Se não servir, seguir manual (abaixo).
+1. `npm install` (instala a `expo-live-activity` já declarada).
+2. `npx expo prebuild --clean` — o plugin injeta o Widget Extension e liga
+   `NSSupportsLiveActivities` no Info.plist.
+3. `eas build --platform ios` — o EAS guia a assinatura da nova extensão (precisa da
+   conta Apple Developer configurada no projeto).
+4. Instalar no iPhone (TestFlight/ad-hoc) e validar (checklist abaixo).
 
-2. **Widget Extension (SwiftUI)** — novo target `MOVTWidgets`:
-   - `WorkoutAttributes: ActivityAttributes` com `ContentState` = os 6 campos acima.
-   - `WorkoutLiveActivity: Widget` com `ActivityConfiguration`:
-     - Lock screen / banner: distância (destaque) + tempo + pace/`paceLabel`; selo
-       "Pausado" quando `paused`. Cor de marca `#BBF246` sobre fundo `#192126`.
-     - Dynamic Island: `compactLeading` = ícone (🏃/🚴), `compactTrailing` = tempo;
-       `expanded` = as 3 métricas.
-   - `@available(iOS 16.1, *)` em tudo.
+## Ajustes opcionais (depois do 1º funcionar)
 
-3. **Módulo nativo** `MOVTLiveActivity` (Expo Module Swift ou RN bridge) expondo:
-   - `isSupported` → `ActivityAuthorizationInfo().areActivitiesEnabled`.
-   - `start(data)` → `Activity.request(attributes:contentState:)` (guardar o handle;
-     se já existir, faz `update`).
-   - `update(data)` → `activity.update(using:)`.
-   - `end()` → `activity.end(dismissalPolicy: .immediate)`.
-   - Tudo atrás de `if #available(iOS 16.1, *)`; no-op abaixo disso.
+- **Ícone/imagem** no card: `imageName`/`dynamicIslandImageName` no state + arquivo em
+  `assets/liveActivity` (≤ 4 KB). Hoje não usamos imagem.
+- **Push updates (APNs)** para atualização mais confiável em background profundo:
+  plugin `["expo-live-activity", { "enablePushNotifications": true }]` +
+  `addActivityTokenListener`. Não necessário para a v1 (atualizamos com o app vivo
+  em background via `UIBackgroundModes: location`, já presente).
 
-4. **Config plugin** `plugins/withLiveActivity.js` (rodar no prebuild):
-   - Adiciona o target do Widget Extension ao `.pbxproj` (ou usa o da lib).
-   - `Info.plist` do app: `NSSupportsLiveActivities = true`.
-   - Registra o plugin no `app.json` (array `plugins`).
+## Nota sobre a dependência
 
-5. **Info.plist** (via plugin): `NSSupportsLiveActivities` = `YES`.
+O npm marca **todas** as versões de `expo-live-activity` como *deprecated* com a
+mensagem genérica "Package no longer supported" — inclusive a alpha 0.5.0 recém
+publicada. É o flag genérico do npm, **não** um abandono: o repo (Software Mansion,
+mesma dona de reanimated/gesture-handler/screens que já usamos) foi atualizado em
+2026-06. Se preferir não depender de pacote marcado assim, a alternativa é **vendar**
+(copiar) o módulo para dentro do repo. Fixamos a versão **0.4.2** (última estável).
 
-## Notas de confiabilidade
-
-- Updates a partir do app rodando em background dependem do `UIBackgroundModes:
-  location` (já presente no `app.json`). Para robustez em background profundo,
-  ActivityKit suporta **push updates (APNs)** — opcional numa v2.
-- Não há como validar isto sem device iOS: **rodar em iPhone físico** (Live
-  Activities não aparecem no simulador de forma confiável) após `eas build`.
-
-## Checklist de validação (device iOS)
+## Checklist de validação (iPhone físico, iOS 16.2+)
 
 - [ ] Iniciar corrida → card aparece na tela de bloqueio e no Dynamic Island.
-- [ ] km/tempo/pace atualizam ao vivo com a tela **bloqueada**.
-- [ ] Pausar → selo "Pausado"; Retomar → some.
+- [ ] Distância/tempo/pace atualizam com a tela **bloqueada**.
+- [ ] Pausar → "· pausado" no subtítulo; Retomar → some.
 - [ ] Encerrar → card some.
-- [ ] Relaunch do processo no meio do treino não cria Activity duplicada.
+- [ ] Relaunch do processo no meio do treino não cria card duplicado
+      (`startWorkoutActivity` é idempotente).
+- [ ] Tocar no card abre o app (deep link `movt://`).
