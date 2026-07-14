@@ -12,7 +12,7 @@ interface UseWearOsConnectionResult {
  * @param userId ID do usuário
  * @returns Objeto com status de conexão, dispositivo conectado e loading
  */
-export const useWearOsConnection = (userId: number | null): UseWearOsConnectionResult => {
+export const useWearOsConnection = (userId: string | null): UseWearOsConnectionResult => {
   const [isConnected, setIsConnected] = useState(false);
   const [connectedDevice, setConnectedDevice] = useState<WearOsDeviceData | null>(null);
   const [isLoading, setIsLoading] = useState(true);

@@ -176,6 +176,10 @@ settings*.yml
 # Saida transpilada do teste de historico (descartavel)
 scripts/.tmp-wh/
 
+# Artefatos de desenvolvimento soltos (screenshots/refs) — não são assets do app
+/frames/
+**/WhatsApp Image*
+
 # Worktrees do git criados pelo Claude Code. Cada um é um checkout completo com
 # .git próprio, então `git add .` os stageia como GITLINK (o mesmo mecanismo de
 # submódulo) — commitar isso deixaria a main apontando para "submódulos" que não
