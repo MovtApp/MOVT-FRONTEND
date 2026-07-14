@@ -7,7 +7,7 @@ import {
   Platform,
   ActivityIndicator,
 } from "react-native";
-import MapView, { Marker, PROVIDER_GOOGLE } from "@components/MapComponent";
+import MapView, { Marker, MAP_PROVIDER } from "@components/MapComponent";
 
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import TrainingSelector from "@components/TrainingSelector";
@@ -343,7 +343,7 @@ const MapScreen: React.FC = () => {
       ) : (
         <MapView
           ref={mapRef}
-          provider={PROVIDER_GOOGLE}
+          provider={MAP_PROVIDER}
           style={{ flex: 1 }}
           initialRegion={{
             latitude: location?.latitude || defaultLocation.latitude,

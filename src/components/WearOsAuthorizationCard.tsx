@@ -1,13 +1,92 @@
-import React from "react";
-import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator } from "react-native";
+import React, { useState } from "react";
+import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator, Platform } from "react-native";
 import { AlertCircle, Watch, CheckCircle } from "lucide-react-native";
 import { useWearOsAuthorization } from "../hooks/useWearOsAuthorization";
+import { NativeHealthManager } from "../services/nativeHealthManager";
 
 /**
- * Componente de card para autorização do Wear OS
- * Exibe status e botão para solicitar autorização
+ * Variante iOS do card: Wear OS é Android-only, então no iOS o equivalente é o
+ * **Apple Saúde** — os dados do Apple Watch entram automaticamente no HealthKit e
+ * o app lê de lá. O botão dispara `NativeHealthManager.authorize()` (que no iOS =
+ * `ensureHealthKitPermissions`), o mesmo authorize usado nas telas de Dados.
+ */
+const AppleHealthCard: React.FC = () => {
+  const [status, setStatus] = useState<"idle" | "loading" | "authorized" | "error">("idle");
+  const isAuthorized = status === "authorized";
+  const isLoading = status === "loading";
+
+  const handleConnect = async () => {
+    setStatus("loading");
+    try {
+      const ok = await NativeHealthManager.authorize();
+      setStatus(ok ? "authorized" : "error");
+    } catch {
+      setStatus("error");
+    }
+  };
+
+  return (
+    <View style={styles.container}>
+      <View style={styles.header}>
+        <Watch size={24} color={isAuthorized ? "#4CAF50" : "#FF9800"} />
+        <Text style={styles.title}>Apple Saúde</Text>
+      </View>
+
+      {isAuthorized ? (
+        <View style={styles.authorizedContent}>
+          <View style={styles.statusRow}>
+            <CheckCircle size={20} color="#4CAF50" />
+            <Text style={styles.statusText}>Conectado</Text>
+          </View>
+          <Text style={styles.description}>
+            Os dados do seu Apple Watch são sincronizados automaticamente pelo app Saúde.
+          </Text>
+        </View>
+      ) : (
+        <View style={status === "error" ? styles.errorContent : styles.unauthorizedContent}>
+          {status === "error" && (
+            <View style={styles.statusRow}>
+              <AlertCircle size={20} color="#F44336" />
+              <Text style={styles.errorText}>Permissão negada</Text>
+            </View>
+          )}
+          <Text style={styles.description}>
+            Conecte o Apple Saúde para sincronizar os dados de saúde do seu Apple Watch.
+          </Text>
+        </View>
+      )}
+
+      {!isAuthorized && (
+        <TouchableOpacity
+          style={[styles.button, isLoading && styles.buttonDisabled]}
+          onPress={handleConnect}
+          disabled={isLoading}
+        >
+          {isLoading ? (
+            <ActivityIndicator color="#fff" size="small" />
+          ) : (
+            <Text style={styles.buttonText}>
+              {status === "error" ? "Tentar novamente" : "Conectar Apple Saúde"}
+            </Text>
+          )}
+        </TouchableOpacity>
+      )}
+    </View>
+  );
+};
+
+/**
+ * Componente de card para autorização do Wear OS (Android) / Apple Saúde (iOS).
+ * Exibe status e botão para solicitar autorização.
  */
 export const WearOsAuthorizationCard: React.FC = () => {
+  // Wear OS não existe no iOS — lá o caminho é o Apple Saúde/HealthKit.
+  if (Platform.OS === "ios") return <AppleHealthCard />;
+
+  return <WearOsAndroidCard />;
+};
+
+const WearOsAndroidCard: React.FC = () => {
   const { isAuthorized, isLoading, error, requestAuthorization } = useWearOsAuthorization();
 
   const handleRequestAuthorization = async () => {

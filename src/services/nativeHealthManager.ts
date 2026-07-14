@@ -5,6 +5,8 @@ import {
   fetchHealthKitSteps,
   fetchHealthKitHeartRate,
   fetchHealthKitCalories,
+  fetchHealthKitOxygen,
+  fetchHealthKitSleep,
 } from "./appleHealthKitService";
 import { saveHealthMetricData } from "./caloriesService";
 
@@ -86,6 +88,8 @@ export const NativeHealthManager = {
     try {
       if (Platform.OS === "android") {
         oxygen = await unifiedHealthService.getOxygen();
+      } else if (Platform.OS === "ios") {
+        oxygen = await fetchHealthKitOxygen();
       }
     } catch (e) {
       console.warn("[NHM] fetchOxygen falhou:", e);
@@ -107,6 +111,8 @@ export const NativeHealthManager = {
     try {
       if (Platform.OS === "android") {
         hours = await unifiedHealthService.getSleep();
+      } else if (Platform.OS === "ios") {
+        hours = await fetchHealthKitSleep();
       }
     } catch (e) {
       console.warn("[NHM] fetchSleep falhou:", e);

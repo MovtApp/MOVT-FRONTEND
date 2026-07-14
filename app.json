@@ -26,6 +26,7 @@
         "NSLocationAlwaysAndWhenInUseUsageDescription": "Este aplicativo precisa de acesso à localização em segundo plano para rastrear suas rotas de exercício.",
         "NSHealthShareUsageDescription": "Este aplicativo precisa de acesso aos seus dados de saúde para mostrar seu progresso fitness.",
         "NSHealthUpdateUsageDescription": "Este aplicativo precisa registrar seus dados de saúde para rastrear suas atividades.",
+        "NSMotionUsageDescription": "Este aplicativo usa os sensores de movimento para contar seus passos e medir suas atividades físicas.",
         "ITSAppUsesNonExemptEncryption": false,
         "LSApplicationQueriesSchemes": ["instagram-stories", "instagram"]
       }
@@ -71,6 +72,7 @@
       "expo-localization",
       "expo-web-browser",
       "expo-sensors",
+      "expo-live-activity",
       [
         "expo-location",
         {

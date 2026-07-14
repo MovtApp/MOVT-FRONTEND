@@ -1,4 +1,4 @@
-import { MessageCircle, Heart, MessageSquare, UserPlus, EyeOff, Moon, Clock } from "lucide-react-native";
+import { MessageCircle, Heart, MessageSquare, UserPlus, ImageIcon, EyeOff, Moon, Clock } from "lucide-react-native";
 import React, { useEffect, useState, useCallback } from "react";
 import {
   View,
@@ -22,6 +22,7 @@ interface Prefs {
   push_likes: boolean;
   push_comments: boolean;
   push_follows: boolean;
+  push_posts: boolean;
   hide_message_preview: boolean;
   quiet_hours_enabled: boolean;
   quiet_start: string | null;
@@ -36,6 +37,7 @@ const DEFAULT_PREFS: Prefs = {
   push_likes: true,
   push_comments: true,
   push_follows: true,
+  push_posts: true,
   hide_message_preview: false,
   quiet_hours_enabled: false,
   quiet_start: "22:00",
@@ -183,9 +185,16 @@ const NotificationPreferencesScreen: React.FC = () => {
             <ToggleRow
               icon={UserPlus}
               label="Seguidores"
-              description="Quando aceitarem sua solicitação para seguir"
+              description="Quando quiserem te seguir ou aceitarem sua solicitação"
               value={prefs.push_follows}
               onChange={(v) => save({ push_follows: v })}
+            />
+            <ToggleRow
+              icon={ImageIcon}
+              label="Novas publicações"
+              description="Quando alguém que você segue publica"
+              value={prefs.push_posts}
+              onChange={(v) => save({ push_posts: v })}
             />
 
             <Text style={styles.sectionTitle}>Privacidade</Text>

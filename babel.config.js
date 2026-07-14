@@ -26,5 +26,15 @@ export default function (api) {
       ],
       "react-native-reanimated/plugin",
     ],
+    env: {
+      // Em builds de produção (expo export / EAS release), remove os console.*
+      // do bundle para não vazar PII (chat, auth, perfil) no logcat nem gastar
+      // CPU/string-building em runtime. Mantém error/warn — o Sentry os captura.
+      production: {
+        plugins: [
+          ["transform-remove-console", { exclude: ["error", "warn"] }],
+        ],
+      },
+    },
   };
 };

@@ -9,6 +9,7 @@ const PERMISSIONS = {
       AppleHealthKit.Constants.Permissions.ActiveEnergyBurned,
       AppleHealthKit.Constants.Permissions.Water,
       AppleHealthKit.Constants.Permissions.SleepAnalysis,
+      AppleHealthKit.Constants.Permissions.OxygenSaturation,
     ],
     write: [AppleHealthKit.Constants.Permissions.Water],
   },
@@ -80,6 +81,64 @@ export const fetchHealthKitCalories = (): Promise<number> => {
       }
       const total = results.reduce((sum, r) => sum + r.value, 0);
       resolve(total);
+    });
+  });
+};
+
+/**
+ * SpO2 mais recente das últimas 24h, em PERCENTUAL (ex.: 97) para bater com o
+ * Android (Health Connect devolve `.percentage`). O HealthKit devolve fração
+ * (0.0–1.0), então multiplicamos por 100. Cast p/ any: `getOxygenSaturationSamples`
+ * pode não estar nos tipos da lib nesta versão.
+ */
+export const fetchHealthKitOxygen = (): Promise<number> => {
+  return new Promise((resolve) => {
+    const HK = AppleHealthKit as any;
+    if (Platform.OS !== "ios" || !HK?.getOxygenSaturationSamples) return resolve(0);
+
+    const options: HealthInputOptions = {
+      startDate: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
+    };
+
+    HK.getOxygenSaturationSamples(options, (err: any, results: any[]) => {
+      if (err || !Array.isArray(results) || results.length === 0) return resolve(0);
+      // Amostra de endDate mais recente (a ordem do retorno não é garantida).
+      const latest = results.reduce((a, b) =>
+        new Date(b.endDate).getTime() > new Date(a.endDate).getTime() ? b : a
+      );
+      const frac = typeof latest.value === "number" ? latest.value : 0;
+      resolve(Math.round(frac * 100 * 100) / 100); // fração → % com 2 casas
+    });
+  });
+};
+
+/**
+ * Horas de sono nas últimas 24h, para bater com o Android (soma das sessões).
+ * O HealthKit devolve samples por estágio; somamos a duração dos estágios de
+ * SONO (asleep/core/deep/rem), ignorando "INBED" (que envolve todo o período na
+ * cama e sobreporia) e "AWAKE".
+ */
+export const fetchHealthKitSleep = (): Promise<number> => {
+  return new Promise((resolve) => {
+    const HK = AppleHealthKit as any;
+    if (Platform.OS !== "ios" || !HK?.getSleepSamples) return resolve(0);
+
+    const options: HealthInputOptions = {
+      startDate: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
+    };
+
+    HK.getSleepSamples(options, (err: any, results: any[]) => {
+      if (err || !Array.isArray(results) || results.length === 0) return resolve(0);
+      const ASLEEP = new Set(["ASLEEP", "CORE", "DEEP", "REM"]);
+      let ms = 0;
+      for (const s of results) {
+        const v = String(s?.value || "").toUpperCase();
+        if (!ASLEEP.has(v)) continue;
+        const start = new Date(s.startDate).getTime();
+        const end = new Date(s.endDate).getTime();
+        if (isFinite(start) && isFinite(end) && end > start) ms += end - start;
+      }
+      resolve(ms / (1000 * 60 * 60)); // ms → horas
     });
   });
 };
