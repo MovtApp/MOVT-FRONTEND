@@ -89,7 +89,10 @@ interface CommentItemProps {
   onDelete: (id: string | number) => void;
 }
 
-const CommentItem: React.FC<CommentItemProps> = ({ item, currentUserId, authorId, onDelete }) => {
+// Memoizado: numa lista de comentários, currentUserId/authorId são escalares e
+// onDelete vem estável (useCallback), então cada item só re-renderiza quando o
+// próprio comentário muda.
+const CommentItem = React.memo<CommentItemProps>(({ item, currentUserId, authorId, onDelete }) => {
   const ownerId = item.user_id ?? item.comment_user_id;
   const isCommentOwner = currentUserId != null && String(ownerId) === String(currentUserId);
   const isContentOwner =
@@ -156,7 +159,8 @@ const CommentItem: React.FC<CommentItemProps> = ({ item, currentUserId, authorId
       {content}
     </Swipeable>
   );
-};
+});
+CommentItem.displayName = "CommentItem";
 
 // Barra de input isolada: mantém o próprio estado de texto/envio. Assim, digitar
 // re-renderiza APENAS esta barra — não o CommentsSheet inteiro — evitando que o
