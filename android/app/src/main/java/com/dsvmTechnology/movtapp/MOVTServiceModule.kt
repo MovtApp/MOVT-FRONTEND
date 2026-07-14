@@ -73,6 +73,25 @@ class MOVTServiceModule(reactContext: ReactApplicationContext) : ReactContextBas
         context.stopService(intent)
     }
 
+    // Atualiza o card ao vivo do treino (km · tempo · pace) na notificação do
+    // foreground service — inclusive com a tela BLOQUEADA. Usa
+    // NotificationManagerCompat.notify no MESMO NOTIFICATION_ID do serviço, o que
+    // substitui o card existente sem re-tocar no estado do FGS (evita o
+    // ForegroundServiceStartNotAllowed que o expo-location lança em background).
+    // Best-effort: uma falha de update não pode afetar o treino.
+    @ReactMethod
+    fun updateNotification(title: String, body: String) {
+        try {
+            val context = reactApplicationContext
+            MOVTForegroundService.ensureChannel(context)
+            val notification = MOVTForegroundService.buildNotification(context, title, body)
+            androidx.core.app.NotificationManagerCompat.from(context)
+                .notify(MOVTForegroundService.NOTIFICATION_ID, notification)
+        } catch (e: Exception) {
+            Log.w("MOVTServiceModule", "Falha ao atualizar notificação do treino: ${e.message}")
+        }
+    }
+
     // ─── Isenção de otimização de bateria ────────────────────────────────────────
     // Sem isenção, ROMs Android (Samsung/Motorola/Xiaomi…) congelam o processo do
     // app alguns minutos após a tela apagar — mesmo com foreground service — e o

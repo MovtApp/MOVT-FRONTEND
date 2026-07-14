@@ -72,6 +72,7 @@
       "expo-localization",
       "expo-web-browser",
       "expo-sensors",
+      "expo-live-activity",
       [
         "expo-location",
         {

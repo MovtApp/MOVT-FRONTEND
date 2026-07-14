@@ -43,6 +43,21 @@ export const stopMOVTService = () => {
 };
 
 /**
+ * Atualiza o card ao vivo do treino (título + corpo) na notificação do foreground
+ * service — o "modal de atividade" na tela de bloqueio do Android. Chamável mesmo
+ * com o app em background (a atualização é um NotificationManager.notify no nativo,
+ * não um start de FGS). Best-effort e no-op no iOS/sem módulo — nunca afeta o treino.
+ */
+export const updateWorkoutNotification = (title: string, body: string) => {
+  if (Platform.OS !== "android" || !MOVTServiceModule?.updateNotification) return;
+  try {
+    MOVTServiceModule.updateNotification(title, body);
+  } catch {
+    // atualização de notificação é cosmética — silencioso
+  }
+};
+
+/**
  * O app está isento da otimização de bateria? Quando NÃO está, o SO congela o
  * processo com a tela apagada e o rastreio do treino para. iOS/sem módulo → true
  * (não se aplica). Falha → true para não incomodar o usuário à toa.

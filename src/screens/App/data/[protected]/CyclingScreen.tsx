@@ -1466,6 +1466,12 @@ const CyclingScreen: React.FC = () => {
   // de GPS continua emitindo `lastLocation` em background, o que dispararia esse
   // efeito repetidamente. Guardamos por esta ref.
   const appActiveRef = useRef<boolean>(AppState.currentState === "active");
+  // Espelho em STATE do foreground: dispara re-render para MONTAR/DESMONTAR o mapa
+  // ao vivo conforme o app entra/sai de foreground. O MapView (Google/Apple) não
+  // pode receber updates com a superfície GL destruída pelo SO (tela bloqueada);
+  // desmontá-lo em background elimina o crash nativo — e o tracking segue no
+  // serviço (GPS + tempo), parando só em Pausar/Encerrar.
+  const [appActive, setAppActive] = useState<boolean>(AppState.currentState === "active");
   // O mapa ao vivo já terminou de montar (onMapReady)? Só animamos depois disso.
   const liveMapReadyRef = useRef<boolean>(false);
   const insets = useSafeAreaInsets();
@@ -1514,6 +1520,11 @@ const CyclingScreen: React.FC = () => {
       const nowActive = state === "active";
       const wasActive = appActiveRef.current;
       appActiveRef.current = nowActive;
+      // Espelha no state para (re)montar o mapa. Ao SAIR de foreground, marca o
+      // mapa como "não pronto": ele é desmontado no render e as guardas de câmera
+      // não devem tocar numa superfície que não existe mais.
+      setAppActive(nowActive);
+      if (!nowActive) liveMapReadyRef.current = false;
       if (nowActive && !wasActive) {
         // Rehidrata/religa a sessão (idempotente) e recentra uma única vez, no
         // frame seguinte (dá tempo do mapa reanexar a superfície nativa).
@@ -1960,6 +1971,7 @@ const CyclingScreen: React.FC = () => {
       {isTracking && isToday ? (
         // ─── Tela cheia de treino ativo (estilo Strava) ───────────────────────
         <View style={styles.immersive}>
+          {appActive ? (
           <MapView
             ref={liveMapRef}
             provider={MAP_PROVIDER}
@@ -1998,6 +2010,14 @@ const CyclingScreen: React.FC = () => {
               ) : null
             )}
           </MapView>
+          ) : (
+            // App fora de foreground (tela bloqueada / outro app): desmonta o mapa.
+            // O MapView não pode receber updates com a superfície GL destruída pelo
+            // SO — desmontar elimina o crash nativo. O tracking continua no serviço
+            // (GPS + tempo por relógio de parede); ao voltar, o mapa remonta já
+            // centrado na posição atual (initialRegion usa o último fix).
+            <View style={[StyleSheet.absoluteFillObject, { backgroundColor: "#0B1220" }]} />
+          )}
 
           {/* Topo: minimizar (treino segue) + modalidade + badge Pausado */}
           <SafeAreaView edges={["top"]} style={styles.immTopSafe} pointerEvents="box-none">
@@ -2137,6 +2157,7 @@ const CyclingScreen: React.FC = () => {
           showsVerticalScrollIndicator={false}
         >
           <View style={styles.mapContainer}>
+            {appActive ? (
             <MapView
               ref={liveMapRef}
               provider={MAP_PROVIDER}
@@ -2176,6 +2197,11 @@ const CyclingScreen: React.FC = () => {
                 ) : null
               )}
             </MapView>
+            ) : (
+              // App fora de foreground: desmonta o mapa (evita crash nativo numa
+              // superfície GL destruída). Remonta ao voltar ao foreground.
+              <View style={[styles.map, { backgroundColor: "#0B1220" }]} />
+            )}
 
             <View style={styles.hudOverlay}>
               <View style={styles.hudGrid}>

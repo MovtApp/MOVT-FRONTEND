@@ -15,33 +15,16 @@ import androidx.core.app.NotificationCompat
 
 class MOVTForegroundService : Service() {
 
-    private val CHANNEL_ID = "movt_workout_channel"
-    private val NOTIFICATION_ID = 1001
-
     override fun onCreate() {
         super.onCreate()
-        createNotificationChannel()
+        ensureChannel(this)
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         val title = intent?.getStringExtra("title") ?: "MOVT - Treino em Andamento"
         val body = intent?.getStringExtra("body") ?: "Acompanhando seus dados e localização..."
 
-        val notificationIntent = Intent(this, MainActivity::class.java)
-        val pendingIntent = PendingIntent.getActivity(
-            this,
-            0,
-            notificationIntent,
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) PendingIntent.FLAG_IMMUTABLE else 0
-        )
-
-        val notification: Notification = NotificationCompat.Builder(this, CHANNEL_ID)
-            .setContentTitle(title)
-            .setContentText(body)
-            .setSmallIcon(applicationContext.resources.getIdentifier("ic_launcher", "mipmap", packageName))
-            .setContentIntent(pendingIntent)
-            .setOngoing(true)
-            .build()
+        val notification = buildNotification(this, title, body)
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             var foregroundType = 0
@@ -118,15 +101,49 @@ class MOVTForegroundService : Service() {
         return null
     }
 
-    private fun createNotificationChannel() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val serviceChannel = NotificationChannel(
-                CHANNEL_ID,
-                "Monitoramento de Treinos MOVT",
-                NotificationManager.IMPORTANCE_LOW
+    companion object {
+        const val CHANNEL_ID = "movt_workout_channel"
+        const val NOTIFICATION_ID = 1001
+
+        /** Cria o canal de notificação do treino (idempotente). */
+        fun ensureChannel(context: Context) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                val serviceChannel = NotificationChannel(
+                    CHANNEL_ID,
+                    "Monitoramento de Treinos MOVT",
+                    NotificationManager.IMPORTANCE_LOW
+                )
+                val manager = context.getSystemService(NotificationManager::class.java)
+                manager?.createNotificationChannel(serviceChannel)
+            }
+        }
+
+        /**
+         * Constrói o card ("live activity") do treino. Compartilhado entre o serviço
+         * (startForeground, no início) e o MOVTServiceModule.updateNotification
+         * (NotificationManagerCompat.notify, a cada atualização de stats). Manter o
+         * MESMO CHANNEL_ID/NOTIFICATION_ID faz a atualização substituir o card
+         * existente — inclusive com a tela bloqueada, sem re-tocar no estado do FGS
+         * (o que dispararia ForegroundServiceStartNotAllowed em background).
+         * `setOnlyAlertOnce` evita som/vibração a cada atualização por segundo.
+         */
+        fun buildNotification(context: Context, title: String, body: String): Notification {
+            val notificationIntent = Intent(context, MainActivity::class.java)
+            val pendingIntent = PendingIntent.getActivity(
+                context,
+                0,
+                notificationIntent,
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) PendingIntent.FLAG_IMMUTABLE else 0
             )
-            val manager = getSystemService(NotificationManager::class.java)
-            manager?.createNotificationChannel(serviceChannel)
+            return NotificationCompat.Builder(context, CHANNEL_ID)
+                .setContentTitle(title)
+                .setContentText(body)
+                .setSmallIcon(context.applicationContext.resources.getIdentifier("ic_launcher", "mipmap", context.packageName))
+                .setContentIntent(pendingIntent)
+                .setOngoing(true)
+                .setOnlyAlertOnce(true)
+                .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+                .build()
         }
     }
 }
