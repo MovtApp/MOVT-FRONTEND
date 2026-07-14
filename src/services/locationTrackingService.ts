@@ -33,6 +33,12 @@ import {
   stopMOVTService,
   updateWorkoutNotification,
 } from "./movtService";
+import {
+  startWorkoutActivity,
+  updateWorkoutActivity,
+  endWorkoutActivity,
+  type LiveActivityData,
+} from "./liveActivityService";
 import { deriveSpeedMs, speedToPace, formatDuration } from "../utils/workout/performance";
 import {
   haversineMeters,
@@ -688,15 +694,36 @@ function workoutNotifText(): { title: string; body: string } {
   return { title: `MOVT · ${s.type}${status}`, body: `${km} km · ${time} · ${perf}` };
 }
 
-// Atualiza o card ao vivo (throttled). Só quando NOSSO FGS está no ar (bgGranted);
-// no modo fallback, quem mostra a notificação é o expo-location (texto estático).
-function pushWorkoutNotification(force = false) {
-  if (!bgGranted || !session?.active) return;
+// Dados da Live Activity (iOS) a partir do snapshot — casa com LiveActivityData.
+function liveActivityData(): LiveActivityData {
+  const s = getSnapshot();
+  const avgMs = s.elapsedSec > 0 ? (s.distanceKm * 1000) / s.elapsedSec : 0;
+  const isCycling = s.type === "Ciclismo";
+  return {
+    type: s.type,
+    distance: s.distanceKm.toFixed(2).replace(".", ","),
+    time: formatDuration(s.elapsedSec),
+    pace: isCycling ? `${(avgMs * 3.6).toFixed(1)} km/h` : `${speedToPace(avgMs)} /km`,
+    paceLabel: isCycling ? "km/h" : "pace",
+    paused: s.isPaused,
+  };
+}
+
+// Empurra o status do treino para o SO: card no FGS (Android, modo nosso-FGS) e/ou
+// Live Activity (iOS). Throttled; roda mesmo com a tela bloqueada (a partir da task
+// de GPS). Cada canal é no-op quando não se aplica à plataforma/estado.
+function pushWorkoutStatus(force = false) {
+  if (!session?.active) return;
   const now = Date.now();
   if (!force && now - lastNotifTs < NOTIF_UPDATE_MS) return;
   lastNotifTs = now;
-  const { title, body } = workoutNotifText();
-  updateWorkoutNotification(title, body);
+  // Android: card ao vivo no nosso FGS (só no modo nosso-FGS).
+  if (bgGranted) {
+    const { title, body } = workoutNotifText();
+    updateWorkoutNotification(title, body);
+  }
+  // iOS: Live Activity / Dynamic Island (no-op até o módulo nativo existir).
+  updateWorkoutActivity(liveActivityData());
 }
 
 // ─── Opções de location updates (compartilhadas start/resume) ───────────────────
@@ -903,6 +930,9 @@ export async function startTracking(type: WorkoutKind): Promise<StartResult> {
     const { title, body } = workoutNotifText();
     startMOVTService(title, body);
   }
+  // iOS: inicia a Live Activity (card na tela de bloqueio + Dynamic Island).
+  // No-op fora do iOS / enquanto o módulo nativo não existir.
+  startWorkoutActivity(liveActivityData());
 
   // Começa a ler a FC do relógio (best-effort, só leitura — ver startHrPolling).
   startHrPolling();
@@ -929,8 +959,8 @@ export function togglePause() {
     pauseManual();
   }
   persist(true);
-  // Reflete pausa/retomada no card ao vivo imediatamente.
-  pushWorkoutNotification(true);
+  // Reflete pausa/retomada no card ao vivo (Android) e Live Activity (iOS).
+  pushWorkoutStatus(true);
   notify();
 }
 
@@ -967,8 +997,10 @@ export async function stopTracking(): Promise<TrackingSnapshot> {
 
   if (session) session.active = false;
   releaseWorkoutWakeLock();
-  // Encerra o card ao vivo (nosso FGS). No-op se estava no modo fallback.
+  // Encerra o card ao vivo (nosso FGS, Android) e a Live Activity (iOS). No-op
+  // quando não se aplica.
   stopMOVTService();
+  endWorkoutActivity();
   bgGranted = false;
   Sentry.addBreadcrumb({
     category: "workout",
@@ -1064,9 +1096,10 @@ TaskManager.defineTask(LOCATION_TASK, async ({ data, error }) => {
 
   await persist();
   notify();
-  // Card ao vivo na tela de bloqueio (throttled; só no modo nosso-FGS). É o que
-  // mantém km/tempo/pace atualizados na notificação mesmo com o app em background.
-  pushWorkoutNotification();
+  // Status ao vivo na tela de bloqueio (throttled): card do FGS (Android) e Live
+  // Activity (iOS). É o que mantém km/tempo/pace atualizados mesmo com a tela
+  // bloqueada / app em background.
+  pushWorkoutStatus();
   // Map-matching ao vivo (não-bloqueante, throttled internamente).
   maybeSnapLive();
 });
