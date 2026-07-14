@@ -175,3 +175,10 @@ settings*.yml
 !.env.example
 # Saida transpilada do teste de historico (descartavel)
 scripts/.tmp-wh/
+
+# Worktrees do git criados pelo Claude Code. Cada um é um checkout completo com
+# .git próprio, então `git add .` os stageia como GITLINK (o mesmo mecanismo de
+# submódulo) — commitar isso deixaria a main apontando para "submódulos" que não
+# existem em lugar nenhum, quebrando o clone e virando lixo assim que as branches
+# saíssem. Nunca versionar.
+.claude/worktrees/
