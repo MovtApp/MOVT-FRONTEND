@@ -484,4 +484,7 @@ const PostCard: React.FC<PostCardProps> = ({ post, onShare, onCommentPress }) =>
   );
 };
 
-export default PostCard;
+// Memoizado: no feed (FlatList) os handlers vêm estáveis (useCallback) e o
+// `post` tem identidade estável (feedItems é useMemo), então o cartão só
+// re-renderiza quando seus próprios dados mudam — não a cada render da lista.
+export default React.memo(PostCard);

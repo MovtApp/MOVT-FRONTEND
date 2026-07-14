@@ -29,7 +29,16 @@ import {
   requestIgnoreBatteryOptimizations,
   acquireWorkoutWakeLock,
   releaseWorkoutWakeLock,
+  startMOVTService,
+  stopMOVTService,
+  updateWorkoutNotification,
 } from "./movtService";
+import {
+  startWorkoutActivity,
+  updateWorkoutActivity,
+  endWorkoutActivity,
+  type LiveActivityData,
+} from "./liveActivityService";
 import { deriveSpeedMs, speedToPace, formatDuration } from "../utils/workout/performance";
 import {
   haversineMeters,
@@ -197,6 +206,10 @@ interface Session {
   // Estado do filtro de Kalman (suavização do traçado). Serializável → sobrevive
   // à persistência/rehidratação. null até o primeiro fix válido.
   kf: KalmanState | null;
+  // "Permitir o tempo todo" concedido? Decide o modo de foreground service (nosso
+  // card ao vivo vs. fallback do expo-location). Persistido p/ sobreviver ao
+  // restart do processo.
+  backgroundGranted: boolean;
 }
 
 let session: Session | null = null;
@@ -549,6 +562,8 @@ async function ensureHydrated() {
         if (typeof parsed.maxHr !== "number") parsed.maxHr = 0;
         if (typeof parsed.watchPresent !== "boolean") parsed.watchPresent = false;
         if (typeof parsed.lastAltitude !== "number") parsed.lastAltitude = null;
+        if (typeof parsed.backgroundGranted !== "boolean") parsed.backgroundGranted = false;
+        bgGranted = parsed.backgroundGranted;
         session = parsed;
       }
     }
@@ -657,9 +672,63 @@ export async function hasActiveSession(): Promise<{ active: boolean; type?: Work
   return { active: false };
 }
 
+// ─── Card ao vivo na tela de bloqueio (Fase 2, Android) ─────────────────────────
+// Com "Permitir o tempo todo" concedido, NOSSO foreground service
+// (MOVTForegroundService) hospeda o card ao vivo do treino e o expo-location roda
+// SEM FGS próprio — assim aparece UMA notificação só, atualizável mesmo com a tela
+// bloqueada. Sem o background, mantemos o FGS do expo-location (senão
+// startLocationUpdatesAsync exigiria background e lançaria).
+let bgGranted = false;
+let lastNotifTs = 0;
+const NOTIF_UPDATE_MS = 2000;
+
+// Texto do card: "MOVT · Corrida" + "3,21 km · 18:45 · 5:50 /km" (pace/vel. média).
+function workoutNotifText(): { title: string; body: string } {
+  const s = getSnapshot();
+  const km = s.distanceKm.toFixed(2).replace(".", ",");
+  const time = formatDuration(s.elapsedSec);
+  const avgMs = s.elapsedSec > 0 ? (s.distanceKm * 1000) / s.elapsedSec : 0;
+  const perf =
+    s.type === "Ciclismo" ? `${(avgMs * 3.6).toFixed(1)} km/h` : `${speedToPace(avgMs)} /km`;
+  const status = s.isPaused ? " (pausado)" : "";
+  return { title: `MOVT · ${s.type}${status}`, body: `${km} km · ${time} · ${perf}` };
+}
+
+// Dados da Live Activity (iOS) a partir do snapshot — casa com LiveActivityData.
+function liveActivityData(): LiveActivityData {
+  const s = getSnapshot();
+  const avgMs = s.elapsedSec > 0 ? (s.distanceKm * 1000) / s.elapsedSec : 0;
+  const isCycling = s.type === "Ciclismo";
+  return {
+    type: s.type,
+    distance: s.distanceKm.toFixed(2).replace(".", ","),
+    time: formatDuration(s.elapsedSec),
+    pace: isCycling ? `${(avgMs * 3.6).toFixed(1)} km/h` : `${speedToPace(avgMs)} /km`,
+    paceLabel: isCycling ? "km/h" : "pace",
+    paused: s.isPaused,
+  };
+}
+
+// Empurra o status do treino para o SO: card no FGS (Android, modo nosso-FGS) e/ou
+// Live Activity (iOS). Throttled; roda mesmo com a tela bloqueada (a partir da task
+// de GPS). Cada canal é no-op quando não se aplica à plataforma/estado.
+function pushWorkoutStatus(force = false) {
+  if (!session?.active) return;
+  const now = Date.now();
+  if (!force && now - lastNotifTs < NOTIF_UPDATE_MS) return;
+  lastNotifTs = now;
+  // Android: card ao vivo no nosso FGS (só no modo nosso-FGS).
+  if (bgGranted) {
+    const { title, body } = workoutNotifText();
+    updateWorkoutNotification(title, body);
+  }
+  // iOS: Live Activity / Dynamic Island (no-op até o módulo nativo existir).
+  updateWorkoutActivity(liveActivityData());
+}
+
 // ─── Opções de location updates (compartilhadas start/resume) ───────────────────
 function buildOptions(type: WorkoutKind): Location.LocationTaskOptions {
-  return {
+  const base: Location.LocationTaskOptions = {
     accuracy: Location.Accuracy.BestForNavigation,
     // 500 ms (era 1000): pede fixes na taxa máxima que o GPS entrega, para o
     // acompanhamento da câmera não "pular" em alta velocidade. distanceInterval
@@ -669,13 +738,22 @@ function buildOptions(type: WorkoutKind): Location.LocationTaskOptions {
     pausesUpdatesAutomatically: false,
     activityType: Location.ActivityType.Fitness,
     showsBackgroundLocationIndicator: true,
-    foregroundService: {
-      notificationTitle: "MOVT — Treino em andamento",
-      notificationBody: `Acompanhando sua atividade de ${type.toLowerCase()} em tempo real`,
-      notificationColor: "#BBF246",
-      killServiceOnDestroy: false,
-    },
   };
+  // Sem background concedido: delega o FGS ao expo-location (exigido p/ as updates
+  // seguirem e evita o throw de background-permission). Com background, NOSSO
+  // MOVTForegroundService é o único FGS (card ao vivo) — não duplicamos a notif.
+  if (!bgGranted) {
+    return {
+      ...base,
+      foregroundService: {
+        notificationTitle: "MOVT — Treino em andamento",
+        notificationBody: `Acompanhando sua atividade de ${type.toLowerCase()} em tempo real`,
+        notificationColor: "#BBF246",
+        killServiceOnDestroy: false,
+      },
+    };
+  }
+  return base;
 }
 
 // ─── Re-arme das location updates (recuperação de serviço morto) ─────────────────
@@ -785,6 +863,8 @@ export async function startTracking(type: WorkoutKind): Promise<StartResult> {
   } catch {
     // alguns devices/ROMs lançam aqui; seguimos com o que houver
   }
+  // Define o modo de FGS ANTES de buildOptions (ele lê `bgGranted`).
+  bgGranted = backgroundGranted;
 
   // Isenção de otimização de bateria: SEM ela, o SO congela o processo com a tela
   // apagada (causa #1 do treino "parar" no meio). Mostra o diálogo do sistema
@@ -838,9 +918,21 @@ export async function startTracking(type: WorkoutKind): Promise<StartResult> {
     lastSplitKm: 0,
     lastLocation: null,
     kf: null,
+    backgroundGranted,
   };
   hydrated = true; // sessão fresca; não rehidratar por cima
   await persist(true);
+
+  // Card ao vivo na tela de bloqueio: com background concedido, NOSSO foreground
+  // service hospeda a notificação (single card, atualizável mesmo bloqueado). Sem
+  // background, o FGS do expo-location cuida da notificação (ver buildOptions).
+  if (bgGranted) {
+    const { title, body } = workoutNotifText();
+    startMOVTService(title, body);
+  }
+  // iOS: inicia a Live Activity (card na tela de bloqueio + Dynamic Island).
+  // No-op fora do iOS / enquanto o módulo nativo não existir.
+  startWorkoutActivity(liveActivityData());
 
   // Começa a ler a FC do relógio (best-effort, só leitura — ver startHrPolling).
   startHrPolling();
@@ -867,6 +959,8 @@ export function togglePause() {
     pauseManual();
   }
   persist(true);
+  // Reflete pausa/retomada no card ao vivo (Android) e Live Activity (iOS).
+  pushWorkoutStatus(true);
   notify();
 }
 
@@ -903,6 +997,11 @@ export async function stopTracking(): Promise<TrackingSnapshot> {
 
   if (session) session.active = false;
   releaseWorkoutWakeLock();
+  // Encerra o card ao vivo (nosso FGS, Android) e a Live Activity (iOS). No-op
+  // quando não se aplica.
+  stopMOVTService();
+  endWorkoutActivity();
+  bgGranted = false;
   Sentry.addBreadcrumb({
     category: "workout",
     level: "info",
@@ -943,6 +1042,13 @@ export async function resumeIfActive() {
     // Processo religado pelo SO durante um treino: rearma o WakeLock (foi solto
     // quando o processo morreu) para a CPU não suspender de novo.
     acquireWorkoutWakeLock();
+    // Restaura o modo de FGS e religa o card ao vivo (o serviço morreu com o
+    // processo; START_STICKY pode tê-lo recriado com texto padrão — reafirmamos).
+    bgGranted = s.backgroundGranted === true;
+    if (bgGranted) {
+      const { title, body } = workoutNotifText();
+      startMOVTService(title, body);
+    }
     // Rearma também o poller de FC (o timer não sobrevive ao restart do JS).
     startHrPolling();
     const started = await Location.hasStartedLocationUpdatesAsync(LOCATION_TASK).catch(() => false);
@@ -990,6 +1096,10 @@ TaskManager.defineTask(LOCATION_TASK, async ({ data, error }) => {
 
   await persist();
   notify();
+  // Status ao vivo na tela de bloqueio (throttled): card do FGS (Android) e Live
+  // Activity (iOS). É o que mantém km/tempo/pace atualizados mesmo com a tela
+  // bloqueada / app em background.
+  pushWorkoutStatus();
   // Map-matching ao vivo (não-bloqueante, throttled internamente).
   maybeSnapLive();
 });

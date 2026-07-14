@@ -32,7 +32,7 @@ const WEAR_OS_PERMISSIONS = [
  * @returns Promise com resultado da autorização
  */
 export const requestWearOsAuthorization = async (
-  userId: number,
+  userId: string,
   onProgress?: (message: string) => void
 ): Promise<WearOsAuthorizationResult> => {
   try {
@@ -80,7 +80,7 @@ export const requestWearOsAuthorization = async (
     onProgress?.("Registrando dispositivo no banco de dados...");
 
     // Registrar o dispositivo Wear OS no banco
-    const deviceInfo = await registerWearOsDevice(userId, {
+    const deviceInfo = await registerWearOsDevice({
       deviceName: `Wear OS ${Platform.Version}`,
       deviceModel: "Android Wear",
       deviceType: "Wear OS",
@@ -117,7 +117,7 @@ export const requestWearOsAuthorization = async (
  * @returns Promise com resultado da autorização
  */
 export const requestWearOsAuthorizationWithUI = async (
-  userId: number
+  userId: string
 ): Promise<WearOsAuthorizationResult> => {
   return new Promise((resolve) => {
     Alert.alert(
@@ -164,7 +164,7 @@ export const showWearOsAuthorizationAlert = (result: WearOsAuthorizationResult):
  * @returns Promise com resultado da autorização
  */
 export const initializeWearOsAuthorization = async (
-  userId: number
+  userId: string
 ): Promise<WearOsAuthorizationResult> => {
   return new Promise((resolve) => {
     Alert.alert(
@@ -239,8 +239,12 @@ export const checkWearOsPermissions = async (): Promise<boolean> => {
   }
 
   try {
-    const results = await PermissionsAndroid.checkMultiple(WEAR_OS_PERMISSIONS);
-    return Object.values(results).every((result) => result === PermissionsAndroid.RESULTS.GRANTED);
+    // A RN não tem `checkMultiple`; verificamos cada permissão com `check`
+    // (retorna boolean) e exigimos que todas estejam concedidas.
+    const results = await Promise.all(
+      WEAR_OS_PERMISSIONS.map((permission) => PermissionsAndroid.check(permission)),
+    );
+    return results.every((granted) => granted);
   } catch (error) {
     console.error("Erro ao verificar permissões Wear OS:", error);
     return false;

@@ -44,11 +44,18 @@ const BackButton: React.FC<BackButtonProps> = ({ to, onPress, style, autoTopInse
     }
 
     if (to?.name) {
+      // O navigator é tipado genericamente (Record<string, ...>), então os nomes
+      // de rota são dinâmicos; tipamos a função de navegação em vez de forçar
+      // `as never` em cada argumento.
+      const navigate = navigation.navigate as (
+        name: string,
+        params?: Record<string, unknown>,
+      ) => void;
       if (MAIN_TAB_SCREENS.includes(to.name)) {
         // Tela aninhada no Tab navigator: roteia pelo MainTabs.
-        navigation.navigate("MainTabs" as never, { screen: to.name, params: to.params } as never);
+        navigate("MainTabs", { screen: to.name, params: to.params });
       } else {
-        navigation.navigate(to.name as never, (to.params || {}) as never);
+        navigate(to.name, to.params || {});
       }
       return;
     }

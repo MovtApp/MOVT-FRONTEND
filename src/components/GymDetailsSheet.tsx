@@ -120,8 +120,8 @@ export const GymDetailsSheet: React.FC<GymDetailsSheetProps> = ({
     const origin = userLocation ? `${userLocation.latitude},${userLocation.longitude}` : "";
     const destination = `${gym.latitude},${gym.longitude}`;
     const url = origin
-      ? `http://maps.apple.com/?saddr=${origin}&daddr=${destination}`
-      : `http://maps.apple.com/?daddr=${destination}`;
+      ? `https://maps.apple.com/?saddr=${origin}&daddr=${destination}`
+      : `https://maps.apple.com/?daddr=${destination}`;
     Linking.openURL(url).catch(() => {
       // Se falhar, tenta abrir Google Maps como fallback
       openGoogleMaps();
