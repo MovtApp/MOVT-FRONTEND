@@ -152,6 +152,11 @@ babel.config.js
 *.config.js
 *.config.cjs
 *.config.mjs
+# Exceção: o config dos targets nativos (@bacons/apple-targets) casa com
+# `*.config.js` mas NÃO é config de ferramenta — é fonte, e sem ele o
+# `expo prebuild` não cria o target (falha silenciosa: nenhum erro, target
+# ausente). Tem de ser versionado.
+!targets/**/expo-target.config.js
 
 # Expo Prebuild
 # /android é versionado porque contém código nativo customizado (MOVTForegroundService,

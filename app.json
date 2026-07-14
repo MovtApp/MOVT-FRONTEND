@@ -73,6 +73,7 @@
       "expo-web-browser",
       "expo-sensors",
       "expo-live-activity",
+      "@bacons/apple-targets",
       [
         "expo-location",
         {
