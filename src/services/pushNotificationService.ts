@@ -24,7 +24,73 @@ export const ANDROID_CHANNELS = {
   reminders: "reminders",
 } as const;
 
+/**
+ * Categorias de AÇÃO (os botões da notificação). Os ids têm de bater EXATAMENTE
+ * com o `ACTION_CATEGORY_FOR_TYPE` do backend (services/pushService.js) — se
+ * divergirem, o SO não desenha botão nenhum e não reclama.
+ */
+export const ACTION_CATEGORIES = {
+  chat: "movt_chat",
+  comment: "movt_comment",
+  followRequest: "movt_follow_request",
+  newPost: "movt_new_post",
+} as const;
+
+/** Identificadores dos botões, usados no listener de resposta. */
+export const ACTION_IDS = {
+  reply: "reply",
+  accept: "accept",
+  reject: "reject",
+  like: "like",
+} as const;
+
 let cachedToken: string | null = null;
+
+/**
+ * Registra as categorias de ação. Idempotente (sobrescreve pelo id).
+ *
+ * `textInput` abre o campo de resposta direto na notificação (igual WhatsApp).
+ * `opensAppToForeground: false` deixa a ação ser processada SEM abrir o app —
+ * é o que dá a sensação de app grande; o listener de resposta faz a chamada de
+ * API. Já os botões que precisam de contexto visual abrem o app.
+ */
+export async function setupNotificationCategories(): Promise<void> {
+  try {
+    await Notifications.setNotificationCategoryAsync(ACTION_CATEGORIES.chat, [
+      {
+        identifier: ACTION_IDS.reply,
+        buttonTitle: "Responder",
+        textInput: { submitButtonTitle: "Enviar", placeholder: "Mensagem" },
+        options: { opensAppToForeground: false },
+      },
+    ]);
+
+    await Notifications.setNotificationCategoryAsync(ACTION_CATEGORIES.comment, [
+      {
+        identifier: ACTION_IDS.reply,
+        buttonTitle: "Responder",
+        textInput: { submitButtonTitle: "Enviar", placeholder: "Comentário" },
+        options: { opensAppToForeground: false },
+      },
+    ]);
+
+    await Notifications.setNotificationCategoryAsync(ACTION_CATEGORIES.followRequest, [
+      { identifier: ACTION_IDS.accept, buttonTitle: "Aceitar", options: { opensAppToForeground: false } },
+      {
+        identifier: ACTION_IDS.reject,
+        buttonTitle: "Recusar",
+        options: { opensAppToForeground: false, isDestructive: true },
+      },
+    ]);
+
+    await Notifications.setNotificationCategoryAsync(ACTION_CATEGORIES.newPost, [
+      { identifier: ACTION_IDS.like, buttonTitle: "Curtir", options: { opensAppToForeground: false } },
+    ]);
+  } catch (err) {
+    // Botão é enfeite: se falhar, a notificação continua chegando normalmente.
+    if (__DEV__) console.log("[push] falha ao registrar categorias:", err);
+  }
+}
 
 /** Cria/atualiza os canais de notificação do Android (no-op no iOS). */
 export async function setupAndroidChannels(): Promise<void> {
@@ -88,6 +154,7 @@ function getProjectId(): string | undefined {
 export async function registerForPushNotifications(): Promise<string | null> {
   try {
     await setupAndroidChannels();
+    await setupNotificationCategories();
 
     const granted = await requestPushPermission();
     if (!granted) {

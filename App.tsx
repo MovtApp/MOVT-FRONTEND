@@ -26,6 +26,7 @@ import {
   Rubik_700Bold,
 } from "@expo-google-fonts/rubik";
 import FlashMessage from "react-native-flash-message";
+import { RichNotificationHost } from "@components/RichNotificationBanner";
 import "react-native-reanimated";
 import GlobalErrorBoundary from "./src/components/GlobalErrorBoundary";
 import * as Sentry from "@sentry/react-native";
@@ -231,6 +232,9 @@ function App() {
               <NoConnectionGate />
             </ConnectivityProvider>
             <FlashMessage position="top" />
+            {/* Depois do FlashMessage global de propósito: o banner de
+                notificação precisa ficar POR CIMA do toast, não atrás. */}
+            <RichNotificationHost />
           </KeyboardProvider>
         </GestureHandlerRootView>
       </SafeAreaProvider>
