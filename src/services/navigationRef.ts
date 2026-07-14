@@ -59,10 +59,12 @@ export function navigateFromNotification(data: any) {
       break;
 
     // Fase 2 (social): like/comment abrem o post; follow abre o perfil.
+    // `new_post` (publicação de quem você segue) também abre o post.
     case "like":
     case "comment":
     case "like_diet":
     case "comment_diet":
+    case "new_post":
       if (data.reference_id != null) {
         navigateInHomeStack("PostDetailScreen", { postId: data.reference_id });
       }
