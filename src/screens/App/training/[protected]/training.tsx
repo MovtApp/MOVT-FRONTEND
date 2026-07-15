@@ -162,9 +162,18 @@ const TrainingDetails: React.FC = () => {
                       )}
                     </View>
                   </View>
-                  <View style={styles.exPlayTrigger}>
+                  <TouchableOpacity
+                    style={styles.exPlayTrigger}
+                    onPress={() =>
+                      navigation.navigate("ActiveWorkout", { training, startIndex: idx })
+                    }
+                    hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Começar o treino em ${ex.nome}`}
+                    activeOpacity={0.8}
+                  >
                     <Play size={14} color="#fff" fill="#fff" />
-                  </View>
+                  </TouchableOpacity>
                 </View>
                 {ex.observacoes && (
                   <View style={styles.obsBox}>

@@ -35,13 +35,8 @@ const ActiveWorkout: React.FC = () => {
   const route = useRoute<ActiveWorkoutRouteProp>();
   const navigation = useNavigation();
   const insets = useSafeAreaInsets();
-  const { training } = route.params;
+  const { training, startIndex } = route.params;
   const t = training as any;
-
-  const [currentExerciseIndex, setCurrentExerciseIndex] = useState(0);
-  const [seconds, setSeconds] = useState(0);
-  const [isActive, setIsActive] = useState(true);
-  const [completedExercises, setCompletedExercises] = useState<string[]>([]);
 
   // Inteligência de fallback: se não houver exercícios, trata o treino como um exercício único
   const exercises: Exercise[] = useMemo(() => {
@@ -61,6 +56,19 @@ const ActiveWorkout: React.FC = () => {
       },
     ];
   }, [t]);
+
+  // startIndex = exercício em que o play do roteiro tocou. Vem da tela de detalhe,
+  // que lista o mesmo array; ainda assim é limitado ao intervalo válido para que um
+  // params defasado (ou treino sem exercícios, que cai no fallback de 1 item) não
+  // renderize um exercício undefined.
+  const [currentExerciseIndex, setCurrentExerciseIndex] = useState(() =>
+    Math.min(Math.max(startIndex ?? 0, 0), exercises.length - 1)
+  );
+  const [seconds, setSeconds] = useState(0);
+  const [isActive, setIsActive] = useState(true);
+  // Conclusão é rastreada por índice, não por id: os exercícios reais vêm do admin
+  // com `id_exercicio` e sem `id`, então chavear por id marcava todos de uma vez.
+  const [completedExercises, setCompletedExercises] = useState<number[]>([]);
 
   const currentExercise = exercises[currentExerciseIndex];
 
@@ -87,8 +95,8 @@ const ActiveWorkout: React.FC = () => {
 
   const handleNext = () => {
     if (currentExerciseIndex < exercises.length - 1) {
-      if (!completedExercises.includes(currentExercise.id)) {
-        setCompletedExercises([...completedExercises, currentExercise.id]);
+      if (!completedExercises.includes(currentExerciseIndex)) {
+        setCompletedExercises([...completedExercises, currentExerciseIndex]);
       }
       setCurrentExerciseIndex(currentExerciseIndex + 1);
     } else {
@@ -198,17 +206,17 @@ const ActiveWorkout: React.FC = () => {
           <Text style={styles.sectionTitle}>Fila de exercícios ({exercises.length})</Text>
           {exercises.map((ex, idx) => (
             <View
-              key={ex.id}
+              key={idx}
               style={[
                 styles.listItem,
                 idx === currentExerciseIndex && styles.listItemActive,
-                completedExercises.includes(ex.id) && styles.listItemCompleted,
+                completedExercises.includes(idx) && styles.listItemCompleted,
               ]}
             >
               <Text
                 style={[
                   styles.listIndex,
-                  (idx === currentExerciseIndex || completedExercises.includes(ex.id)) && {
+                  (idx === currentExerciseIndex || completedExercises.includes(idx)) && {
                     color: "#BBF246",
                   },
                 ]}
@@ -220,8 +228,8 @@ const ActiveWorkout: React.FC = () => {
               >
                 {ex.nome}
               </Text>
-              {completedExercises.includes(ex.id) && <CheckCircle2 size={18} color="#BBF246" />}
-              {idx === currentExerciseIndex && !completedExercises.includes(ex.id) && (
+              {completedExercises.includes(idx) && <CheckCircle2 size={18} color="#BBF246" />}
+              {idx === currentExerciseIndex && !completedExercises.includes(idx) && (
                 <View style={styles.activeDot} />
               )}
             </View>

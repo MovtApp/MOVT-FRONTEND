@@ -91,7 +91,7 @@ export type AppStackParamList = {
   TrainingScreen: undefined;
   TrainingDetails: { training: Training };
   ChallengeDetails: { challenge: Training };
-  ActiveWorkout: { training: Training };
+  ActiveWorkout: { training: Training; startIndex?: number };
   AppointmentScreen:
     | {
         trainerId?: string;

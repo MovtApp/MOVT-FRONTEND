@@ -57,12 +57,15 @@ const ChallengeDetails: React.FC = () => {
   // "Aceitar desafio" = registrar participação (limite mensal por plano: free 2,
   // premium 8) e iniciar o treino. 403 do limite → sheet de upgrade. O backend é
   // idempotente: reaceitar um desafio que já participa não consome novo slot.
-  const handleAccept = async () => {
+  // O play de cada exercício do roteiro entra por aqui também (com startIndex), e
+  // não direto na ActiveWorkout: senão ele viraria um atalho que pula o limite de
+  // plano que o CTA respeita. Ver ADR-0013.
+  const handleAccept = async (startIndex = 0) => {
     if (accepting) return;
     setAccepting(true);
     try {
       await api.post(`/desafios/${challenge.id_treino}/participar`);
-      navigation.navigate("ActiveWorkout", { training: challenge });
+      navigation.navigate("ActiveWorkout", { training: challenge, startIndex });
     } catch (error: any) {
       if (
         error?.response?.status === 403 &&
@@ -214,9 +217,17 @@ const ChallengeDetails: React.FC = () => {
                       )}
                     </View>
                   </View>
-                  <View style={styles.exPlayTrigger}>
+                  <TouchableOpacity
+                    style={styles.exPlayTrigger}
+                    onPress={() => handleAccept(idx)}
+                    disabled={accepting}
+                    hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Aceitar o desafio e começar em ${ex.nome}`}
+                    activeOpacity={0.8}
+                  >
                     <Play size={14} color="#fff" fill="#fff" />
-                  </View>
+                  </TouchableOpacity>
                 </View>
                 {ex.observacoes && (
                   <View style={styles.obsBox}>
@@ -253,7 +264,7 @@ const ChallengeDetails: React.FC = () => {
       <View style={[styles.bottomNav, { paddingBottom: (insets.bottom || 24) + 12 }]}>
         <TouchableOpacity
           style={styles.startBtn}
-          onPress={handleAccept}
+          onPress={() => handleAccept()}
           disabled={accepting}
           activeOpacity={0.9}
         >
