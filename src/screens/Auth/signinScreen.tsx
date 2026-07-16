@@ -327,6 +327,10 @@ export const SignInScreen = () => {
         try {
           // Sincronização DIRETA com o backend da Vercel (Bypass Edge Function)
           const syncResponse = await api.post("/auth/social-sync", {
+              // C1: o backend valida este access_token via Supabase antes de
+              // confiar em email/supabase_uid (sem ele, o endpoint permitia
+              // tomada de conta de qualquer e-mail conhecido).
+              access_token,
               email: supabaseUser.email,
               nome: supabaseUser.user_metadata?.full_name,
               supabase_uid: supabaseUser.id,
