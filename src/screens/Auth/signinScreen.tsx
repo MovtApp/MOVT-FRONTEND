@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from "react";
+import { useState } from "react";
 import { View, Text, TouchableOpacity, StyleSheet, Alert, Platform } from "react-native";
 import BackButton from "@/components/BackButton";
 import SocialButton from "@/components/SocialButton";
@@ -9,17 +9,10 @@ import CustomInput from "@/components/CustomInput";
 import { Eye, EyeOff } from "lucide-react-native";
 import { useAuth } from "@contexts/AuthContext";
 import { supabase } from "../../services/supabaseClient";
-import * as WebBrowser from "expo-web-browser";
-import * as Google from "expo-auth-session/providers/google";
-import * as AuthSession from "expo-auth-session";
 import { api } from "../../services/api";
 import { API_CONFIG } from "../../config/api";
 import { PHONE_VERIFICATION_ENABLED } from "../../config/featureFlags";
-
-// URL da sua Edge Function que receberá os tokens dos provedores
-const SOCIAL_SIGN_IN_EDGE_FUNCTION_URL = `${
-  process.env.EXPO_PUBLIC_SUPABASE_URL || "https://ypnpdjgsyzdwsmnxsoqj.supabase.co"
-}/functions/v1/auth/social-sign-in`;
+import { useGoogleOAuth } from "../../hooks/useGoogleOAuth";
 
 // Variáveis de ambiente (usa EXPO_PUBLIC_* e faz fallback)
 const GOOGLE_WEB_CLIENT_ID = process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID;
@@ -29,6 +22,7 @@ const GOOGLE_IOS_CLIENT_ID = process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID;
 export const SignInScreen = () => {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const { signIn } = useAuth();
+  const { startGoogleOAuth } = useGoogleOAuth();
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -193,207 +187,82 @@ export const SignInScreen = () => {
     }
   };
 
-  WebBrowser.maybeCompleteAuthSession();
-
-  const handleSignInWithSocialToken = useCallback(
-    async (provider: "google", token: string) => {
-      setLoading(true);
-      setError(null);
-      try {
-        console.log(`Iniciando autenticação social com ${provider}...`);
-        const response = await fetch(SOCIAL_SIGN_IN_EDGE_FUNCTION_URL, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({ provider, token }),
-        });
-
-        if (!response.ok) {
-          const errorData = await response.json();
-          throw new Error(errorData.message || "Erro ao autenticar via Edge Function.");
-        }
-
-        const { access_token, refresh_token } = await response.json();
-
-        if (access_token && refresh_token) {
-          const {
-            data: { user: supabaseUser },
-            error: userError,
-          } = await supabase.auth.setSession({
-            access_token,
-            refresh_token,
-          });
-
-          if (userError || !supabaseUser) {
-            throw new Error("Erro ao obter dados do usuário do Supabase.");
-          }
-
-          await signIn(access_token, {
-            id: supabaseUser.id,
-            name:
-              supabaseUser.user_metadata?.full_name ||
-              supabaseUser.user_metadata?.name ||
-              "Usuário Google",
-            email: supabaseUser.email || "",
-            username:
-              supabaseUser.user_metadata?.user_name ||
-              supabaseUser.email?.split("@")[0] ||
-              "google_user",
-            isVerified: true,
-            supabaseUserId: supabaseUser.id,
-            photo: supabaseUser.user_metadata?.avatar_url || null,
-          });
-
-          console.log("Login social bem-sucedido!");
-
-          navigation.reset({
-            index: 0,
-            routes: [
-              {
-                name: "App" as never,
-                params: { screen: "HomeStack" } as never,
-              },
-            ],
-          });
-        }
-      } catch (error: any) {
-        console.error("Erro na autenticação social:", error.message);
-        setError(error.message);
-        Alert.alert("Erro de Login", error.message);
-      } finally {
-        setLoading(false);
-      }
-    },
-    [navigation, signIn]
-  );
-
   const signInWithGoogle = async () => {
     setLoading(true);
     try {
-      const redirectUri = AuthSession.makeRedirectUri({
-        scheme: "movt",
-        path: "auth",
-      });
+      // Fluxo OAuth (PKCE) centralizado no hook compartilhado.
+      const result = await startGoogleOAuth();
 
-      const { data, error } = await supabase.auth.signInWithOAuth({
-        provider: "google",
-        options: {
-          redirectTo: redirectUri,
-          skipBrowserRedirect: true,
-          queryParams: {
-            access_type: "offline",
-            prompt: "consent",
-          },
-          scopes: "openid profile email",
-        },
-      });
+      if (result.status === "cancel") {
+        // Usuário fechou o navegador — silencioso, sem alerta de erro.
+        return;
+      }
 
-      if (error) throw error;
+      const { access_token, supabaseUser } = result;
 
-      const res = await WebBrowser.openAuthSessionAsync(data.url, redirectUri);
+      try {
+        // Login social CANÔNICO: NUNCA cria conta. Se o e-mail não tiver conta
+        // MOVT, o backend responde 404 SOCIAL_NOT_LINKED e mandamos criar conta.
+        const loginResponse = await api.post("/auth/social-login", {
+          email: supabaseUser.email,
+          supabase_uid: supabaseUser.id,
+          photo: supabaseUser.user_metadata?.avatar_url,
+          access_token,
+        });
 
-      console.log("Resultado do WebBrowser:", res.type);
+        const backendData = loginResponse.data;
 
-      if (res.type === "success" && res.url) {
-        // NÃO logar res.url: contém o authorization code.
-        if (__DEV__) console.log("URL de retorno recebida (sucesso).");
+        // Só navegamos DEPOIS de confirmar a sessão MOVT. Sem fallback local:
+        // nada de app aberto atrás do alerta.
+        await signIn(backendData.sessionId, {
+          id: backendData.user.id_us || backendData.user.id,
+          id_us: backendData.user.id_us || backendData.user.id,
+          name: backendData.user.nome,
+          email: backendData.user.email,
+          username: backendData.user.username,
+          isVerified: backendData.user.isVerified ?? true,
+          role: backendData.user.role,
+          supabaseUserId: supabaseUser.id,
+          photo: supabaseUser.user_metadata?.avatar_url || null,
+        });
 
-        // PKCE: a URL traz ?code=, NÃO mais #access_token=. O code só vira
-        // sessão se combinado com o code_verifier guardado pelo SDK ao iniciar
-        // o fluxo — inutilizável se outro app interceptar o custom scheme.
-        // Extração por regex (cobre ?, & e #) para não depender do tipo
-        // incompleto de URLSearchParams no React Native.
-        const codeMatch = res.url.match(/[?&#]code=([^&#]+)/);
-        const code = codeMatch ? decodeURIComponent(codeMatch[1]) : null;
+        navigation.reset({
+          index: 0,
+          routes: [{ name: "App" as never }],
+        });
+      } catch (loginError: any) {
+        const status = loginError?.response?.status;
+        const data = loginError?.response?.data;
 
-        if (!code) {
-          throw new Error("Código de autorização não encontrado na URL de retorno.");
+        // Encerra a sessão Supabase para NÃO ficar meio-logado (era isso que
+        // deixava o app abrir atrás do alerta de "conta inativa/excluída").
+        await supabase.auth.signOut().catch(() => {});
+
+        if (status === 404 && data?.error === "SOCIAL_NOT_LINKED") {
+          Alert.alert(
+            "Conta não encontrada",
+            data?.message ||
+              "Não encontramos uma conta MOVT com este e-mail. Crie sua conta e depois conecte o Google nas configurações.",
+            [
+              { text: "Agora não", style: "cancel" },
+              {
+                text: "Criar conta",
+                onPress: () =>
+                  navigation.navigate("Auth", { screen: "SignUpScreen" }),
+              },
+            ]
+          );
+          return;
         }
 
-        const {
-          data: { session, user: supabaseUser },
-          error: exchangeError,
-        } = await supabase.auth.exchangeCodeForSession(code);
-
-        if (exchangeError || !supabaseUser || !session) {
-          throw exchangeError || new Error("Falha ao trocar code por sessão.");
-        }
-
-        const access_token = session.access_token;
-
-        if (__DEV__) console.log("Sessão Supabase definida. Iniciando Sincronização Direta Vercel...");
-
-        try {
-          // Sincronização DIRETA com o backend da Vercel (Bypass Edge Function)
-          const syncResponse = await api.post("/auth/social-sync", {
-              email: supabaseUser.email,
-              nome: supabaseUser.user_metadata?.full_name,
-              supabase_uid: supabaseUser.id,
-              photo: supabaseUser.user_metadata?.avatar_url,
-            });
-
-            if (syncResponse.status === 200 || syncResponse.status === 201) {
-              const backendData = syncResponse.data;
-              console.log("✅ Sincronização Direta com Vercel concluída.");
-
-              await signIn(backendData.sessionId, {
-                id: backendData.user.id_us || backendData.user.id,
-                id_us: backendData.user.id_us || backendData.user.id,
-                name: backendData.user.nome,
-                email: backendData.user.email,
-                username: backendData.user.username,
-                isVerified: true,
-                role: backendData.user.role,
-                supabaseUserId: supabaseUser.id,
-                photo: backendData.user.avatar_url,
-                isPendingSync: backendData.isNewUser, // Só bloqueia se for usuário novo
-              });
-
-              if (backendData.isNewUser) {
-                console.log("Novo usuário social. Redirecionando para Onboarding...");
-                navigation.reset({
-                  index: 0,
-                  routes: [{ name: "Info" as never }],
-                });
-              } else {
-                console.log("Usuário social recorrente. Indo para Home...");
-                navigation.reset({
-                  index: 0,
-                  routes: [{ name: "App" as never }],
-                });
-              }
-            } else {
-              throw new Error(`Erro na sincronização: Status ${syncResponse.status}`);
-            }
-          } catch (syncError: any) {
-            console.error(
-              "Falha na Sincronização Direta:",
-              syncError.response?.data || syncError.message
-            );
-
-            // Fallback de segurança (mantém o usuário logado localmente mas pendente)
-            await signIn(access_token, {
-              id: supabaseUser.id,
-              name: supabaseUser.user_metadata?.full_name || "Usuário Google",
-              email: supabaseUser.email || "",
-              username: "google_user",
-              isVerified: true,
-              role: "client_pf", // Fallback role
-              supabaseUserId: supabaseUser.id,
-              isPendingSync: true,
-            });
-
-            navigation.reset({
-              index: 0,
-              routes: [{ name: "Info" as never }],
-            });
-          }
-      } else if (res.type === "cancel") {
-        console.log("Login cancelado pelo usuário no navegador.");
+        const msg =
+          data?.message || data?.error || "Não foi possível entrar com o Google.";
+        Alert.alert("Erro de Login", msg);
       }
     } catch (error: any) {
+      // Erro do próprio fluxo OAuth (troca de code, navegador, etc.).
       console.error("Erro detalhado no login Google:", error);
+      await supabase.auth.signOut().catch(() => {});
       Alert.alert("Erro", "Falha ao autenticar com Google.");
     } finally {
       setLoading(false);
