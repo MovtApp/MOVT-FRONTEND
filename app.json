@@ -16,6 +16,10 @@
       "bundleIdentifier": "com.dsvmTechnology.movtapp",
       "supportsTablet": false,
       "googleServicesFile": "./GoogleService-Info.plist",
+      "entitlements": {
+        "com.apple.developer.healthkit": true,
+        "com.apple.developer.healthkit.access": []
+      },
       "infoPlist": {
         "UIBackgroundModes": [
           "background-fetch",

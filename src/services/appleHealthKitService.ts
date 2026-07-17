@@ -18,15 +18,38 @@ const PERMISSIONS = {
 export const ensureHealthKitPermissions = (): Promise<boolean> => {
   return new Promise((resolve) => {
     if (Platform.OS !== "ios" || !AppleHealthKit?.initHealthKit || !AppleHealthKit?.Constants) {
+      console.warn("[HealthKit] módulo nativo indisponível (react-native-health não linkado?)");
       return resolve(false);
     }
 
-    AppleHealthKit.initHealthKit(PERMISSIONS, (error) => {
-      if (error) {
-        return resolve(false);
-      }
-      resolve(true);
-    });
+    // `initHealthKit` pode nunca chamar o callback se a capability do HealthKit
+    // não estiver no build/provisioning — sem este guard o botão trava em "loading".
+    let settled = false;
+    const done = (value: boolean) => {
+      if (settled) return;
+      settled = true;
+      resolve(value);
+    };
+
+    const timeout = setTimeout(() => {
+      console.warn("[HealthKit] initHealthKit não respondeu em 8s — capability ausente?");
+      done(false);
+    }, 8000);
+
+    try {
+      AppleHealthKit.initHealthKit(PERMISSIONS, (error) => {
+        clearTimeout(timeout);
+        if (error) {
+          console.warn("[HealthKit] initHealthKit retornou erro:", error);
+          return done(false);
+        }
+        done(true);
+      });
+    } catch (e) {
+      clearTimeout(timeout);
+      console.warn("[HealthKit] initHealthKit lançou exceção:", e);
+      done(false);
+    }
   });
 };
 
