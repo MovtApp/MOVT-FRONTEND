@@ -17,6 +17,7 @@ import ProfilePJ from "../screens/App/profile/ProfilePJScreen";
 import { TrainerProfileScreen } from "../screens/App/profile/TrainerProfileScreen";
 import SelectedTrainersScreen from "../screens/App/profile/SelectedTrainersScreen";
 import ConfigScreen from "../screens/App/config/configScreen";
+import GoogleAccountScreen from "../screens/App/config/GoogleAccountScreen";
 import NotificationPreferencesScreen from "../screens/App/config/NotificationPreferencesScreen";
 import PlanScreen from "../screens/App/plan/planScreen";
 import FAQScreen from "../screens/App/faq/faqScreen";
@@ -135,6 +136,7 @@ function AppLayout() {
         <Stack.Screen name="ChallengeDetails" component={ChallengeDetails} />
         <Stack.Screen name="ActiveWorkout" component={ActiveWorkout} />
         <Stack.Screen name="ConfigScreen" component={ConfigScreen} />
+        <Stack.Screen name="GoogleAccountScreen" component={GoogleAccountScreen} />
         <Stack.Screen
           name="NotificationPreferencesScreen"
           component={NotificationPreferencesScreen}

@@ -78,6 +78,7 @@ export type AppStackParamList = {
   WelcomeScreen: undefined;
   CommunityScreen: { category?: string } | undefined;
   ConfigScreen: undefined;
+  GoogleAccountScreen: undefined;
   FAQScreen: undefined;
   PlanScreen: undefined;
 
