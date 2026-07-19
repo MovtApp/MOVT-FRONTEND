@@ -99,9 +99,36 @@ function AppContent() {
   });
 
   const { loading: isLoadingAuth, user } = useAuth();
-  const [currentRoute, setCurrentRoute] = React.useState<"Auth" | "Verify" | "App" | "Info">(
-    "Auth"
-  );
+  // Área de navegação derivada SÍNCRONA do estado de auth. Antes isto vivia num
+  // useState + useEffect([user]) que defasava um render (montava "Auth" e só depois
+  // flipava pra área real), obrigando o key={currentRoute} a REMONTAR a árvore
+  // inteira pra corrigir — e era essa remontagem que ativava o restore. Derivando
+  // aqui, o primeiro (e único) mount de <Routes> já nasce na área certa; trocas de
+  // área depois são feitas por resetRoot imperativo (ver effect abaixo), sem remontar.
+  const currentRoute = React.useMemo<"Auth" | "Verify" | "App" | "Info">(() => {
+    if (!user) return "Auth";
+    // Personal trainer (conta CNPJ) precisa passar pela verificação profissional
+    // (CREF) antes de acessar o app — bloqueio total até cref_verified=true.
+    // Admin é isento: nunca passa pela validação de CNPJ/CREF.
+    const isAdmin = user.role?.toLowerCase().includes("admin") ?? false;
+    const isTrainer =
+      user.documentType === "CNPJ" || user.role === "trainer" || user.role === "personal";
+    const needsProfessionalVerification = !isAdmin && isTrainer && !user.cref_verified;
+    // Telefone é etapa universal (todas as contas). Contas antigas já vêm com
+    // phone_verified=true (grandfather no backend), então não são afetadas.
+    // Desativada temporariamente via PHONE_VERIFICATION_ENABLED (ver featureFlags).
+    const needsPhoneVerification =
+      PHONE_VERIFICATION_ENABLED && !isAdmin && user.phone_verified === false;
+    // Dados pessoais (onboarding Info) é o último gate universal, após todas as
+    // verificações. Contas antigas já vêm com onboarding_completed=true.
+    const needsOnboarding = !isAdmin && user.onboarding_completed === false;
+
+    if (!user.isVerified || needsPhoneVerification || needsProfessionalVerification) {
+      return "Verify";
+    }
+    if (needsOnboarding) return "Info";
+    return "App";
+  }, [user]);
 
   // Inicia o carregamento de chats em background
   usePreloadChat();
@@ -124,36 +151,34 @@ function AppContent() {
     return () => task.cancel();
   }, [user?.sessionId, user?.isPendingSync]);
 
-  // Monitora mudanças no estado de autenticação e atualiza a rota atual
+  // Troca de área (login/logout/gate) SEM remontar o NavigationContainer. As 4 áreas
+  // coexistem no navigator (telas navegam entre elas por nome: recovery, verify→app,
+  // config→recovery, etc.), então reancorar a raiz com um resetRoot é o suficiente.
+  //
+  // Guarda anti-clobber: só reancora se a raiz atual do navigator difere da área alvo.
+  // Isso pula o caso do cold start (o mount de <Routes> já entra na área certa e, se
+  // for "App", restaura a última tela via initialState) — sem esse guard, o resetRoot
+  // dispararia depois que o navigator ficasse pronto e ATROPELARIA o restore.
   React.useEffect(() => {
-    let initialRouteName: "Auth" | "Verify" | "App" | "Info" = "Auth";
-    if (user) {
-      // Personal trainer (conta CNPJ) precisa passar pela verificação profissional
-      // (CREF) antes de acessar o app — bloqueio total até cref_verified=true.
-      // Admin é isento: nunca passa pela validação de CNPJ/CREF.
-      const isAdmin = user.role?.toLowerCase().includes("admin") ?? false;
-      const isTrainer =
-        user.documentType === "CNPJ" || user.role === "trainer" || user.role === "personal";
-      const needsProfessionalVerification = !isAdmin && isTrainer && !user.cref_verified;
-      // Telefone é etapa universal (todas as contas). Contas antigas já vêm com
-      // phone_verified=true (grandfather no backend), então não são afetadas.
-      // Desativada temporariamente via PHONE_VERIFICATION_ENABLED (ver featureFlags).
-      const needsPhoneVerification =
-        PHONE_VERIFICATION_ENABLED && !isAdmin && user.phone_verified === false;
-      // Dados pessoais (onboarding Info) é o último gate universal, após todas as
-      // verificações. Contas antigas já vêm com onboarding_completed=true.
-      const needsOnboarding = !isAdmin && user.onboarding_completed === false;
-
-      if (!user.isVerified || needsPhoneVerification || needsProfessionalVerification) {
-        initialRouteName = "Verify";
-      } else if (needsOnboarding) {
-        initialRouteName = "Info";
-      } else {
-        initialRouteName = "App";
+    let cancelled = false;
+    const anchor = (attempt = 0) => {
+      if (cancelled) return;
+      if (navigationRef.isReady()) {
+        const root = navigationRef.getRootState();
+        const rootArea = root?.routes?.[root.index ?? 0]?.name;
+        if (rootArea !== currentRoute) {
+          navigationRef.resetRoot({ index: 0, routes: [{ name: currentRoute }] });
+        }
+      } else if (attempt < 20) {
+        // Navigator ainda montando (ex.: logado no cold start, esperando o restore).
+        setTimeout(() => anchor(attempt + 1), 150);
       }
-    }
-    setCurrentRoute(initialRouteName);
-  }, [user]);
+    };
+    anchor();
+    return () => {
+      cancelled = true;
+    };
+  }, [currentRoute]);
 
   // Restaura a tela de treino se houver uma sessão de rastreamento ativa quando o
   // app abre/relança — ex.: o SO matou o processo durante uma corrida com a tela
@@ -194,7 +219,7 @@ function AppContent() {
       <LocationProvider>
         <NotificationProvider>
           <PushNotificationsBridge />
-          <Routes key={currentRoute} initialRouteName={currentRoute} />
+          <Routes initialRouteName={currentRoute} />
         </NotificationProvider>
       </LocationProvider>
     </BottomNavProvider>

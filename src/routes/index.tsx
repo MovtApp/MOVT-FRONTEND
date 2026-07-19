@@ -24,15 +24,21 @@ interface RoutesProps {
 }
 
 export function Routes({ initialRouteName }: RoutesProps) {
-  // Só a área autenticada "App" restaura a última tela (com os params). As demais
-  // áreas (Auth/Verify/Info) renderizam de imediato, sem esperar o AsyncStorage.
-  const needsRestore = initialRouteName === "App";
-  const [isReady, setIsReady] = React.useState(!needsRestore);
+  // Restauração de tela só faz sentido no cold start: se o app abre direto na área
+  // autenticada "App", recupera a última tela (com os params). Capturado UMA vez no
+  // mount via ref — trocas de área depois (login/logout in-app, que agora vêm por
+  // resetRoot no App.tsx e não mais por remontagem) nunca re-disparam o restore. As
+  // demais áreas (Auth/Verify/Info) renderizam de imediato, sem esperar o AsyncStorage.
+  const needsRestoreRef = React.useRef(initialRouteName === "App");
+  // O initialRouteName do Navigator também é congelado no mount: o React Navigation só
+  // o lê na primeira montagem, e a partir daí a área é dirigida por resetRoot.
+  const initialAreaRef = React.useRef(initialRouteName);
+  const [isReady, setIsReady] = React.useState(!needsRestoreRef.current);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- estado serializado do React Navigation
   const [initialState, setInitialState] = React.useState<any>(undefined);
 
   React.useEffect(() => {
-    if (!needsRestore) return;
+    if (!needsRestoreRef.current) return;
     let mounted = true;
     (async () => {
       try {
@@ -45,7 +51,7 @@ export function Routes({ initialRouteName }: RoutesProps) {
     return () => {
       mounted = false;
     };
-  }, [needsRestore]);
+  }, []);
 
   if (!isReady) {
     return (
@@ -72,7 +78,7 @@ export function Routes({ initialRouteName }: RoutesProps) {
       onStateChange={(state) => saveNavState(state)}
     >
       <Stack.Navigator
-        initialRouteName={initialRouteName || "Auth"} // Usa a prop, ou 'Auth' como padrão
+        initialRouteName={initialAreaRef.current || "Auth"} // Área do mount; trocas depois vão por resetRoot
         screenOptions={{
           headerShown: false,
         }}
