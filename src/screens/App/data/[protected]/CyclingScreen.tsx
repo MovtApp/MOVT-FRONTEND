@@ -2022,18 +2022,26 @@ const CyclingScreen: React.FC = () => {
           {/* Topo: minimizar (treino segue) + modalidade + badge Pausado */}
           <SafeAreaView edges={["top"]} style={styles.immTopSafe} pointerEvents="box-none">
             <View style={styles.immTopRow}>
-              <BackButton to={{ name: "DataScreen" }} />
-              <View style={styles.immModalityPill}>
-                <Text style={styles.immModalityText}>{activeTab.toUpperCase()}</Text>
+              {/* 3 colunas de larguras iguais (flex:1 nas laterais) mantêm o pill da
+                  modalidade centralizado independentemente da largura do voltar (46px)
+                  e do badge PAUSADO. O antigo spacer fixo de 92px nunca casava com os
+                  46px do botão, então o pill ficava ~23px fora do centro. */}
+              <View style={styles.immTopSide}>
+                <BackButton to={{ name: "DataScreen" }} />
               </View>
-              {isPaused ? (
-                <Animated.View style={[styles.immPausedBadge, { opacity: pausePulse }]}>
-                  <Pause size={12} color="#fff" fill="#fff" />
-                  <Text style={styles.immPausedText}>PAUSADO</Text>
-                </Animated.View>
-              ) : (
-                <View style={{ width: 92 }} />
-              )}
+              <View style={styles.immTopCenter}>
+                <View style={styles.immModalityPill}>
+                  <Text style={styles.immModalityText}>{activeTab.toUpperCase()}</Text>
+                </View>
+              </View>
+              <View style={[styles.immTopSide, styles.immTopSideRight]}>
+                {isPaused ? (
+                  <Animated.View style={[styles.immPausedBadge, { opacity: pausePulse }]}>
+                    <Pause size={12} color="#fff" fill="#fff" />
+                    <Text style={styles.immPausedText}>PAUSADO</Text>
+                  </Animated.View>
+                ) : null}
+              </View>
             </View>
           </SafeAreaView>
 
@@ -2417,11 +2425,15 @@ const styles = StyleSheet.create({
   immTopRow: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
     paddingHorizontal: 16,
     paddingTop: 6,
     gap: 8,
   },
+  // Laterais com flex:1 (larguras iguais) e centro de largura natural: o pill da
+  // modalidade fica geometricamente no meio, sem depender das larguras laterais.
+  immTopSide: { flex: 1, flexDirection: "row", alignItems: "center" },
+  immTopSideRight: { justifyContent: "flex-end" },
+  immTopCenter: { flexShrink: 0, alignItems: "center", justifyContent: "center" },
   immModalityPill: {
     backgroundColor: "rgba(25,33,38,0.85)",
     paddingHorizontal: 16,
