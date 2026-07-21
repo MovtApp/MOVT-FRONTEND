@@ -1520,11 +1520,14 @@ const CyclingScreen: React.FC = () => {
       const nowActive = state === "active";
       const wasActive = appActiveRef.current;
       appActiveRef.current = nowActive;
-      // Espelha no state para (re)montar o mapa. Ao SAIR de foreground, marca o
-      // mapa como "não pronto": ele é desmontado no render e as guardas de câmera
-      // não devem tocar numa superfície que não existe mais.
+      // Espelha no state para desligar/religar a camada nativa do ponto azul
+      // (showsUserLocation={appActive}). O mapa NÃO é mais desmontado em background
+      // (isso é o que crashava no Fabric), então NÃO zeramos `liveMapReadyRef` aqui:
+      // o MapView continua montado e pronto — zerá-lo travaria o follow da câmera
+      // depois do 1º ciclo de bloqueio (o onMapReady não re-dispara sem remontar).
+      // A supressão de animação em background já é feita pela guarda `appActiveRef`.
+      // O reset legítimo de `liveMapReadyRef` fica só na troca imersivo↔normal.
       setAppActive(nowActive);
-      if (!nowActive) liveMapReadyRef.current = false;
       if (nowActive && !wasActive) {
         // Rehidrata/religa a sessão (idempotente) e recentra uma única vez, no
         // frame seguinte (dá tempo do mapa reanexar a superfície nativa).
@@ -1971,12 +1974,24 @@ const CyclingScreen: React.FC = () => {
       {isTracking && isToday ? (
         // ─── Tela cheia de treino ativo (estilo Strava) ───────────────────────
         <View style={styles.immersive}>
-          {appActive ? (
+          {/* MAPA SEMPRE MONTADO — NÃO desmontar em background (New Architecture).
+              Na New Arch (Fabric) + react-native-maps, DESMONTAR o MapView na
+              transição para background é o GATILHO do crash NATIVO de teardown:
+              MapViewManager.onDropViewInstance → GoogleMap.onDestroy →
+              DeferredLifecycleHelper.onDestroy (NPE em lista nula). Crash nativo
+              não chega ao Sentry-JS ("fecha seco"). Um mapa montado-e-ocioso
+              SOBREVIVE ao background (o Google MapView é lifecycle-aware: só quebra
+              no onDestroy do drop ou ao animar sobre superfície destruída — a
+              câmera já é blindada por appActiveRef/liveMapReadyRef). Em background
+              desligamos apenas a camada nativa do ponto azul
+              (showsUserLocation={appActive}), outro foco de teardown. O tracking
+              segue no serviço (GPS + tempo por relógio de parede). Revê a Fase 1 do
+              ADR-0028 (que desmontava o mapa) para o cenário New Architecture. */}
           <MapView
             ref={liveMapRef}
             provider={MAP_PROVIDER}
             style={StyleSheet.absoluteFillObject}
-            showsUserLocation
+            showsUserLocation={appActive}
             showsMyLocationButton={false}
             onMapReady={() => {
               liveMapReadyRef.current = true;
@@ -2010,14 +2025,6 @@ const CyclingScreen: React.FC = () => {
               ) : null
             )}
           </MapView>
-          ) : (
-            // App fora de foreground (tela bloqueada / outro app): desmonta o mapa.
-            // O MapView não pode receber updates com a superfície GL destruída pelo
-            // SO — desmontar elimina o crash nativo. O tracking continua no serviço
-            // (GPS + tempo por relógio de parede); ao voltar, o mapa remonta já
-            // centrado na posição atual (initialRegion usa o último fix).
-            <View style={[StyleSheet.absoluteFillObject, { backgroundColor: "#0B1220" }]} />
-          )}
 
           {/* Topo: minimizar (treino segue) + modalidade + badge Pausado */}
           <SafeAreaView edges={["top"]} style={styles.immTopSafe} pointerEvents="box-none">
@@ -2165,12 +2172,15 @@ const CyclingScreen: React.FC = () => {
           showsVerticalScrollIndicator={false}
         >
           <View style={styles.mapContainer}>
-            {appActive ? (
+            {/* MAPA SEMPRE MONTADO — ver a nota no mapa imersivo acima. Na New Arch
+                (Fabric), desmontar o MapView em background dispara o crash nativo de
+                teardown (onDropViewInstance). Mantemos montado e só desligamos o
+                ponto azul nativo em background (showsUserLocation={appActive}). */}
             <MapView
               ref={liveMapRef}
               provider={MAP_PROVIDER}
               style={styles.map}
-              showsUserLocation
+              showsUserLocation={appActive}
               showsMyLocationButton={false}
               followsUserLocation={false}
               onMapReady={() => {
@@ -2205,11 +2215,6 @@ const CyclingScreen: React.FC = () => {
                 ) : null
               )}
             </MapView>
-            ) : (
-              // App fora de foreground: desmonta o mapa (evita crash nativo numa
-              // superfície GL destruída). Remonta ao voltar ao foreground.
-              <View style={[styles.map, { backgroundColor: "#0B1220" }]} />
-            )}
 
             <View style={styles.hudOverlay}>
               <View style={styles.hudGrid}>

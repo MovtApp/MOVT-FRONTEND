@@ -76,18 +76,26 @@ let watchdogTimer: ReturnType<typeof setInterval> | null = null;
 let rearmInProgress = false;
 // Cadência de verificação do watchdog.
 const WATCHDOG_INTERVAL_MS = 10000;
-// Silêncio (ms) tolerado antes de re-armar. Fixes saudáveis chegam a cada ~0,5–2 s;
-// 25 s cobre um túnel/cânion urbano sem re-armar à toa, mas religa rápido quando o
-// SO derrubou o serviço. NÃO afeta o tempo do treino (relógio de parede).
+// Silêncio (ms) tolerado antes de re-armar EM FOREGROUND. Fixes saudáveis chegam a
+// cada ~0,5–2 s; 25 s cobre um túnel/cânion urbano sem re-armar à toa, mas religa
+// rápido quando o SO derrubou o serviço. NÃO afeta o tempo do treino (relógio de parede).
 const WATCHDOG_SILENCE_MS = 25000;
+// Silêncio (ms) tolerado antes de re-armar EM BACKGROUND (tela apagada). Mais folgado
+// que em foreground: em background o SO pode legitimamente entregar em lote, então só
+// re-armamos após um silêncio longo — o suficiente para RECUPERAR a entrega quando ela
+// para de vez (ex.: no modo card-único o expo-location perde o vínculo do FGS, ou a ROM
+// estrangula o serviço) sem gastar bateria re-armando à toa. O WakeLock parcial mantém
+// este timer vivo mesmo com a tela apagada.
+const WATCHDOG_BG_SILENCE_MS = 45000;
 // Evita re-armar em rajada: intervalo mínimo entre dois re-armes.
 const REARM_MIN_INTERVAL_MS = 20000;
 let lastRearmTs = 0;
 
-// AppState atual (foreground/background). O watchdog só re-arma quando o app está
-// ATIVO — em background o SO pode legitimamente estar entregando em lote e um
-// stop/start cego poderia atrapalhar; o re-arme forte acontece no retorno ao
-// foreground (onde o usuário desbloqueia e a UI reaparece).
+// AppState atual (foreground/background). O watchdog re-arma em AMBOS os estados, com
+// limiares distintos (WATCHDOG_SILENCE_MS em foreground, WATCHDOG_BG_SILENCE_MS em
+// background) — o re-arme em background é o que recupera a entrega de GPS quando ela
+// para com a tela apagada (o "para no meio e não volta"). No retorno ao foreground há
+// ainda um re-arme imediato via handleAppStateChange.
 let appActive = AppState.currentState === "active";
 
 // ─── Parâmetros de rastreamento (qualidade Strava/Uber) ─────────────────────────
@@ -726,6 +734,20 @@ function pushWorkoutStatus(force = false) {
   updateWorkoutActivity(liveActivityData());
 }
 
+// ─── Estratégia de foreground service (entrega de GPS × nº de notificações) ──────
+// Com background concedido, por padrão usamos o modo CARD ÚNICO: o NOSSO
+// MOVTForegroundService é o único FGS (hospeda o card ao vivo, atualizável na tela
+// bloqueada) e o expo-location roda SEM FGS próprio → UMA notificação só. A entrega
+// de GPS em background passa a depender do nosso FGS + do watchdog de re-arme
+// (que agora também age em background — ver startWatchdog).
+//
+// ESCAPE HATCH (validação em campo): se um treino longo com a tela apagada mostrar
+// BURACOS na rota (o expo-location não sustentou a entrega sob o nosso FGS), vire
+// este flag para `true`. Aí o expo-location volta a subir o FGS DELE (entrega de GPS
+// garantida por construção) — ao custo de DUAS notificações persistentes durante o
+// treino (a do expo-location + o nosso card). Confiabilidade > notificação limpa.
+const PREFER_RELIABLE_DELIVERY = false;
+
 // ─── Opções de location updates (compartilhadas start/resume) ───────────────────
 function buildOptions(type: WorkoutKind): Location.LocationTaskOptions {
   const base: Location.LocationTaskOptions = {
@@ -739,10 +761,11 @@ function buildOptions(type: WorkoutKind): Location.LocationTaskOptions {
     activityType: Location.ActivityType.Fitness,
     showsBackgroundLocationIndicator: true,
   };
-  // Sem background concedido: delega o FGS ao expo-location (exigido p/ as updates
-  // seguirem e evita o throw de background-permission). Com background, NOSSO
-  // MOVTForegroundService é o único FGS (card ao vivo) — não duplicamos a notif.
-  if (!bgGranted) {
+  // Inclui o FGS do expo-location quando (a) não há background concedido — exigido
+  // p/ as updates seguirem e evita o throw de background-permission — OU (b) o modo
+  // de entrega garantida está ligado (PREFER_RELIABLE_DELIVERY). Caso contrário
+  // (card único), o NOSSO MOVTForegroundService é o único FGS e não duplicamos a notif.
+  if (!bgGranted || PREFER_RELIABLE_DELIVERY) {
     return {
       ...base,
       foregroundService: {
@@ -797,12 +820,14 @@ function startWatchdog() {
   lastFixWallTs = Date.now();
   watchdogTimer = setInterval(() => {
     if (!session?.active || session.isPaused) return;
-    // Só age em foreground (ver nota em `appActive`). Em background, o SO pode
-    // estar entregando em lote; o re-arme forte acontece ao voltar ao foreground.
-    if (!appActive) return;
+    // Re-arma em AMBOS os estados, com limiar maior em background (o SO pode entregar
+    // em lote com a tela apagada; só religamos após silêncio longo). É o que recupera
+    // a entrega quando ela PARA de vez com a tela bloqueada — o "para no meio e não
+    // volta". O WakeLock parcial mantém este setInterval vivo em background.
+    const silenceLimit = appActive ? WATCHDOG_SILENCE_MS : WATCHDOG_BG_SILENCE_MS;
     const silence = lastFixWallTs ? Date.now() - lastFixWallTs : 0;
-    if (silence > WATCHDOG_SILENCE_MS) {
-      rearmLocationUpdates("watchdog-silence");
+    if (silence > silenceLimit) {
+      rearmLocationUpdates(appActive ? "watchdog-silence" : "watchdog-silence-bg");
     }
   }, WATCHDOG_INTERVAL_MS);
 }
