@@ -1,0 +1,304 @@
+diff --git a/node_modules/expo-live-activity/build/index.d.ts b/node_modules/expo-live-activity/build/index.d.ts
+index 1253114..bf2e216 100644
+--- a/node_modules/expo-live-activity/build/index.d.ts
++++ b/node_modules/expo-live-activity/build/index.d.ts
+@@ -14,6 +14,12 @@ export type LiveActivityState = {
+     progressBar?: ProgressBarType;
+     imageName?: string;
+     dynamicIslandImageName?: string;
++    headerText?: string;
++    paused?: boolean;
++    timeText?: string;
++    primaryValue?: string;
++    primaryLabel?: string;
++    distanceText?: string;
+ };
+ export type NativeLiveActivityState = {
+     title: string;
+diff --git a/node_modules/expo-live-activity/ios-files/LiveActivityView.swift b/node_modules/expo-live-activity/ios-files/LiveActivityView.swift
+index 1a00e92..6a6a260 100644
+--- a/node_modules/expo-live-activity/ios-files/LiveActivityView.swift
++++ b/node_modules/expo-live-activity/ios-files/LiveActivityView.swift
+@@ -150,7 +150,87 @@ import WidgetKit
+       )
+     }
+ 
++    // MOVT — card de treino em 3 colunas (usado quando o service envia timeText).
++    private var movtCard: some View {
++      let paused = contentState.paused ?? false
++      // Cores de marca MOVT: pausado = amarelo (igual referencia Apple Fitness);
++      // ativo = verde da marca. Texto sempre escuro sobre header claro.
++      let headerBg = paused ? Color(hex: "FCC419") : Color(hex: "BBF246")
++      let ink = Color(hex: "192126")
++
++      return VStack(spacing: 0) {
++        // Header colorido: titulo centralizado + logo MOVT a direita.
++        ZStack {
++          if let header = contentState.headerText {
++            Text(header)
++              .font(.system(size: 15, weight: .semibold))
++              .foregroundStyle(ink)
++              .frame(maxWidth: .infinity, alignment: .center)
++              .lineLimit(1)
++              .minimumScaleFactor(0.7)
++          }
++          HStack {
++            Spacer()
++            Image("movt_logo")
++              .resizable()
++              .scaledToFit()
++              .frame(width: 22, height: 22)
++          }
++        }
++        .padding(.horizontal, 16)
++        .padding(.vertical, 9)
++        .frame(maxWidth: .infinity)
++        .background(headerBg)
++
++        // Corpo branco: 3 colunas (Tempo | metrica principal | Distancia).
++        HStack(alignment: .top, spacing: 8) {
++          statColumn(value: contentState.timeText, label: "Tempo", emphasized: false, ink: ink)
++          Spacer(minLength: 0)
++          statColumn(
++            value: contentState.primaryValue, label: contentState.primaryLabel,
++            emphasized: true, ink: ink
++          )
++          Spacer(minLength: 0)
++          statColumn(value: contentState.distanceText, label: "Distância (km)", emphasized: false, ink: ink)
++        }
++        .padding(.horizontal, 20)
++        .padding(.vertical, 14)
++        .frame(maxWidth: .infinity)
++        .background(Color.white)
++      }
++      .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
++    }
++
++    private func statColumn(value: String?, label: String?, emphasized: Bool, ink: Color) -> some View {
++      VStack(spacing: 3) {
++        Text(value ?? "—")
++          .font(.system(size: emphasized ? 30 : 24, weight: .bold))
++          .monospacedDigit()
++          .foregroundStyle(ink)
++          .lineLimit(1)
++          .minimumScaleFactor(0.6)
++        if let label {
++          Text(label)
++            .font(.system(size: 11, weight: .regular))
++            .foregroundStyle(ink.opacity(0.55))
++            .multilineTextAlignment(.center)
++            .lineLimit(2)
++            .minimumScaleFactor(0.8)
++        }
++      }
++      .frame(maxWidth: .infinity)
++    }
++
++    @ViewBuilder
+     var body: some View {
++      if contentState.timeText != nil {
++        movtCard
++      } else {
++        legacyBody
++      }
++    }
++
++    private var legacyBody: some View {
+       let defaultPadding = 24
+ 
+       let top = CGFloat(
+diff --git a/node_modules/expo-live-activity/ios-files/LiveActivityWidget.swift b/node_modules/expo-live-activity/ios-files/LiveActivityWidget.swift
+index 24cd8c5..e956f27 100644
+--- a/node_modules/expo-live-activity/ios-files/LiveActivityWidget.swift
++++ b/node_modules/expo-live-activity/ios-files/LiveActivityWidget.swift
+@@ -10,6 +10,13 @@ struct LiveActivityAttributes: ActivityAttributes {
+     var progress: Double?
+     var imageName: String?
+     var dynamicIslandImageName: String?
++    // MOVT — card de treino em 3 colunas (opcionais; ausentes = layout padrao da lib).
++    var headerText: String?
++    var paused: Bool?
++    var timeText: String?
++    var primaryValue: String?
++    var primaryLabel: String?
++    var distanceText: String?
+   }
+ 
+   var name: String
+@@ -57,7 +64,7 @@ struct LiveActivityWidget: Widget {
+     } dynamicIsland: { context in
+       DynamicIsland {
+         DynamicIslandExpandedRegion(.leading, priority: 1) {
+-          dynamicIslandExpandedLeading(title: context.state.title, subtitle: context.state.subtitle)
++          dynamicIslandExpandedLeading(state: context.state)
+             .dynamicIsland(verticalPlacement: .belowIfTooWide)
+             .padding(.leading, 5)
+             .applyWidgetURL(from: context.attributes.deepLinkUrl)
+@@ -83,9 +90,21 @@ struct LiveActivityWidget: Widget {
+           resizableImage(imageName: dynamicIslandImageName)
+             .frame(maxWidth: 23, maxHeight: 23)
+             .applyWidgetURL(from: context.attributes.deepLinkUrl)
++        } else if context.state.timeText != nil {
++          // MOVT — marca no Dynamic Island compacto.
++          Image("movt_logo")
++            .resizable()
++            .scaledToFit()
++            .frame(maxWidth: 20, maxHeight: 20)
++            .applyWidgetURL(from: context.attributes.deepLinkUrl)
+         }
+       } compactTrailing: {
+-        if let date = context.state.timerEndDateInMilliseconds {
++        if let time = context.state.timeText {
++          Text(time)
++            .font(.system(size: 14, weight: .semibold))
++            .monospacedDigit()
++            .applyWidgetURL(from: context.attributes.deepLinkUrl)
++        } else if let date = context.state.timerEndDateInMilliseconds {
+           compactTimer(
+             endDate: date,
+             timerType: context.attributes.timerType ?? .circular,
+@@ -123,20 +142,26 @@ struct LiveActivityWidget: Widget {
+     }
+   }
+ 
+-  private func dynamicIslandExpandedLeading(title: String, subtitle: String?) -> some View {
+-    VStack(alignment: .leading) {
+-      Spacer()
+-      Text(title)
++  private func dynamicIslandExpandedLeading(state: LiveActivityAttributes.ContentState) -> some View {
++    VStack(alignment: .leading, spacing: 2) {
++      Spacer(minLength: 0)
++      if let header = state.headerText {
++        Text(header)
++          .font(.caption)
++          .fontWeight(.semibold)
++          .foregroundStyle(.white.opacity(0.85))
++      }
++      Text(state.title)
+         .font(.title2)
+         .foregroundStyle(.white)
+         .fontWeight(.semibold)
+-      if let subtitle {
++      if let subtitle = state.subtitle {
+         Text(subtitle)
+-          .font(.title3)
++          .font(.subheadline)
+           .minimumScaleFactor(0.8)
+           .foregroundStyle(.white.opacity(0.75))
+       }
+-      Spacer()
++      Spacer(minLength: 0)
+     }
+   }
+ 
+diff --git a/node_modules/expo-live-activity/ios/ExpoLiveActivityModule.swift b/node_modules/expo-live-activity/ios/ExpoLiveActivityModule.swift
+index 6fdf9f5..d8afb74 100644
+--- a/node_modules/expo-live-activity/ios/ExpoLiveActivityModule.swift
++++ b/node_modules/expo-live-activity/ios/ExpoLiveActivityModule.swift
+@@ -25,6 +25,25 @@ public class ExpoLiveActivityModule: Module {
+ 
+     @Field
+     var dynamicIslandImageName: String?
++
++    // MOVT — card de treino em 3 colunas.
++    @Field
++    var headerText: String?
++
++    @Field
++    var paused: Bool?
++
++    @Field
++    var timeText: String?
++
++    @Field
++    var primaryValue: String?
++
++    @Field
++    var primaryLabel: String?
++
++    @Field
++    var distanceText: String?
+   }
+ 
+   struct LiveActivityConfig: Record {
+@@ -249,7 +268,13 @@ public class ExpoLiveActivityModule: Module {
+           title: state.title,
+           subtitle: state.subtitle,
+           timerEndDateInMilliseconds: state.progressBar?.date,
+-          progress: state.progressBar?.progress
++          progress: state.progressBar?.progress,
++          headerText: state.headerText,
++          paused: state.paused,
++          timeText: state.timeText,
++          primaryValue: state.primaryValue,
++          primaryLabel: state.primaryLabel,
++          distanceText: state.distanceText
+         )
+ 
+         let activity = try Activity.request(
+@@ -285,7 +310,13 @@ public class ExpoLiveActivityModule: Module {
+           title: state.title,
+           subtitle: state.subtitle,
+           timerEndDateInMilliseconds: state.progressBar?.date,
+-          progress: state.progressBar?.progress
++          progress: state.progressBar?.progress,
++          headerText: state.headerText,
++          paused: state.paused,
++          timeText: state.timeText,
++          primaryValue: state.primaryValue,
++          primaryLabel: state.primaryLabel,
++          distanceText: state.distanceText
+         )
+         try await updateImages(state: state, newState: &newState)
+         await activity.end(
+@@ -312,7 +343,13 @@ public class ExpoLiveActivityModule: Module {
+           title: state.title,
+           subtitle: state.subtitle,
+           timerEndDateInMilliseconds: state.progressBar?.date,
+-          progress: state.progressBar?.progress
++          progress: state.progressBar?.progress,
++          headerText: state.headerText,
++          paused: state.paused,
++          timeText: state.timeText,
++          primaryValue: state.primaryValue,
++          primaryLabel: state.primaryLabel,
++          distanceText: state.distanceText
+         )
+         try await updateImages(state: state, newState: &newState)
+         await activity.update(ActivityContent(state: newState, staleDate: nil))
+diff --git a/node_modules/expo-live-activity/ios/LiveActivityAttributes.swift b/node_modules/expo-live-activity/ios/LiveActivityAttributes.swift
+index f71c857..0a9d9b0 100644
+--- a/node_modules/expo-live-activity/ios/LiveActivityAttributes.swift
++++ b/node_modules/expo-live-activity/ios/LiveActivityAttributes.swift
+@@ -9,6 +9,13 @@ struct LiveActivityAttributes: ActivityAttributes {
+     var progress: Double?
+     var imageName: String?
+     var dynamicIslandImageName: String?
++    // MOVT — card de treino em 3 colunas (opcionais; ausentes = layout padrao da lib).
++    var headerText: String?
++    var paused: Bool?
++    var timeText: String?
++    var primaryValue: String?
++    var primaryLabel: String?
++    var distanceText: String?
+   }
+ 
+   var name: String
+diff --git a/node_modules/expo-live-activity/src/index.ts b/node_modules/expo-live-activity/src/index.ts
+index 675bc9e..387b179 100644
+--- a/node_modules/expo-live-activity/src/index.ts
++++ b/node_modules/expo-live-activity/src/index.ts
+@@ -23,6 +23,13 @@ export type LiveActivityState = {
+   progressBar?: ProgressBarType
+   imageName?: string
+   dynamicIslandImageName?: string
++  // MOVT — card de treino em 3 colunas (lock screen + Dynamic Island).
++  headerText?: string
++  paused?: boolean
++  timeText?: string
++  primaryValue?: string
++  primaryLabel?: string
++  distanceText?: string
+ }
+ 
+ export type NativeLiveActivityState = {

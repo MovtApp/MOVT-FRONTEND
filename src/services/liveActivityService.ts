@@ -4,7 +4,8 @@
  *
  * Mantém a MESMA API pública usada pelo tracker (`startWorkoutActivity` /
  * `updateWorkoutActivity` / `endWorkoutActivity`) e mapeia o snapshot do treino
- * para o `LiveActivityState` de schema FIXO da lib (title/subtitle + config visual).
+ * para o `LiveActivityState` estendido (patch MOVT): header + 3 colunas
+ * (tempo / métrica principal / distância).
  *
  * Seguro em qualquer plataforma/estado:
  *  - Android: guard `Platform.OS !== "ios"` retorna cedo (a lib nem é tocada).
@@ -12,8 +13,8 @@
  *    nulo) e o try/catch aqui engole a chamada — no-op, sem crash.
  *  - iOS pós-build: funciona.
  *
- * A UI do widget (SwiftUI) é gerada pelo config plugin da lib (target no Xcode no
- * prebuild) — não escrevemos Swift. Ver `docs/live-activity-ios.md`.
+ * Layout SwiftUI customizado via `patches/expo-live-activity+0.4.2.patch`.
+ * Ver `docs/live-activity-ios.md`.
  */
 import { Platform } from "react-native";
 import {
@@ -34,17 +35,17 @@ export interface LiveActivityData {
   time: string;
   /** Pace ("5:50 /km") ou velocidade média ("18.4 km/h"), com unidade. */
   pace: string;
-  /** Rótulo de `pace` ("pace" | "km/h") — reservado para variações de layout. */
+  /** Rótulo de `pace` ("pace" | "km/h") — define a coluna do meio. */
   paceLabel: string;
   /** Treino pausado? */
   paused: boolean;
 }
 
-// Estilo do card (cores de marca MOVT). deepLinkUrl abre o app ao tocar no card.
+// Fundo branco do sistema (o card MOVT pinta o header sozinho).
 const CONFIG: LiveActivityConfig = {
-  backgroundColor: "#192126",
-  titleColor: "#FFFFFF",
-  subtitleColor: "#BBF246",
+  backgroundColor: "#FFFFFF",
+  titleColor: "#192126",
+  subtitleColor: "#192126",
   deepLinkUrl: "movt://",
 };
 
@@ -52,13 +53,36 @@ const CONFIG: LiveActivityConfig = {
 let currentActivityId: string | undefined;
 let lastState: LiveActivityState | undefined;
 
-/** Mapeia o snapshot do treino para o schema fixo da lib. */
-function toState(d: LiveActivityData): LiveActivityState {
-  const icon = d.type === "Ciclismo" ? "🚴" : "🏃";
-  const pausedTag = d.paused ? " · pausado" : "";
+/** Extrai o valor numérico/tempo da string de pace/velocidade. */
+function primaryMetric(d: LiveActivityData): { value: string; label: string } {
+  const isCycling = d.paceLabel === "km/h" || d.type === "Ciclismo";
+  if (isCycling) {
+    return {
+      value: d.pace.replace(/\s*km\/h$/i, "").replace(".", ",").trim(),
+      label: "Velocidade média",
+    };
+  }
   return {
-    title: `${icon} ${d.distance} km`,
-    subtitle: `${d.time} · ${d.pace}${pausedTag}`,
+    value: d.pace.replace(/\s*\/km$/i, "").trim(),
+    label: "Pace (min/km)",
+  };
+}
+
+/** Mapeia o snapshot do treino para o schema estendido (card 3 colunas). */
+function toState(d: LiveActivityData): LiveActivityState {
+  const { value: primaryValue, label: primaryLabel } = primaryMetric(d);
+  const headerText = d.paused ? "Em pausa automática" : d.type;
+
+  return {
+    // title/subtitle: fallback Dynamic Island / layout legacy da lib.
+    title: `${d.distance} km`,
+    subtitle: `${d.time} · ${primaryValue}${d.type === "Ciclismo" ? " km/h" : " /km"}`,
+    headerText,
+    paused: d.paused,
+    timeText: d.time,
+    primaryValue,
+    primaryLabel,
+    distanceText: d.distance,
   };
 }
 
