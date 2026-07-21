@@ -7,6 +7,10 @@
  * para o `LiveActivityState` estendido (patch MOVT): header + 3 colunas
  * (tempo / métrica principal / distância).
  *
+ * Tempo ao vivo: envia `timerStartDateInMilliseconds` (= now − elapsed). O
+ * SwiftUI usa `Text(timerInterval:countsDown: false)` e tiqueia sozinho no lock
+ * screen — sem depender de push JS a cada segundo.
+ *
  * Seguro em qualquer plataforma/estado:
  *  - Android: guard `Platform.OS !== "ios"` retorna cedo (a lib nem é tocada).
  *  - iOS antes do build nativo: a lib usa `requireOptionalNativeModule` (módulo
@@ -31,7 +35,7 @@ export interface LiveActivityData {
   type: string;
   /** Distância em km, formatada (ex.: "3,21"). */
   distance: string;
-  /** Tempo decorrido formatado (ex.: "18:45"). */
+  /** Tempo decorrido formatado (ex.: "18:45") — fallback quando pausado. */
   time: string;
   /** Pace ("5:50 /km") ou velocidade média ("18.4 km/h"), com unidade. */
   pace: string;
@@ -39,6 +43,11 @@ export interface LiveActivityData {
   paceLabel: string;
   /** Treino pausado? */
   paused: boolean;
+  /**
+   * Epoch ms do instante "agora − elapsed" (só quando correndo).
+   * O widget conta o tempo nativamente a partir daqui.
+   */
+  timerStartMs?: number;
 }
 
 // Fundo branco do sistema (o card MOVT pinta o header sozinho).
@@ -83,6 +92,8 @@ function toState(d: LiveActivityData): LiveActivityState {
     primaryValue,
     primaryLabel,
     distanceText: d.distance,
+    // Congela o timer nativo quando pausado (Swift cai no timeText estático).
+    timerStartDateInMilliseconds: d.paused ? undefined : d.timerStartMs,
   };
 }
 

@@ -38,6 +38,10 @@ estende o schema e reescreve o SwiftUI no estilo Apple Fitness (header colorido 
 
 Mapeamento enviado pelo service:
 - `headerText` / `paused` / `timeText` / `primaryValue` / `primaryLabel` / `distanceText`
+- `timerStartDateInMilliseconds` (= now − elapsed) → o SwiftUI conta o **tempo**
+  nativamente com `Text(timerInterval:countsDown: false)` (tique a cada segundo
+  mesmo com a tela bloqueada, sem push JS)
+- Pace/distância: ticker JS de 1 s + updates da task de GPS
 - `title` / `subtitle` ficam como fallback (Dynamic Island / layout legacy da lib)
 - `deepLinkUrl: "movt://"` (toque no card abre o app)
 - fundo do sistema `#FFFFFF` (o header pinta a cor da marca)

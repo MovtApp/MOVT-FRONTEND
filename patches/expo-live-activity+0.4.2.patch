@@ -1,8 +1,8 @@
 diff --git a/node_modules/expo-live-activity/build/index.d.ts b/node_modules/expo-live-activity/build/index.d.ts
-index 1253114..bf2e216 100644
+index 1253114..c9a72f9 100644
 --- a/node_modules/expo-live-activity/build/index.d.ts
 +++ b/node_modules/expo-live-activity/build/index.d.ts
-@@ -14,6 +14,12 @@ export type LiveActivityState = {
+@@ -14,6 +14,13 @@ export type LiveActivityState = {
      progressBar?: ProgressBarType;
      imageName?: string;
      dynamicIslandImageName?: string;
@@ -12,11 +12,12 @@ index 1253114..bf2e216 100644
 +    primaryValue?: string;
 +    primaryLabel?: string;
 +    distanceText?: string;
++    timerStartDateInMilliseconds?: number;
  };
  export type NativeLiveActivityState = {
      title: string;
 diff --git a/node_modules/expo-live-activity/ios-files/LiveActivityView.swift b/node_modules/expo-live-activity/ios-files/LiveActivityView.swift
-index 1a00e92..1b9ed66 100644
+index 1a00e92..acfbd01 100644
 --- a/node_modules/expo-live-activity/ios-files/LiveActivityView.swift
 +++ b/node_modules/expo-live-activity/ios-files/LiveActivityView.swift
 @@ -6,6 +6,7 @@ import WidgetKit
@@ -27,7 +28,7 @@ index 1a00e92..1b9ed66 100644
      func body(content: Content) -> some View {
        if let color = color {
          content.foregroundStyle(Color(hex: color))
-@@ -150,7 +151,86 @@ import WidgetKit
+@@ -150,7 +151,126 @@ import WidgetKit
        )
      }
  
@@ -65,7 +66,7 @@ index 1a00e92..1b9ed66 100644
 +
 +        // Corpo branco: 3 colunas (Tempo | metrica principal | Distancia).
 +        HStack(alignment: .top, spacing: 8) {
-+          statColumn(value: contentState.timeText, label: "Tempo", emphasized: false, ink: ink)
++          timeColumn(ink: ink)
 +          Spacer(minLength: 0)
 +          statColumn(
 +            value: contentState.primaryValue, label: contentState.primaryLabel,
@@ -80,6 +81,46 @@ index 1a00e92..1b9ed66 100644
 +        .background(Color.white)
 +      }
 +      .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
++    }
++
++    /// Tempo ao vivo via Text(timerInterval:) — tique nativo no lock screen, sem push JS.
++    private func timeColumn(ink: Color) -> some View {
++      let paused = contentState.paused ?? false
++      let startMs = contentState.timerStartDateInMilliseconds
++      return VStack(spacing: 3) {
++        Group {
++          if !paused, let startMs {
++            liveElapsedText(startMs: startMs)
++              .font(.system(size: 24, weight: .bold))
++              .monospacedDigit()
++              .foregroundStyle(ink)
++              .lineLimit(1)
++              .minimumScaleFactor(0.6)
++              .multilineTextAlignment(.center)
++          } else {
++            Text(contentState.timeText ?? "—")
++              .font(.system(size: 24, weight: .bold))
++              .monospacedDigit()
++              .foregroundStyle(ink)
++              .lineLimit(1)
++              .minimumScaleFactor(0.6)
++          }
++        }
++        Text("Tempo")
++          .font(.system(size: 11, weight: .regular))
++          .foregroundStyle(ink.opacity(0.55))
++          .multilineTextAlignment(.center)
++          .lineLimit(2)
++          .minimumScaleFactor(0.8)
++      }
++      .frame(maxWidth: .infinity)
++    }
++
++    private func liveElapsedText(startMs: Double) -> Text {
++      Text(
++        timerInterval: Date(timeIntervalSince1970: startMs / 1000.0)...Date.distantFuture,
++        countsDown: false
++      )
 +    }
 +
 +    private func statColumn(value: String?, label: String?, emphasized: Bool, ink: Color) -> some View {
@@ -114,7 +155,7 @@ index 1a00e92..1b9ed66 100644
        let defaultPadding = 24
  
        let top = CGFloat(
-@@ -181,7 +261,7 @@ import WidgetKit
+@@ -181,7 +301,7 @@ import WidgetKit
            ?? defaultPadding
        )
  
@@ -124,10 +165,10 @@ index 1a00e92..1b9ed66 100644
          let isStretch = position.contains("Stretch")
          let isLeftImage = position.hasPrefix("left")
 diff --git a/node_modules/expo-live-activity/ios-files/LiveActivityWidget.swift b/node_modules/expo-live-activity/ios-files/LiveActivityWidget.swift
-index 24cd8c5..628d398 100644
+index 24cd8c5..ebe90fd 100644
 --- a/node_modules/expo-live-activity/ios-files/LiveActivityWidget.swift
 +++ b/node_modules/expo-live-activity/ios-files/LiveActivityWidget.swift
-@@ -10,6 +10,13 @@ struct LiveActivityAttributes: ActivityAttributes {
+@@ -10,6 +10,15 @@ struct LiveActivityAttributes: ActivityAttributes {
      var progress: Double?
      var imageName: String?
      var dynamicIslandImageName: String?
@@ -138,10 +179,12 @@ index 24cd8c5..628d398 100644
 +    var primaryValue: String?
 +    var primaryLabel: String?
 +    var distanceText: String?
++    /// Epoch ms do "agora - elapsed": Text(timerInterval:) conta sozinho no lock screen.
++    var timerStartDateInMilliseconds: Double?
    }
  
    var name: String
-@@ -57,7 +64,7 @@ struct LiveActivityWidget: Widget {
+@@ -57,7 +66,7 @@ struct LiveActivityWidget: Widget {
      } dynamicIsland: { context in
        DynamicIsland {
          DynamicIslandExpandedRegion(.leading, priority: 1) {
@@ -150,7 +193,7 @@ index 24cd8c5..628d398 100644
              .dynamicIsland(verticalPlacement: .belowIfTooWide)
              .padding(.leading, 5)
              .applyWidgetURL(from: context.attributes.deepLinkUrl)
-@@ -83,14 +90,30 @@ struct LiveActivityWidget: Widget {
+@@ -83,14 +92,40 @@ struct LiveActivityWidget: Widget {
            resizableImage(imageName: dynamicIslandImageName)
              .frame(maxWidth: 23, maxHeight: 23)
              .applyWidgetURL(from: context.attributes.deepLinkUrl)
@@ -166,7 +209,17 @@ index 24cd8c5..628d398 100644
          }
        } compactTrailing: {
 -        if let date = context.state.timerEndDateInMilliseconds {
-+        if let time = context.state.timeText {
++        if !(context.state.paused ?? false),
++          let startMs = context.state.timerStartDateInMilliseconds
++        {
++          Text(
++            timerInterval: Date(timeIntervalSince1970: startMs / 1000.0)...Date.distantFuture,
++            countsDown: false
++          )
++          .font(.system(size: 14, weight: .semibold))
++          .monospacedDigit()
++          .applyWidgetURL(from: context.attributes.deepLinkUrl)
++        } else if let time = context.state.timeText {
 +          Text(time)
 +            .font(.system(size: 14, weight: .semibold))
 +            .monospacedDigit()
@@ -182,7 +235,7 @@ index 24cd8c5..628d398 100644
          }
        } minimal: {
          if let date = context.state.timerEndDateInMilliseconds {
-@@ -99,6 +122,14 @@ struct LiveActivityWidget: Widget {
+@@ -99,6 +134,14 @@ struct LiveActivityWidget: Widget {
              timerType: context.attributes.timerType ?? .circular,
              progressViewTint: context.attributes.progressViewTint
            ).applyWidgetURL(from: context.attributes.deepLinkUrl)
@@ -197,7 +250,7 @@ index 24cd8c5..628d398 100644
          }
        }
      }
-@@ -123,20 +154,26 @@ struct LiveActivityWidget: Widget {
+@@ -123,20 +166,26 @@ struct LiveActivityWidget: Widget {
      }
    }
  
@@ -232,10 +285,10 @@ index 24cd8c5..628d398 100644
    }
  
 diff --git a/node_modules/expo-live-activity/ios/ExpoLiveActivityModule.swift b/node_modules/expo-live-activity/ios/ExpoLiveActivityModule.swift
-index 6fdf9f5..d8afb74 100644
+index 6fdf9f5..4ee9803 100644
 --- a/node_modules/expo-live-activity/ios/ExpoLiveActivityModule.swift
 +++ b/node_modules/expo-live-activity/ios/ExpoLiveActivityModule.swift
-@@ -25,6 +25,25 @@ public class ExpoLiveActivityModule: Module {
+@@ -25,6 +25,28 @@ public class ExpoLiveActivityModule: Module {
  
      @Field
      var dynamicIslandImageName: String?
@@ -258,10 +311,13 @@ index 6fdf9f5..d8afb74 100644
 +
 +    @Field
 +    var distanceText: String?
++
++    @Field
++    var timerStartDateInMilliseconds: Double?
    }
  
    struct LiveActivityConfig: Record {
-@@ -249,7 +268,13 @@ public class ExpoLiveActivityModule: Module {
+@@ -249,7 +271,14 @@ public class ExpoLiveActivityModule: Module {
            title: state.title,
            subtitle: state.subtitle,
            timerEndDateInMilliseconds: state.progressBar?.date,
@@ -272,11 +328,12 @@ index 6fdf9f5..d8afb74 100644
 +          timeText: state.timeText,
 +          primaryValue: state.primaryValue,
 +          primaryLabel: state.primaryLabel,
-+          distanceText: state.distanceText
++          distanceText: state.distanceText,
++          timerStartDateInMilliseconds: state.timerStartDateInMilliseconds
          )
  
          let activity = try Activity.request(
-@@ -285,7 +310,13 @@ public class ExpoLiveActivityModule: Module {
+@@ -285,7 +314,14 @@ public class ExpoLiveActivityModule: Module {
            title: state.title,
            subtitle: state.subtitle,
            timerEndDateInMilliseconds: state.progressBar?.date,
@@ -287,11 +344,12 @@ index 6fdf9f5..d8afb74 100644
 +          timeText: state.timeText,
 +          primaryValue: state.primaryValue,
 +          primaryLabel: state.primaryLabel,
-+          distanceText: state.distanceText
++          distanceText: state.distanceText,
++          timerStartDateInMilliseconds: state.timerStartDateInMilliseconds
          )
          try await updateImages(state: state, newState: &newState)
          await activity.end(
-@@ -312,7 +343,13 @@ public class ExpoLiveActivityModule: Module {
+@@ -312,7 +348,14 @@ public class ExpoLiveActivityModule: Module {
            title: state.title,
            subtitle: state.subtitle,
            timerEndDateInMilliseconds: state.progressBar?.date,
@@ -302,15 +360,16 @@ index 6fdf9f5..d8afb74 100644
 +          timeText: state.timeText,
 +          primaryValue: state.primaryValue,
 +          primaryLabel: state.primaryLabel,
-+          distanceText: state.distanceText
++          distanceText: state.distanceText,
++          timerStartDateInMilliseconds: state.timerStartDateInMilliseconds
          )
          try await updateImages(state: state, newState: &newState)
          await activity.update(ActivityContent(state: newState, staleDate: nil))
 diff --git a/node_modules/expo-live-activity/ios/LiveActivityAttributes.swift b/node_modules/expo-live-activity/ios/LiveActivityAttributes.swift
-index f71c857..0a9d9b0 100644
+index f71c857..76027b8 100644
 --- a/node_modules/expo-live-activity/ios/LiveActivityAttributes.swift
 +++ b/node_modules/expo-live-activity/ios/LiveActivityAttributes.swift
-@@ -9,6 +9,13 @@ struct LiveActivityAttributes: ActivityAttributes {
+@@ -9,6 +9,15 @@ struct LiveActivityAttributes: ActivityAttributes {
      var progress: Double?
      var imageName: String?
      var dynamicIslandImageName: String?
@@ -321,14 +380,16 @@ index f71c857..0a9d9b0 100644
 +    var primaryValue: String?
 +    var primaryLabel: String?
 +    var distanceText: String?
++    /// Epoch ms do "agora - elapsed": Text(timerInterval:) conta sozinho no lock screen.
++    var timerStartDateInMilliseconds: Double?
    }
  
    var name: String
 diff --git a/node_modules/expo-live-activity/src/index.ts b/node_modules/expo-live-activity/src/index.ts
-index 675bc9e..387b179 100644
+index 675bc9e..b23b668 100644
 --- a/node_modules/expo-live-activity/src/index.ts
 +++ b/node_modules/expo-live-activity/src/index.ts
-@@ -23,6 +23,13 @@ export type LiveActivityState = {
+@@ -23,6 +23,15 @@ export type LiveActivityState = {
    progressBar?: ProgressBarType
    imageName?: string
    dynamicIslandImageName?: string
@@ -339,6 +400,8 @@ index 675bc9e..387b179 100644
 +  primaryValue?: string
 +  primaryLabel?: string
 +  distanceText?: string
++  /** Epoch ms = now - elapsed; o SwiftUI conta o tempo nativamente no card. */
++  timerStartDateInMilliseconds?: number
  }
  
  export type NativeLiveActivityState = {

@@ -20,7 +20,7 @@
  * (caso o SO mate e religue o app para entregar uma localização headless).
  */
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { AppState, type AppStateStatus } from "react-native";
+import { AppState, Platform, type AppStateStatus } from "react-native";
 import * as Sentry from "@sentry/react-native";
 import * as Location from "expo-location";
 import * as TaskManager from "expo-task-manager";
@@ -681,6 +681,27 @@ export async function hasActiveSession(): Promise<{ active: boolean; type?: Work
 let bgGranted = false;
 let lastNotifTs = 0;
 const NOTIF_UPDATE_MS = 2000;
+// iOS Live Activity: push de pace/distância a cada 1 s enquanto o JS está vivo.
+// O TEMPO no card tiqueia nativamente (Text timerInterval) — este ticker só
+// mantém as outras métricas frescas (pace muda com o elapsed mesmo sem GPS).
+let liveActivityTicker: ReturnType<typeof setInterval> | null = null;
+const LIVE_ACTIVITY_TICK_MS = 1000;
+
+function startLiveActivityTicker() {
+  if (Platform.OS !== "ios") return;
+  stopLiveActivityTicker();
+  liveActivityTicker = setInterval(() => {
+    if (!session?.active || session.isPaused) return;
+    updateWorkoutActivity(liveActivityData());
+  }, LIVE_ACTIVITY_TICK_MS);
+}
+
+function stopLiveActivityTicker() {
+  if (liveActivityTicker) {
+    clearInterval(liveActivityTicker);
+    liveActivityTicker = null;
+  }
+}
 
 // Texto do card: "MOVT · Corrida" + "3,21 km · 18:45 · 5:50 /km" (pace/vel. média).
 function workoutNotifText(): { title: string; body: string } {
@@ -697,7 +718,8 @@ function workoutNotifText(): { title: string; body: string } {
 // Dados da Live Activity (iOS) a partir do snapshot — casa com LiveActivityData.
 function liveActivityData(): LiveActivityData {
   const s = getSnapshot();
-  const avgMs = s.elapsedSec > 0 ? (s.distanceKm * 1000) / s.elapsedSec : 0;
+  const elapsedMs = currentElapsedMs();
+  const avgMs = elapsedMs > 0 ? (s.distanceKm * 1000) / (elapsedMs / 1000) : 0;
   const isCycling = s.type === "Ciclismo";
   return {
     type: s.type,
@@ -706,6 +728,8 @@ function liveActivityData(): LiveActivityData {
     pace: isCycling ? `${(avgMs * 3.6).toFixed(1)} km/h` : `${speedToPace(avgMs)} /km`,
     paceLabel: isCycling ? "km/h" : "pace",
     paused: s.isPaused,
+    // Âncora do timer nativo no SwiftUI (= agora − elapsed, respeitando pausas).
+    timerStartMs: s.isPaused ? undefined : Date.now() - elapsedMs,
   };
 }
 
@@ -933,6 +957,7 @@ export async function startTracking(type: WorkoutKind): Promise<StartResult> {
   // iOS: inicia a Live Activity (card na tela de bloqueio + Dynamic Island).
   // No-op fora do iOS / enquanto o módulo nativo não existir.
   startWorkoutActivity(liveActivityData());
+  startLiveActivityTicker();
 
   // Começa a ler a FC do relógio (best-effort, só leitura — ver startHrPolling).
   startHrPolling();
@@ -961,6 +986,11 @@ export function togglePause() {
   persist(true);
   // Reflete pausa/retomada no card ao vivo (Android) e Live Activity (iOS).
   pushWorkoutStatus(true);
+  if (session.isPaused) {
+    stopLiveActivityTicker();
+  } else {
+    startLiveActivityTicker();
+  }
   notify();
 }
 
@@ -1001,6 +1031,7 @@ export async function stopTracking(): Promise<TrackingSnapshot> {
   // quando não se aplica.
   stopMOVTService();
   endWorkoutActivity();
+  stopLiveActivityTicker();
   bgGranted = false;
   Sentry.addBreadcrumb({
     category: "workout",
@@ -1061,6 +1092,9 @@ export async function resumeIfActive() {
     }
     // Rearma o watchdog (o timer não sobrevive ao restart do JS).
     startWatchdog();
+    // Religa Live Activity + ticker de métricas (o id em memória morreu com o JS).
+    startWorkoutActivity(liveActivityData());
+    if (!s.isPaused) startLiveActivityTicker();
     notify();
   }
 }
