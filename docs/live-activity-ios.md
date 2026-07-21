@@ -31,7 +31,7 @@ estende o schema e reescreve o SwiftUI no estilo Apple Fitness (header colorido 
 
 | Parte | Comportamento |
 |---|---|
-| Header | Barra colorida + texto centralizado + logo MOVT à direita. Pausado = amarelo `#FCC419` + "Em pausa automática". Ativo = verde `#BBF246` + "Corrida"/"Ciclismo". |
+| Header | Barra verde da marca `#BBF246` + texto centralizado + logo MOVT à direita. Pausado mantém o verde e mostra "Em pausa automática"; ativo mostra "Corrida"/"Ciclismo". |
 | Corpo | Card branco, 3 colunas: **Tempo** \| métrica principal (fonte maior) \| **Distância (km)**. |
 | Métrica do meio | Corrida → Pace (min/km). Ciclismo → Velocidade média (km/h). |
 | Dynamic Island | Compacto: logo + tempo. Expandido: header + título/subtítulo. |
