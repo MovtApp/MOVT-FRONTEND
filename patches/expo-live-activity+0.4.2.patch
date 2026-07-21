@@ -16,7 +16,7 @@ index 1253114..bf2e216 100644
  export type NativeLiveActivityState = {
      title: string;
 diff --git a/node_modules/expo-live-activity/ios-files/LiveActivityView.swift b/node_modules/expo-live-activity/ios-files/LiveActivityView.swift
-index 1a00e92..2a43450 100644
+index 1a00e92..1b9ed66 100644
 --- a/node_modules/expo-live-activity/ios-files/LiveActivityView.swift
 +++ b/node_modules/expo-live-activity/ios-files/LiveActivityView.swift
 @@ -6,6 +6,7 @@ import WidgetKit
@@ -114,6 +114,15 @@ index 1a00e92..2a43450 100644
        let defaultPadding = 24
  
        let top = CGFloat(
+@@ -181,7 +261,7 @@ import WidgetKit
+           ?? defaultPadding
+       )
+ 
+-      VStack(alignment: .leading) {
++      return VStack(alignment: .leading) {
+         let position = attributes.imagePosition ?? "right"
+         let isStretch = position.contains("Stretch")
+         let isLeftImage = position.hasPrefix("left")
 diff --git a/node_modules/expo-live-activity/ios-files/LiveActivityWidget.swift b/node_modules/expo-live-activity/ios-files/LiveActivityWidget.swift
 index 24cd8c5..628d398 100644
 --- a/node_modules/expo-live-activity/ios-files/LiveActivityWidget.swift
