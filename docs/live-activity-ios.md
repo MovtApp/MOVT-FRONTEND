@@ -4,63 +4,70 @@ Card do treino na **tela de bloqueio** + **Dynamic Island** (iOS 16.2+), atualiz
 ao vivo durante corrida/ciclismo. Paridade com o card do Android (Fase 2).
 
 Feito via **[`expo-live-activity`](https://github.com/software-mansion-labs/expo-live-activity)**
-(Software Mansion) — o config plugin da lib cria o Widget Extension no Xcode
-automaticamente durante o `prebuild`, então **não escrevemos SwiftUI**.
+(Software Mansion) + **patch MOVT** (`patches/expo-live-activity+0.4.2.patch`) que
+estende o schema e reescreve o SwiftUI no estilo Apple Fitness (header colorido +
+3 colunas + logo MOVT).
 
 > **Dá para fechar tudo do Windows** (sem Mac): o build iOS roda nos Macs da nuvem
 > do **EAS Build**. O que ainda é obrigatório: **conta Apple Developer** (assinatura)
 > e um **iPhone físico (16.2+)** para testar Live Activity (não funciona confiável
 > no simulador).
 
-## O que já está no repo (este PR)
+## O que já está no repo
 
-- `package.json` → dependência `expo-live-activity`.
+- `package.json` → dependência `expo-live-activity@0.4.2` + `postinstall` com
+  `patch-package`.
+- `patches/expo-live-activity+0.4.2.patch` → schema + layout SwiftUI customizados.
+- `assets/liveActivity/movt_logo.png` → símbolo MOVT (≤ 4 KB); o plugin copia para
+  o `Assets.xcassets` do Widget Extension no prebuild.
 - `app.json` → plugin `"expo-live-activity"` na lista de `plugins`.
 - `src/services/liveActivityService.ts` → wrapper que mapeia o snapshot do treino
-  para o `LiveActivityState` (schema fixo: `title`/`subtitle` + `config` de cores).
-  Guardado por plataforma/try-catch → **no-op em Android e em iOS antes do build**.
-- `src/services/locationTrackingService.ts` → já dispara start/update/end no ciclo
+  para o state estruturado. Guardado por plataforma/try-catch → **no-op em Android
+  e em iOS antes do build**.
+- `src/services/locationTrackingService.ts` → dispara start/update/end no ciclo
   do treino (update throttled a partir da task de GPS, roda mesmo bloqueado).
 
-Mapeamento atual (schema fixo da lib 0.4.2 — `progressBar` só tem `date`/`progress`,
-sem timer de contagem; por isso o tempo vai como texto, atualizado a cada ~2 s):
-- `title`  = "🏃 3,21 km" (ícone + distância)
-- `subtitle` = "18:45 · 5:50 /km" (+ " · pausado" quando pausado)
-- cores de marca via `config` (fundo #192126, título branco, subtítulo #BBF246),
-  `deepLinkUrl: "movt://"` (toque no card abre o app).
+## Layout (estilo Apple Fitness / referência)
 
-## Passos para ativar (quem tiver a conta Apple)
+| Parte | Comportamento |
+|---|---|
+| Header | Barra colorida + texto centralizado + logo MOVT à direita. Pausado = amarelo `#FCC419` + "Em pausa automática". Ativo = verde `#BBF246` + "Corrida"/"Ciclismo". |
+| Corpo | Card branco, 3 colunas: **Tempo** \| métrica principal (fonte maior) \| **Distância (km)**. |
+| Métrica do meio | Corrida → Pace (min/km). Ciclismo → Velocidade média (km/h). |
+| Dynamic Island | Compacto: logo + tempo. Expandido: header + título/subtítulo. |
 
-1. `npm install` (instala a `expo-live-activity` já declarada).
-2. `npx expo prebuild --clean` — o plugin injeta o Widget Extension e liga
-   `NSSupportsLiveActivities` no Info.plist.
-3. `eas build --platform ios` — o EAS guia a assinatura da nova extensão (precisa da
-   conta Apple Developer configurada no projeto).
-4. Instalar no iPhone (TestFlight/ad-hoc) e validar (checklist abaixo).
+Mapeamento enviado pelo service:
+- `headerText` / `paused` / `timeText` / `primaryValue` / `primaryLabel` / `distanceText`
+- `title` / `subtitle` ficam como fallback (Dynamic Island / layout legacy da lib)
+- `deepLinkUrl: "movt://"` (toque no card abre o app)
+- fundo do sistema `#FFFFFF` (o header pinta a cor da marca)
 
-## Ajustes opcionais (depois do 1º funcionar)
+Sem `timeText`, o widget cai no layout original da lib (2 linhas).
 
-- **Ícone/imagem** no card: `imageName`/`dynamicIslandImageName` no state + arquivo em
-  `assets/liveActivity` (≤ 4 KB). Hoje não usamos imagem.
-- **Push updates (APNs)** para atualização mais confiável em background profundo:
-  plugin `["expo-live-activity", { "enablePushNotifications": true }]` +
-  `addActivityTokenListener`. Não necessário para a v1 (atualizamos com o app vivo
-  em background via `UIBackgroundModes: location`, já presente).
+## Passos para ativar / validar no device
+
+1. `npm install` (aplica o patch automaticamente).
+2. `npx expo prebuild --clean` — o plugin injeta o Widget Extension, assets e
+   `NSSupportsLiveActivities`.
+3. `eas build --platform ios --profile preview` — EAS assina app + LiveActivity +
+   Notification Service.
+4. Instalar no iPhone (link/QR) e validar (checklist abaixo).
 
 ## Nota sobre a dependência
 
 O npm marca **todas** as versões de `expo-live-activity` como *deprecated* com a
-mensagem genérica "Package no longer supported" — inclusive a alpha 0.5.0 recém
-publicada. É o flag genérico do npm, **não** um abandono: o repo (Software Mansion,
-mesma dona de reanimated/gesture-handler/screens que já usamos) foi atualizado em
-2026-06. Se preferir não depender de pacote marcado assim, a alternativa é **vendar**
-(copiar) o módulo para dentro do repo. Fixamos a versão **0.4.2** (última estável).
+mensagem genérica "Package no longer supported" — inclusive a alpha 0.5.0. É o
+flag genérico do npm, **não** um abandono. Fixamos a versão **0.4.2** + patch.
+Se subir a lib, reaplique / regenere o patch.
 
 ## Checklist de validação (iPhone físico, iOS 16.2+)
 
-- [ ] Iniciar corrida → card aparece na tela de bloqueio e no Dynamic Island.
-- [ ] Distância/tempo/pace atualizam com a tela **bloqueada**.
-- [ ] Pausar → "· pausado" no subtítulo; Retomar → some.
+- [ ] Iniciar corrida → card com header verde "Corrida", logo MOVT e 3 colunas.
+- [ ] Pace no centro (fonte maior); tempo à esquerda; distância à direita.
+- [ ] Ciclismo → centro vira "Velocidade média" em km/h.
+- [ ] Métricas atualizam com a tela **bloqueada**.
+- [ ] Pausar → header amarelo "Em pausa automática"; Retomar → volta ao verde.
+- [ ] Dynamic Island compacto mostra logo + tempo.
 - [ ] Encerrar → card some.
 - [ ] Relaunch do processo no meio do treino não cria card duplicado
       (`startWorkoutActivity` é idempotente).
