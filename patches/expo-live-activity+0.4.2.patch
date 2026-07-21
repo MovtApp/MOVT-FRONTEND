@@ -17,7 +17,7 @@ index 1253114..c9a72f9 100644
  export type NativeLiveActivityState = {
      title: string;
 diff --git a/node_modules/expo-live-activity/ios-files/LiveActivityView.swift b/node_modules/expo-live-activity/ios-files/LiveActivityView.swift
-index 1a00e92..1692067 100644
+index 1a00e92..71ff515 100644
 --- a/node_modules/expo-live-activity/ios-files/LiveActivityView.swift
 +++ b/node_modules/expo-live-activity/ios-files/LiveActivityView.swift
 @@ -6,6 +6,7 @@ import WidgetKit
@@ -28,13 +28,12 @@ index 1a00e92..1692067 100644
      func body(content: Content) -> some View {
        if let color = color {
          content.foregroundStyle(Color(hex: color))
-@@ -150,7 +151,125 @@ import WidgetKit
+@@ -150,7 +151,124 @@ import WidgetKit
        )
      }
  
 +    // MOVT — card de treino em 3 colunas (usado quando o service envia timeText).
 +    private var movtCard: some View {
-+      let paused = contentState.paused ?? false
 +      // Sempre verde da marca (ativo e pausado). Texto escuro sobre header claro.
 +      let headerBg = Color(hex: "BBF246")
 +      let ink = Color(hex: "192126")
@@ -154,7 +153,7 @@ index 1a00e92..1692067 100644
        let defaultPadding = 24
  
        let top = CGFloat(
-@@ -181,7 +300,7 @@ import WidgetKit
+@@ -181,7 +299,7 @@ import WidgetKit
            ?? defaultPadding
        )
  
