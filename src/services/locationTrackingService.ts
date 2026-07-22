@@ -76,18 +76,24 @@ let watchdogTimer: ReturnType<typeof setInterval> | null = null;
 let rearmInProgress = false;
 // Cadência de verificação do watchdog.
 const WATCHDOG_INTERVAL_MS = 10000;
-// Silêncio (ms) tolerado antes de re-armar. Fixes saudáveis chegam a cada ~0,5–2 s;
-// 25 s cobre um túnel/cânion urbano sem re-armar à toa, mas religa rápido quando o
-// SO derrubou o serviço. NÃO afeta o tempo do treino (relógio de parede).
+// Silêncio (ms) tolerado antes de re-armar EM FOREGROUND. Fixes saudáveis chegam a
+// cada ~0,5–2 s; 25 s cobre um túnel/cânion urbano sem re-armar à toa, mas religa
+// rápido quando o SO derrubou o serviço. NÃO afeta o tempo do treino (relógio de parede).
 const WATCHDOG_SILENCE_MS = 25000;
+// Silêncio (ms) tolerado antes de re-armar EM BACKGROUND (tela apagada). Mais folgado
+// que em foreground: em background o SO pode legitimamente entregar em lote, então só
+// re-armamos após um silêncio longo — o suficiente para RECUPERAR a entrega quando ela
+// para de vez sem gastar bateria re-armando à toa. O WakeLock parcial (Android) / a
+// location task (iOS) mantêm este timer vivo na medida do possível.
+const WATCHDOG_BG_SILENCE_MS = 45000;
 // Evita re-armar em rajada: intervalo mínimo entre dois re-armes.
 const REARM_MIN_INTERVAL_MS = 20000;
 let lastRearmTs = 0;
 
-// AppState atual (foreground/background). O watchdog só re-arma quando o app está
-// ATIVO — em background o SO pode legitimamente estar entregando em lote e um
-// stop/start cego poderia atrapalhar; o re-arme forte acontece no retorno ao
-// foreground (onde o usuário desbloqueia e a UI reaparece).
+// AppState atual (foreground/background). O watchdog re-arma em AMBOS os estados, com
+// limiares distintos (WATCHDOG_SILENCE_MS em foreground, WATCHDOG_BG_SILENCE_MS em
+// background) — o re-arme em background recupera a entrega de GPS quando ela para
+// com a tela apagada. No retorno ao foreground há ainda um re-arme imediato.
 let appActive = AppState.currentState === "active";
 
 // ─── Parâmetros de rastreamento (qualidade Strava/Uber) ─────────────────────────
@@ -96,6 +102,12 @@ let appActive = AppState.currentState === "active";
 // meio-termo: o Kalman pondera os ruidosos pela acurácia, e o filtro de "ré"
 // (processFix) remove os vai-e-volta restantes. Tunável.
 const MAX_ACCURACY_M = 35;
+// Em background o GPS demora a reaquecer; aceita um pouco mais de ruído para não
+// furar o traçado (o Kalman ainda suaviza). Em foreground mantém o limiar estrito.
+const MAX_ACCURACY_BG_M = 50;
+// Throttle do breadcrumb de reject por acurácia (não inundar o Sentry).
+let lastAccRejectTs = 0;
+const ACC_REJECT_BREADCRUMB_MS = 15000;
 // Acurácia assumida quando o device não reporta (m).
 const DEFAULT_ACCURACY_M = 20;
 // Deslocamento mínimo (m) entre pontos JÁ filtrados para contar distância/registrar.
@@ -340,9 +352,22 @@ function processFix(loc: Location.LocationObject) {
 
   // Acurácia efetiva (assume um valor quando o device não reporta).
   const acc = typeof accuracy === "number" && accuracy > 0 ? accuracy : DEFAULT_ACCURACY_M;
+  const accLimit = appActive ? MAX_ACCURACY_M : MAX_ACCURACY_BG_M;
 
   // Fix ruidoso demais: não entra no traçado (mas já moveu o marcador acima).
-  if (acc > MAX_ACCURACY_M) return;
+  if (acc > accLimit) {
+    const now = Date.now();
+    if (now - lastAccRejectTs >= ACC_REJECT_BREADCRUMB_MS) {
+      lastAccRejectTs = now;
+      Sentry.addBreadcrumb({
+        category: "workout",
+        level: "info",
+        message: "tracking:fix-rejected-accuracy",
+        data: { acc, accLimit, appActive, fixCount },
+      });
+    }
+    return;
+  }
 
   // Gap break: o GPS ficou mudo tempo demais desde o último fix aceito (processo
   // congelado com a tela apagada, túnel longo…). Zera o Kalman para que ele
@@ -750,6 +775,14 @@ function pushWorkoutStatus(force = false) {
   updateWorkoutActivity(liveActivityData());
 }
 
+// ─── Estratégia de foreground service (entrega de GPS × nº de notificações) ──────
+// Com background concedido, o modo CARD ÚNICO usa só o MOVTForegroundService
+// (Android) e o expo-location sem FGS próprio. Em campo, buracos com a tela
+// apagada levaram a ligar o escape hatch: o expo-location sobe o FGS DELE
+// (entrega garantida) — no Android pode aparecer 2 notificações; no iOS a
+// location task fica com a entrega mais agressiva do SO.
+const PREFER_RELIABLE_DELIVERY = true;
+
 // ─── Opções de location updates (compartilhadas start/resume) ───────────────────
 function buildOptions(type: WorkoutKind): Location.LocationTaskOptions {
   const base: Location.LocationTaskOptions = {
@@ -763,10 +796,10 @@ function buildOptions(type: WorkoutKind): Location.LocationTaskOptions {
     activityType: Location.ActivityType.Fitness,
     showsBackgroundLocationIndicator: true,
   };
-  // Sem background concedido: delega o FGS ao expo-location (exigido p/ as updates
-  // seguirem e evita o throw de background-permission). Com background, NOSSO
-  // MOVTForegroundService é o único FGS (card ao vivo) — não duplicamos a notif.
-  if (!bgGranted) {
+  // Inclui o FGS do expo-location quando (a) não há background concedido — exigido
+  // p/ as updates seguirem e evita o throw de background-permission — OU (b) o modo
+  // de entrega garantida está ligado (PREFER_RELIABLE_DELIVERY).
+  if (!bgGranted || PREFER_RELIABLE_DELIVERY) {
     return {
       ...base,
       foregroundService: {
@@ -821,12 +854,12 @@ function startWatchdog() {
   lastFixWallTs = Date.now();
   watchdogTimer = setInterval(() => {
     if (!session?.active || session.isPaused) return;
-    // Só age em foreground (ver nota em `appActive`). Em background, o SO pode
-    // estar entregando em lote; o re-arme forte acontece ao voltar ao foreground.
-    if (!appActive) return;
+    // Re-arma em AMBOS os estados, com limiar maior em background (o SO pode
+    // entregar em lote com a tela apagada; só religamos após silêncio longo).
+    const silenceLimit = appActive ? WATCHDOG_SILENCE_MS : WATCHDOG_BG_SILENCE_MS;
     const silence = lastFixWallTs ? Date.now() - lastFixWallTs : 0;
-    if (silence > WATCHDOG_SILENCE_MS) {
-      rearmLocationUpdates("watchdog-silence");
+    if (silence > silenceLimit) {
+      rearmLocationUpdates(appActive ? "watchdog-silence" : "watchdog-silence-bg");
     }
   }, WATCHDOG_INTERVAL_MS);
 }
@@ -845,7 +878,33 @@ function stopWatchdog() {
 function handleAppStateChange(next: AppStateStatus) {
   const wasActive = appActive;
   appActive = next === "active";
+
+  if (!appActive && wasActive && session?.active) {
+    Sentry.addBreadcrumb({
+      category: "workout",
+      level: "info",
+      message: "tracking:enter-background",
+      data: {
+        fixCount,
+        silenceMs: lastFixWallTs ? Date.now() - lastFixWallTs : -1,
+        routeLen: session.route.length,
+        distanceKm: Number(session.distanceKm.toFixed(3)),
+      },
+    });
+  }
+
   if (appActive && !wasActive && session?.active) {
+    Sentry.addBreadcrumb({
+      category: "workout",
+      level: "info",
+      message: "tracking:return-foreground",
+      data: {
+        fixCount,
+        silenceMs: lastFixWallTs ? Date.now() - lastFixWallTs : -1,
+        routeLen: session.route.length,
+        distanceKm: Number(session.distanceKm.toFixed(3)),
+      },
+    });
     // Se ficou mudo além do limite enquanto em background, religa já (sem esperar
     // o próximo tick do watchdog). Caso contrário, apenas segue.
     const silence = lastFixWallTs ? Date.now() - lastFixWallTs : 0;
@@ -909,7 +968,7 @@ export async function startTracking(type: WorkoutKind): Promise<StartResult> {
     category: "workout",
     level: "info",
     message: "tracking:start",
-    data: { type, backgroundGranted },
+    data: { type, backgroundGranted, preferReliable: PREFER_RELIABLE_DELIVERY },
   });
 
   const now = Date.now();

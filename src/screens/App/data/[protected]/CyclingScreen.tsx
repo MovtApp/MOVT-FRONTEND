@@ -1520,11 +1520,12 @@ const CyclingScreen: React.FC = () => {
       const nowActive = state === "active";
       const wasActive = appActiveRef.current;
       appActiveRef.current = nowActive;
-      // Espelha no state para (re)montar o mapa. Ao SAIR de foreground, marca o
-      // mapa como "não pronto": ele é desmontado no render e as guardas de câmera
-      // não devem tocar numa superfície que não existe mais.
+      // Espelha no state para desligar/religar a camada nativa do ponto azul
+      // (showsUserLocation={appActive}). O mapa NÃO é mais desmontado em background
+      // (isso é o que crashava no Fabric), então NÃO zeramos `liveMapReadyRef` aqui:
+      // o MapView continua montado e pronto — zerá-lo travaria o follow da câmera
+      // depois do 1º ciclo de bloqueio (o onMapReady não re-dispara sem remontar).
       setAppActive(nowActive);
-      if (!nowActive) liveMapReadyRef.current = false;
       if (nowActive && !wasActive) {
         // Rehidrata/religa a sessão (idempotente) e recentra uma única vez, no
         // frame seguinte (dá tempo do mapa reanexar a superfície nativa).
@@ -1702,11 +1703,21 @@ const CyclingScreen: React.FC = () => {
           "Ative a localização em segundo plano",
           "Para o treino não parar com a tela bloqueada, defina a localização do MOVT como \"Permitir o tempo todo\" nos ajustes do app.",
           [
-            { text: "Agora não", style: "cancel" },
+            { text: "Continuar mesmo assim", style: "cancel" },
             { text: "Abrir ajustes", onPress: () => Linking.openSettings() },
           ]
         );
       }
+    } else if (Platform.OS === "ios" && res.backgroundGranted === false) {
+      // iOS: sem "Sempre", o GPS para com a tela bloqueada — tempo continua, rota fura.
+      Alert.alert(
+        "Ative Localização → Sempre",
+        "Com a tela bloqueada o iPhone só entrega GPS se o MOVT estiver em \"Sempre\". Sem isso o tempo corre, mas a rota fica com buracos. Em Ajustes → MOVT → Localização, escolha Sempre.",
+        [
+          { text: "Continuar mesmo assim", style: "cancel" },
+          { text: "Abrir ajustes", onPress: () => Linking.openSettings() },
+        ]
+      );
     }
   };
 
@@ -1971,12 +1982,16 @@ const CyclingScreen: React.FC = () => {
       {isTracking && isToday ? (
         // ─── Tela cheia de treino ativo (estilo Strava) ───────────────────────
         <View style={styles.immersive}>
-          {appActive ? (
+          {/* MAPA SEMPRE MONTADO — NÃO desmontar em background (New Architecture).
+              Na New Arch (Fabric) + react-native-maps, DESMONTAR o MapView na
+              transição para background é o GATILHO do crash NATIVO de teardown.
+              Em background desligamos apenas o ponto azul nativo
+              (showsUserLocation={appActive}). O tracking segue no serviço. */}
           <MapView
             ref={liveMapRef}
             provider={MAP_PROVIDER}
             style={StyleSheet.absoluteFillObject}
-            showsUserLocation
+            showsUserLocation={appActive}
             showsMyLocationButton={false}
             onMapReady={() => {
               liveMapReadyRef.current = true;
@@ -2010,14 +2025,6 @@ const CyclingScreen: React.FC = () => {
               ) : null
             )}
           </MapView>
-          ) : (
-            // App fora de foreground (tela bloqueada / outro app): desmonta o mapa.
-            // O MapView não pode receber updates com a superfície GL destruída pelo
-            // SO — desmontar elimina o crash nativo. O tracking continua no serviço
-            // (GPS + tempo por relógio de parede); ao voltar, o mapa remonta já
-            // centrado na posição atual (initialRegion usa o último fix).
-            <View style={[StyleSheet.absoluteFillObject, { backgroundColor: "#0B1220" }]} />
-          )}
 
           {/* Topo: minimizar (treino segue) + modalidade + badge Pausado */}
           <SafeAreaView edges={["top"]} style={styles.immTopSafe} pointerEvents="box-none">
@@ -2165,12 +2172,12 @@ const CyclingScreen: React.FC = () => {
           showsVerticalScrollIndicator={false}
         >
           <View style={styles.mapContainer}>
-            {appActive ? (
+            {/* MAPA SEMPRE MONTADO — ver nota no mapa imersivo. */}
             <MapView
               ref={liveMapRef}
               provider={MAP_PROVIDER}
               style={styles.map}
-              showsUserLocation
+              showsUserLocation={appActive}
               showsMyLocationButton={false}
               followsUserLocation={false}
               onMapReady={() => {
@@ -2205,11 +2212,6 @@ const CyclingScreen: React.FC = () => {
                 ) : null
               )}
             </MapView>
-            ) : (
-              // App fora de foreground: desmonta o mapa (evita crash nativo numa
-              // superfície GL destruída). Remonta ao voltar ao foreground.
-              <View style={[styles.map, { backgroundColor: "#0B1220" }]} />
-            )}
 
             <View style={styles.hudOverlay}>
               <View style={styles.hudGrid}>
