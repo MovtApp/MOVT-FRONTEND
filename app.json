@@ -28,6 +28,7 @@
         ],
         "NSLocationWhenInUseUsageDescription": "Este aplicativo precisa de acesso à sua localização para mostrar você no mapa e rastrear atividades de ciclismo.",
         "NSLocationAlwaysAndWhenInUseUsageDescription": "Este aplicativo precisa de acesso à localização em segundo plano para rastrear suas rotas de exercício.",
+        "NSLocationAlwaysUsageDescription": "Este aplicativo precisa de acesso à localização em segundo plano para rastrear suas rotas de corrida e ciclismo mesmo com a tela apagada.",
         "NSHealthShareUsageDescription": "Este aplicativo precisa de acesso aos seus dados de saúde para mostrar seu progresso fitness.",
         "NSHealthUpdateUsageDescription": "Este aplicativo precisa registrar seus dados de saúde para rastrear suas atividades.",
         "NSMotionUsageDescription": "Este aplicativo usa os sensores de movimento para contar seus passos e medir suas atividades físicas.",
@@ -82,6 +83,8 @@
         "expo-location",
         {
           "locationAlwaysAndWhenInUsePermission": "Este aplicativo precisa de acesso à localização em segundo plano para rastrear suas rotas de corrida e ciclismo mesmo com a tela apagada.",
+          "locationAlwaysPermission": "Este aplicativo precisa de acesso à localização em segundo plano para rastrear suas rotas de corrida e ciclismo mesmo com a tela apagada.",
+          "isIosBackgroundLocationEnabled": true,
           "isAndroidBackgroundLocationEnabled": true,
           "isAndroidForegroundServiceEnabled": true
         }

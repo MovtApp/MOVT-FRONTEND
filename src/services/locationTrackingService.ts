@@ -740,6 +740,11 @@ export async function hasActiveSession(): Promise<{ active: boolean; type?: Work
 let bgGranted = false;
 let lastNotifTs = 0;
 const NOTIF_UPDATE_MS = 2000;
+// Com a tela bloqueada, atualizar Live Activity/FGS a cada 2s + map-matching
+// estoura o budget de background do iOS e o SO PARA de entregar GPS. Em
+// background usamos um throttle bem mais folgado; o traçado continua denso
+// (processFix + persist a cada lote).
+const NOTIF_BG_UPDATE_MS = 10000;
 // iOS Live Activity: push de pace/distância a cada 1 s enquanto o JS está vivo.
 // O TEMPO no card tiqueia nativamente (Text timerInterval) — este ticker só
 // mantém as outras métricas frescas (pace muda com o elapsed mesmo sem GPS).
@@ -798,7 +803,8 @@ function liveActivityData(): LiveActivityData {
 function pushWorkoutStatus(force = false) {
   if (!session?.active) return;
   const now = Date.now();
-  if (!force && now - lastNotifTs < NOTIF_UPDATE_MS) return;
+  const throttle = appActive ? NOTIF_UPDATE_MS : NOTIF_BG_UPDATE_MS;
+  if (!force && now - lastNotifTs < throttle) return;
   lastNotifTs = now;
   // Android: card ao vivo no nosso FGS (só no modo nosso-FGS).
   if (bgGranted) {
@@ -829,6 +835,10 @@ function buildOptions(type: WorkoutKind): Location.LocationTaskOptions {
     pausesUpdatesAutomatically: false,
     activityType: Location.ActivityType.Fitness,
     showsBackgroundLocationIndicator: true,
+    // iOS: sem deferral — entrega o mais contínuo possível com a tela apagada
+    // (batching agressivo é o que abre “buracos” no traçado).
+    deferredUpdatesInterval: 0,
+    deferredUpdatesDistance: 0,
   };
   // Inclui o FGS do expo-location quando (a) não há background concedido — exigido
   // p/ as updates seguirem e evita o throw de background-permission — OU (b) o modo
@@ -925,6 +935,21 @@ function handleAppStateChange(next: AppStateStatus) {
         distanceKm: Number(session.distanceKm.toFixed(3)),
       },
     });
+    // Para o ticker de 1s (Live Activity) — em background ele só desperdiça
+    // budget do iOS. O card continua atualizando via a task de GPS (throttle BG).
+    stopLiveActivityTicker();
+    stopHrPolling();
+    // Persiste já (se o processo morrer, a rota até aqui sobrevive).
+    persist(true);
+    // Garante que o pipeline de location updates ainda está armado.
+    Location.hasStartedLocationUpdatesAsync(LOCATION_TASK)
+      .then((started) => {
+        if (!started && session?.active) {
+          return rearmLocationUpdates("enter-background-not-started");
+        }
+        return undefined;
+      })
+      .catch(() => {});
   }
 
   if (appActive && !wasActive && session?.active) {
@@ -950,6 +975,13 @@ function handleAppStateChange(next: AppStateStatus) {
     }
     // Retoma a leitura de FC (foi ignorada em background).
     startHrPolling();
+    // Religa ticker de métricas da Live Activity.
+    if (!session.isPaused) startLiveActivityTicker();
+    // Empurra o snapshot acumulado em background (a task não notificou a UI).
+    notify();
+    pushWorkoutStatus(true);
+    // Map-matching ficou pausado em background — tenta um snap agora.
+    maybeSnapLive();
   }
 }
 AppState.addEventListener("change", handleAppStateChange);
@@ -1223,11 +1255,14 @@ TaskManager.defineTask(LOCATION_TASK, async ({ data, error }) => {
   }
 
   await persist();
-  notify();
-  // Status ao vivo na tela de bloqueio (throttled): card do FGS (Android) e Live
-  // Activity (iOS). É o que mantém km/tempo/pace atualizados mesmo com a tela
-  // bloqueada / app em background.
-  pushWorkoutStatus();
-  // Map-matching ao vivo (não-bloqueante, throttled internamente).
-  maybeSnapLive();
+  // Em background: NÃO notifica a UI React (trabalho inútil) e NÃO dispara
+  // map-matching (rede) — isso estoura o budget do iOS e o SO corta o GPS.
+  // Só persiste a rota + atualiza o card (throttle folgado).
+  if (appActive) {
+    notify();
+    pushWorkoutStatus();
+    maybeSnapLive();
+  } else {
+    pushWorkoutStatus();
+  }
 });
