@@ -115,6 +115,10 @@ const DEFAULT_ACCURACY_M = 20;
 // a "deriva" do GPS parado.
 const MIN_SEGMENT_M = 2;
 const SEGMENT_ACCURACY_FACTOR = 0.5;
+// Acima desta velocidade (m/s ≈ caminhada leve) o gate NÃO infla com a acurácia —
+// evita o "buraco" entre o ponto azul e a polyline enquanto a pessoa se move.
+const MOVING_SPEED_MS = 0.6;
+const MIN_SEGMENT_MOVING_M = 2.5;
 // Acima de MAX_SPEED_MS·este fator entre fixes = salto impossível → descarta.
 const OUTLIER_SPEED_FACTOR = 1.5;
 // Silêncio máximo (s) tolerado entre dois fixes ACEITOS. Acima disso, assumimos
@@ -176,6 +180,12 @@ export interface TrackingSnapshot {
   watchPresent: boolean;
   isPaused: boolean;
   lastLocation: LatLng | null;
+  /**
+   * Cabeça ao vivo do traçado (último ponto aceito pelo Kalman). A UI liga
+   * `lastRegPoint` → `liveTrailHead` para a polyline acompanhar o usuário sem
+   * esperar o gate de distância — sem somar km fantasma.
+   */
+  liveTrailHead: LatLng | null;
 }
 
 /** Estado interno mutável da sessão (também o que é persistido). */
@@ -215,6 +225,8 @@ interface Session {
   lastFixTs: number; // domínio location.timestamp (p/ deltaSeconds)
   lastSplitKm: number;
   lastLocation: LatLng | null;
+  /** Posição Kalman atual — cabeça visual da polyline (não conta km). */
+  liveTrailHead: LatLng | null;
   // Estado do filtro de Kalman (suavização do traçado). Serializável → sobrevive
   // à persistência/rehidratação. null até o primeiro fix válido.
   kf: KalmanState | null;
@@ -354,8 +366,10 @@ function processFix(loc: Location.LocationObject) {
   const acc = typeof accuracy === "number" && accuracy > 0 ? accuracy : DEFAULT_ACCURACY_M;
   const accLimit = appActive ? MAX_ACCURACY_M : MAX_ACCURACY_BG_M;
 
-  // Fix ruidoso demais: não entra no traçado (mas já moveu o marcador acima).
+  // Fix ruidoso demais: não entra no traçado oficial, mas a cabeça ao vivo
+  // acompanha o cru para a polyline não “sumir” atrás do ponto azul.
   if (acc > accLimit) {
+    session.liveTrailHead = { latitude, longitude, timestamp: ts, accuracy: acc };
     const now = Date.now();
     if (now - lastAccRejectTs >= ACC_REJECT_BREADCRUMB_MS) {
       lastAccRejectTs = now;
@@ -390,7 +404,11 @@ function processFix(loc: Location.LocationObject) {
     if (dtRaw > 0) {
       const rawDist = haversineMeters(session.kf.lat, session.kf.lng, latitude, longitude);
       const rawSpeed = rawDist / dtRaw;
-      if (rawSpeed > MAX_SPEED_MS[session.type] * OUTLIER_SPEED_FACTOR && acc > 10) return;
+      if (rawSpeed > MAX_SPEED_MS[session.type] * OUTLIER_SPEED_FACTOR && acc > 10) {
+        // Mantém a cabeça ao vivo no cru — a rota oficial não teleporta.
+        session.liveTrailHead = { latitude, longitude, timestamp: ts, accuracy: acc };
+        return;
+      }
       measuredSpeedMs = rawSpeed;
     }
   }
@@ -405,10 +423,16 @@ function processFix(loc: Location.LocationObject) {
   const fLat = session.kf.lat;
   const fLng = session.kf.lng;
 
+  // Cabeça ao vivo: posição filtrada atual. A UI desenha lastReg → liveTrailHead
+  // para a polyline acompanhar o usuário (e atravessar silêncios/gaps) sem
+  // esperar o gate de registro. Não conta distância.
+  session.liveTrailHead = { latitude: fLat, longitude: fLng, timestamp: ts, accuracy: acc };
+
   // Gap break (só quando já havia um trecho em andamento): recomeça aqui. Não soma
   // distância nem velocidade do salto, marca o ponto com `gap:true` para a polyline
   // quebrar, e reancora tudo neste fix. O tempo decorrido NÃO é afetado (relógio de
   // parede). Sem isso, um congelamento viraria uma reta de vários km com pace falso.
+  // A cabeça ao vivo (acima) já liga visualmente o último trecho ao usuário.
   if (isGapBreak && session.lastRegPoint) {
     session.currentSpeedMs = 0;
     session.lastPoint = { latitude: fLat, longitude: fLng };
@@ -464,15 +488,22 @@ function processFix(loc: Location.LocationObject) {
   // retomar o primeiro segmento seja medido a partir de onde parou (sem "salto").
   if (session.isPaused) return;
 
-  // Distância/rota: medida contra a última âncora REGISTRADA, com gate
-  // proporcional à acurácia → mata a deriva do GPS parado sem perder a forma.
+  // Distância/rota: medida contra a última âncora REGISTRADA.
+  // Em movimento claro: limiar baixo fixo (não infla com accuracy) — fecha o
+  // buraco visual entre ponto azul e polyline. Quase parado: gate proporcianal
+  // à acurácia para matar deriva do GPS.
   const regSegmentM = haversineMeters(
     session.lastRegPoint.latitude,
     session.lastRegPoint.longitude,
     fLat,
     fLng
   );
-  const distThreshold = Math.max(MIN_SEGMENT_M, acc * SEGMENT_ACCURACY_FACTOR);
+  const moving =
+    session.currentSpeedMs >= MOVING_SPEED_MS ||
+    (typeof speed === "number" && isFinite(speed) && speed >= MOVING_SPEED_MS);
+  const distThreshold = moving
+    ? MIN_SEGMENT_MOVING_M
+    : Math.max(MIN_SEGMENT_M, acc * SEGMENT_ACCURACY_FACTOR);
   if (regSegmentM > distThreshold) {
     // Filtro de "ré"/spike: descarta o ponto se ele inverte bruscamente a direção
     // do último segmento (cosseno < -0.5, ~>120°) com avanço curto (< 8 m) — padrão
@@ -588,6 +619,7 @@ async function ensureHydrated() {
         if (typeof parsed.watchPresent !== "boolean") parsed.watchPresent = false;
         if (typeof parsed.lastAltitude !== "number") parsed.lastAltitude = null;
         if (typeof parsed.backgroundGranted !== "boolean") parsed.backgroundGranted = false;
+        if (!parsed.liveTrailHead) parsed.liveTrailHead = parsed.lastPoint ?? null;
         bgGranted = parsed.backgroundGranted;
         session = parsed;
       }
@@ -619,6 +651,7 @@ function emptySnapshot(): TrackingSnapshot {
     watchPresent: false,
     isPaused: false,
     lastLocation: null,
+    liveTrailHead: null,
   };
 }
 
@@ -641,6 +674,7 @@ export function getSnapshot(): TrackingSnapshot {
     watchPresent: session.watchPresent,
     isPaused: session.isPaused,
     lastLocation: session.lastLocation,
+    liveTrailHead: session.liveTrailHead,
   };
 }
 
@@ -1000,6 +1034,7 @@ export async function startTracking(type: WorkoutKind): Promise<StartResult> {
     lastFixTs: 0,
     lastSplitKm: 0,
     lastLocation: null,
+    liveTrailHead: null,
     kf: null,
     backgroundGranted,
   };

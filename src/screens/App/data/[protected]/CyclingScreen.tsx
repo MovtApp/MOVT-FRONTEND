@@ -1900,6 +1900,20 @@ const CyclingScreen: React.FC = () => {
     [displayRoute]
   );
 
+  // Cabeça ao vivo: liga o fim do último trecho → liveTrailHead para a polyline
+  // acompanhar o usuário sem esperar o gate de distância (e atravessar gaps).
+  const liveHeadSegment = useMemo(() => {
+    const head = snap.liveTrailHead;
+    if (!isTracking || !head || !isValidLatLng(head)) return null;
+    const lastSeg = displaySegments[displaySegments.length - 1];
+    const anchor = lastSeg?.[lastSeg.length - 1] ?? safeRoute[safeRoute.length - 1];
+    if (!anchor || !isValidLatLng(anchor)) return null;
+    const dLat = Math.abs(anchor.latitude - head.latitude);
+    const dLng = Math.abs(anchor.longitude - head.longitude);
+    if (dLat < 1e-6 && dLng < 1e-6) return null;
+    return [anchor, head];
+  }, [snap.liveTrailHead, isTracking, displaySegments, safeRoute]);
+
   // Posição "ao vivo": último fix do treino em andamento, ou a posição conhecida
   // ao abrir a tela (antes de iniciar).
   const liveLatLng = snap.lastLocation || initialCenter;
@@ -2024,6 +2038,15 @@ const CyclingScreen: React.FC = () => {
                 />
               ) : null
             )}
+            {liveHeadSegment ? (
+              <Polyline
+                coordinates={liveHeadSegment}
+                strokeColor={activeTab === "Ciclismo" ? "#3B82F6" : "#10B981"}
+                strokeWidth={5}
+                lineCap="round"
+                lineJoin="round"
+              />
+            ) : null}
           </MapView>
 
           {/* Topo: minimizar (treino segue) + modalidade + badge Pausado */}
@@ -2211,6 +2234,15 @@ const CyclingScreen: React.FC = () => {
                   />
                 ) : null
               )}
+              {liveHeadSegment ? (
+                <Polyline
+                  coordinates={liveHeadSegment}
+                  strokeColor={activeTab === "Ciclismo" ? "#3B82F6" : "#10B981"}
+                  strokeWidth={4}
+                  lineCap="round"
+                  lineJoin="round"
+                />
+              ) : null}
             </MapView>
 
             <View style={styles.hudOverlay}>
