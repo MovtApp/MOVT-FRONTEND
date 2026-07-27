@@ -79,6 +79,7 @@ import {
   type ShareVariant,
 } from "../../../../services/shareWorkoutService";
 import { toastInfo, toastError, notifyApiError } from "../../../../utils/notify";
+import { CYCLING_ENABLED } from "../../../../config/featureFlags";
 import {
   WorkoutRecord,
   WorkoutType,
@@ -523,14 +524,19 @@ const WorkoutDetail: React.FC<WorkoutDetailProps> = ({
       return;
     }
     setSharing(true);
-    toastInfo("Gerando imagens do treino…");
+    toastInfo(
+      workout.serverId && workout.shareCards?.cards
+        ? "Abrindo imagens do treino…"
+        : "Gerando imagens do treino…"
+    );
     try {
-      const uris = await generateWorkoutCards({
+      const { uris } = await generateWorkoutCards({
         route: safeRoute,
         type: workout.type,
         title: workout.type,
         subtitle: formatDate(workout.date),
         variants: buildVariants(),
+        workoutId: workout.serverId ?? null,
       });
       setPreviewUris(uris);
       setPageIndex(0);
@@ -583,6 +589,8 @@ const WorkoutDetail: React.FC<WorkoutDetailProps> = ({
         stats: variant.stats,
         layout: variant.layout,
         format: "stories",
+        workoutId: workout.serverId ?? null,
+        variantIndex: pageIndex,
       });
       await shareWorkoutStory(uri);
     } catch (e) {
@@ -627,6 +635,8 @@ const WorkoutDetail: React.FC<WorkoutDetailProps> = ({
         stats: variant.stats,
         layout: variant.layout,
         format: "square",
+        workoutId: workout.serverId ?? null,
+        variantIndex: pageIndex,
       });
       // Fecha o Modal (RN) do preview ANTES de abrir o bottom-sheet, senão o
       // editor abriria por trás do Modal nativo.
@@ -1447,7 +1457,9 @@ const CyclingScreen: React.FC = () => {
     );
   }, [routeDate]);
 
-  const [activeTab, setActiveTab] = useState<"Ciclismo" | "Corrida" | "Maratona">("Ciclismo");
+  const [activeTab, setActiveTab] = useState<"Ciclismo" | "Corrida" | "Maratona">(
+    CYCLING_ENABLED ? "Ciclismo" : "Corrida"
+  );
   const bottomSheetRef = useRef<BottomSheet>(null);
   const snapPoints = useMemo(() => ["50%", "92%"], []);
 
@@ -2169,25 +2181,30 @@ const CyclingScreen: React.FC = () => {
           </TouchableOpacity>
         </View>
 
-        <View style={styles.tabsContainer}>
-          <View style={styles.tabSelector}>
-            {["Ciclismo", "Corrida"].map((tab) => (
-              <TouchableOpacity
-                key={tab}
-                onPress={() => setActiveTab(tab as any)}
-                style={[
-                  styles.tab,
-                  activeTab === tab && {
-                    backgroundColor: activeTab === "Ciclismo" ? "#3B82F6" : "#10B981",
-                  },
-                ]}
-                disabled={isTracking}
-              >
-                <Text style={[styles.tabText, activeTab === tab && { color: "#FFF" }]}>{tab}</Text>
-              </TouchableOpacity>
-            ))}
+        {/* Seletor Ciclismo/Corrida: só aparece com ciclismo habilitado (ou
+            sessão ativa de ciclismo restaurada). Com CYCLING_ENABLED=false a
+            tela é só Corrida — sem botão de modalidade. */}
+        {(CYCLING_ENABLED || (isTracking && snap.type === "Ciclismo")) && (
+          <View style={styles.tabsContainer}>
+            <View style={styles.tabSelector}>
+              {(["Ciclismo", "Corrida"] as const).map((tab) => (
+                <TouchableOpacity
+                  key={tab}
+                  onPress={() => setActiveTab(tab as any)}
+                  style={[
+                    styles.tab,
+                    activeTab === tab && {
+                      backgroundColor: activeTab === "Ciclismo" ? "#3B82F6" : "#10B981",
+                    },
+                  ]}
+                  disabled={isTracking}
+                >
+                  <Text style={[styles.tabText, activeTab === tab && { color: "#FFF" }]}>{tab}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
           </View>
-        </View>
+        )}
 
         <ScrollView
           style={styles.scrollView}

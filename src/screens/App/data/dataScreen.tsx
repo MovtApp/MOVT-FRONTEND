@@ -32,6 +32,7 @@ import {
 } from "lucide-react-native";
 import { useAuth } from "../../../contexts/AuthContext";
 import { usePlanAccess } from "@hooks/usePlanAccess";
+import { CYCLING_ENABLED } from "../../../config/featureFlags";
 import ECGDisplay from "../../../components/ECGDisplay";
 import MiniRadarChart, { RadarData } from "../../../components/MiniRadarChart";
 import WaterWave from "../../../components/WaterWave";
@@ -813,7 +814,7 @@ const DataContent: React.FC<DataContentProps> = ({ userId, targetDate, navigatio
         </TouchableOpacity>
       </View>
 
-      {/* Cycling Map Card */}
+      {/* GPS Performance Card — CyclingScreen serve Corrida (+ Ciclismo se flag on) */}
       <TouchableOpacity
         activeOpacity={0.9}
         style={styles.cyclingCard}
@@ -823,9 +824,15 @@ const DataContent: React.FC<DataContentProps> = ({ userId, targetDate, navigatio
       >
         <View style={styles.cyclingHeader}>
           <View style={styles.cyclingIconBox}>
-            <Bike size={20} color="#111827" />
+            {CYCLING_ENABLED ? (
+              <Bike size={20} color="#111827" />
+            ) : (
+              <Footprints size={20} color="#111827" />
+            )}
           </View>
-          <Text style={styles.cyclingTitle}>Atividade de Ciclismo</Text>
+          <Text style={styles.cyclingTitle}>
+            {CYCLING_ENABLED ? "Atividade de Ciclismo" : "Atividade de Corrida"}
+          </Text>
         </View>
 
         <View style={styles.mapContainer}>

@@ -82,8 +82,9 @@ const EditProfileScreen = () => {
 
       if (!result.canceled) {
         setLoadingUpdate(true);
-        const imageUri = result.assets[0].uri;
-        const response = await userService.updateAvatar(imageUri);
+        const asset = result.assets[0];
+        const imageUri = asset.uri;
+        const response = await userService.updateAvatar(imageUri, asset.mimeType);
         if (response.success || response.avatar_url || response.photo) {
           const newPhoto =
             response.data?.avatar_url ||
@@ -96,7 +97,14 @@ const EditProfileScreen = () => {
         }
       }
     } catch (error: any) {
-      Alert.alert("Erro", "Não foi possível atualizar a imagem.");
+      const apiMsg =
+        error?.response?.data?.error || error?.response?.data?.message || error?.message;
+      Alert.alert(
+        "Erro",
+        apiMsg
+          ? `Não foi possível atualizar a imagem: ${apiMsg}`
+          : "Não foi possível atualizar a imagem."
+      );
     } finally {
       setLoadingUpdate(false);
     }
@@ -113,8 +121,9 @@ const EditProfileScreen = () => {
 
       if (!result.canceled) {
         setLoadingUpdate(true);
-        const imageUri = result.assets[0].uri;
-        const response = await userService.updateBanner(imageUri);
+        const asset = result.assets[0];
+        const imageUri = asset.uri;
+        const response = await userService.updateBanner(imageUri, asset.mimeType);
 
         if (response.success || response.banner || response.banner_url) {
           const newBanner =
@@ -128,7 +137,14 @@ const EditProfileScreen = () => {
         }
       }
     } catch (error: any) {
-      Alert.alert("Erro", "Não foi possível atualizar o banner.");
+      const apiMsg =
+        error?.response?.data?.error || error?.response?.data?.message || error?.message;
+      Alert.alert(
+        "Erro",
+        apiMsg
+          ? `Não foi possível atualizar o banner: ${apiMsg}`
+          : "Não foi possível atualizar o banner."
+      );
     } finally {
       setLoadingUpdate(false);
     }

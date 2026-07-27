@@ -29,7 +29,7 @@ export const useUpgradeSheet = () => useContext(UpgradeSheetContext);
 
 const BENEFITS = [
   "Treinos e dietas ilimitados",
-  "Todos os dados de saúde (batimentos, sono, ciclismo)",
+  "Todos os dados de saúde (batimentos, sono, corrida)",
   "Desafios e comparativo Expectativa x Realidade",
   "Agendamentos e comunidades sem limite",
   "Sem anúncios ou interrupções",

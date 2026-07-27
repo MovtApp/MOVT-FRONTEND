@@ -2,13 +2,10 @@
  * shareWorkoutService — compartilhamento do CARD de treino (estilo Strava).
  *
  * O servidor (movt-backend, POST /api/route/share-card) gera a imagem pronta:
- * o mapa real com a rota desenhada + os números do treino e a marca MOVT. Aqui
- * baixamos o PNG (base64) e gravamos num arquivo temporário (generateWorkoutCard);
- * a UI mostra esse arquivo numa tela de preview e, ao confirmar, abre o menu
- * nativo de compartilhamento (shareImageFile) — Instagram, WhatsApp, Stories, etc.
- *
- * Mantemos a Mapbox e a composição da imagem 100% no backend — sem rebuild
- * nativo (nada de capturar o MapView, que sai preto no Android).
+ * o mapa real com a rota desenhada + os números do treino e a marca MOVT. Com
+ * `workoutId`, o backend persiste os PNGs no Storage e nas próximas vezes
+ * devolve URLs em cache (sem novo Mapbox). Aqui materializamos base64/URL num
+ * arquivo local (preview + share nativo).
  */
 import * as FileSystem from "expo-file-system/legacy";
 import * as Sharing from "expo-sharing";
@@ -37,6 +34,10 @@ export interface ShareWorkoutInput {
   layout?: CardLayout;
   /** Formato da imagem (default: feed 4:5; stories = 9:16). */
   format?: CardFormat;
+  /** id em user_workouts — habilita cache persistente no backend. */
+  workoutId?: number | null;
+  /** Índice da variante no carrossel (Stories / square). */
+  variantIndex?: number;
 }
 
 /** Uma variante do card (layout + as 3 stats daquele card). */
@@ -51,53 +52,90 @@ export interface ShareWorkoutCardsInput {
   title: string;
   subtitle: string;
   variants: ShareVariant[];
+  workoutId?: number | null;
+  format?: CardFormat;
 }
 
-/**
- * Gera o card no backend e grava o PNG num arquivo temporário local.
- * Retorna o URI do arquivo (para exibir no preview e depois compartilhar).
- * Lança em caso de falha (rede/sem rota) — o caller mostra o feedback via notify.
- */
-export async function generateWorkoutCard(input: ShareWorkoutInput): Promise<string> {
-  const res = await api.post("/route/share-card", input);
-  const base64: string | undefined = res.data?.image;
-  if (!base64) throw new Error("Não foi possível gerar a imagem do treino.");
+export interface ShareCardsDoc {
+  updatedAt?: string | null;
+  cards?: Record<string, string>;
+}
 
-  const uri = `${FileSystem.cacheDirectory}movt-treino-${Date.now()}.png`;
+async function writeBase64Png(base64: string, name: string): Promise<string> {
+  const uri = `${FileSystem.cacheDirectory}${name}`;
   await FileSystem.writeAsStringAsync(uri, base64, {
     encoding: FileSystem.EncodingType.Base64,
   });
   return uri;
 }
 
+async function downloadPng(url: string, name: string): Promise<string> {
+  const uri = `${FileSystem.cacheDirectory}${name}`;
+  const result = await FileSystem.downloadAsync(url, uri);
+  return result.uri;
+}
+
 /**
- * Gera VÁRIOS cards de uma vez (carrossel) num único request — o backend baixa o
- * mapa só uma vez e compõe todas as variantes. Grava cada PNG num arquivo e
- * retorna os URIs na mesma ordem das variantes.
+ * Gera o card no backend e grava o PNG num arquivo temporário local.
+ * Retorna o URI do arquivo (para exibir no preview e depois compartilhar).
  */
-export async function generateWorkoutCards(input: ShareWorkoutCardsInput): Promise<string[]> {
+export async function generateWorkoutCard(input: ShareWorkoutInput): Promise<string> {
   const res = await api.post("/route/share-card", input);
+  const stamp = Date.now();
+  const name = `movt-treino-${stamp}.png`;
+
+  if (res.data?.url && typeof res.data.url === "string") {
+    return downloadPng(res.data.url, name);
+  }
+
+  const base64: string | undefined = res.data?.image;
+  if (!base64) throw new Error("Não foi possível gerar a imagem do treino.");
+  return writeBase64Png(base64, name);
+}
+
+export interface GenerateWorkoutCardsResult {
+  uris: string[];
+  cached: boolean;
+  shareCards?: ShareCardsDoc;
+}
+
+/**
+ * Gera VÁRIOS cards (carrossel). Com workoutId, o backend reusa PNGs salvos.
+ */
+export async function generateWorkoutCards(
+  input: ShareWorkoutCardsInput
+): Promise<GenerateWorkoutCardsResult> {
+  const res = await api.post("/route/share-card", {
+    ...input,
+    format: input.format || "feed",
+  });
+  const stamp = Date.now();
+  const cached = !!res.data?.cached;
+  const shareCards = res.data?.shareCards as ShareCardsDoc | undefined;
+
+  const urls: string[] | undefined = Array.isArray(res.data?.urls) ? res.data.urls : undefined;
+  if (urls && urls.length > 0) {
+    const uris: string[] = [];
+    for (let i = 0; i < urls.length; i++) {
+      uris.push(await downloadPng(urls[i], `movt-treino-${stamp}-${i}.png`));
+    }
+    return { uris, cached, shareCards };
+  }
+
   const images: string[] | undefined = res.data?.images;
   if (!Array.isArray(images) || images.length === 0) {
     throw new Error("Não foi possível gerar as imagens do treino.");
   }
-  const stamp = Date.now();
   const uris: string[] = [];
   for (let i = 0; i < images.length; i++) {
-    const uri = `${FileSystem.cacheDirectory}movt-treino-${stamp}-${i}.png`;
-    await FileSystem.writeAsStringAsync(uri, images[i], {
-      encoding: FileSystem.EncodingType.Base64,
-    });
-    uris.push(uri);
+    uris.push(await writeBase64Png(images[i], `movt-treino-${stamp}-${i}.png`));
   }
-  return uris;
+  return { uris, cached, shareCards };
 }
 
 /**
  * Gera o card e o SOBE pelo backend (service_role), devolvendo a URL pública —
- * usado para PUBLICAR no feed do MOVT. O upload é server-side de propósito: a
- * RLS do Storage barra uploads client-side de usuários sem sessão Supabase
- * (login por e-mail/senha). O caller passa a URL direto pro POST /user/posts.
+ * usado para PUBLICAR no feed do MOVT. Com workoutId, reusa URL em cache.
  */
 export async function uploadWorkoutPostImage(input: ShareWorkoutInput): Promise<string> {
   const res = await api.post("/route/share-card", { ...input, upload: true });
@@ -141,8 +179,6 @@ export function isInstagramStoriesConfigured(): boolean {
 
 /**
  * Abre o Instagram direto na tela de Stories com a imagem como fundo.
- * Requer o Facebook/Meta App ID (source_application). Lança se não configurado
- * ou se o Instagram não estiver instalado — o caller mostra o feedback.
  */
 export async function shareWorkoutStory(uri: string): Promise<void> {
   const appId = getFacebookAppId();

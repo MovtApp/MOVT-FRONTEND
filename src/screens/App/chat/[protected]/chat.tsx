@@ -170,6 +170,12 @@ const Chat = () => {
   }, [messages, markAsRead, effectiveUserId]);
 
   useLayoutEffect(() => {
+    // iOS: nav bar nativo ~44pt de conteúdo — BackButton (46) e avatar (40) ficam apertados.
+    // Sobe a altura útil e centraliza verticalmente os containers, sem alterar
+    // as estilizações já definidas de back / título / avatar.
+    const iosHeaderContentHeight = 58;
+    const iosHeaderHeight = insets.top + iosHeaderContentHeight;
+
     navigation.setOptions({
       headerShown: true,
       headerStyle: {
@@ -178,8 +184,28 @@ const Chat = () => {
         shadowOpacity: 0,
         borderBottomWidth: 1,
         borderBottomColor: "#f0f0f0",
+        ...(Platform.OS === "ios" ? { height: iosHeaderHeight } : null),
       },
       headerTitleAlign: "center",
+      ...(Platform.OS === "ios"
+        ? {
+            headerLeftContainerStyle: {
+              justifyContent: "center",
+              alignItems: "center",
+              height: iosHeaderContentHeight,
+            },
+            headerTitleContainerStyle: {
+              justifyContent: "center",
+              alignItems: "center",
+              height: iosHeaderContentHeight,
+            },
+            headerRightContainerStyle: {
+              justifyContent: "center",
+              alignItems: "center",
+              height: iosHeaderContentHeight,
+            },
+          }
+        : null),
       headerTitle: () => (
         <View style={{ alignItems: "center" }}>
           <Text style={styles.headerTitleText}>{participantName || "Chat"}</Text>
@@ -218,7 +244,7 @@ const Chat = () => {
         </TouchableOpacity>
       ),
     });
-  }, [navigation, participantName, participantAvatar, participantId, participantProfile, otherTyping]);
+  }, [navigation, participantName, participantAvatar, participantId, participantProfile, otherTyping, insets.top]);
 
   const onSend = useCallback(
     (newMessages: any[]) => {

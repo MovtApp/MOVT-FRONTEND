@@ -73,7 +73,15 @@ export interface CommunityManagementSheetRef {
 
 type ViewMode = "list" | "form";
 
-const INITIAL_CATEGORIES = ["Corrida", "Funcional", "Yoga", "Ciclismo", "Outros"];
+import { CYCLING_ENABLED } from "../../../../../config/featureFlags";
+
+const INITIAL_CATEGORIES = [
+  "Corrida",
+  "Funcional",
+  "Yoga",
+  ...(CYCLING_ENABLED ? (["Ciclismo"] as const) : []),
+  "Outros",
+];
 
 const CommunityManagementSheet = forwardRef<
   CommunityManagementSheetRef,

@@ -14,6 +14,20 @@ const getAuthHeaders = async () => {
   };
 };
 
+/** Normaliza mime do ImagePicker/iOS: `.jpg` vira `image/jpg`, rejeitado pelo backend. */
+const resolveImageMimetype = (imageUri: string, mimeHint?: string | null) => {
+  const raw = (mimeHint || "").toLowerCase().trim();
+  if (raw === "image/jpg" || raw === "image/jpeg") return "image/jpeg";
+  if (raw === "image/png" || raw === "image/webp") return raw;
+
+  const filename = imageUri.split("?")[0].split("/").pop() || "";
+  const ext = /\.(\w+)$/.exec(filename)?.[1]?.toLowerCase();
+  if (ext === "jpg" || ext === "jpeg") return "image/jpeg";
+  if (ext === "png") return "image/png";
+  if (ext === "webp") return "image/webp";
+  return "image/jpeg";
+};
+
 export const userService = {
   updateField: async (field: string, value: string) => {
     const headers = await getAuthHeaders();
@@ -21,7 +35,7 @@ export const userService = {
     return response.data;
   },
 
-  updateAvatar: async (imageUri: string) => {
+  updateAvatar: async (imageUri: string, mimeHint?: string | null) => {
     const headers = await getAuthHeaders();
 
     try {
@@ -30,9 +44,7 @@ export const userService = {
         encoding: "base64",
       });
 
-      const filename = imageUri.split("/").pop();
-      const match = /\.(\w+)$/.exec(filename || "");
-      const mimetype = match ? `image/${match[1]}` : `image/jpeg`;
+      const mimetype = resolveImageMimetype(imageUri, mimeHint);
 
       // 2. Enviar para o Back-end via JSON (Zero erros de Multipart ou RLS)
       const response = await api.put(
@@ -55,7 +67,7 @@ export const userService = {
     }
   },
 
-  updateBanner: async (imageUri: string) => {
+  updateBanner: async (imageUri: string, mimeHint?: string | null) => {
     const headers = await getAuthHeaders();
 
     try {
@@ -64,9 +76,7 @@ export const userService = {
         encoding: "base64",
       });
 
-      const filename = imageUri.split("/").pop();
-      const match = /\.(\w+)$/.exec(filename || "");
-      const mimetype = match ? `image/${match[1]}` : `image/jpeg`;
+      const mimetype = resolveImageMimetype(imageUri, mimeHint);
 
       // 2. Enviar para o Back-end
       const response = await api.put(

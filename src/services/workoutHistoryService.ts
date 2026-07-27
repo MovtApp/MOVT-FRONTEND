@@ -60,6 +60,8 @@ export interface WorkoutRecord {
   watchPresent?: boolean; // métrica: houve relógio entregando FC neste treino
   serverId?: number | null; // id no banco (user_workouts.id); null enquanto não sincronizado
   synced?: boolean; // true quando já confirmado no backend
+  /** Cache de URLs de cards de share (Mapbox) — espelho de user_workouts.share_cards */
+  shareCards?: { updatedAt?: string | null; cards?: Record<string, string> } | null;
 }
 
 /** Recordes pessoais do usuário, por tipo de atividade. */
@@ -131,6 +133,8 @@ function mapRowToRecord(row: any): WorkoutRecord {
     maxHr: row.hr_max != null ? Number(row.hr_max) : undefined,
     hrSeries: Array.isArray(row.hr_serie) ? row.hr_serie : undefined,
     watchPresent: typeof row.watch_present === "boolean" ? row.watch_present : undefined,
+    shareCards:
+      row.share_cards && typeof row.share_cards === "object" ? row.share_cards : undefined,
   };
 }
 

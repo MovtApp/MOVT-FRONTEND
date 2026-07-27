@@ -124,12 +124,12 @@
     ],
     "extra": {
       "eas": {
-        "projectId": "6edbc095-2229-4734-8443-27ec0ca14ee1",
+        "projectId": "2d73320b-52df-4407-83d5-c827a5a55f27",
         "versionSource": "local"
       },
       "facebookAppId": "997090909849852"
     },
     "updates": {},
-    "owner": "jvlima22"
+    "owner": "movtapp"
   }
 }

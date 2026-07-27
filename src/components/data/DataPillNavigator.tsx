@@ -5,6 +5,7 @@ import { useNavigation } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { AppStackParamList } from "../../@types/routes";
+import { CYCLING_ENABLED } from "../../config/featureFlags";
 
 type DataPillNavigatorProps = {
   currentScreen: keyof AppStackParamList;
@@ -16,7 +17,13 @@ const SCREEN_MAPPING = [
   { screen: "HeartbeatsScreen", icon: Heart, color: "#EF4444" },
   { screen: "WaterScreen", icon: Droplets, color: "#00BFFF" },
   { screen: "SleepScreen", icon: Moon, color: "#8B5CF6" },
-  { screen: "CyclingScreen", icon: Bike, color: "#10B981" },
+  // CyclingScreen = UI compartilhada Corrida + Ciclismo. Com ciclismo off,
+  // mantém o atalho (Corrida) com ícone de passadas em vez de bike.
+  {
+    screen: "CyclingScreen",
+    icon: CYCLING_ENABLED ? Bike : Footprints,
+    color: "#10B981",
+  },
 ];
 
 const DataPillNavigator: React.FC<DataPillNavigatorProps> = ({ currentScreen }) => {

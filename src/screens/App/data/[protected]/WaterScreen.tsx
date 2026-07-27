@@ -14,7 +14,7 @@ import {
   Platform,
 } from "react-native";
 
-import { SafeAreaView } from "react-native-safe-area-context";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { getHealthMetricData, saveHealthMetricData } from "../../../../services/caloriesService";
 import { notifyApiError } from "../../../../utils/notify";
@@ -74,6 +74,10 @@ class DataErrorBoundary extends React.Component<{ children: React.ReactNode }, E
   }
 }
 
+// Altura aproximada do DataPillNavigator (padding 10*2 + ícone 44).
+const DATA_PILL_HEIGHT = 64;
+const DATA_PILL_GAP = 24; // folga entre o botão ADD e o pill
+
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 
 const getTodayKey = (): string => {
@@ -106,6 +110,11 @@ const DATA_SCREENS: (keyof AppStackParamList)[] = [
 const WaterScreen: React.FC = () => {
   // ... [Inside WaterScreen component]
   const route = useRoute<any>();
+  const insets = useSafeAreaInsets();
+  // Espaço sob o card azul para o ADD ML ficar sempre ACIMA do DataPillNavigator
+  // (pill bottom = max(insets.bottom+10, 20) + altura do pill + folga).
+  const pillBottomOffset = Math.max(insets.bottom + 10, 20);
+  const addButtonClearance = pillBottomOffset + DATA_PILL_HEIGHT + DATA_PILL_GAP;
   const routeDate = (() => {
     try {
       const d = route.params?.date ? new Date(route.params.date) : new Date();
@@ -130,6 +139,7 @@ const WaterScreen: React.FC = () => {
   const cupMl = DEFAULT_CUP_ML;
 
   const [showConfetti, setShowConfetti] = useState<boolean>(false);
+  const [confettiKey, setConfettiKey] = useState<number>(0);
   const [showEditGoalModal, setShowEditGoalModal] = useState<boolean>(false);
   const [goalInputValue, setGoalInputValue] = useState<string>("");
 
@@ -139,7 +149,8 @@ const WaterScreen: React.FC = () => {
   const prevConsumedRef = useRef<number>(0);
   useEffect(() => {
     const prev = prevConsumedRef.current;
-    if (prev < goalMl && consumedMl >= goalMl) {
+    if (prev < goalMl && consumedMl >= goalMl && goalMl > 0) {
+      setConfettiKey((k) => k + 1);
       setShowConfetti(true);
     }
     prevConsumedRef.current = consumedMl;
@@ -150,12 +161,15 @@ const WaterScreen: React.FC = () => {
       try {
         const data = await getHealthMetricData("water", "1d", dateStr);
         if (data && data.data) {
-          setConsumedMl(data.totalCalories || 0);
+          const loaded = data.totalCalories || 0;
+          setConsumedMl(loaded);
+          prevConsumedRef.current = loaded;
           setGoalMl(data.dailyGoal || DEFAULT_GOAL_ML);
         }
       } catch (error) {
         console.error("Erro ao buscar dados de água:", error);
         setConsumedMl(0);
+        prevConsumedRef.current = 0;
       }
     };
     load();
@@ -177,6 +191,8 @@ const WaterScreen: React.FC = () => {
   };
 
   const handleReset = () => {
+    setShowConfetti(false);
+    prevConsumedRef.current = 0;
     setConsumedMl(0);
     persist(0);
   };
@@ -219,25 +235,18 @@ const WaterScreen: React.FC = () => {
     <DataErrorBoundary>
       <SafeAreaView style={styles.safeArea} edges={["top"]}>
         <View style={{ flex: 1 }}>
-          <ScrollView contentContainerStyle={styles.scrollContent}>
+          <ScrollView
+            contentContainerStyle={[
+              styles.scrollContent,
+              { paddingBottom: addButtonClearance + 40 },
+            ]}
+            showsVerticalScrollIndicator={false}
+          >
             <View style={styles.header}>
               <BackButton to={{ name: "DataScreen" }} />
               <Text style={styles.headerTitle}>Hidratação</Text>
               <View style={{ width: 46 }} />
             </View>
-
-            {showConfetti && (
-              <ConfettiCannon
-                key={`confetti-${consumedMl}`}
-                count={150}
-                origin={{ x: SCREEN_WIDTH / 2, y: -10 }}
-                fadeOut
-                autoStart
-                explosionSpeed={400}
-                fallSpeed={2500}
-                onAnimationEnd={() => setShowConfetti(false)}
-              />
-            )}
 
             <View style={styles.summaryCard}>
               <View style={styles.heroRow}>
@@ -249,7 +258,9 @@ const WaterScreen: React.FC = () => {
               </View>
               <Text style={styles.summarySub}>
                 {isToday
-                  ? `Faltam mais ${remainingMl} ml para hoje.`
+                  ? remainingMl === 0
+                    ? "Meta de hidratação atingida! 🎉"
+                    : `Faltam mais ${remainingMl} ml para hoje.`
                   : remainingMl === 0
                     ? "Meta de hidratação atingida! 🎉"
                     : `Faltaram ${remainingMl} ml para atingir a meta.`}
@@ -289,14 +300,14 @@ const WaterScreen: React.FC = () => {
             </View>
 
             {/* Área métrica empilhada: cinza (meta) como fundo e azul crescendo de baixo para cima */}
-            <View style={styles.metricStack}>
+            <View style={[styles.metricStack, { marginBottom: addButtonClearance }]}>
               {/* Fundo cinza (meta) ocupando toda a área */}
               <View style={styles.metricGreyBackground}>
                 <Text style={styles.metricGreyLabel}>Meta</Text>
                 <Text style={styles.metricGreyValue}>{goalMl}ml</Text>
               </View>
 
-              {/* Azul dinâmico ancorado no bottom */}
+              {/* Azul dinâmico ancorado no bottom — sem offset iOS que clipava o texto na meta */}
               <Animated.View style={[styles.metricBlueFill, { height: animatedBlueHeight }]}>
                 <View style={styles.metricTopRightGroup}>
                   <Text style={styles.metricBlueTopRight}>Até agora</Text>
@@ -315,6 +326,23 @@ const WaterScreen: React.FC = () => {
               </Animated.View>
             </View>
           </ScrollView>
+
+          {/* Confete fora do ScrollView — overflow do scroll clipava no iOS */}
+          {showConfetti && (
+            <View style={styles.confettiOverlay} pointerEvents="none">
+              <ConfettiCannon
+                key={`confetti-${confettiKey}`}
+                count={180}
+                origin={{ x: SCREEN_WIDTH / 2, y: -20 }}
+                fadeOut
+                autoStart
+                explosionSpeed={350}
+                fallSpeed={3000}
+                onAnimationEnd={() => setShowConfetti(false)}
+              />
+            </View>
+          )}
+
           <DataPillNavigator currentScreen="WaterScreen" />
         </View>
 
@@ -376,7 +404,11 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     flexGrow: 1,
-    paddingBottom: Platform.OS === "ios" ? 200 : 100, // Preenchimento maior no iOS para garantir que o card suba o suficiente
+  },
+  confettiOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 1000,
+    elevation: 1000,
   },
   header: {
     flexDirection: "row",
@@ -447,7 +479,6 @@ const styles = StyleSheet.create({
     marginHorizontal: 0,
     borderRadius: 16,
     overflow: "hidden",
-    marginBottom: Platform.OS === "ios" ? 160 : 80, // Adicionado margem no Android também
   },
   metricGreyBackground: {
     ...StyleSheet.absoluteFillObject,
@@ -478,27 +509,29 @@ const styles = StyleSheet.create({
     position: "absolute",
     left: 0,
     right: 0,
-    bottom: Platform.OS === "ios" ? 40 : 0,
+    bottom: 0,
     backgroundColor: "#1976d2",
     borderTopLeftRadius: 16,
     borderTopRightRadius: 16,
-    borderBottomLeftRadius: Platform.OS === "ios" ? 16 : 0,
-    borderBottomRightRadius: Platform.OS === "ios" ? 16 : 0,
     alignItems: "center",
     justifyContent: "flex-end",
-    paddingBottom: Platform.OS === "ios" ? 40 : 16,
+    paddingTop: 16,
+    paddingBottom: 16,
+    overflow: "hidden",
   },
   metricTopRightGroup: {
     position: "absolute",
     right: 20,
-    top: 20,
+    top: 16,
     alignItems: "flex-end",
+    zIndex: 2,
   },
   metricBlueTopRight: {
     color: "#fff",
     fontSize: 12,
     fontWeight: "bold",
     textAlign: "right",
+    marginTop: 2,
     marginBottom: 4,
   },
   plusButton: {
@@ -510,7 +543,8 @@ const styles = StyleSheet.create({
     alignItems: "center",
     borderWidth: 6,
     borderColor: "#8099DA",
-    marginBottom: Platform.OS === "ios" ? 70 : 90,
+    marginBottom: 8,
+    zIndex: 3,
   },
   actionsCard: {
     backgroundColor: "#fff",

@@ -52,7 +52,10 @@ const ProfileMediaScreen = () => {
             aspect,
             quality: 0.8,
           });
-          if (!result.canceled) await upload(target, result.assets[0].uri);
+          if (!result.canceled) {
+            const asset = result.assets[0];
+            await upload(target, asset.uri, asset.mimeType);
+          }
         },
       },
       {
@@ -69,31 +72,45 @@ const ProfileMediaScreen = () => {
             aspect,
             quality: 0.8,
           });
-          if (!result.canceled) await upload(target, result.assets[0].uri);
+          if (!result.canceled) {
+            const asset = result.assets[0];
+            await upload(target, asset.uri, asset.mimeType);
+          }
         },
       },
     ]);
   };
 
-  const upload = async (target: "photo" | "banner", imageUri: string) => {
+  const upload = async (
+    target: "photo" | "banner",
+    imageUri: string,
+    mimeHint?: string | null
+  ) => {
     setUploading(target);
     try {
       if (target === "photo") {
-        const res = await userService.updateAvatar(imageUri);
+        const res = await userService.updateAvatar(imageUri, mimeHint);
         const newPhoto =
           res.data?.avatar_url || res.data?.photo || res.avatar_url || res.photo || imageUri;
         updateUser({ photo: newPhoto });
         setPhoto(newPhoto);
       } else {
-        const res = await userService.updateBanner(imageUri);
+        const res = await userService.updateBanner(imageUri, mimeHint);
         const newBanner =
           res.data?.banner_url || res.data?.banner || res.banner_url || res.banner || imageUri;
         updateUser({ banner: newBanner });
         setBanner(newBanner);
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error(`Erro ao enviar ${target}:`, err);
-      Alert.alert("Erro", "Não foi possível enviar a imagem. Tente novamente.");
+      const apiMsg =
+        err?.response?.data?.error || err?.response?.data?.message || err?.message;
+      Alert.alert(
+        "Erro",
+        apiMsg
+          ? `Não foi possível enviar a imagem: ${apiMsg}`
+          : "Não foi possível enviar a imagem. Tente novamente."
+      );
     } finally {
       setUploading(null);
     }
