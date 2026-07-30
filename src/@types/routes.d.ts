@@ -192,6 +192,7 @@ export type VerifyStackParamList = {
 
 export type InfoStackParamList = {
   ProfileMediaScreen: undefined;
+  UsernameScreen: undefined;
   ProfileDetailsScreen: undefined;
   AgeScreen: undefined;
   GenderScreen: undefined;

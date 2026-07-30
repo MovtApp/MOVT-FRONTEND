@@ -464,6 +464,9 @@ const ProfilePFScreen = () => {
             <View style={styles.nameSectionRow}>
               <View style={{ flex: 1 }}>
                 <Text style={styles.nameText}>{profileData.name}</Text>
+                {profileData.username && (
+                  <Text style={styles.usernameText}>@{profileData.username}</Text>
+                )}
                 {profileData.bio && <Text style={styles.bioText}>{profileData.bio}</Text>}
               </View>
             </View>
@@ -809,9 +812,15 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   nameText: {
-    fontSize: 20,
-    fontWeight: "800",
+    fontSize: 24,
+    fontFamily: "Rubik_700Bold",
     color: "#1E293B",
+  },
+  usernameText: {
+    fontSize: 16,
+    fontFamily: "Rubik_400Regular",
+    color: "#64748B",
+    marginTop: 2,
   },
   bioText: {
     fontSize: 13,

@@ -17,7 +17,8 @@ import { userService } from "@services/userService";
 import * as ImagePicker from "expo-image-picker";
 import BackButton from "@components/BackButton";
 import { FooterVersion } from "@components/FooterVersion";
-import { ChevronRight, ImagePlus } from "lucide-react-native";
+import { ChevronRight, ImagePlus, AlertCircle } from "lucide-react-native";
+import { notifyError } from "@utils/notify";
 
 const EditProfileScreen = () => {
   const navigation = useNavigation<any>();
@@ -27,6 +28,7 @@ const EditProfileScreen = () => {
   const [profileData, setProfileData] = useState({
     nome: authUser?.name || "",
     username: authUser?.username || "",
+    email: authUser?.email || "",
     pronomes: "Pronomes",
     bio: (authUser as any)?.bio || "",
     photo:
@@ -54,6 +56,7 @@ const EditProfileScreen = () => {
             ...prev,
             nome: fetchedUser.nome || fetchedUser.name || prev.nome,
             username: fetchedUser.username || prev.username,
+            email: fetchedUser.email || prev.email,
             bio: fetchedUser.bio || prev.bio,
             photo: fetchedUser.photo || fetchedUser.avatar_url || prev.photo,
             banner: fetchedUser.banner_url || fetchedUser.banner || prev.banner,
@@ -151,11 +154,21 @@ const EditProfileScreen = () => {
   };
 
   const updateField = async (field: string, value: string) => {
+    if (!value) return;
     try {
       await userService.updateField(field, value);
       updateUser({ [field]: value });
-    } catch (err) {
+    } catch (err: any) {
       console.error(`Erro ao atualizar ${field}:`, err);
+      const msg = err?.response?.data?.error || `Erro ao atualizar ${field}`;
+      notifyError(msg);
+      // Reverter alteração local se falhar
+      if (authUser) {
+        setProfileData((prev) => ({
+          ...prev,
+          [field]: (authUser as any)[field] || (authUser as any).name || "",
+        }));
+      }
     }
   };
 
@@ -199,6 +212,16 @@ const EditProfileScreen = () => {
 
         {/* Inputs */}
         <View style={styles.inputList}>
+          {(profileData.username.includes("@") || profileData.username === profileData.email) && (
+            <View style={styles.legacyWarning}>
+              <AlertCircle size={18} color="#854d0e" />
+              <Text style={styles.legacyWarningText}>
+                Seu nome de usuário ainda é seu e-mail. Escolha um @username exclusivo para ser
+                identificado no feed e busca.
+              </Text>
+            </View>
+          )}
+
           <View style={styles.inputRow}>
             <Text style={styles.inputLabel}>Nome</Text>
             <TextInput
@@ -216,11 +239,24 @@ const EditProfileScreen = () => {
             <TextInput
               style={styles.textInput}
               value={profileData.username}
-              onChangeText={(text) => setProfileData((prev) => ({ ...prev, username: text }))}
+              onChangeText={(text) =>
+                setProfileData((prev) => ({ ...prev, username: text.toLowerCase().trim() }))
+              }
               onBlur={() => updateField("username", profileData.username)}
               placeholder="Seu nome de usuário"
               placeholderTextColor="#94A3B8"
               autoCapitalize="none"
+            />
+          </View>
+
+          <View style={styles.inputRow}>
+            <Text style={styles.inputLabel}>E-mail</Text>
+            <TextInput
+              style={[styles.textInput, { color: "#94A3B8" }]}
+              value={profileData.email}
+              editable={false}
+              placeholder="Seu e-mail"
+              placeholderTextColor="#94A3B8"
             />
           </View>
 
@@ -399,7 +435,24 @@ const styles = StyleSheet.create({
     fontWeight: "500",
   },
   footer: {
-    paddingHorizontal: 20,
+    marginTop: 20,
+  },
+  legacyWarning: {
+    backgroundColor: "#fefce8",
+    padding: 12,
+    borderRadius: 10,
+    flexDirection: "row",
+    gap: 10,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: "#fef08a",
+  },
+  legacyWarningText: {
+    flex: 1,
+    fontSize: 13,
+    color: "#854d0e",
+    fontFamily: "Rubik_400Regular",
+    lineHeight: 18,
   },
 });
 

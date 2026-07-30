@@ -34,6 +34,10 @@ export const userService = {
     const response = await api.put("/user/update-field", { field, value }, headers);
     return response.data;
   },
+  checkUsernameAvailable: async (username: string) => {
+    const response = await api.get(`/user/check-username?username=${username}`);
+    return response.data;
+  },
 
   updateAvatar: async (imageUri: string, mimeHint?: string | null) => {
     const headers = await getAuthHeaders();

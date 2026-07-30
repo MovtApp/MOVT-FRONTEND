@@ -123,7 +123,7 @@ const ProfileMediaScreen = () => {
       Alert.alert("Quase lá", "Adicione sua foto de perfil e a capa para continuar.");
       return;
     }
-    navigation.navigate("Info", { screen: "ProfileDetailsScreen" });
+    navigation.navigate("Info", { screen: "UsernameScreen" });
   };
 
   return (

@@ -1,6 +1,7 @@
 import React from "react";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import ProfileMediaScreen from "../screens/Info/ProfileMediaScreen";
+import UsernameScreen from "../screens/Info/UsernameScreen";
 import ProfileDetailsScreen from "../screens/Info/ProfileDetailsScreen";
 import GenderScreen from "../screens/Info/GenderScreen";
 import AgeScreen from "../screens/Info/AgeScreen";
@@ -21,6 +22,7 @@ export function InfoRoutes() {
       }}
     >
       <Stack.Screen name="ProfileMediaScreen" component={ProfileMediaScreen} />
+      <Stack.Screen name="UsernameScreen" component={UsernameScreen} />
       <Stack.Screen name="ProfileDetailsScreen" component={ProfileDetailsScreen} />
       <Stack.Screen name="GenderScreen" component={GenderScreen} />
       <Stack.Screen name="AgeScreen" component={AgeScreen} />
