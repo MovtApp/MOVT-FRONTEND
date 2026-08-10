@@ -44,7 +44,7 @@
       },
       "package": "com.dsvmTechnology.movtapp",
       "googleServicesFile": "./google-services.json",
-      "versionCode": 32,
+      "versionCode": 47,
       "edgeToEdgeEnabled": true,
       "allowBackup": false,
       "permissions": [
@@ -113,8 +113,8 @@
         {
           "android": {
             "minSdkVersion": 26,
-            "compileSdkVersion": 35,
-            "targetSdkVersion": 35
+            "compileSdkVersion": 36,
+            "targetSdkVersion": 36
           },
           "ios": {
             "useFrameworks": "static"

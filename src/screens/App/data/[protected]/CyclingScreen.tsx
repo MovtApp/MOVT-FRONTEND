@@ -2417,7 +2417,7 @@ const CyclingScreen: React.FC = () => {
             backgroundStyle={styles.bsBackground}
             onClose={handleCloseHistory}
           >
-            <BottomSheetView style={{ flex: 1 }}>
+            <View style={{ flex: 1 }}>
               {selectedWorkout ? (
                 <WorkoutDetail
                   workout={selectedWorkout}
@@ -2441,7 +2441,7 @@ const CyclingScreen: React.FC = () => {
                   formatDate={formatWorkoutDate}
                 />
               )}
-            </BottomSheetView>
+            </View>
           </BottomSheet>
         )}
       </SafeAreaView>
