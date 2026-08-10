@@ -80,14 +80,16 @@ const WATCHDOG_INTERVAL_MS = 10000;
 // cada ~0,5–2 s; 25 s cobre um túnel/cânion urbano sem re-armar à toa, mas religa
 // rápido quando o SO derrubou o serviço. NÃO afeta o tempo do treino (relógio de parede).
 const WATCHDOG_SILENCE_MS = 25000;
-// Silêncio (ms) tolerado antes de re-armar EM BACKGROUND (tela apagada). Mais folgado
-// que em foreground: em background o SO pode legitimamente entregar em lote, então só
-// re-armamos após um silêncio longo — o suficiente para RECUPERAR a entrega quando ela
-// para de vez sem gastar bateria re-armando à toa. O WakeLock parcial (Android) / a
-// location task (iOS) mantêm este timer vivo na medida do possível.
-const WATCHDOG_BG_SILENCE_MS = 45000;
+// Silêncio (ms) tolerado antes de re-armar EM BACKGROUND (tela apagada).
+// Reduzido de 45s → 30s: em ROMs agressivas (MIUI, Samsung) o GPS pode ficar
+// mudo por 35-50s antes do watchdog reagir com 45s, gerando vários gaps visíveis.
+// 30s equilibra melhor a recuperação antecipada vs. re-armes desnecessários por
+// entrega em lote legítima do SO (que raramente passa de 20-25s).
+const WATCHDOG_BG_SILENCE_MS = 30000;
 // Evita re-armar em rajada: intervalo mínimo entre dois re-armes.
-const REARM_MIN_INTERVAL_MS = 20000;
+// Reduzido de 20s → 12s: permite tentativas mais frequentes em ROMs agressivas
+// que chegam a matar e reiniciar o FGS em ciclos rápidos.
+const REARM_MIN_INTERVAL_MS = 12000;
 let lastRearmTs = 0;
 
 // AppState atual (foreground/background). O watchdog re-arma em AMBOS os estados, com
@@ -126,9 +128,11 @@ const OUTLIER_SPEED_FACTOR = 1.5;
 // cânion urbano) e NÃO ligamos os dois pontos: um segmento reto cego inflaria a
 // distância (vira a "linha reta fantasma" do início ao fim) e mentiria a rota.
 // Em vez disso, recomeçamos um trecho novo a partir do fix pós-silêncio (a rota
-// ganha um ponto marcado com `gap:true` para a polyline quebrar). 30 s é folgado:
-// fixes saudáveis chegam a cada ~0,5–2 s; um túnel curto (<30 s) ainda é ligado.
-const MAX_FIX_GAP_S = 30;
+// ganha um ponto marcado com `gap:true` para a polyline quebrar).
+// Reduzido de 30s → 20s: o watchdog em background dispara com 30s e o re-arme
+// leva ~2s; com MAX_FIX_GAP_S=30 havia janelas em que o GPS voltava após o gap
+// e o segmento era ligado com reta cega de ~25s. Com 20s o gap é detectado antes.
+const MAX_FIX_GAP_S = 20;
 
 // ─── Map-matching ao vivo (snap-to-roads via backend/Mapbox) ────────────────────
 // Encaixa o traçado nas ruas reais durante o treino. Throttled: roda no máximo a
@@ -874,7 +878,10 @@ async function rearmLocationUpdates(reason: string) {
       message: "tracking:rearm",
       data: { reason, silenceMs: lastFixWallTs ? now - lastFixWallTs : -1, fixCount },
     });
-    // O WakeLock pode ter sido solto quando o processo/serviço morreu — rearma.
+    // Re-adquire o WakeLock JS como camada de redundância além do WakeLock nativo
+    // do MOVTForegroundService. Em casos onde o FGS é reiniciado sem passar pelo
+    // onStartCommand (ex.: kill abrupto + START_REDELIVER_INTENT pendente), garantir
+    // que ao menos o lock JS esteja ativo enquanto o re-arme do GPS ocorre.
     acquireWorkoutWakeLock();
     const started = await Location.hasStartedLocationUpdatesAsync(LOCATION_TASK).catch(() => false);
     if (started) {
