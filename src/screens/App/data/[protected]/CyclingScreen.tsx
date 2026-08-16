@@ -1684,7 +1684,7 @@ const CyclingScreen: React.FC = () => {
   const startTracking = async () => {
     const res = await Tracker.startTracking(activeTab === "Ciclismo" ? "Ciclismo" : "Corrida");
     if (!res.ok) {
-      Alert.alert("Permissão negada", "Precisamos de acesso ao GPS para o MOVT Performance.");
+      Alert.alert(res.error === "location-disabled" ? "GPS desligado" : "Permissão negada", "Precisamos de acesso ao GPS para o MOVT Performance.");
       return;
     }
     // Treino inicia mesmo sem "Permitir o tempo todo", mas com a tela apagada o

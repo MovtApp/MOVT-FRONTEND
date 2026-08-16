@@ -2,6 +2,7 @@ import React, { createContext, useContext, useEffect, useRef, useState } from "r
 import * as Location from "expo-location";
 import { AppState, AppStateStatus, Linking, Platform } from "react-native";
 import { NativeHealthManager } from "../services/nativeHealthManager";
+import { isActive as isWorkoutActive, subscribe as subscribeToWorkout } from "../services/locationTrackingService";
 
 type Coordinates = { latitude: number; longitude: number };
 
@@ -17,12 +18,27 @@ export const LocationProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const [location, setLocation] = useState<Coordinates | null>(null);
   const [permissionStatus, setPermissionStatus] = useState<Location.PermissionStatus | null>(null);
   const watcherRef = useRef<Location.LocationSubscription | null>(null);
+  const stopLocationWatcher = () => {
+    watcherRef.current?.remove();
+    watcherRef.current = null;
+  };
 
   useEffect(() => {
-    initializeLocation();
+    const workoutWasActive = { current: isWorkoutActive() };
+    const unsubscribeWorkout = subscribeToWorkout((snapshot) => {
+      if (snapshot.active) {
+        workoutWasActive.current = true;
+        stopLocationWatcher();
+      } else if (workoutWasActive.current) {
+        workoutWasActive.current = false;
+        void initializeLocation();
+      }
+    });
+
+    void initializeLocation();
     return () => {
-      watcherRef.current?.remove();
-      watcherRef.current = null;
+      unsubscribeWorkout();
+      stopLocationWatcher();
     };
   }, []);
 
@@ -96,6 +112,8 @@ export const LocationProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         });
       }
 
+      // Durante uma corrida, a task headless e o foreground service sao a unica fonte de GPS.
+      if (isWorkoutActive()) return;
       // Inicia watcher para manter atualizado em tempo real
       watcherRef.current = await Location.watchPositionAsync(
         {

@@ -27,10 +27,6 @@ import * as TaskManager from "expo-task-manager";
 import {
   isIgnoringBatteryOptimizations,
   requestIgnoreBatteryOptimizations,
-  acquireWorkoutWakeLock,
-  releaseWorkoutWakeLock,
-  startMOVTService,
-  stopMOVTService,
   updateWorkoutNotification,
 } from "./movtService";
 import {
@@ -243,6 +239,7 @@ interface Session {
 let session: Session | null = null;
 let hydrated = false;
 let lastPersistTs = 0;
+let persistChain: Promise<void> = Promise.resolve();
 // Garante UM snap em voo por vez (a task de localização dispara em cada lote).
 let snapInProgress = false;
 
@@ -594,11 +591,12 @@ async function persist(force = false) {
   const now = Date.now();
   if (!force && now - lastPersistTs < 5000) return;
   lastPersistTs = now;
-  try {
-    await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(session));
-  } catch {
-    // ignora: persistência é só para recuperação de crash
-  }
+  const serialized = JSON.stringify(session);
+  persistChain = persistChain
+    .catch(() => {})
+    .then(() => AsyncStorage.setItem(STORAGE_KEY, serialized))
+    .catch(() => {});
+  await persistChain;
 }
 
 async function ensureHydrated() {
@@ -882,7 +880,6 @@ async function rearmLocationUpdates(reason: string) {
     // do MOVTForegroundService. Em casos onde o FGS é reiniciado sem passar pelo
     // onStartCommand (ex.: kill abrupto + START_REDELIVER_INTENT pendente), garantir
     // que ao menos o lock JS esteja ativo enquanto o re-arme do GPS ocorre.
-    acquireWorkoutWakeLock();
     const started = await Location.hasStartedLocationUpdatesAsync(LOCATION_TASK).catch(() => false);
     if (started) {
       await Location.stopLocationUpdatesAsync(LOCATION_TASK).catch(() => {});
@@ -931,6 +928,7 @@ function handleAppStateChange(next: AppStateStatus) {
   appActive = next === "active";
 
   if (!appActive && wasActive && session?.active) {
+    void rearmLocationUpdates("enter-background");
     Sentry.addBreadcrumb({
       category: "workout",
       level: "info",
@@ -997,7 +995,7 @@ AppState.addEventListener("change", handleAppStateChange);
 
 export interface StartResult {
   ok: boolean;
-  error?: "foreground-denied";
+  error?: "foreground-denied" | "location-disabled";
   /**
    * "Permitir o tempo todo" concedido? Se false, o rastreio com a tela apagada
    * degrada — a UI avisa, mas o treino inicia mesmo assim (best-effort).
@@ -1009,6 +1007,16 @@ export interface StartResult {
 export async function startTracking(type: WorkoutKind): Promise<StartResult> {
   const fg = await Location.requestForegroundPermissionsAsync();
   if (fg.status !== "granted") return { ok: false, error: "foreground-denied" };
+
+  const servicesEnabled = await Location.hasServicesEnabledAsync();
+  if (!servicesEnabled) {
+    Sentry.addBreadcrumb({
+      category: "workout",
+      level: "warning",
+      message: "tracking:location-services-disabled",
+    });
+    return { ok: false, error: "location-disabled" };
+  }
   // Background ("Permitir o tempo todo"): essencial para a tela apagada. Best-effort
   // — se negado, seguimos com o foreground service, mas devolvemos o status para a
   // UI orientar o usuário a habilitar nos Ajustes.
@@ -1033,7 +1041,6 @@ export async function startTracking(type: WorkoutKind): Promise<StartResult> {
   }
 
   // WakeLock parcial: mantém a CPU viva (Doze) para a task processar os fixes.
-  acquireWorkoutWakeLock();
 
   fixCount = 0;
   lastBatchTs = Date.now();
@@ -1085,7 +1092,6 @@ export async function startTracking(type: WorkoutKind): Promise<StartResult> {
   // background, o FGS do expo-location cuida da notificação (ver buildOptions).
   if (bgGranted) {
     const { title, body } = workoutNotifText();
-    startMOVTService(title, body);
   }
   // iOS: inicia a Live Activity (card na tela de bloqueio + Dynamic Island).
   // No-op fora do iOS / enquanto o módulo nativo não existir.
@@ -1159,10 +1165,8 @@ export async function stopTracking(): Promise<TrackingSnapshot> {
   }
 
   if (session) session.active = false;
-  releaseWorkoutWakeLock();
   // Encerra o card ao vivo (nosso FGS, Android) e a Live Activity (iOS). No-op
   // quando não se aplica.
-  stopMOVTService();
   endWorkoutActivity();
   stopLiveActivityTicker();
   bgGranted = false;
@@ -1205,13 +1209,11 @@ export async function resumeIfActive() {
   if (s?.active) {
     // Processo religado pelo SO durante um treino: rearma o WakeLock (foi solto
     // quando o processo morreu) para a CPU não suspender de novo.
-    acquireWorkoutWakeLock();
     // Restaura o modo de FGS e religa o card ao vivo (o serviço morreu com o
     // processo; START_STICKY pode tê-lo recriado com texto padrão — reafirmamos).
     bgGranted = s.backgroundGranted === true;
     if (bgGranted) {
       const { title, body } = workoutNotifText();
-      startMOVTService(title, body);
     }
     // Rearma também o poller de FC (o timer não sobrevive ao restart do JS).
     startHrPolling();
