@@ -1004,6 +1004,11 @@ export interface StartResult {
 }
 
 /** Inicia uma nova sessão de rastreamento. */
+/** Processa um fix foreground pelo mesmo pipeline da task headless. */
+export function ingestForegroundLocation(loc: Location.LocationObject) {
+  processFix(loc);
+}
+
 export async function startTracking(type: WorkoutKind): Promise<StartResult> {
   const fg = await Location.requestForegroundPermissionsAsync();
   if (fg.status !== "granted") return { ok: false, error: "foreground-denied" };
@@ -1247,7 +1252,7 @@ TaskManager.defineTask(LOCATION_TASK, async ({ data, error }) => {
   await ensureHydrated();
   if (!session?.active) return;
 
-  for (const loc of locations) processFix(loc);
+  for (const loc of locations) ingestForegroundLocation(loc);
   fixCount += locations.length;
 
   // Diagnóstico: registra um lote no Sentry (throttled) com o gap desde o último —

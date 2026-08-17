@@ -28,7 +28,6 @@ export const LocationProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     const unsubscribeWorkout = subscribeToWorkout((snapshot) => {
       if (snapshot.active) {
         workoutWasActive.current = true;
-        stopLocationWatcher();
       } else if (workoutWasActive.current) {
         workoutWasActive.current = false;
         void initializeLocation();
@@ -113,7 +112,7 @@ export const LocationProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       }
 
       // Durante uma corrida, a task headless e o foreground service sao a unica fonte de GPS.
-      if (isWorkoutActive()) return;
+      stopLocationWatcher();
       // Inicia watcher para manter atualizado em tempo real
       watcherRef.current = await Location.watchPositionAsync(
         {
@@ -123,6 +122,9 @@ export const LocationProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         },
         (loc) => {
           if (loc?.coords?.latitude && loc?.coords?.longitude) {
+            if (Platform.OS === android && isWorkoutActive()) {
+              ingestForegroundLocation(loc);
+            }
             setLocation({
               latitude: loc.coords.latitude,
               longitude: loc.coords.longitude,
